@@ -1,0 +1,30 @@
+{
+  "template": "https://github.com/scverse/cookiecutter-scverse",
+  "commit": "5d44c58df427f884585ae9772cae81f1b6638f80",
+  "checkout": null,
+  "context": {
+    "cookiecutter": {
+      "project_name": "alphatools",
+      "package_name": "alphatools",
+      "project_description": "Search- and quantification-engine agnostic biological interpretation of protemoics data",
+      "author_full_name": "MannLabs",
+      "author_email": "brennsteiner@biochem.mpg.de",
+      "github_user": "MannLabs",
+      "github_repo": "alphatools",
+      "license": "Apache License Version 2.0",
+      "ide_integration": true,
+      "_copy_without_render": [
+        ".github/workflows/build.yaml",
+        ".github/workflows/test.yaml",
+        "docs/_templates/autosummary/**.rst"
+      ],
+      "_render_devdocs": false,
+      "_jinja2_env_vars": {
+        "lstrip_blocks": true,
+        "trim_blocks": true
+      },
+      "_template": "https://github.com/scverse/cookiecutter-scverse"
+    }
+  },
+  "directory": null
+}
