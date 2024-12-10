@@ -54,6 +54,9 @@ pre-commit install
 in the root of the repository.
 Pre-commit will automatically download all dependencies when it is run for the first time.
 
+<!--
+DECISION: we don't want to use pre-commit.ci for the moment.
+
 Alternatively, you can rely on the [pre-commit.ci][] service enabled on GitHub.
 If you didn't run `pre-commit` before pushing changes to GitHub it will automatically commit fixes to your pull request, or show an error message.
 
@@ -66,11 +69,13 @@ git pull --rebase
 to integrate the changes into yours.
 While the [pre-commit.ci][] is useful, we strongly encourage installing and running pre-commit locally first to understand its usage.
 
+[pre-commit.ci]: https://pre-commit.ci/
+-->
+
 Finally, most editors have an _autoformat on save_ feature.
 Consider enabling this option for [ruff][ruff-editors] and [prettier][prettier-editors].
 
 [pre-commit]: https://pre-commit.com/
-[pre-commit.ci]: https://pre-commit.ci/
 [ruff-editors]: https://docs.astral.sh/ruff/integrations/
 
 [prettier-editors]: https://prettier.io/docs/en/editors.html
