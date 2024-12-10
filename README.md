@@ -54,4 +54,4 @@ If you found a bug, please use the [issue tracker][].
 [documentation]: https://alphatools.readthedocs.io
 [changelog]: https://alphatools.readthedocs.io/en/latest/changelog.html
 [api documentation]: https://alphatools.readthedocs.io/en/latest/api.html
-[pypi]: https://pypi.org/project/alphatools
+<!-- [pypi]: https://pypi.org/project/alphatools -->
