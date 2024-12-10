@@ -31,7 +31,8 @@ pip install alphatools
 1. Install the latest development version:
 
 ```bash
-pip install git+https://github.com/MannLabs/alphatools.git@main
+git clone git+https://github.com/MannLabs/alphatools.git@main && cd alphatools
+pip install -e .
 ```
 
 ## Release notes
