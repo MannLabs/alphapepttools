@@ -27,6 +27,6 @@ def _parse_returns_section(self: NumpyDocstring, section: str) -> list[str]:
     return lines
 
 
-def setup(app: Sphinx):
+def setup(app: Sphinx) -> None:
     """Set app."""
     NumpyDocstring._parse_returns_section = _parse_returns_section

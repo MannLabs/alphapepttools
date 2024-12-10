@@ -13,5 +13,6 @@ def basic_tool(adata: AnnData) -> int:
     -------
     Some integer value.
     """
+    del adata  # unused
     print("Implement a tool to run on the AnnData object.")
     return 0
