@@ -13,5 +13,6 @@ def basic_preproc(adata: AnnData) -> int:
     -------
     Some integer value.
     """
+    del adata  # unused
     print("Implement a preprocessing function here.")
     return 0

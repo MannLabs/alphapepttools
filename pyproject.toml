@@ -77,36 +77,64 @@ extend-include = [ "*.ipynb" ]
 format.docstring-code-format = true
 
 lint.select = [
-  "B",      # flake8-bugbear
-  "BLE",    # flake8-blind-except
-  "C4",     # flake8-comprehensions
-  "D",      # pydocstyle
-  "E",      # Error detected by Pycodestyle
-  "F",      # Errors detected by Pyflakes
-  "I",      # isort
-  "RUF100", # Report unused noqa directives
-  "TID",    # flake8-tidy-imports
-  "UP",     # pyupgrade
-  "W",      # Warning detected by Pycodestyle
+  "ALL",
 ]
+
 lint.ignore = [
-  "B008", # Errors from function calls in argument defaults. These are fine when the result is immutable.
-  "D100", # Missing docstring in public module
-  "D104", # Missing docstring in public package
-  "D105", # __magic__ methods are often self-explanatory, allow missing docstrings
-  "D107", # Missing docstring in __init__
+  "ANN002", # Missing type annotation for `*args`
+  "ANN003", # Missing type annotation for `**kwargs
+  "ANN204", # Missing return type annotation for special method `__init__`
+  "ARG001", # TODO: remove soon
+  "ARG002", # TODO: remove soon
+  "B008",   # Errors from function calls in argument defaults. These are fine when the result is immutable.
+  "B023",   # Function definition does not bind loop variable
+  "B028",   #  No explicit `stacklevel` keyword argument found (for warnings)
+  "COM812", #may cause conflicts when used with the formatter
+  "D100",   # Missing docstring in public module
+  "D104",   # Missing docstring in public package
+  "D105",   # __magic__ methods are often self-explanatory, allow missing docstrings
+  "D107",   # Missing docstring in __init__
   # Disable one in each pair of mutually incompatible rules
-  "D203", # We don’t want a blank line before a class docstring
-  "D213", # <> We want docstrings to start immediately after the opening triple quote
-  "D400", # first line should end with a period [Bug: doesn’t work with single-line docstrings]
-  "D401", # First line should be in imperative mood; try rephrasing
-  "E501", # line too long -> we accept long comment lines; formatter gets rid of long code lines
-  "E731", # Do not assign a lambda expression, use a def -> lambda expression assignments are convenient
-  "E741", # allow I, O, l as variable names -> I is the identity matrix
+  "D203",   # We don’t want a blank line before a class docstring
+  "D211",   # no-blank-line-before-class
+  "D213",   # <> We want docstrings to start immediately after the opening triple quote
+  "D400",   # first line should end with a period [Bug: doesn’t work with single-line docstrings]
+  "D401",   # First line should be in imperative mood; try rephrasing
+  "E501",   # line too long -> we accept long comment lines; formatter gets rid of long code lines
+  "E731",   # Do not assign a lambda expression, use a def -> lambda expression assignments are convenient
+  "E741",   # allow I, O, l as variable names -> I is the identity matrix
+  "EM101",  # Exception must not use a string literal, assign to variable first
+  "EM102",  # Logging statement uses f-string
+  "ERA001", # Found commented-out code
+  "FA102",  # Missing `from __future__ import annotations
+  "FIX002", # things around TO-DO
+  "G004",
+  "INP001", # implicit namespace package.
+  "ISC001", #may cause conflicts when used with the formatter
+  "NPY002", # Replace legacy `np.random.normal` # TODO: remove soon
+  "PD901",  # Avoid using the generic variable name `df` for DataFrames
+  "T201",   # use of 'print' detected  # TODO remove soon
+  "TC002",
+  "TC003",  # Move standard library import into a type-checking block
+  "TD002",
+  "TD003",
+  "TRY003", # Avoid specifying long messages outside the exception class
 ]
 lint.per-file-ignores."*/__init__.py" = [ "F401" ]
-lint.per-file-ignores."docs/*" = [ "I" ]
-lint.per-file-ignores."tests/*" = [ "D" ]
+lint.per-file-ignores."docs/*" = [
+  "I",
+  "SLF001", # Private member accessed
+]
+lint.per-file-ignores."tests/*" = [
+  "ANN",
+  "ARG001", # TODO: remove soon
+  "ARG002", # TODO: remove soon
+  "D",
+  "PT011",  #pytest.raises(ValueError) is too broad
+  "S101",   # use of "assert" detected
+  "SLF001", # Private member accessed
+
+]
 lint.pydocstyle.convention = "numpy"
 
 [tool.pytest.ini_options]
