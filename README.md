@@ -6,7 +6,7 @@
 [badge-tests]: https://img.shields.io/github/actions/workflow/status/MannLabs/alphatools/test.yaml?branch=main
 [badge-docs]: https://img.shields.io/readthedocs/alphatools
 
-Search- and quantification-engine agnostic biological interpretation of protemoics data
+Search- and quantification-engine agnostic biological interpretation of proteomics data
 
 ## Getting started
 

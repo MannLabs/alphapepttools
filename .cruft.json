@@ -6,7 +6,7 @@
     "cookiecutter": {
       "project_name": "alphatools",
       "package_name": "alphatools",
-      "project_description": "Search- and quantification-engine agnostic biological interpretation of protemoics data",
+      "project_description": "Search- and quantification-engine agnostic biological interpretation of proteomics data",
       "author_full_name": "MannLabs",
       "author_email": "brennsteiner@biochem.mpg.de",
       "github_user": "MannLabs",

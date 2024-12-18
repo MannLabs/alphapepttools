@@ -5,7 +5,7 @@ requires = [ "hatchling" ]
 [project]
 name = "alphatools"
 version = "0.0.1"
-description = "Search- and quantification-engine agnostic biological interpretation of protemoics data"
+description = "Search- and quantification-engine agnostic biological interpretation of proteomics data"
 readme = "README.md"
 license = { file = "LICENSE" }
 maintainers = [
