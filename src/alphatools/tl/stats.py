@@ -1,14 +1,18 @@
 # Statistics functionalities for working with AnnData objects
 
-import anndata as ad
-import numpy as np
-import pandas as pd
+import logging
 
-def ttest():
+# logging configuration
+logging.basicConfig(level=logging.INFO)
+
+
+def ttest() -> None:
     raise NotImplementedError
 
-def pca():
+
+def pca() -> None:
     raise NotImplementedError
+
 
 # Automatically define __all__ to contain public names
-__all__ = [name for name in globals() if not name.startswith("_")]
+__all__: list[str] = [name for name in globals() if not name.startswith("_")]

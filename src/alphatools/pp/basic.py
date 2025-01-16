@@ -19,4 +19,4 @@ def basic_preproc(adata: AnnData) -> int:
 
 
 # Automatically define __all__ to contain public names
-__all__ = [name for name in globals() if not name.startswith("_")]
+__all__: list[str] = [name for name in globals() if not name.startswith("_")]
