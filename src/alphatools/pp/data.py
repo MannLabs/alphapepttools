@@ -10,7 +10,23 @@ import pandas as pd
 logging.basicConfig(level=logging.INFO)
 
 
-def to_anndata(
+### PLACEHOLDER FOR ALPHABASE DIANN-READER WRAPPERS ###
+def load_diann_pg_matrix(
+    data_path: str,
+    obs_path: str | None = None,
+    var_path: str | None = None,
+) -> ad.AnnData:
+    """Placeholder for development; load diann sample data into a pandas dataframe"""
+    X = pd.read_pickle(data_path)
+    obs = pd.read_pickle(obs_path) if obs_path else None
+    var = pd.read_pickle(var_path) if var_path else None
+
+    # to be replaced by AlphaBase PSM reader
+    return _to_anndata(X, obs, var)
+
+
+# TODO: redundancy wiht add_metadata regarding metadata addition
+def _to_anndata(
     data: np.ndarray | pd.DataFrame,
     obs: pd.DataFrame = None,
     var: pd.DataFrame = None,
@@ -60,11 +76,12 @@ def to_anndata(
     # If data is a dataframe, convert row and col indices to obs and var
     if isinstance(data, pd.DataFrame):
         adata = ad.AnnData(data)
-        adata.obs = data.index.to_frame(name=None)
-        adata.var = data.columns.to_frame(name=None)
+        adata.obs = data.index.to_frame(name="obs")
+        adata.var = data.columns.to_frame(name="var")
     elif isinstance(data, np.ndarray):
         adata = ad.AnnData(data)
 
+        ### delete this entire block? v ###
         # If obs and var are provided, they need to match in shape
         if obs is not None and obs.shape[0] != data.shape[0]:
             logging.info("obs must have the same number of rows as data, skipping...")
@@ -90,6 +107,7 @@ def to_anndata(
         adata = add_metadata(
             adata, var, axis=1, keep_data_shape=keep_all_data_cols, keep_existing_metadata=False, verbose=False
         )
+    ### delete this entire block? ^ ###
 
     return adata
 
@@ -101,7 +119,7 @@ def add_metadata(
     *,
     keep_data_shape: bool = False,
     keep_existing_metadata: bool = False,
-    verbose: bool = True,
+    verbose: bool = False,
 ) -> ad.AnnData:
     """Add metadata to an AnnData object while checking for matching indices or shape
 

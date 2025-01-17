@@ -112,9 +112,11 @@ lint.ignore = [
   "G004",
   "INP001",  # implicit namespace package.
   "ISC001",  #may cause conflicts when used with the formatter
+  "N806",    # Variable X in uppercase is commonplace in AnnData and should be allowed
   "NPY002",  # Replace legacy `np.random.normal` # TODO: remove soon
   "PD901",   # Avoid using the generic variable name `df` for DataFrames
   "PLR0913", # Plotting functions for a backend may have many arguments, prioritize sensible defaults
+  "S301",    # Allow pickled data in modules
   "T201",    # use of 'print' detected  # TODO remove soon
   "TC002",
   "TC003",   # Move standard library import into a type-checking block
