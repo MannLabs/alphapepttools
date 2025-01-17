@@ -13,26 +13,17 @@ logging.basicConfig(level=logging.INFO)
 ### PLACEHOLDER FOR ALPHABASE DIANN-READER WRAPPERS ###
 def load_diann_pg_matrix(
     data_path: str,
-    obs_path: str | None = None,
-    var_path: str | None = None,
 ) -> ad.AnnData:
     """Placeholder for development; load diann sample data into a pandas dataframe"""
     X = pd.read_pickle(data_path)
-    obs = pd.read_pickle(obs_path) if obs_path else None
-    var = pd.read_pickle(var_path) if var_path else None
 
     # to be replaced by AlphaBase PSM reader
-    return _to_anndata(X, obs, var)
+    return _to_anndata(X)
 
 
 # TODO: redundancy wiht add_metadata regarding metadata addition
 def _to_anndata(
     data: np.ndarray | pd.DataFrame,
-    obs: pd.DataFrame = None,
-    var: pd.DataFrame = None,
-    *,
-    keep_all_data_rows: bool = False,
-    keep_all_data_cols: bool = False,
 ) -> ad.AnnData:
     """Create an AnnData object from a data array and optional sample & feature metadata
 
@@ -41,31 +32,7 @@ def _to_anndata(
     data : np.ndarray or pd.DataFrame
             The data array, where rows correspond to samples and columns correspond to features.
             If data is a pd.DataFrame, row and column indices are used for inner join with obs and var.
-            If data is a np.ndarray, obs and var must match the number of rows and columns, respectively.
-
-    obs : pd.DataFrame, optional
-            Dataframe with sample metadata. If data is a pd.DataFrame, row indices of data and obs must match to be added.
-
-    var : pd.DataFrame, optional
-            Dataframe with feature metadata. If data is a pd.DataFrame, column indices of data and var must match to be added.
-
-    keep_all_data_rows : bool, default False
-            Whether to keep all rows of data, even if they are not present in obs. Non-matching rows will be set to NaN in obs.
-
-    keep_all_data_cols : bool, default False
-            Whether to keep all columns of data, even if they are not present in var. Non-matching columns will be set to NaN in var.
-
-    data_idx_level : int, default 0
-            Level of row index to use as obs if data is a pd.DataFrame.
-
-    data_col_level : int, default 0
-            Level of column index to use as var if data is a pd.DataFrame.
-
-    obs_idx_level : int, default 0
-            Level of row index to use as index of obs.
-
-    var_idx_level : int, default 0
-            Level of column index to use as index of var.
+            If data is a np.ndarray, obs and var are not assigned.
 
     Returns
     -------
@@ -80,34 +47,6 @@ def _to_anndata(
         adata.var = data.columns.to_frame(name="var")
     elif isinstance(data, np.ndarray):
         adata = ad.AnnData(data)
-
-        ### delete this entire block? v ###
-        # If obs and var are provided, they need to match in shape
-        if obs is not None and obs.shape[0] != data.shape[0]:
-            logging.info("obs must have the same number of rows as data, skipping...")
-            obs = None
-        if var is not None and var.shape[0] != data.shape[1]:
-            logging.info("var must have the same number of columns as data, skipping...")
-            var = None
-
-    else:
-        raise TypeError("data must be a pd.DataFrame or np.ndarray")
-
-    # If obs is provided, add to adata
-    if obs is not None:
-        if not isinstance(obs, pd.DataFrame):
-            raise TypeError("obs must be a pd.DataFrame")
-        adata = add_metadata(
-            adata, obs, axis=0, keep_data_shape=keep_all_data_rows, keep_existing_metadata=False, verbose=False
-        )
-    # If var is provided, add to adata
-    if var is not None:
-        if not isinstance(var, pd.DataFrame):
-            raise TypeError("var must be a pd.DataFrame")
-        adata = add_metadata(
-            adata, var, axis=1, keep_data_shape=keep_all_data_cols, keep_existing_metadata=False, verbose=False
-        )
-    ### delete this entire block? ^ ###
 
     return adata
 
