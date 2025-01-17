@@ -5,6 +5,7 @@ import logging
 import anndata as ad
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import RobustScaler, StandardScaler
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -173,8 +174,48 @@ def impute() -> None:
     raise NotImplementedError
 
 
-def scale() -> None:
-    raise NotImplementedError
+def scale_and_center(
+    adata: ad.AnnData,
+    scaler: str = "standard",
+    to_layer: str | None = None,
+    from_layer: str | None = None,
+) -> None:
+    """Scale and center data.
+
+    Either use standard or robust scaling. 'robust' scaling relies
+    on interquartile range and is more resistant to outliers. Scaling
+    operates on columns only.
+
+    Parameters
+    ----------
+    adata : ad.AnnData
+        Anndata object with data to scale.
+    scaler : str
+        Sklearn scaler to use. Available scalers are 'standard' and 'robust'.
+    to_layer : str, optional
+        Name of the layer to scale. If None, the data matrix X is modified
+    from_layer : str, optional
+        Name of the layer to scale. If None, the data matrix X is used.
+
+    Returns
+    -------
+    None
+    """
+    mod_status = "inplace" if to_layer is None else f"to layer '{to_layer}'"
+
+    logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler {mod_status}.")
+
+    if scaler == "standard":
+        scaler = StandardScaler(with_mean=True, with_std=True)
+    elif scaler == "robust":
+        scaler = RobustScaler(with_centering=True, with_scaling=True, quantile_range=(25.0, 75.0))
+    else:
+        raise NotImplementedError(f"Scaler {scaler} not implemented.")
+
+    if to_layer is None:
+        adata.X = scaler.fit_transform(adata.X if from_layer is None else adata.layers[from_layer])
+    else:
+        adata.layers[to_layer] = scaler.fit_transform(adata.X if from_layer is None else adata.layers[from_layer])
 
 
 # Automatically define __all__ to contain public names
