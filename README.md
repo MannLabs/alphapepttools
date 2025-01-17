@@ -35,6 +35,12 @@ git clone git+https://github.com/MannLabs/alphatools.git@main && cd alphatools
 pip install -e .
 ```
 
+or with more dependencies:
+
+```bash
+pip install -e ".[test, dev]"
+```
+
 ## Release notes
 
 See the [changelog][].
