@@ -77,9 +77,6 @@ def add_metadata(
                 of both adata.obs and adata.var is always the index.
 
     """
-    if metadata is None:
-        return adata
-
     if not isinstance(metadata, pd.DataFrame) or metadata.index.nlevels > 1:
         raise TypeError("metadata must be a pd.DataFrame with single-level index.")
 
@@ -170,10 +167,6 @@ def _get_df_from_adata(
     return pd.DataFrame(adata.X, index=adata.obs.index, columns=adata.var.index)
 
 
-def impute() -> None:
-    raise NotImplementedError
-
-
 def scale_and_center(
     adata: ad.AnnData,
     scaler: str = "standard",
@@ -216,7 +209,3 @@ def scale_and_center(
         adata.X = scaler.fit_transform(adata.X if from_layer is None else adata.layers[from_layer])
     else:
         adata.layers[to_layer] = scaler.fit_transform(adata.X if from_layer is None else adata.layers[from_layer])
-
-
-# Automatically define __all__ to contain public names
-__all__: list[str] = [name for name in globals() if not name.startswith("_")]

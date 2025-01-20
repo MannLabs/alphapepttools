@@ -7,12 +7,10 @@ logging.basicConfig(level=logging.INFO)
 
 
 def ttest() -> None:
+    """Perform a t-test on the data"""
     raise NotImplementedError
 
 
 def pca() -> None:
+    """Perform a PCA on the data"""
     raise NotImplementedError
-
-
-# Automatically define __all__ to contain public names
-__all__: list[str] = [name for name in globals() if not name.startswith("_")]

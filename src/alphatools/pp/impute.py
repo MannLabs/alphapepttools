@@ -1,4 +1,4 @@
-# Tools for data processing
+# Imputation methods for proteomics data
 
 import logging
 
@@ -6,6 +6,6 @@ import logging
 logging.basicConfig(level=logging.INFO)
 
 
-def umap() -> None:
-    """Perform UMAP on the data"""
+def impute() -> None:
+    """Impute missing values in the data"""
     raise NotImplementedError

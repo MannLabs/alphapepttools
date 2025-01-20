@@ -16,7 +16,3 @@ def basic_tool(adata: AnnData) -> int:
     del adata  # unused
     print("Implement a tool to run on the AnnData object.")
     return 0
-
-
-# Automatically define __all__ to contain public names
-__all__: list[str] = [name for name in globals() if not name.startswith("_")]
