@@ -107,25 +107,25 @@ def add_metadata(
     # align metadata to data. Based on axis, metadata index will be aligned
     # to either data index (axis = 0) or data columns (axis = 1)
     if axis == 0:
-        _df, _md = _get_df_from_adata(adata).align(metadata, axis=0, join=join)
-        if not _df.index.equals(_md.index):
+        df, md = _get_df_from_adata(adata).align(metadata, axis=0, join=join)
+        if not df.index.equals(md.index):
             raise ValueError("Attempted alignment; metadata indices do not match data indices.")
     elif axis == 1:
         # transpose metadata to align with data columns
-        _df, _md = _get_df_from_adata(adata).align(metadata.T, axis=1, join=join)
-        if not _df.columns.equals(_md.columns):
+        df, md = _get_df_from_adata(adata).align(metadata.T, axis=1, join=join)
+        if not df.columns.equals(md.columns):
             raise ValueError("Attempted alignment; metadata columns do not match data columns.")
 
     # new AnnData object
-    _adata = ad.AnnData(_df.values)
-    _adata.obs = _md if axis == 0 else adata.obs
-    _adata.var = _md.T if axis == 1 else adata.var
+    adata_new = ad.AnnData(df.values)
+    adata_new.obs = md if axis == 0 else adata.obs
+    adata_new.var = md.T if axis == 1 else adata.var
     if verbose:
         logging.info(
-            f"pp.add_metadata(): Data {adata.shape} to {_adata.shape}; obs {adata.obs.shape} to {_adata.obs.shape}; var {adata.var.shape} to {_adata.var.shape} \n"
+            f"pp.add_metadata(): Data {adata.shape} to {adata_new.shape}; obs {adata.obs.shape} to {adata_new.obs.shape}; var {adata.var.shape} to {adata_new.var.shape} \n"
         )
 
-    return _adata
+    return adata_new
 
 
 def _handle_overlapping_columns(
