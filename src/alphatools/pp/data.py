@@ -76,6 +76,9 @@ def add_metadata(
                 of both adata.obs and adata.var is always the index.
 
     """
+    if axis not in [0, 1]:
+        raise ValueError("Axis must be 0 or 1.")
+
     if not isinstance(metadata, pd.DataFrame) or metadata.index.nlevels > 1:
         raise TypeError("metadata must be a pd.DataFrame with single-level index.")
 
@@ -176,7 +179,7 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
 
     Either use standard or robust scaling. 'robust' scaling relies
     on interquartile range and is more resistant to outliers. Scaling
-    operates on columns only.
+    operates on columns only for now.
 
     Parameters
     ----------
