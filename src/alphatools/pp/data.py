@@ -22,7 +22,6 @@ def load_diann_pg_matrix(
     return _to_anndata(X)
 
 
-# TODO: redundancy wiht add_metadata regarding metadata addition
 def _to_anndata(
     data: np.ndarray | pd.DataFrame,
 ) -> ad.AnnData:
@@ -167,7 +166,7 @@ def _get_df_from_adata(
     return pd.DataFrame(adata.X, index=adata.obs.index, columns=adata.var.index)
 
 
-def scale_and_center(
+def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     adata: ad.AnnData,
     scaler: str = "standard",
     to_layer: str | None = None,
