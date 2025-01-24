@@ -91,7 +91,6 @@ lint.ignore = [
   "B008",   # Errors from function calls in argument defaults. These are fine when the result is immutable.
   "B023",   # Function definition does not bind loop variable
   "B028",   #  No explicit `stacklevel` keyword argument found (for warnings)
-  "C901",   # Somewhat redundant with max-branches, therefore disabled
   "COM812", #may cause conflicts when used with the formatter
   "D100",   # Missing docstring in public module
   "D104",   # Missing docstring in public package
@@ -155,9 +154,6 @@ source = [ "alphatools" ]
 omit = [
   "**/test_*.py",
 ]
-
-[toolruff.lint.pylint]
-max-branches = 20
 
 [tool.cruft]
 skip = [

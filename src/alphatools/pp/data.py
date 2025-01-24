@@ -1,6 +1,7 @@
 # Create and manipulate Anndata objects
 
 import logging
+import warnings
 
 import anndata as ad
 import numpy as np
@@ -51,7 +52,7 @@ def _to_anndata(
     return adata
 
 
-def add_metadata(
+def add_metadata(  # noqa: C901
     adata: ad.AnnData,
     metadata: pd.DataFrame,
     axis: int,
@@ -88,7 +89,7 @@ def add_metadata(
     _flag_nonoverlapping_indices(_get_df_from_adata(adata), metadata, axis)
 
     # set join type
-    join = "inner" if not keep_data_shape else "left"
+    join = "left" if keep_data_shape else "inner"
 
     # if existing metadata should be kept and new metadata contains synonymous fields to existing metadata, drop incoming fields
     if keep_existing_metadata:
@@ -144,6 +145,7 @@ def _flag_nonoverlapping_indices(
         raise ValueError(f"No matching fields found between data and metadata (axis = {axis}).")
 
 
+# TODO: Add test for this function or refactor to handle indices with suffixes
 def _handle_overlapping_columns(
     metadata: pd.DataFrame,
     _inplace_metadata: pd.DataFrame,
@@ -152,29 +154,32 @@ def _handle_overlapping_columns(
 ) -> pd.DataFrame:
     """Drop overlapping fields from incoming metadata to avoid name collisions"""
     overlapping_fields = metadata.columns.intersection(_inplace_metadata.columns)
-    if overlapping_fields.size > 0:
-        if verbose:
-            logging.info(
-                f"pp.add_metadata(): Synonymous fields, dropping {overlapping_fields.to_list()} from incoming metadata."
-            )
-        return metadata.drop(
-            overlapping_fields,
-            axis=1,
-            errors="ignore",
-            inplace=False,
+    if not overlapping_fields.size:
+        return metadata
+    if verbose:
+        warnings.warn(
+            f"pp.add_metadata(): Synonymous fields, dropping {overlapping_fields.to_list()} from incoming metadata."
         )
-    return metadata
+    return metadata.drop(
+        overlapping_fields,
+        axis=1,
+        errors="ignore",
+        inplace=False,
+    )
 
 
 def _get_df_from_adata(
     adata: ad.AnnData,
+    layer: str | None = None,
 ) -> pd.DataFrame:
-    """Extract dataframe from AnnData object
+    """Extract dataframe from AnnData object, either from X or a layer.
 
     Parameters
     ----------
     adata : ad.AnnData
             Anndata object to extract data from.
+    layer : str, optional
+            Name of the layer to extract. If None, the data matrix X is extracted.
 
     Returns
     -------
@@ -182,14 +187,16 @@ def _get_df_from_adata(
             Dataframe with data from adata.
 
     """
+    if layer is not None:
+        return pd.DataFrame(adata.layers[layer], index=adata.obs.index, columns=adata.var.index)
     return pd.DataFrame(adata.X, index=adata.obs.index, columns=adata.var.index)
 
 
 def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     adata: ad.AnnData,
     scaler: str = "standard",
-    to_layer: str | None = None,
     from_layer: str | None = None,
+    to_layer: str | None = None,
 ) -> None:
     """Scale and center data.
 
@@ -203,10 +210,10 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
         Anndata object with data to scale.
     scaler : str
         Sklearn scaler to use. Available scalers are 'standard' and 'robust'.
-    to_layer : str, optional
-        Name of the layer to scale. If None, the data matrix X is modified
     from_layer : str, optional
         Name of the layer to scale. If None, the data matrix X is used.
+    to_layer : str, optional
+        Name of the layer to scale. If None, the data matrix X is modified
 
     Returns
     -------
@@ -223,7 +230,9 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     else:
         raise NotImplementedError(f"Scaler {scaler} not implemented.")
 
+    input_data = adata.X if from_layer is None else adata.layers[from_layer]
+    result = scaler.fit_transform(input_data)
     if to_layer is None:
-        adata.X = scaler.fit_transform(adata.X if from_layer is None else adata.layers[from_layer])
+        adata.X = result
     else:
-        adata.layers[to_layer] = scaler.fit_transform(adata.X if from_layer is None else adata.layers[from_layer])
+        adata.layers[to_layer] = result
