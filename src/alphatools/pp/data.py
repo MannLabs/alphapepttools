@@ -82,9 +82,10 @@ def add_metadata(
     if not isinstance(metadata, pd.DataFrame) or metadata.index.nlevels > 1:
         raise TypeError("metadata must be a pd.DataFrame with single-level index.")
 
-    # duplicate metadata indices are not supported
     if any(metadata.index.duplicated()):
         raise ValueError("Duplicated metadata indices are not supported.")
+
+    _flag_nonoverlapping_indices(_get_df_from_adata(adata), metadata, axis)
 
     # set join type
     join = "inner" if not keep_data_shape else "left"
@@ -126,6 +127,21 @@ def add_metadata(
         )
 
     return adata_new
+
+
+def _flag_nonoverlapping_indices(
+    data: pd.Index,
+    metadata: pd.Index,
+    axis: int,
+) -> None:
+    """Check if any fields overlap between two dataframes on respective axes"""
+    if axis == 0:
+        shared_idx_len = len(data.index.intersection(metadata.index))
+    elif axis == 1:
+        shared_idx_len = len(data.columns.intersection(metadata.index))
+
+    if shared_idx_len == 0:
+        raise ValueError(f"No matching fields found between data and metadata (axis = {axis}).")
 
 
 def _handle_overlapping_columns(

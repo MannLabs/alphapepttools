@@ -208,6 +208,50 @@ def test_add_metadata(
     )
 
 
+@pytest.mark.parametrize(
+    ("axis", "mismatching_metadata"),
+    [
+        (0, True),
+        (1, True),
+        (0, False),
+        (1, False),
+    ],
+)
+def test_add_metadata_nonmatching_sample_metadata(
+    example_data,
+    example_sample_metadata,
+    example_feature_metadata,
+    axis,
+    mismatching_metadata,
+):
+    # get input datasets
+    df = example_data.copy()
+
+    # change sample metadata indices
+    if axis == 0:
+        md = example_sample_metadata.copy()
+        if mismatching_metadata:
+            md.index = md.index + "_changed"
+    elif axis == 1:
+        md = example_feature_metadata.copy()
+        if mismatching_metadata:
+            md.index = md.index + "_changed"
+
+    # create AnnData object (this would already be done during data loading; here substituted with a private method)
+    adata = _to_anndata(df)
+
+    # if indices do not overlap, raise an error and do not change the incoming adata object
+    if mismatching_metadata:
+        adata_before = adata.copy()
+        with pytest.raises(ValueError):
+            adata = at.pp.add_metadata(adata, md, axis=axis)
+        assert adata.obs.equals(adata_before.obs)
+        assert adata.var.equals(adata_before.var)
+        assert np.array_equal(adata.X, adata_before.X)
+    else:
+        adata = at.pp.add_metadata(adata, md, axis=axis)
+
+
 # test scaling of data
 @pytest.mark.parametrize(
     ("expected_data", "scaler", "from_layer", "to_layer"),
