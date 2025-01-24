@@ -182,7 +182,8 @@ def test_add_metadata(
     adata.obs = pd.DataFrame({"batch_new": ["11", "22", "33"]}, index=["cell1", "cell2", "cell3"])
     adata.var = pd.DataFrame({"UniProtID_new": ["P23456", "P34567", "P45678"]}, index=["G1", "G2", "G3"])
 
-    # add metadata to data
+    # Add metadata to data
+    # when
     adata = at.pp.add_metadata(
         adata, smd, axis=0, keep_data_shape=keep_data_shape, keep_existing_metadata=keep_existing_metadata
     )
@@ -243,10 +244,11 @@ def test_add_metadata_nonmatching_sample_metadata(
     # create AnnData object (this would already be done during data loading; here substituted with a private method)
     adata = _to_anndata(df)
 
-    # if indices do not overlap, raise an error and do not change the incoming adata object
+    # If indices do not overlap, raise an error and do not change the incoming adata object
     if mismatching_metadata:
         adata_before = adata.copy()
         with pytest.raises(ValueError):
+            # when
             adata = at.pp.add_metadata(adata, md, axis=axis)
         assert adata.obs.equals(adata_before.obs)
         assert adata.var.equals(adata_before.var)
@@ -297,12 +299,14 @@ def test_handle_overlapping_columns(metadata, inplace_metadata, verbose, expecte
     if expected_warning:
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
+            # when
             result = _handle_overlapping_columns(metadata, inplace_metadata, verbose=verbose)
             assert result.equals(expected_result)
             assert len(w) == 1
             assert expected_warning in str(w[0].message)
     else:
         with warnings.catch_warnings(record=True) as w:
+            # when
             result = _handle_overlapping_columns(metadata, inplace_metadata, verbose=verbose)
             assert result.equals(expected_result)
             assert len(w) == 0
