@@ -154,12 +154,15 @@ def _handle_overlapping_columns(
 ) -> pd.DataFrame:
     """Drop overlapping fields from incoming metadata to avoid name collisions"""
     overlapping_fields = metadata.columns.intersection(_inplace_metadata.columns)
+
     if not overlapping_fields.size:
         return metadata
+
     if verbose:
         warnings.warn(
             f"pp.add_metadata(): Synonymous fields, dropping {overlapping_fields.to_list()} from incoming metadata."
         )
+
     return metadata.drop(
         overlapping_fields,
         axis=1,

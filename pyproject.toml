@@ -23,10 +23,10 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "anndata",
-  "scikit-learn",
+  "anndata==0.11.1",
+  "scikit-learn==1.6.1",
   # for debug logging (referenced from the issue template)
-  "session-info",
+  "session-info==1",
 ]
 optional-dependencies.dev = [
   "pre-commit",

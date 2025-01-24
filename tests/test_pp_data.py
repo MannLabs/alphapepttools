@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -5,7 +7,7 @@ import pytest
 import alphatools as at
 
 # import private method to obtain anndata object
-from alphatools.pp.data import _get_df_from_adata, _to_anndata
+from alphatools.pp.data import _get_df_from_adata, _handle_overlapping_columns, _to_anndata
 
 ### Fixtures ###
 
@@ -208,6 +210,7 @@ def test_add_metadata(
     )
 
 
+# Test proper failing behavior if resulting anndata object would be empty
 @pytest.mark.parametrize(
     ("axis", "mismatching_metadata"),
     [
@@ -250,6 +253,59 @@ def test_add_metadata_nonmatching_sample_metadata(
         assert np.array_equal(adata.X, adata_before.X)
     else:
         adata = at.pp.add_metadata(adata, md, axis=axis)
+
+
+# Test handling of incoming columns that overlap with existing metadata
+@pytest.mark.parametrize(
+    ("metadata", "inplace_metadata", "verbose", "expected_result", "expected_warning"),
+    [
+        # Test case 1: No overlapping columns
+        (
+            pd.DataFrame({"A": [1, 2], "B": [3, 4]}),
+            pd.DataFrame({"C": [5, 6], "D": [7, 8]}),
+            True,
+            pd.DataFrame({"A": [1, 2], "B": [3, 4]}),
+            None,
+        ),
+        # Test case 2: Partial overlap
+        (
+            pd.DataFrame({"A": [1, 2], "B": [3, 4]}),
+            pd.DataFrame({"B": [5, 6], "C": [7, 8]}),
+            True,
+            pd.DataFrame({"A": [1, 2]}),
+            "pp.add_metadata(): Synonymous fields, dropping ['B'] from incoming metadata.",
+        ),
+        # Test case 3: Complete overlap
+        (
+            pd.DataFrame({"A": [1, 2], "B": [3, 4]}),
+            pd.DataFrame({"A": [5, 6], "B": [7, 8]}),
+            True,
+            pd.DataFrame(index=[0, 1]),
+            "pp.add_metadata(): Synonymous fields, dropping ['A', 'B'] from incoming metadata.",
+        ),
+        # Test case 4: Verbose is False, no warnings
+        (
+            pd.DataFrame({"A": [1, 2], "B": [3, 4]}),
+            pd.DataFrame({"B": [5, 6], "C": [7, 8]}),
+            False,
+            pd.DataFrame({"A": [1, 2]}),
+            None,
+        ),
+    ],
+)
+def test_handle_overlapping_columns(metadata, inplace_metadata, verbose, expected_result, expected_warning):
+    if expected_warning:
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = _handle_overlapping_columns(metadata, inplace_metadata, verbose=verbose)
+            assert result.equals(expected_result)
+            assert len(w) == 1
+            assert expected_warning in str(w[0].message)
+    else:
+        with warnings.catch_warnings(record=True) as w:
+            result = _handle_overlapping_columns(metadata, inplace_metadata, verbose=verbose)
+            assert result.equals(expected_result)
+            assert len(w) == 0
 
 
 # test scaling of data
