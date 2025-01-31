@@ -81,7 +81,7 @@ lint.select = [
   "ALL",
 ]
 
-### STOP: Before adding rulse to ignore here, consider disabling them on a per-file or per-line basis!
+### STOP: Before adding rules to ignore here, consider disabling them on a per-file or per-line basis!
 lint.ignore = [
   "ANN002", # Missing type annotation for `*args`
   "ANN003", # Missing type annotation for `**kwargs
