@@ -52,9 +52,9 @@ def _to_anndata(
     return adata
 
 
-def add_metadata(  # noqa: C901
+def add_metadata(  # noqa: C901, PLR0912
     adata: ad.AnnData,
-    metadata: pd.DataFrame,
+    incoming_metadata: pd.DataFrame,
     axis: int,
     *,
     keep_data_shape: bool = False,
@@ -80,13 +80,13 @@ def add_metadata(  # noqa: C901
     if axis not in [0, 1]:
         raise ValueError("Axis must be 0 or 1.")
 
-    if not isinstance(metadata, pd.DataFrame) or metadata.index.nlevels > 1:
+    if not isinstance(incoming_metadata, pd.DataFrame) or incoming_metadata.index.nlevels > 1:
         raise TypeError("metadata must be a pd.DataFrame with single-level index.")
 
-    if any(metadata.index.duplicated()):
+    if any(incoming_metadata.index.duplicated()):
         raise ValueError("Duplicated metadata indices are not supported.")
 
-    _flag_nonoverlapping_indices(_get_df_from_adata(adata), metadata, axis)
+    _raise_nonoverlapping_indices(_get_df_from_adata(adata), incoming_metadata, axis)
 
     # set join type
     join = "left" if keep_data_shape else "inner"
@@ -94,43 +94,52 @@ def add_metadata(  # noqa: C901
     # if existing metadata should be kept and new metadata contains synonymous fields to existing metadata, drop incoming fields
     if keep_existing_metadata:
         if axis == 0:
-            _inplace_metadata = adata.obs
+            inplace_metadata = adata.obs
         elif axis == 1:
-            _inplace_metadata = adata.var
+            inplace_metadata = adata.var
 
         # handle overlapping metadata columns
-        metadata = _handle_overlapping_columns(metadata, _inplace_metadata, verbose=verbose)
+        incoming_metadata = _handle_overlapping_columns(incoming_metadata, inplace_metadata, verbose=verbose)
 
         # join new to existing metadata; same join logic as for data
         if verbose:
             logging.info(f"pp.add_metadata(): Join incoming to existing metadata via {join} join on axis  {axis}.")
-        metadata = _inplace_metadata.join(metadata, how=join)
+        incoming_metadata = inplace_metadata.join(incoming_metadata, how=join)
 
-    # align metadata to data. Based on axis, metadata index will be aligned
-    # to either data index (axis = 0) or data columns (axis = 1)
+    # 1. align the new metadata to obs or var under the proper join
     if axis == 0:
-        df, md = _get_df_from_adata(adata).align(metadata, axis=0, join=join)
-        if not df.index.equals(md.index):
-            raise ValueError("Attempted alignment; metadata indices do not match data indices.")
+        incoming_metadata = incoming_metadata.reindex(adata.obs.index)
     elif axis == 1:
-        # transpose metadata to align with data columns
-        df, md = _get_df_from_adata(adata).align(metadata.T, axis=1, join=join)
-        if not df.columns.equals(md.columns):
-            raise ValueError("Attempted alignment; metadata columns do not match data columns.")
+        incoming_metadata = incoming_metadata.reindex(adata.var.index)
 
-    # new AnnData object
-    adata_new = ad.AnnData(df.values)
-    adata_new.obs = md if axis == 0 else adata.obs
-    adata_new.var = md.T if axis == 1 else adata.var
-    if verbose:
-        logging.info(
-            f"pp.add_metadata(): Data {adata.shape} to {adata_new.shape}; obs {adata.obs.shape} to {adata_new.obs.shape}; var {adata.var.shape} to {adata_new.var.shape} \n"
-        )
+    # 2. use the [] method to subset the adata object inplace based on the obs and incoming indices
+    if axis == 0:
+        bool_mask = adata.obs.index.isin(incoming_metadata.index)
+        adata = adata[bool_mask, :]
+    elif axis == 1:
+        bool_mask = adata.var.index.isin(incoming_metadata.index)
+        adata = adata[:, bool_mask]
 
-    return adata_new
+    # 3. reindex the incoming metadata to match the adata object's obs or var index
+    if axis == 0:
+        incoming_metadata = incoming_metadata.reindex(adata.obs.index)
+    elif axis == 1:
+        incoming_metadata = incoming_metadata.reindex(adata.var.index)
+
+    # 4. assign the new metadata to the adata object's obs or var attribute
+    if axis == 0:
+        if not adata.obs.index.equals(incoming_metadata.index):
+            raise ValueError("Index mismatch between data and metadata.")
+        adata.obs = incoming_metadata
+    elif axis == 1:
+        if not adata.var.index.equals(incoming_metadata.index):
+            raise ValueError("Index mismatch between data and metadata.")
+        adata.var = incoming_metadata
+
+    return adata
 
 
-def _flag_nonoverlapping_indices(
+def _raise_nonoverlapping_indices(
     data: pd.Index,
     metadata: pd.Index,
     axis: int,

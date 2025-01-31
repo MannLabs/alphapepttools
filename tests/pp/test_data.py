@@ -168,12 +168,12 @@ def test_add_metadata(
     # get input datasets
     if not keep_data_shape:
         df = example_data.copy()
-        smd = example_sample_metadata.copy()
-        fmd = example_feature_metadata.copy()
+        sample_metadata = example_sample_metadata.copy()
+        feature_metadata = example_feature_metadata.copy()
     else:
         df = example_data.copy()
-        smd = example_sample_metadata.copy().iloc[:2, :]  # keep samples cell1 and cell3
-        fmd = example_feature_metadata.copy().iloc[:2, :]  # keep features G1 and G3
+        sample_metadata = example_sample_metadata.copy().iloc[:2, :]  # keep samples cell1 and cell3
+        feature_metadata = example_feature_metadata.copy().iloc[:2, :]  # keep features G1 and G3
 
     # create AnnData object (this would already be done during data loading; here substituted with a private method)
     adata = _to_anndata(df)
@@ -185,30 +185,30 @@ def test_add_metadata(
     # Add metadata to data
     # when
     adata = at.pp.add_metadata(
-        adata, smd, axis=0, keep_data_shape=keep_data_shape, keep_existing_metadata=keep_existing_metadata
+        adata, sample_metadata, axis=0, keep_data_shape=keep_data_shape, keep_existing_metadata=keep_existing_metadata
     )
     adata = at.pp.add_metadata(
-        adata, fmd, axis=1, keep_data_shape=keep_data_shape, keep_existing_metadata=keep_existing_metadata
+        adata, feature_metadata, axis=1, keep_data_shape=keep_data_shape, keep_existing_metadata=keep_existing_metadata
     )
 
     # check whether data was correctly added and aligned
     df_aligned = _get_df_from_adata(adata)
-    smd_aligned = adata.obs
-    fmd_aligned = adata.var
+    sample_metadata_aligned = adata.obs
+    feature_metadata_aligned = adata.var
 
     # main tests for data, sample-, and feature metadata
     assert df_aligned.equals(expected_data), "Data should be aligned with sample and feature metadata"
-    assert smd_aligned.equals(expected_sample_metadata), "Sample metadata should be aligned with data"
-    assert fmd_aligned.equals(expected_feature_metadata), "Feature metadata should be aligned with data"
+    assert sample_metadata_aligned.equals(expected_sample_metadata), "Sample metadata should be aligned with data"
+    assert feature_metadata_aligned.equals(expected_feature_metadata), "Feature metadata should be aligned with data"
 
     # assert whether input data was changed
     assert df.equals(example_data), "Data should not be changed by adding it to Data object"
-    assert smd.equals(example_sample_metadata if not keep_data_shape else example_sample_metadata.iloc[:2, :]), (
-        "Sample metadata should not be changed by adding it to Data object"
-    )
-    assert fmd.equals(example_feature_metadata if not keep_data_shape else example_feature_metadata.iloc[:2, :]), (
-        "Feature metadata should not be changed by adding it to Data object"
-    )
+    assert sample_metadata.equals(
+        example_sample_metadata if not keep_data_shape else example_sample_metadata.iloc[:2, :]
+    ), "Sample metadata should not be changed by adding it to Data object"
+    assert feature_metadata.equals(
+        example_feature_metadata if not keep_data_shape else example_feature_metadata.iloc[:2, :]
+    ), "Feature metadata should not be changed by adding it to Data object"
 
 
 # Test proper failing behavior if resulting anndata object would be empty
