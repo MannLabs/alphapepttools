@@ -106,6 +106,7 @@ def add_metadata(  # noqa: C901, PLR0912
             logging.info(f"pp.add_metadata(): Join incoming to existing metadata via {join} join on axis  {axis}.")
         incoming_metadata = inplace_metadata.join(incoming_metadata, how=join)
 
+    # TODO: streamline logic below
     # 1. align the new metadata to obs or var under the proper join
     if axis == 0:
         incoming_metadata = incoming_metadata.reindex(adata.obs.index)
