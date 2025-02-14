@@ -244,20 +244,53 @@ def _verify_filter_dict(
             raise TypeError(f"Filter values must be of type str, list or tuple, not {type(v)}.")
 
 
-def filter_by_metadata(
-    data: ad.AnnData,
+def _get_filter_mask_from_adata(
+    adata: ad.AnnData,
     filter_dict: dict,
     axis: int,
+    logic: str,
+) -> pd.Series:
+    # TODO: perhaps too small for a separate method?
+    if axis == 0:
+        filter_mask = filter_by_dict(adata.obs, filter_dict, logic)
+    elif axis == 1:
+        filter_mask = filter_by_dict(adata.var, filter_dict, logic)
+
+    return filter_mask
+
+
+def filter_by_metadata(
+    adata: ad.AnnData,
+    filter_dict: dict,
+    axis: int,
+    logic: str = "and",
 ) -> ad.AnnData:
     """Filter based on metadata"""
+    filter_mask = _get_filter_mask_from_adata(adata, filter_dict, axis, logic)
+
+    if axis == 0:
+        adata = adata[filter_mask, :]
+    elif axis == 1:
+        adata = adata[:, filter_mask]
+
+    return adata
 
 
 def drop_by_metadata(
-    data: ad.AnnData,
+    adata: ad.AnnData,
     filter_dict: dict,
     axis: int,
+    logic: str = "and",
 ) -> ad.AnnData:
     """Drop based on metadata"""
+    filter_mask = _get_filter_mask_from_adata(adata, filter_dict, axis, logic)
+
+    if axis == 0:
+        adata = adata[~filter_mask, :]
+    elif axis == 1:
+        adata = adata[:, ~filter_mask]
+
+    return adata
 
 
 def _raise_nonoverlapping_indices(
