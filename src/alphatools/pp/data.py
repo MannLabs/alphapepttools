@@ -183,14 +183,17 @@ def filter_by_dict(
         logging.warning("pp.filter_by_dict(): Duplicated indices in data, reassigning index.")
         data = data.reset_index(drop=True)
 
+    if not filter_dict:
+        return pd.Series(True, index=data.index)  # noqa: FBT003
+
     _verify_filter_dict(filter_dict, data)
 
     filter_masks = []
     for k, v in filter_dict.items():
         feature = data[k] if k != "index" else data.index
-        if isinstance(v, None):
+        if v is None:
             current_mask = pd.Series(True, index=data.index)  # noqa: FBT003
-        elif isinstance(v, str):
+        elif isinstance(v, str | numbers.Number):
             current_mask = feature == v
         elif isinstance(v, list):
             current_mask = feature.isin(v)
@@ -227,6 +230,10 @@ def _tuple_based_filter(
         current_mask = feature >= lower
     elif upper is not None:
         current_mask = feature < upper
+    elif lower is None and upper is None:
+        current_mask = pd.Series(True, index=feature.index)  # noqa: FBT003
+    else:
+        raise ValueError("Tuple-based filtering failed, check filter values.")
 
     return current_mask
 
@@ -240,8 +247,8 @@ def _verify_filter_dict(
             raise TypeError("Filter keys must be strings.")
         if k not in data.columns and k != "index":
             raise ValueError(f"Filter key '{k}' is not 'index' and also not found in data columns.")
-        if not isinstance(v, str | list | tuple):
-            raise TypeError(f"Filter values must be of type str, list or tuple, not {type(v)}.")
+        if not isinstance(v, str | numbers.Number | list | tuple):
+            raise TypeError(f"Filter values must be of type str, number, list or tuple, not {type(v)}.")
 
 
 def _get_filter_mask_from_adata(
@@ -264,8 +271,7 @@ def filter_by_metadata(
     filter_dict: dict,
     axis: int,
     logic: str = "and",
-    *,
-    drop: bool = False,
+    action: str = "keep",
 ) -> ad.AnnData:
     """Filter based on metadata
 
@@ -292,8 +298,10 @@ def filter_by_metadata(
     logic : str, optional
         Filtering logic to apply in case of multiple filters. Default to 'and'.
         Can be 'and' or 'or'.
-    drop : bool, optional
-        If True, drop rows/columns that match the filter conditions. Default to False.
+    action : str, optional
+        If "keep", extract rows/columns that match the filter conditions.
+        If "drop", extract rows/columns outside the filter conditions.
+        Default to "keep".
 
     Returns
     -------
@@ -303,15 +311,16 @@ def filter_by_metadata(
     """
     filter_mask = _get_filter_mask_from_adata(adata, filter_dict, axis, logic)
 
-    if not drop:
+    if action == "keep":
         if axis == 0:
             adata = adata[filter_mask, :]
         elif axis == 1:
             adata = adata[:, filter_mask]
-    elif axis == 0:
-        adata = adata[~filter_mask, :]
-    elif axis == 1:
-        adata = adata[:, ~filter_mask]
+    elif action == "drop":
+        if axis == 0:
+            adata = adata[~filter_mask, :]
+        elif axis == 1:
+            adata = adata[:, ~filter_mask]
 
     return adata
 
