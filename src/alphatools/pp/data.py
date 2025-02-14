@@ -264,28 +264,51 @@ def filter_by_metadata(
     filter_dict: dict,
     axis: int,
     logic: str = "and",
+    *,
+    drop: bool = False,
 ) -> ad.AnnData:
-    """Filter based on metadata"""
+    """Filter based on metadata
+
+    Filter or drop rows/columns from an adata object based on filter conditions
+    specified in a filter_dict. The filter_dict contains keys, which are column
+    names, and values, which can be either strings, lists or tuples. The 'logic'
+    parameter determines whether multiple filters operate on an 'and' or 'or'
+    basis.
+
+    Parameters
+    ----------
+    adata : ad.AnnData
+        Anndata object to filter.
+    filter_dict : dict
+        Dictionary with column names as keys and filter values as values.
+        Values can be either string, list or tuple. For strings, exact matches
+        are performed. For lists, matches are performed on any element in the
+        list. Tuples specify value ranges and must consist of numeric values,
+        where 'None' is interpreted as an open end. Ranges are inclusive on
+        the lower end and exclusive on the upper end to prevent double counting
+        with adjacent filters.
+    axis : int
+        Axis to filter on. 0 for obs and 1 for var.
+    logic : str, optional
+        Filtering logic to apply in case of multiple filters. Default to 'and'.
+        Can be 'and' or 'or'.
+    drop : bool, optional
+        If True, drop rows/columns that match the filter conditions. Default to False.
+
+    Returns
+    -------
+    adata : ad.AnnData
+        Filtered anndata object.
+
+    """
     filter_mask = _get_filter_mask_from_adata(adata, filter_dict, axis, logic)
 
-    if axis == 0:
-        adata = adata[filter_mask, :]
-    elif axis == 1:
-        adata = adata[:, filter_mask]
-
-    return adata
-
-
-def drop_by_metadata(
-    adata: ad.AnnData,
-    filter_dict: dict,
-    axis: int,
-    logic: str = "and",
-) -> ad.AnnData:
-    """Drop based on metadata"""
-    filter_mask = _get_filter_mask_from_adata(adata, filter_dict, axis, logic)
-
-    if axis == 0:
+    if not drop:
+        if axis == 0:
+            adata = adata[filter_mask, :]
+        elif axis == 1:
+            adata = adata[:, filter_mask]
+    elif axis == 0:
         adata = adata[~filter_mask, :]
     elif axis == 1:
         adata = adata[:, ~filter_mask]
