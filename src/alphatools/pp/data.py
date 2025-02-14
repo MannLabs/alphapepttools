@@ -1,11 +1,13 @@
 # Create and manipulate Anndata objects
 
 import logging
+import numbers
 import warnings
 
 import anndata as ad
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 from sklearn.preprocessing import RobustScaler, StandardScaler
 
 # logging configuration
@@ -138,6 +140,124 @@ def add_metadata(  # noqa: C901, PLR0912
         adata.var = incoming_metadata
 
     return adata
+
+
+def filter_by_dict(
+    data: pd.DataFrame,
+    filter_dict: dict,
+    logic: str = "and",
+) -> pd.Series:
+    """Core filtering function to operate on metadata
+
+    Versatile filtering for pd.DataFrames, where different filtering logic
+    can be applied: The filter_dict contains keys, which are column names,
+    and values, which can be either strings, lists or tuples (see below).
+    The 'logic' parameter determines whether multiple filters operate on
+    an 'and' or 'or' basis. Returns indices of samples that match the filter
+    conditions.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Dataframe to filter. Columns must match with filter_dict keys.
+    filter_dict : dict
+        Dictionary with column names as keys and filter values as values.
+        Values can be either string, list or tuple. For strings, exact matches
+        are performed. For lists, matches are performed on any element in the
+        list. Tuples specify value ranges and must consist of numeric values,
+        where 'None' is interpreted as an open end. Ranges are inclusive on
+        the lower end and exclusive on the upper end to prevent double counting
+        with adjacent filters.
+    logic : str, optional
+        Filtering logic to apply in case of multiple filters. Default to 'and'.
+        Can be 'and' or 'or'.
+
+    Returns
+    -------
+    filter_mask : pd.Series
+        Boolean mask to filter the dataframe.
+
+    """
+    # data must have unique indices
+    if any(data.index.duplicated()):
+        logging.warning("pp.filter_by_dict(): Duplicated indices in data, reassigning index.")
+        data = data.reset_index(drop=True)
+
+    _verify_filter_dict(filter_dict, data)
+
+    filter_masks = []
+    for k, v in filter_dict.items():
+        feature = data[k] if k != "index" else data.index
+        if isinstance(v, None):
+            current_mask = pd.Series(True, index=data.index)  # noqa: FBT003
+        elif isinstance(v, str):
+            current_mask = feature == v
+        elif isinstance(v, list):
+            current_mask = feature.isin(v)
+        elif isinstance(v, tuple):
+            current_mask = _tuple_based_filter(feature, v)
+        filter_masks.append(current_mask)
+
+    # if 'and', all masks must be True to keep a row
+    # if 'or', at least one mask must be True to keep a row
+    if logic == "and":
+        data_mask = np.all(filter_masks, axis=0)
+    elif logic == "or":
+        data_mask = np.any(filter_masks, axis=0)
+
+    return data_mask
+
+
+def _tuple_based_filter(
+    feature: pd.Series,
+    input_tuple: tuple,
+) -> pd.Series:
+    """Tuple-based filtering of numeric features"""
+    if not is_numeric_dtype(feature):
+        raise ValueError("Tuple-based filtering only works on numeric features.")
+    if not len(input_tuple) == 2:  # noqa: PLR2004
+        raise ValueError("Tuple-based filtering requires a tuple of length 2.")
+    if not all(isinstance(x, numbers.Number) or x is None for x in input_tuple):
+        raise ValueError("Tuple-based filtering requires numeric values or None.")
+
+    lower, upper = input_tuple
+    if lower is not None and upper is not None:
+        current_mask = (feature >= lower) & (feature < upper)
+    elif lower is not None:
+        current_mask = feature >= lower
+    elif upper is not None:
+        current_mask = feature < upper
+
+    return current_mask
+
+
+def _verify_filter_dict(
+    filter_dict: dict,
+    data: pd.DataFrame,
+) -> None:
+    for k, v in filter_dict.items():
+        if not isinstance(k, str):
+            raise TypeError("Filter keys must be strings.")
+        if k not in data.columns and k != "index":
+            raise ValueError(f"Filter key '{k}' is not 'index' and also not found in data columns.")
+        if not isinstance(v, str | list | tuple):
+            raise TypeError(f"Filter values must be of type str, list or tuple, not {type(v)}.")
+
+
+def filter_by_metadata(
+    data: ad.AnnData,
+    filter_dict: dict,
+    axis: int,
+) -> ad.AnnData:
+    """Filter based on metadata"""
+
+
+def drop_by_metadata(
+    data: ad.AnnData,
+    filter_dict: dict,
+    axis: int,
+) -> ad.AnnData:
+    """Drop based on metadata"""
 
 
 def _raise_nonoverlapping_indices(
