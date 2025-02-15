@@ -246,3 +246,46 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
         adata.X = result
     else:
         adata.layers[to_layer] = result
+
+    def filter_data_completenes(
+        max_missing: float,
+        group_column: str | None = None,
+        groups: list[str] | None = None,
+        axis: int = 0,
+    ) -> ad.AnnData:
+        """Filter data based on missing values
+
+        Filter either samples or features based on the fraction of missing values.
+        If group_column and groups are provided, only missingness of certain metadata
+        levels is considered. This is especially useful for imbalanced classes, where
+        filtering by global missingness may leave too many missing values in the smaller
+        class.
+
+        Parameters
+        ----------
+        max_missing : float
+            Maximum fraction of missing values allowed.
+        group_column : str, optional
+            Column in obs or var to determine groups for filtering.
+        groups : list[str], optional
+            List of groups to consider in filtering.
+
+        """
+        if max_missing < 0 or max_missing > 1:
+            raise ValueError("Threshold must be between 0 and 1.")
+
+        if group_column:
+            raise NotImplementedError("Group-based filtering not implemented yet.")
+        if groups:
+            raise NotImplementedError("Group-based filtering not implemented yet.")
+
+        if axis == 0:
+            missing_fraction = adata.X.isna().mean(axis=0)
+            missing_above_cutoff = missing_fraction > max_missing
+            adata = adata[~missing_above_cutoff, :]
+        elif axis == 1:
+            missing_fraction = adata.X.isna().mean(axis=1)
+            missing_above_cutoff = missing_fraction > max_missing
+            adata = adata[:, ~missing_above_cutoff]
+
+        return adata

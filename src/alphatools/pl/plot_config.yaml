@@ -1,0 +1,39 @@
+# Global Configuration for Plots Module
+# Allows easy modification of font sizes, colors, and linewidths without changing the source code
+
+# Font settings
+font_family: "sans-serif"
+default_font: "Arial"
+
+font_sizes:
+  small: 4.102
+  medium: 5.102
+  large: 6.102
+
+axes:
+  title_size: 6.102
+  label_size: 5.102
+  tick_size: 4.102
+
+legend:
+  font_size: 5.102
+
+marker_sizes:
+  small: 5
+  medium: 10
+  large: 15
+
+linewidths:
+  small: 0.25
+  medium: 0.5
+  large: 1.25
+
+colorscales:
+  qualitative: "rspectral"
+  sequential: "mako"
+  diverging: "vlag"
+
+highlight_colors:
+  high: "#9ecae1"
+  low: "#fdae6b"
+  general: "#5ec962"
