@@ -3,6 +3,7 @@
 import colorsys
 
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib import colors as mpl_colors
 
 
@@ -161,6 +162,49 @@ class BaseColormaps:
         """Get a default matplotlib.pyplot cmap by name"""
         try:
             colorscale = getattr(cls, colorscale_name)
-        except AttributeError as exc:
-            raise ValueError(f"Unknown colorscale name: {colorscale_name}") from exc
+        except AttributeError:
+            try:
+                colorscale = plt.get_cmap(colorscale_name)
+            except ValueError as exc:
+                raise ValueError(f"Unknown colorscale name: {colorscale_name}") from exc
+
         return colorscale
+
+
+class MappedColormaps:
+    """Mapped colorscales to numerical values in data
+
+    Mapping a continuous colorscale to data (e.g. in a heatmap) requires
+    that the values are normalized, that descending/ascending coloring is
+    available, and that outliers can be compressed within a reasonable range.
+
+    """
+
+    def __init__(
+        self,
+        cmap: str,
+        percentile: tuple[float, float] | None = None,
+    ):
+        self.cmap = BaseColormaps.get(cmap)
+        self.percentile = percentile
+
+    def fit_transform(
+        self,
+        data: np.ndarray,
+    ) -> np.ndarray:
+        """Normalize data and transform it to colors"""
+        data = np.array(data.copy())
+
+        if self.percentile is not None:
+            self.vmin = np.percentile(data, self.percentile[0])
+            self.vmax = np.percentile(data, self.percentile[1])
+        else:
+            self.vmin = np.min(data)
+            self.vmax = np.max(data)
+
+        data = np.clip(data, self.vmin, self.vmax)
+
+        self.color_normalizer = mpl_colors.Normalize(vmin=self.vmin, vmax=self.vmax)
+        normalized_data = self.color_normalizer(data)
+
+        return [self.cmap(d) for d in normalized_data]
