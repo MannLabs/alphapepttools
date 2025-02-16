@@ -33,7 +33,26 @@ def _lighten_color(
     return tuple(color)
 
 
-def _base_colorscale() -> list:
+def _cycle_palette(
+    palette: list,
+    n: int,
+) -> list:
+    """Cycle through a palette to get n colors"""
+    if n > len(palette):
+        palette = palette * (n // len(palette) + 1)
+    return palette[:n]
+
+
+def _get_colors_from_cmap(
+    cmap_name: str,
+    num_colors: int,
+) -> list:
+    """Get a list of colors from a colormap"""
+    cmap = plt.get_cmap(cmap_name)
+    return [cmap(i / (num_colors - 1)) for i in range(num_colors)]
+
+
+def _base_qualitative_colorscale() -> list:
     """Base colorscale selected from matplotlib's 'Spectral' colorscale
 
     This colorscale aims for maximum separability when sequentially assigned to data:
@@ -43,9 +62,7 @@ def _base_colorscale() -> list:
     9 colors.
 
     """
-    cmap = plt.get_cmap("Spectral")
-    num_colors = 11
-    colors = [cmap(i / (num_colors)) for i in range(num_colors)]
+    colors = _get_colors_from_cmap("Spectral", 12)
 
     # hand-selected colors
     color_indices = [0, 9, 10, 2, 5, 1, 8, 10, 3]
@@ -60,20 +77,90 @@ def _base_colorscale() -> list:
     return picked_colors
 
 
+def _base_binary_colorscale() -> list:
+    """Base colorscale for binary data"""
+    colors = _get_colors_from_cmap("BrBG", 10)
+
+    # hand-selected colors
+    color_indices = [2, 7]
+    return [colors[i] for i in color_indices]
+
+
 class BaseColors:
     """Base colors for AlphaTools plots"""
 
-    def __init__(self):
-        self._colorscale = _base_colorscale()
-        self.red = self._colorscale[0]
-        self.green = self._colorscale[1]
-        self.blue = self._colorscale[2]
-        self.orange = self._colorscale[3]
-        self.yellow = self._colorscale[4]
-        self.lightred = self._colorscale[5]
-        self.lightgreen = self._colorscale[6]
-        self.lightblue = self._colorscale[7]
-        self.lightorange = self._colorscale[8]
-        self.grey = mpl_colors.to_rgba("lightgrey")
-        self.black = mpl_colors.to_rgba("black")
-        self.white = mpl_colors.to_rgba("white")
+    _colorscale = _base_qualitative_colorscale()
+    red = _colorscale[0]
+    green = _colorscale[1]
+    blue = _colorscale[2]
+    orange = _colorscale[3]
+    yellow = _colorscale[4]
+    lightred = _colorscale[5]
+    lightgreen = _colorscale[6]
+    lightblue = _colorscale[7]
+    lightorange = _colorscale[8]
+    grey = mpl_colors.to_rgba("lightgrey")
+    black = mpl_colors.to_rgba("black")
+    white = mpl_colors.to_rgba("white")
+
+    @classmethod
+    def get(
+        cls,
+        color_name: str,
+        lighten: float | None = None,
+        alpha: float | None = None,
+    ) -> tuple:
+        """Get a default color by name, optionally lightened and/or with alpha"""
+        try:
+            color = getattr(cls, color_name)
+        except AttributeError as exc:
+            raise ValueError(f"Unknown color name: {color_name}") from exc
+        if lighten is not None:
+            color = _lighten_color(color, lighten)
+        if alpha is not None:
+            color = tuple(list(color)[:3] + [alpha])
+        return color
+
+
+class BasePalettes:
+    """Base color palettes for AlphaTools plots"""
+
+    qualitative = _base_qualitative_colorscale()
+    binary = _base_binary_colorscale()
+
+    @classmethod
+    def get(
+        cls,
+        palette_name: str,
+        n: int | None = None,
+    ) -> list:
+        """Get a default color palette by name"""
+        try:
+            palette = getattr(cls, palette_name)
+        except AttributeError as exc:
+            raise ValueError(f"Unknown palette name: {palette_name}") from exc
+
+        # if n is greater than the length of the palette, loop through the palette
+        if n is not None:
+            palette = _cycle_palette(palette, n)
+
+        return palette
+
+
+class BaseColormaps:
+    """Base colorscales for AlphaTools plots"""
+
+    sequential = plt.get_cmap("mako")
+    diverging = plt.get_cmap("vlag")
+
+    @classmethod
+    def get(
+        cls,
+        colorscale_name: str,
+    ) -> list:
+        """Get a default matplotlib.pyplot cmap by name"""
+        try:
+            colorscale = getattr(cls, colorscale_name)
+        except AttributeError as exc:
+            raise ValueError(f"Unknown colorscale name: {colorscale_name}") from exc
+        return colorscale
