@@ -18,6 +18,13 @@ def load_plot_config(config_path: str = "plot_config.yaml") -> dict:
         return yaml.safe_load(file)
 
 
+def _show_rgba_color_list(colors: list) -> None:
+    fig, ax = plt.subplots(figsize=(10, 1))
+    ax.imshow([colors], aspect="auto")
+    ax.axis("off")
+    plt.show()
+
+
 class Plots:
     """Class for creating figures with matplotlib
 
