@@ -37,3 +37,15 @@ highlight_colors:
   high: "#9ecae1"
   low: "#fdae6b"
   general: "#5ec962"
+
+# Figure save settings
+resolution:
+  dpi: 300
+
+# preset sizes of figures based on standard paper column widths
+preset_sizes:
+  "2": 183
+  "1.5": 135
+  "1": 89
+  "0.5": 45
+  "0.25": 22.5

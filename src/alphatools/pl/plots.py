@@ -4,25 +4,11 @@ import logging
 from pathlib import Path
 
 import matplotlib.pyplot as plt
-import seaborn as sns
-import yaml
-from matplotlib.patches import Rectangle
+
+from alphatools.pl import utils
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
-
-
-def load_plot_config(config_path: str = "plot_config.yaml") -> dict:
-    """Load the plot configuration file"""
-    with Path.open(config_path) as file:
-        return yaml.safe_load(file)
-
-
-def _show_rgba_color_list(colors: list) -> None:
-    fig, ax = plt.subplots(figsize=(10, 1))
-    ax.imshow([colors], aspect="auto")
-    ax.axis("off")
-    plt.show()
 
 
 class Plots:
@@ -40,7 +26,7 @@ class Plots:
         if not Path(config_file).exists():
             raise FileNotFoundError(f"Config file {config_file} not found")
 
-        config = load_plot_config(config_file)
+        config = utils.load_plot_config(config_file)
 
         self.fontfamily = config["font_family"]
         self.font = config["default_font"]
@@ -71,11 +57,6 @@ class Plots:
         self.lo_color = config["highlight_colors"]["low"]
         self.highlight_color = config["highlight_colors"]["general"]
 
-        # assign colorscales
-        self.custom_colorscales = {
-            "rspectral": self.rearranged_spectral_colorscale(),
-        }
-
         # set global rcParams
         plt.rcParams.update(
             {
@@ -92,33 +73,6 @@ class Plots:
                 "lines.markersize": self.marker_size_medium,
             }
         )
-
-    @staticmethod
-    def show_color(
-        colorhex: str,
-    ) -> None:
-        """Show a color in a matplotlib plot"""
-        _, ax = plt.subplots()
-        ax.add_patch(Rectangle((0, 0), 1, 1, color=colorhex))
-        ax.axis("off")
-        plt.show()
-
-    def get_palette(
-        self,
-        palette_name: str,
-        n_colors: int = 10,
-    ) -> list:
-        """Get a color palette, either from the custom colorscales or from seaborn"""
-        if palette_name in self.special_colorscales:
-            return sns.color_palette(self.custom_colorscales[palette_name], n_colors)
-        return sns.color_palette(palette_name, n_colors)
-
-    def _rearranged_spectral_colorscale(
-        self,
-    ) -> list:
-        """Rearrange the spectral colorscale for better separability"""
-        _pal = sns.color_palette("Spectral", 11).as_hex()
-        return [_pal[i] for i in [0, 9, 10, 3, 5, 1, 8, 2, 7]]
 
     def _set_figure_font_sizes(
         self,

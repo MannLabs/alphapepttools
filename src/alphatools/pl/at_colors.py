@@ -7,6 +7,14 @@ import numpy as np
 from matplotlib import colors as mpl_colors
 
 
+def show_rgba_color_list(colors: list) -> None:
+    """Show a list of RGBA colors for quick inspection"""
+    fig, ax = plt.subplots(figsize=(10, 1))
+    ax.imshow([colors], aspect="auto")
+    ax.axis("off")
+    plt.show()
+
+
 def _lighten_color(
     color: tuple,
     factor: float = 0.5,
@@ -74,6 +82,9 @@ def _base_qualitative_colorscale() -> list:
 
     # handle special case: light red
     picked_colors[-4] = _lighten_color(picked_colors[-4], 0.2)
+
+    # handle special case: darken yellow
+    picked_colors[4] = _lighten_color(picked_colors[4], -1)
 
     return picked_colors
 
