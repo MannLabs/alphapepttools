@@ -123,14 +123,19 @@ class BaseColors:
         alpha: float | None = None,
     ) -> tuple:
         """Get a default color by name, optionally lightened and/or with alpha"""
-        try:
-            color = getattr(cls, color_name)
-        except AttributeError as exc:
-            raise ValueError(f"Unknown color name: {color_name}") from exc
+        color = getattr(cls, color_name, None)
+        if color is None:
+            try:
+                color = mpl_colors.to_rgba(color_name)
+            except ValueError as exc:
+                raise ValueError(f"Unknown color name: {color_name}") from exc
+
         if lighten is not None:
             color = _lighten_color(color, lighten)
+
         if alpha is not None:
             color = tuple(list(color)[:3] + [alpha])
+
         return color
 
 
@@ -147,10 +152,12 @@ class BasePalettes:
         n: int | None = None,
     ) -> list:
         """Get a default color palette by name"""
-        try:
-            palette = getattr(cls, palette_name)
-        except AttributeError as exc:
-            raise ValueError(f"Unknown palette name: {palette_name}") from exc
+        palette = getattr(cls, palette_name, None)
+        if palette is None:
+            try:
+                palette = _get_colors_from_cmap(palette_name, 10)
+            except ValueError as exc:
+                raise ValueError(f"Unknown palette name: {palette_name}") from exc
 
         # if n is greater than the length of the palette, loop through the palette
         if n is not None:
@@ -160,7 +167,7 @@ class BasePalettes:
 
 
 class BaseColormaps:
-    """Base colorscales for AlphaTools plots"""
+    """Base colormaps for AlphaTools plots"""
 
     sequential = plt.get_cmap("mako")
     diverging = plt.get_cmap("vlag")
@@ -168,18 +175,17 @@ class BaseColormaps:
     @classmethod
     def get(
         cls,
-        colorscale_name: str,
+        colormap_name: str,
     ) -> list:
         """Get a default matplotlib.pyplot cmap by name"""
-        try:
-            colorscale = getattr(cls, colorscale_name)
-        except AttributeError:
+        colormap = getattr(cls, colormap_name, None)
+        if colormap is None:
             try:
-                colorscale = plt.get_cmap(colorscale_name)
+                colormap = plt.get_cmap(colormap_name)
             except ValueError as exc:
-                raise ValueError(f"Unknown colorscale name: {colorscale_name}") from exc
+                raise ValueError(f"Unknown colormap name: {colormap_name}") from exc
 
-        return colorscale
+        return colormap
 
 
 class MappedColormaps:

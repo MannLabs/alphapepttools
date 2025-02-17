@@ -17,6 +17,7 @@ axes:
 
 legend:
   font_size: 5.102
+  title_size: 6.102
 
 marker_sizes:
   small: 5

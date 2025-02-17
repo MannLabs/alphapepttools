@@ -34,6 +34,23 @@ def label(
     return ax
 
 
+def _indexable_axes(
+    axs: plt.Axes | list[plt.Axes] | np.ndarray,
+) -> np.ndarray:
+    if not isinstance(axs, plt.Axes | list | np.ndarray):
+        raise TypeError("Invalid axes provided")
+
+    if isinstance(axs, plt.Axes):
+        axs = np.array([[axs]], dtype=object)
+    elif isinstance(axs, list):
+        axs = np.array(axs, dtype=object)
+
+    if isinstance(axs, np.ndarray) and axs.ndim == 1:
+        axs = np.expand_dims(axs, axis=0)
+
+    return axs
+
+
 class AxisManager:
     """Manage axes objects and make them iterable. Apply consistent styling."""
 
@@ -41,17 +58,7 @@ class AxisManager:
         self,
         axs: plt.Axes | list[plt.Axes],
     ):
-        if axs is None or not len(axs):
-            raise ValueError("No axes provided")
-        if not isinstance(axs, plt.Axes | list | np.ndarray):
-            raise TypeError("Invalid axes provided")
-
-        if isinstance(axs, plt.Axes):
-            axs = np.array([[axs]], dtype=object)
-        elif isinstance(axs, list):
-            axs = np.array(axs, dtype=object)
-            if axs.ndim == 1:
-                axs = np.expand_dims(axs, axis=0)
+        axs = _indexable_axes(axs)
 
         self.axs = axs
         self.axs_flat = axs.flatten()
@@ -91,16 +98,87 @@ class AxisManager:
         return stylize(ax)
 
 
+def _parse_figsize(
+    figsize: tuple[float, float] | tuple[str, str] | None,
+) -> tuple[float, float]:
+    """Allow for figsize to be a tuple of strings to access valid presets from the config file"""
+    valid_preset_sizes = config["preset_sizes"]
+
+    if figsize is None:
+        figsize = (valid_preset_sizes["1"], valid_preset_sizes["1"])
+    elif isinstance(figsize[0], str) and isinstance(figsize[1], str):
+        figsize = (valid_preset_sizes[figsize[0]] / 25.4, valid_preset_sizes[figsize[1]] / 25.4)
+    elif isinstance(figsize[0], int) and isinstance(figsize[1], int):
+        figsize = (figsize[0], figsize[1])
+    else:
+        raise ValueError(
+            "Invalid figsize provided. Must be either a tuple of strings to access valid presets from the config or a tuple of integers"
+        )
+
+    return figsize
+
+
+def create_figure(
+    nrows: int = 1,
+    ncols: int = 1,
+    figsize: tuple[float, float] | tuple[str, str] | None = None,
+    height_ratios: list[float] | None = None,
+    width_ratios: list[float] | None = None,
+    figure_padding: float | None = None,
+) -> tuple[plt.Figure, np.ndarray]:
+    """Create a figure with a specified number of rows and columns
+
+    Parameters
+    ----------
+    nrows : int, optional
+        The number of rows in the figure, by default 1
+
+    ncols : int, optional
+        The number of columns in the figure, by default 1
+
+    figsize : tuple[float, float] | tuple[str, str], optional
+        The size of the figure in inches. If a tuple of strings is provided, the strings must be valid keys in the config file, by default None
+
+    height_ratios : list[float], optional
+        The height ratios of the rows in the figure, by default None
+
+    width_ratios : list[float], optional
+        The width ratios of the columns in the figure, by default None
+
+    figure_padding : float, optional
+        The margin padding to apply to the figure, by default None
+
+    Returns
+    -------
+    fig : plt.Figure
+        The figure object
+
+    axs : list[plt.Axes]
+        A 2D array of axes objects
+
+    """
+    figsize = _parse_figsize(figsize)
+
+    fig, axs = plt.subplots(
+        nrows=nrows,
+        ncols=ncols,
+        figsize=figsize,
+        gridspec_kw={"width_ratios": width_ratios, "height_ratios": height_ratios},
+    )
+
+    fig.patch.set_facecolor("white")
+
+    if figure_padding is not None:
+        fig.tight_layout(pad=figure_padding)
+
+    return fig, _indexable_axes(axs)
+
+
 def save_figure(
     fig: plt.Figure,
     filename: str,
     output_dir: str,
-    dpi: int = config["resolution"]["dpi"],
-    width_mm: int = 89,
-    height_mm: int = 89,
-    paper_width: int | None = None,
-    paper_height: str | None = None,
-    figure_padding: float = 0.1,
+    dpi: int | None = None,
     transparent: bool = False,  # noqa: FBT002, FBT001 shadows savefig signature
     **kwargs,
 ) -> None:
@@ -121,36 +199,8 @@ def save_figure(
     dpi : int, optional
         The resolution of the figure, by default 300
 
-    width_mm : int, optional
-        The width of the figure in millimeters, by default None.
-
-    height_mm : int, optional
-        The height of the figure in millimeters, by default None.
-
-    nature_width : str
-        Width of the figure in the scientific paper. One unit
-        corresponds approximately to one column in a two-column
-        publication format. The following values are supported:
-
-        - '2' = 183 mm (7.2 inches)
-        - '1.5' = 135 mm (5.3 inches)
-        - '1' = 89 mm (3.5 inches)
-        - '0.5' = 45 mm (1.8 inches)
-        - '0.25' = 22.5 mm (0.9 inches)
-
-        If specified, 'nature_width' overrides width_mm.
-
-    nature_height : str
-        Height of the figure in the scientific paper. One unit
-        corresponds approximately to one column in a two-column
-        publication format. The following values are supported:
-        - '2' = 183 mm (7.2 inches)
-        - '1.5' = 135 mm (5.3 inches)
-        - '1' = 89 mm (3.5 inches)
-        - '0.5' = 45 mm (1.8 inches)
-        - '0.25' = 22.5 mm (0.9 inches)
-
-        If specified, 'nature_height' overrides height_mm.
+    figure_padding : float, optional
+        The margin padding to apply to the figure, by default 3
 
     transparent : bool, optional
         Whether to save a .png figure with a transparent background.
@@ -160,25 +210,13 @@ def save_figure(
 
     """
     if not Path(output_dir).exists():
-        raise FileNotFoundError(f"Output directory {output_dir} does not exist")
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
 
     if not filename.endswith(".png"):
         filename += ".png"
 
-    paper_sizes = {
-        "2": config["preset_sizes"]["2"],
-        "1.5": config["preset_sizes"]["1.5"],
-        "1": config["preset_sizes"]["1"],
-        "0.5": config["preset_sizes"]["0.5"],
-        "0.25": config["preset_sizes"]["0.25"],
-    }
-
-    width_in = paper_sizes.get(paper_width, width_mm) / 25.4
-    height_in = paper_sizes.get(paper_height, height_mm) / 25.4
-
-    fig.tight_layout(pad=figure_padding)
-
-    fig.set_size_inches(width_in, height_in)
+    if dpi is None:
+        dpi = config["resolution"]["dpi"]
 
     fig.savefig(
         Path(output_dir) / filename,
