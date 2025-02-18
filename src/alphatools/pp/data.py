@@ -6,6 +6,7 @@ import warnings
 import anndata as ad
 import numpy as np
 import pandas as pd
+from pandas.api.types import is_numeric_dtype
 from sklearn.preprocessing import RobustScaler, StandardScaler
 
 # logging configuration
@@ -43,7 +44,7 @@ def _to_anndata(
     """
     # If data is a dataframe, convert row and col indices to obs and var
     if isinstance(data, pd.DataFrame):
-        adata = ad.AnnData(data)
+        adata = ad.AnnData(data.values)
         adata.obs = data.index.to_frame(name="obs")
         adata.var = data.columns.to_frame(name="var")
     elif isinstance(data, np.ndarray):
@@ -86,7 +87,7 @@ def add_metadata(  # noqa: C901, PLR0912
     if any(incoming_metadata.index.duplicated()):
         raise ValueError("Duplicated metadata indices are not supported.")
 
-    _raise_nonoverlapping_indices(_get_df_from_adata(adata), incoming_metadata, axis)
+    _raise_nonoverlapping_indices(get_df_from_adata(adata), incoming_metadata, axis)
 
     # set join type
     join = "left" if keep_data_shape else "inner"
@@ -178,7 +179,7 @@ def _handle_overlapping_columns(
     )
 
 
-def _get_df_from_adata(
+def get_df_from_adata(
     adata: ad.AnnData,
     layer: str | None = None,
 ) -> pd.DataFrame:
@@ -200,6 +201,48 @@ def _get_df_from_adata(
     if layer is not None:
         return pd.DataFrame(adata.layers[layer], index=adata.obs.index, columns=adata.var.index)
     return pd.DataFrame(adata.X, index=adata.obs.index, columns=adata.var.index)
+
+
+def _adata_column_to_array(
+    data: pd.DataFrame | ad.AnnData,
+    column: str,
+) -> np.ndarray:
+    """Get a column from a DataFrame or an AnnData object
+
+    Parameters
+    ----------
+    data : pd.DataFrame | ad.AnnData
+        Data to extract the column from.
+    column : str
+        Column name to extract. If data is of type ad.AnnData, var_names is considered
+        first for the column names. If the column is not found in var_names, the columns
+        of data.obs are considered. If the column is not found in either, a ValueError
+        is raised.
+
+    Returns
+    -------
+    np.ndarray
+        The column data as a numpy array
+
+    """
+    if isinstance(data, pd.DataFrame):
+        if column not in data.columns:
+            raise ValueError(f"Column {column} not found in DataFrame.")
+        return data[column].to_numpy()
+
+    if isinstance(data, ad.AnnData):
+        # prioritize var_names, i.e. numeric data from X
+        if column in data.var_names:
+            col_idx = data.var_names.get_loc(column)
+            return data.X[:, col_idx].flatten()
+
+        # if the column is not found in var_names, check the columns of obs (metadata)
+        if column in data.obs.columns:
+            return data.obs[column].to_numpy()
+
+        raise ValueError(f"Column {column} not found in AnnData object (checked var_names or obs.columns).")
+
+    raise TypeError("Data must be a pandas DataFrame or an AnnData object.")
 
 
 def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
@@ -247,45 +290,55 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     else:
         adata.layers[to_layer] = result
 
-    def filter_data_completenes(
-        max_missing: float,
-        group_column: str | None = None,
-        groups: list[str] | None = None,
-        axis: int = 0,
-    ) -> ad.AnnData:
-        """Filter data based on missing values
 
-        Filter either samples or features based on the fraction of missing values.
-        If group_column and groups are provided, only missingness of certain metadata
-        levels is considered. This is especially useful for imbalanced classes, where
-        filtering by global missingness may leave too many missing values in the smaller
-        class.
+def filter_data_completeness(
+    adata: ad.AnnData,
+    max_missing: float,
+    group_column: str | None = None,
+    groups: list[str] | None = None,
+    axis: int = 0,
+) -> ad.AnnData:
+    """Filter data based on missing values
 
-        Parameters
-        ----------
-        max_missing : float
-            Maximum fraction of missing values allowed.
-        group_column : str, optional
-            Column in obs or var to determine groups for filtering.
-        groups : list[str], optional
-            List of groups to consider in filtering.
+    Filter either samples or features based on the fraction of missing values.
+    If group_column and groups are provided, only missingness of certain metadata
+    levels is considered. This is especially useful for imbalanced classes, where
+    filtering by global missingness may leave too many missing values in the smaller
+    class.
 
-        """
-        if max_missing < 0 or max_missing > 1:
-            raise ValueError("Threshold must be between 0 and 1.")
+    Parameters
+    ----------
+    max_missing : float
+        Maximum fraction of missing values allowed. Compared with the fraction of missing values
+        in a "greater than" fashion, i.e. if max_missing is 0.6 and the fraction of missing values
+        is 0.6, the sample or feature is kept. Greater than comparison is used here since the
+        missing fraction may be 0.0, in which case the sample or feature should be kept.
+    group_column : str, optional
+        Column in obs or var to determine groups for filtering.
+    groups : list[str], optional
+        List of groups to consider in filtering.
+    axis : int, optional
+        Whether to check completeness of samples (0) or features (1).
 
-        if group_column:
-            raise NotImplementedError("Group-based filtering not implemented yet.")
-        if groups:
-            raise NotImplementedError("Group-based filtering not implemented yet.")
+    """
+    if max_missing < 0 or max_missing > 1:
+        raise ValueError("Threshold must be between 0 and 1.")
 
-        if axis == 0:
-            missing_fraction = adata.X.isna().mean(axis=0)
-            missing_above_cutoff = missing_fraction > max_missing
-            adata = adata[~missing_above_cutoff, :]
-        elif axis == 1:
-            missing_fraction = adata.X.isna().mean(axis=1)
-            missing_above_cutoff = missing_fraction > max_missing
-            adata = adata[:, ~missing_above_cutoff]
+    if group_column:
+        raise NotImplementedError("Group-based filtering not implemented yet.")
+    if groups:
+        raise NotImplementedError("Group-based filtering not implemented yet.")
 
-        return adata
+    if not is_numeric_dtype(adata.X):
+        raise ValueError("Data must be numeric.")
+
+    if axis == 0:  # check completeness of samples
+        missing_fraction = np.isnan(adata.X).mean(axis=1)
+        missing_above_cutoff = missing_fraction > max_missing
+        adata = adata[~missing_above_cutoff, :]
+    elif axis == 1:  # check completeness of features
+        missing_fraction = np.isnan(adata.X).mean(axis=0)
+        missing_above_cutoff = missing_fraction > max_missing
+        adata = adata[:, ~missing_above_cutoff]
+
+    return adata

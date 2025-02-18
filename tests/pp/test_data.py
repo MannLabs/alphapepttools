@@ -7,7 +7,7 @@ import pytest
 import alphatools as at
 
 # import private method to obtain anndata object
-from alphatools.pp.data import _get_df_from_adata, _handle_overlapping_columns, _to_anndata
+from alphatools.pp.data import _adata_column_to_array, _handle_overlapping_columns, _to_anndata, get_df_from_adata
 
 ### Fixtures ###
 
@@ -192,7 +192,7 @@ def test_add_metadata(
     )
 
     # check whether data was correctly added and aligned
-    df_aligned = _get_df_from_adata(adata)
+    df_aligned = get_df_from_adata(adata)
     sample_metadata_aligned = adata.obs
     feature_metadata_aligned = adata.var
 
@@ -368,7 +368,7 @@ def test_handle_overlapping_columns(metadata, inplace_metadata, verbose, expecte
         ),
     ],
 )
-def test_pp_scale_and_center(
+def test_scale_and_center(
     example_data,
     expected_data,
     scaler,
@@ -398,3 +398,182 @@ def test_pp_scale_and_center(
 
     # assert whether input data was changed
     assert df.equals(example_data), "Data should not be changed by scaling"
+
+
+@pytest.fixture
+def data_test_completeness_filter():
+    def make_dummy_data():
+        X = pd.DataFrame(
+            {
+                "A": [1, 2, 3, 4, 5],
+                "B": [np.nan, 7, 6, 7, 8],
+                "C": [np.nan, np.nan, 9, 10, 11],
+                "D": [np.nan, np.nan, np.nan, 13, 14],
+                "E": [np.nan, np.nan, np.nan, np.nan, 17],
+            },
+            index=["cell1", "cell2", "cell3", "cell4", "cell5"],
+        )
+        sample_metadata = pd.DataFrame(
+            {
+                "batch": ["1", "1", "1", "2", "2"],
+            },
+            index=["cell1", "cell2", "cell3", "cell4", "cell5"],
+        )
+        feature_metadata = pd.DataFrame(
+            {
+                "gene_name": ["GO1", "GO1", "GO1", "GO2", "GO2"],
+            },
+            index=["A", "B", "C", "D", "E"],
+        )
+        adata = _to_anndata(X)
+        adata.obs = sample_metadata
+        adata.var = feature_metadata
+        return adata
+
+    return make_dummy_data()
+
+
+# test data completeness filtering
+@pytest.mark.parametrize(
+    ("expected_columns", "expected_rows", "max_missing", "axis"),
+    [
+        # 1. Check filtering of columns (features)
+        # 1.1. Filter columns with 0.5 threshold
+        (
+            ["A", "B", "C"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            0.5,
+            1,
+        ),
+        # 1.2. Filter columns with 0.6 threshold so that one value lies exactly on the threshold --> this should be kept since ">" is used
+        (
+            ["A", "B", "C", "D"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            0.6,
+            1,
+        ),
+        # 1.3. Filter columns with 1.0 threshold: keep all columns
+        (
+            ["A", "B", "C", "D", "E"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            1.0,
+            1,
+        ),
+        # 1.4. Filter columns with 0.0 threshold: remove columns with any missing values
+        (
+            ["A"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            0.0,
+            1,
+        ),
+        # 2. Check filtering of rows (samples)
+        # 2.1. Filter rows with 0.5 threshold
+        (
+            ["A", "B", "C", "D", "E"],
+            ["cell3", "cell4", "cell5"],
+            0.5,
+            0,
+        ),
+        # 2.2. Filter rows with 0.6 threshold so that one value lies exactly on the threshold --> this should be kept since ">" is used
+        (
+            ["A", "B", "C", "D", "E"],
+            ["cell2", "cell3", "cell4", "cell5"],
+            0.6,
+            0,
+        ),
+        # 2.3. Filter rows with 1.0 threshold: keep all rows
+        (
+            ["A", "B", "C", "D", "E"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            1.0,
+            0,
+        ),
+        # 2.4. Filter rows with 0.0 threshold: remove rows with any missing values
+        (
+            ["A", "B", "C", "D", "E"],
+            ["cell5"],
+            0.0,
+            0,
+        ),
+    ],
+)
+def test_filter_data_completeness(
+    data_test_completeness_filter,
+    expected_columns,
+    expected_rows,
+    max_missing,
+    axis,
+):
+    # given
+    adata = data_test_completeness_filter.copy()
+
+    # when
+    adata_filtered = at.pp.filter_data_completeness(
+        adata=adata,
+        max_missing=max_missing,
+        axis=axis,
+    )
+
+    # then
+    assert adata_filtered.var.index.to_list() == expected_columns
+    assert adata_filtered.obs.index.to_list() == expected_rows
+
+    # assert whether input data was changed
+    assert adata.var.index.to_list() == data_test_completeness_filter.var.index.to_list()
+    assert adata.obs.index.to_list() == data_test_completeness_filter.obs.index.to_list()
+    assert np.array_equal(adata.X, data_test_completeness_filter.X, equal_nan=True)
+
+
+# test adata_column_to_array
+@pytest.mark.parametrize(
+    ("expected_array", "column", "transpose"),
+    [
+        # 1. Extracting columns from either anndata values or observation metadata
+        # 1.1. Column is in var_names
+        (
+            np.array([1, 2, 3]),
+            "G1",
+            False,
+        ),
+        # 1.2. Column is in obs.columns
+        (
+            np.array(["1", "2", "3"]),
+            "batch",
+            False,
+        ),
+        # 2. Transposed adata, as if to access rows
+        # 2.1. Column is in original obs_names
+        (
+            np.array([2, 5, 8]),
+            "cell2",
+            True,
+        ),
+        # 2.2. Column is in original var.columns
+        (
+            np.array(["gene1", "gene2", "gene3"]),
+            "gene_name",
+            True,
+        ),
+    ],
+)
+def test_adata_column_to_array(
+    example_data,
+    example_sample_metadata,
+    example_feature_metadata,
+    expected_array,
+    column,
+    transpose,
+):
+    # given
+    adata = _to_anndata(example_data)
+    adata = at.pp.add_metadata(adata, example_sample_metadata, axis=0)
+    adata = at.pp.add_metadata(adata, example_feature_metadata, axis=1)
+
+    # when
+    if not transpose:
+        array = _adata_column_to_array(adata, column)
+    else:
+        array = _adata_column_to_array(adata.transpose(), column)
+
+    # then
+    assert np.all(array == expected_array)

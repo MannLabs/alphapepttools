@@ -96,7 +96,7 @@ def _base_binary_colorscale() -> list:
 
     # hand-selected colors
     color_indices = [2, 7]
-    return [colors[i] for i in color_indices]
+    return [_lighten_color(colors[i], 0.1) for i in color_indices]
 
 
 class BaseColors:

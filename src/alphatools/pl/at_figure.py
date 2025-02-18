@@ -105,7 +105,7 @@ def _parse_figsize(
     valid_preset_sizes = config["preset_sizes"]
 
     if figsize is None:
-        figsize = (valid_preset_sizes["1"], valid_preset_sizes["1"])
+        figsize = (valid_preset_sizes["1"] / 25.4, valid_preset_sizes["1"] / 25.4)
     elif isinstance(figsize[0], str) and isinstance(figsize[1], str):
         figsize = (valid_preset_sizes[figsize[0]] / 25.4, valid_preset_sizes[figsize[1]] / 25.4)
     elif isinstance(figsize[0], int) and isinstance(figsize[1], int):

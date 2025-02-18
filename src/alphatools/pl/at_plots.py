@@ -3,14 +3,17 @@
 import logging
 from pathlib import Path
 
+import anndata as ad
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.patches import Patch
+from pandas.api.types import is_numeric_dtype
 
 from alphatools.pl import utils
 from alphatools.pl.at_colors import BaseColors, BasePalettes
+from alphatools.pp.data import _adata_column_to_array
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -19,7 +22,7 @@ config_file = Path(Path(__file__).parent, "plot_config.yaml")
 config = utils.load_plot_config(config_file)
 
 
-def _add_vline(
+def add_vline(
     ax: plt.Axes,
     x: float | list[float | int],
     color: str = "black",
@@ -129,8 +132,9 @@ class Plots:
     @classmethod
     def histogram(
         cls,
-        data: list | np.ndarray | pd.Series,
-        color_data: list | np.ndarray | pd.Series | None = None,
+        data: pd.DataFrame | ad.AnnData,
+        value_column: str,
+        color_column: str | None = None,
         bins: int = 10,
         color: str = "blue",
         ax: plt.Axes | None = None,
@@ -139,27 +143,59 @@ class Plots:
         hist_kwargs: dict | None = None,
         legend_kwargs: dict | None = None,
     ) -> None:
-        """Plot a histogram of a list, an array or a pandas Series"""
+        """Plot a histogram from a DataFrame or AnnData object
+
+        Parameters
+        ----------
+        data : pd.DataFrame | ad.AnnData
+            Data to plot, must contain the value_column and optionally the color_column.
+        value_column : str
+            Column in data to plot as histogram. Must contain numeric data.
+        color_column : str, optional
+            Column in data to use for color encoding. Overrides color parameter. By default None.
+        bins : int, optional
+            Number of bins to use for the histogram. By default 10.
+        color : str, optional
+            Color to use for the histogram. By default "blue".
+        ax : plt.Axes, optional
+            Matplotlib axes object to plot on, if None a new figure is created. By default None.
+        palette : list[tuple], optional
+            List of colors to use for color encoding, if None a default palette is used. By default None.
+        legend : str | mpl.legend.Legend, optional
+            Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
+        hist_kwargs : dict, optional
+            Additional keyword arguments for the matplotlib hist function. By default None.
+        legend_kwargs : dict, optional
+            Additional keyword arguments for the matplotlib legend function. By default None.
+
+        Returns
+        -------
+        None
+
+        """
         hist_kwargs = hist_kwargs or {}
         legend_kwargs = legend_kwargs or {}
 
         if not ax:
             _, ax = plt.subplots(1, 1)
 
-        if color_data is None:
-            color = BaseColors.get(color)
-            ax.hist(data, bins=bins, color=color, **hist_kwargs)
+        values = _adata_column_to_array(data, value_column)
+        if not is_numeric_dtype(values):
+            raise ValueError("Value column must contain numeric data")
 
-        if color_data is not None:
-            levels = np.unique(color_data)
+        if color_column is None:
+            color = BaseColors.get(color)
+            ax.hist(values, bins=bins, color=color, **hist_kwargs)
+
+        if color_column is not None:
+            colors = _adata_column_to_array(data, color_column)
+
+            levels = np.unique(colors)
 
             if palette is None:
                 palette = BasePalettes.get("qualitative", n=len(levels))
 
-            if len(color_data) != len(data):
-                raise ValueError("Data and color data must have the same length")
-
             for _color, level in zip(palette, levels, strict=False):
-                ax.hist(data[color_data == level], bins=bins, color=_color, **hist_kwargs)
+                ax.hist(values[colors == level], bins=bins, color=_color, **hist_kwargs)
 
             _parse_legend(ax, legend, palette, levels, **legend_kwargs)
