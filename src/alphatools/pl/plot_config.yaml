@@ -29,11 +29,6 @@ linewidths:
   medium: 0.5
   large: 1.25
 
-colorscales:
-  qualitative: "rspectral"
-  sequential: "mako"
-  diverging: "vlag"
-
 highlight_colors:
   high: "#9ecae1"
   low: "#fdae6b"
