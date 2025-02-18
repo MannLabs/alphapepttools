@@ -24,6 +24,7 @@ classifiers = [
 ]
 dependencies = [
   "anndata==0.11.1",
+  "cmcrameri==1.9",
   "matplotlib==3.10",
   "scikit-learn==1.6.1",
   # for debug logging (referenced from the issue template)
