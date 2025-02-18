@@ -19,6 +19,75 @@ config_file = Path(Path(__file__).parent, "plot_config.yaml")
 config = utils.load_plot_config(config_file)
 
 
+def _add_vline(
+    ax: plt.Axes,
+    x: float | list[float | int],
+    color: str = "black",
+    linestyle: str = "--",
+    linewidth: float = 1,
+) -> None:
+    """Add a vertical line to a matplotlib axes object"""
+    if isinstance(x, float | int):
+        ax.axvline(x=x, color=color, linestyle=linestyle, linewidth=linewidth)
+    elif isinstance(x, list):
+        for xi in x:
+            ax.axvline(x=xi, color=color, linestyle=linestyle, linewidth=linewidth)
+
+
+def _make_legend_patches(
+    colors: list[str],
+    levels: list[str],
+) -> list[mpl.patches.Patch]:
+    """Create legend patches for a matplotlib legend"""
+    patches = []
+    for color, level in zip(colors, levels, strict=False):
+        patches.append(
+            Patch(
+                facecolor=color,
+                label=level,
+                edgecolor=BaseColors.get("grey"),
+                linewidth=config["linewidths"]["small"],
+            )
+        )
+
+    return patches
+
+
+def _make_legend(
+    ax: plt.Axes,
+    patches: list[mpl.patches.Patch],
+    **kwargs,
+) -> None:
+    """Add a legend to a matplotlib axes object"""
+    # create new legend
+    if "fontsize" not in kwargs:
+        kwargs["fontsize"] = config["legend"]["font_size"]
+    _legend = ax.legend(handles=patches, **kwargs)
+
+    # handle the title separately
+    _legend.set_title(_legend.get_title().get_text(), prop={"size": config["legend"]["title_size"]})
+
+
+def _parse_legend(
+    ax: plt.Axes,
+    legend: str | mpl.legend.Legend | None,
+    palette: list[tuple] | None,
+    levels: list[str] | None,
+    **legend_kwargs,
+) -> None:
+    """Parse the legend parameter of a plot method. Either create a legend or try to add the provided one"""
+    if legend == "auto":
+        patches = _make_legend_patches(palette, levels)
+        _make_legend(ax, patches, **legend_kwargs)
+    elif isinstance(legend, mpl.legend.Legend):
+        try:
+            ax.add_artist(legend)
+        except Exception:
+            logging.exception("Error adding legend. Ignoring legend.")
+    elif legend:
+        logging.warning("Invalid legend parameter. Ignoring legend.")
+
+
 class Plots:
     """Class for creating figures with matplotlib
 
@@ -57,76 +126,6 @@ class Plots:
         self.lo_color = config["highlight_colors"]["low"]
         self.highlight_color = config["highlight_colors"]["general"]
 
-    @staticmethod
-    def _add_vline(
-        ax: plt.Axes,
-        x: float | list[float | int],
-        color: str = "black",
-        linestyle: str = "--",
-        linewidth: float = 1,
-    ) -> None:
-        """Add a vertical line to a matplotlib axes object"""
-        if isinstance(x, float | int):
-            ax.axvline(x=x, color=color, linestyle=linestyle, linewidth=linewidth)
-        elif isinstance(x, list):
-            for xi in x:
-                ax.axvline(x=xi, color=color, linestyle=linestyle, linewidth=linewidth)
-
-    @staticmethod
-    def _make_legend_patches(
-        colors: list[str],
-        levels: list[str],
-    ) -> list[mpl.patches.Patch]:
-        """Create legend patches for a matplotlib legend"""
-        patches = []
-        for color, level in zip(colors, levels, strict=False):
-            patches.append(
-                Patch(
-                    facecolor=color,
-                    label=level,
-                    edgecolor=BaseColors.get("grey"),
-                    linewidth=config["linewidths"]["small"],
-                )
-            )
-
-        return patches
-
-    @staticmethod
-    def _make_legend(
-        ax: plt.Axes,
-        patches: list[mpl.patches.Patch],
-        **kwargs,
-    ) -> None:
-        """Add a legend to a matplotlib axes object"""
-        # create new legend
-        if "fontsize" not in kwargs:
-            kwargs["fontsize"] = config["legend"]["font_size"]
-        _legend = ax.legend(handles=patches, **kwargs)
-
-        # handle the title separately
-        _legend.set_title(_legend.get_title().get_text(), prop={"size": config["legend"]["title_size"]})
-
-    @classmethod
-    def _parse_legend(
-        cls,
-        ax: plt.Axes,
-        legend: str | mpl.legend.Legend | None,
-        palette: list[tuple] | None,
-        levels: list[str] | None,
-        **legend_kwargs,
-    ) -> None:
-        """Parse the legend parameter of a plot method. Either create a legend or try to add the provided one"""
-        if legend == "auto":
-            patches = cls._make_legend_patches(palette, levels)
-            cls._make_legend(ax, patches, **legend_kwargs)
-        elif isinstance(legend, mpl.legend.Legend):
-            try:
-                ax.add_artist(legend)
-            except Exception:
-                logging.exception("Error adding legend. Ignoring legend.")
-        elif legend:
-            logging.warning("Invalid legend parameter. Ignoring legend.")
-
     @classmethod
     def histogram(
         cls,
@@ -145,7 +144,7 @@ class Plots:
         legend_kwargs = legend_kwargs or {}
 
         if not ax:
-            fig, ax = plt.subplots(1, 1)
+            _, ax = plt.subplots(1, 1)
 
         if color_data is None:
             color = BaseColors.get(color)
@@ -163,4 +162,4 @@ class Plots:
             for _color, level in zip(palette, levels, strict=False):
                 ax.hist(data[color_data == level], bins=bins, color=_color, **hist_kwargs)
 
-            cls._parse_legend(ax, legend, palette, levels, **legend_kwargs)
+            _parse_legend(ax, legend, palette, levels, **legend_kwargs)

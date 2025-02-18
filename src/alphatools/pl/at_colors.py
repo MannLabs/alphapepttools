@@ -2,6 +2,7 @@
 
 import colorsys
 
+import cmcrameri.cm as cmc
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import colors as mpl_colors
@@ -169,8 +170,9 @@ class BasePalettes:
 class BaseColormaps:
     """Base colormaps for AlphaTools plots"""
 
-    sequential = plt.get_cmap("mako")
-    diverging = plt.get_cmap("vlag")
+    # Use perceptually uniform color palettes to avoid visual distortion (Crameri, F. (2018a), Scientific colour maps. Zenodo. http://doi.org/10.5281/zenodo.1243862)
+    sequential = cmc.devon
+    diverging = cmc.managua_r
 
     @classmethod
     def get(
