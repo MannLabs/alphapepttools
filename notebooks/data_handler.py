@@ -8,8 +8,6 @@ import numpy as np
 import pandas as pd
 from alphabase.tools.data_downloader import DataShareDownloader
 
-from alphatools.io.anndata_factory import AnnDataFactory
-
 
 def create_synthetic_data1() -> ad.AnnData:
     """Create synthetic data with 3 features and 2 cell types."""
@@ -123,6 +121,10 @@ class DataHandler:
 
         if file_format is not None:
             print(f"Creating anndata object from downloaded {file_format} data .. ")
+            from alphabase.anndata.anndata_factory import (
+                AnnDataFactory,  # TODO: move this import up once alphabase is released
+            )
+
             return AnnDataFactory.from_files(file_paths=file_path, reader_type=file_format).create_anndata()
 
         print("Returning file path to downloaded data .. ")
