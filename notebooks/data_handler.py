@@ -59,15 +59,17 @@ class DataHandler:
     """A class to provide test data, both synthetic and real (downloaded from datashare)."""
 
     def __init__(self, name: str | None = None, *, target_folder: str | None = None):
-        """
-        Initialize with a dictionary of URLs and a target folder.
+        """Initialize with a dictionary of URLs and a target folder.
 
         The environment parameters `_TEST_NAME` and `_TEST_TARGET_FOLDER` override the
         respective arguments.
 
-        Args:
-            name (str): name of the test case
-            target_folder (str): Path to the target folder where results will be saved. If "HOME", then a
+        Parameters
+        ----------
+        name
+            name of the test case, must be a vlaid key of TEST_CASES
+        target_folder
+            Path to the target folder where results will be saved. If "HOME", then a
             folder will be created in the user's home directory. Must be `None` only if synthetic data is used.
         """
         _name_from_env = os.environ.get("_TEST_NAME")
