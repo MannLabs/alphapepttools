@@ -75,6 +75,9 @@ scripts.clean = "git clean -fdX -- {args:docs}"
 [tool.hatch.envs.hatch-test]
 features = [ "test" ]
 
+[tool.hatch.metadata]
+allow-direct-references = true # TODO remove once alphabase with anndata is released
+
 [tool.ruff]
 line-length = 120
 src = [ "src" ]
