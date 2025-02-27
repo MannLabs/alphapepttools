@@ -1,6 +1,5 @@
 """An interface to test data, both synthetic and real (downloaded from datashare)."""
 
-import os
 from pathlib import Path
 
 import anndata as ad
@@ -8,6 +7,9 @@ import numpy as np
 import pandas as pd
 from alphabase.anndata.anndata_factory import AnnDataFactory
 from alphabase.tools.data_downloader import DataShareDownloader
+
+# update this in case the file is moved
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 
 def create_synthetic_data_3x2() -> ad.AnnData:
@@ -61,24 +63,19 @@ class DataHandler:
     def __init__(self, name: str | None = None, *, target_folder: str | None = None):
         """Initialize with a dictionary of URLs and a target folder.
 
-        The environment parameters `_TEST_NAME` and `_TEST_TARGET_FOLDER` override the
-        respective arguments.
-
         Parameters
         ----------
         name
-            name of the test case, must be a vlaid key of TEST_CASES
+            name of the test case, must be a valid key of TEST_CASES
         target_folder
-            Path to the target folder where results will be saved. If "HOME", then a
-            folder will be created in the user's home directory. Must be `None` only if synthetic data is used.
+            Path to the target folder where results will be saved.
+            If None, a folder will be created in the root of the repository.
+            If "HOME", then a folder will be created in the user's home directory.
         """
-        _name_from_env = os.environ.get("_TEST_NAME")
-        _test_case_name = _name_from_env if _name_from_env else name
-        self._test_case = TEST_CASES[_test_case_name]
+        self._test_case = TEST_CASES[name]
 
-        _target_folder_from_env = os.environ.get("_TEST_TARGET_FOLDER")
-        if _target_folder_from_env:
-            _target_folder = _target_folder_from_env
+        if target_folder is None:
+            _target_folder = str(REPO_ROOT / "test_data")
         elif target_folder == "HOME":
             _target_folder = str((Path("~") / "alphatools_test_data").expanduser())
         else:
@@ -87,9 +84,7 @@ class DataHandler:
         self._target_folder = _target_folder
 
         if self._test_case is None:
-            raise ValueError(
-                f"Test case type {_test_case_name} is not supported, valid options are {TEST_CASES.keys()}."
-            )
+            raise ValueError(f"Test case type {name} is not supported, valid options are {TEST_CASES.keys()}.")
 
     def get_data(self, data_type: str | None = None, *, truncate: bool = False, **kwargs) -> ad.AnnData | str:
         """
