@@ -23,7 +23,7 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
-  "alphabase==1.5",
+  "alphabase @ git+https://github.com/MannLabs/alphabase@aeefd993e9f2561011535297b576b2e779eb4e2b",
   "anndata==0.11.1",
   "cmcrameri==1.9",
   "matplotlib==3.10",
