@@ -10,19 +10,19 @@ from alphabase.anndata.anndata_factory import AnnDataFactory
 from alphabase.tools.data_downloader import DataShareDownloader
 
 
-def create_synthetic_data1() -> ad.AnnData:
+def create_synthetic_data_3x2() -> ad.AnnData:
     """Create synthetic data with 3 features and 2 cell types."""
-    np.random.seed(0)
-    feature_1 = np.random.normal(0, 1, 100)
-    feature_2 = np.random.normal(0, 1, 100) + 4
-    feature_3 = np.random.normal(0, 1, 100) + 8
+    # TODO: improvements: allow to draw from a lognormal distribution for more realistic properties,
+    #  dropout simulation based on intensity values, create an arbitrary number of
+    #  observations + features
 
-    # replace 50 % of values with NaN in first feature
-    feature_1[np.random.choice(100, 50, replace=False)] = np.nan
+    np.random.seed(0)
+    X = np.random.normal(loc=[0, 4, 8], scale=1, size=(100, 3))
+    X[np.random.choice(100, 50, replace=False), 0] = np.nan
 
     # create anndata object
     return ad.AnnData(
-        X=np.vstack((feature_1, feature_2, feature_3)).T,
+        X=X,
         obs=pd.DataFrame(
             {"celltype": ["A" for _ in range(50)] + ["B" for _ in range(50)]}, index=[f"cell_{i}" for i in range(100)]
         ),
@@ -51,7 +51,7 @@ TEST_CASES = {
             "format": "csv",
         },
     },
-    "synthetic1": {Keys.FUNCTION: create_synthetic_data1},
+    "synthetic_3x2": {Keys.FUNCTION: create_synthetic_data_3x2},
 }
 
 
