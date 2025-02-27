@@ -1,12 +1,16 @@
 """An interface to test data, both synthetic and real (downloaded from datashare)."""
 
+import warnings
 from pathlib import Path
 
 import anndata as ad
 import numpy as np
 import pandas as pd
 from alphabase.anndata.anndata_factory import AnnDataFactory
-from alphabase.tools.data_downloader import DataShareDownloader
+
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", message=".*'progressbar' not installed.*")
+    from alphabase.tools.data_downloader import DataShareDownloader
 
 # update this in case the file is moved
 REPO_ROOT = Path(__file__).resolve().parent.parent
