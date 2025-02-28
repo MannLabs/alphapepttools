@@ -3,10 +3,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from alphatools.pl import at_colors, utils
+from alphatools.pl import at_colors, defaults
 
-config_file = Path(Path(__file__).parent, "plot_config.yaml")
-config = utils.load_plot_config(config_file)
+config = defaults.plot_settings.to_dict()
 
 
 # Adapted from https://github.com/ersilia-os/stylia.git

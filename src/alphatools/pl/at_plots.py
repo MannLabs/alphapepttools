@@ -11,15 +11,14 @@ import pandas as pd
 from matplotlib.patches import Patch
 from pandas.api.types import is_numeric_dtype
 
-from alphatools.pl import utils
+from alphatools.pl import defaults
 from alphatools.pl.at_colors import BaseColors, BasePalettes
 from alphatools.pp.data import _adata_column_to_array
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
 
-config_file = Path(Path(__file__).parent, "plot_config.yaml")
-config = utils.load_plot_config(config_file)
+config = defaults.plot_settings.to_dict()
 
 
 def add_vline(
@@ -105,8 +104,6 @@ class Plots:
     ):
         if not Path(config_file).exists():
             raise FileNotFoundError(f"Config file {config_file} not found")
-
-        config = utils.load_plot_config(config_file)
 
         self.fontfamily = config["font_family"]
         self.font = config["default_font"]
