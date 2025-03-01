@@ -28,6 +28,7 @@ def label(
 ) -> plt.Axes:
     """Apply labels to a matplotlib axes object"""
     ax.set_xlabel(xlabel, fontsize=config["axes"]["label_size"]) if xlabel is not None else ax.set_xlabel("")
+    print(config["axes"]["label_size"])
     ax.set_ylabel(ylabel, fontsize=config["axes"]["label_size"]) if ylabel is not None else ax.set_ylabel("")
     ax.set_title(title, fontsize=config["axes"]["title_size"]) if title is not None else ax.set_title("")
     return ax
