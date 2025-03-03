@@ -37,28 +37,31 @@ def create_synthetic_data_3x2() -> ad.AnnData:
 
 
 class Keys:
-    """Keys for accessing the data in TEST_CASES."""
+    """Keys for accessing the first level in TEST_CASES."""
 
     ADATA = "adata"
     METADATA = "metadata"
     FUNCTION = "function"
 
-    URL = "url"
-    LIMIT_KB = "limit_kb"
-    FORMAT = "format"
+    class Lvl2:
+        """Keys for accessing the second level in TEST_CASES."""
+
+        URL = "url"
+        LIMIT_KB = "limit_kb"
+        FORMAT = "format"
 
 
 # defines all the test cases
 TEST_CASES = {
     "domap": {
         Keys.ADATA: {
-            Keys.URL: "https://datashare.biochem.mpg.de/s/sSYkOj22kM5AJ4O/download?path=%2FSearch%20results%2FAlphaDIA%201.9.2%2Fsecond_pass_Lumosmodel&files=precursors.tsv",
-            Keys.LIMIT_KB: 1048,
-            Keys.FORMAT: "alphadia",  # needs to be a valid reader_type in AnnDataFactory
+            Keys.Lvl2.URL: "https://datashare.biochem.mpg.de/s/sSYkOj22kM5AJ4O/download?path=%2FSearch%20results%2FAlphaDIA%201.9.2%2Fsecond_pass_Lumosmodel&files=precursors.tsv",
+            Keys.Lvl2.LIMIT_KB: 1048,
+            Keys.Lvl2.FORMAT: "alphadia",  # needs to be a valid reader_type in AnnDataFactory
         },
         Keys.METADATA: {
-            Keys.URL: "https://datashare.biochem.mpg.de/s/sSYkOj22kM5AJ4O/download?path=%2F&files=simple_metadata.csv",
-            Keys.FORMAT: "csv",
+            Keys.Lvl2.URL: "https://datashare.biochem.mpg.de/s/sSYkOj22kM5AJ4O/download?path=%2F&files=simple_metadata.csv",
+            Keys.Lvl2.FORMAT: "csv",
         },
     },
     "synthetic_3x2": {Keys.FUNCTION: create_synthetic_data_3x2},
@@ -99,7 +102,7 @@ class DataHandler:
         Process a single URL using the existing home-made class.
 
         Args:
-            data_type (str): Type of the data to retrieve.
+            data_type (str): Type of the data to retrieve. Needs to be one of the entries in the `Keys` constants class.
             truncate (bool): If True, the data will be truncated to the limit specified in TEST_CASES.
 
         Returns
@@ -118,10 +121,10 @@ class DataHandler:
         if self._target_folder is None:
             raise ValueError("Target folder is required for downloading data.")
 
-        limit_kb = file_info.get(Keys.LIMIT_KB) if truncate else None
-        file_path = DataShareDownloader(file_info[Keys.URL], self._target_folder).download(limit_kb)
+        limit_kb = file_info.get(Keys.Lvl2.LIMIT_KB) if truncate else None
+        file_path = DataShareDownloader(file_info[Keys.Lvl2.URL], self._target_folder).download(limit_kb)
 
-        if (file_format := file_info.get(Keys.FORMAT)) == "csv":
+        if (file_format := file_info.get(Keys.Lvl2.FORMAT)) == "csv":
             print(f"Creating dataframe from downloaded {file_format} data .. ")
             return pd.read_csv(file_path)
 
