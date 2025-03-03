@@ -37,24 +37,28 @@ def create_synthetic_data_3x2() -> ad.AnnData:
 
 
 class Keys:
-    """Keys for the first layer of the TEST_CASES."""
+    """Keys for accessing the data in TEST_CASES."""
 
     ADATA = "adata"
     METADATA = "metadata"
     FUNCTION = "function"
+
+    URL = "url"
+    LIMIT_KB = "limit_kb"
+    FORMAT = "format"
 
 
 # defines all the test cases
 TEST_CASES = {
     "domap": {
         Keys.ADATA: {
-            "url": "https://datashare.biochem.mpg.de/s/sSYkOj22kM5AJ4O/download?path=%2FSearch%20results%2FAlphaDIA%201.9.2%2Fsecond_pass_Lumosmodel&files=precursors.tsv",
-            "limit_kb": 1048,
-            "format": "alphadia",
+            Keys.URL: "https://datashare.biochem.mpg.de/s/sSYkOj22kM5AJ4O/download?path=%2FSearch%20results%2FAlphaDIA%201.9.2%2Fsecond_pass_Lumosmodel&files=precursors.tsv",
+            Keys.LIMIT_KB: 1048,
+            Keys.FORMAT: "alphadia",  # needs to be a valid reader_type in AnnDataFactory
         },
         Keys.METADATA: {
-            "url": "https://datashare.biochem.mpg.de/s/sSYkOj22kM5AJ4O/download?path=%2F&files=simple_metadata.csv",
-            "format": "csv",
+            Keys.URL: "https://datashare.biochem.mpg.de/s/sSYkOj22kM5AJ4O/download?path=%2F&files=simple_metadata.csv",
+            Keys.FORMAT: "csv",
         },
     },
     "synthetic_3x2": {Keys.FUNCTION: create_synthetic_data_3x2},
@@ -114,11 +118,11 @@ class DataHandler:
         if self._target_folder is None:
             raise ValueError("Target folder is required for downloading data.")
 
-        limit_kb = file_info.get("limit_kb") if truncate else None
-        file_path = DataShareDownloader(file_info["url"], self._target_folder).download(limit_kb)
+        limit_kb = file_info.get(Keys.LIMIT_KB) if truncate else None
+        file_path = DataShareDownloader(file_info[Keys.URL], self._target_folder).download(limit_kb)
 
-        if (file_format := file_info.get("format")) == "csv":
-            print(f"Creating dataframe downloaded {file_format} data .. ")
+        if (file_format := file_info.get(Keys.FORMAT)) == "csv":
+            print(f"Creating dataframe from downloaded {file_format} data .. ")
             return pd.read_csv(file_path)
 
         if file_format is not None:
