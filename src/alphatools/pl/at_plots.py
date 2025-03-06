@@ -1,7 +1,14 @@
-# Plotting functionalities of AlphaTools
+# at_plots.py
+
+# Main plotting submodule with a private method for generating legends, and a
+# Plots class containing class methods to generate plots. The proposed
+# layout for plotting functions is such that they accept AnnData objects and dataframes.
+# When columns to plot are specified for an AnnData object, the _adata_column_to_array()
+# function first tries to find the column in the var_names (i.e. the columns of the actual
+# data), and then in the obs.columns (for example, when plotting a numeric value from X and
+# coloring it by a metadata column from obs, see 03_basic_workflow.ipynb).
 
 import logging
-from pathlib import Path
 
 import anndata as ad
 import matplotlib as mpl
@@ -100,31 +107,9 @@ class Plots:
 
     def __init__(
         self,
-        config_file: str = "plot_config.yaml",
+        config: dict = defaults.plot_settings.to_dict(),
     ):
-        if not Path(config_file).exists():
-            raise FileNotFoundError(f"Config file {config_file} not found")
-
-        self.fontfamily = config["font_family"]
-        self.font = config["default_font"]
-
-        self.fontsize_small = config["font_sizes"]["small"]
-        self.fontsize_medium = config["font_sizes"]["medium"]
-        self.fontsize_large = config["font_sizes"]["large"]
-
-        self.legend_size = config["legend"]["legend_size"]
-
-        self.marker_size_small = config["marker_sizes"]["small"]
-        self.marker_size_medium = config["marker_sizes"]["medium"]
-        self.marker_size_large = config["marker_sizes"]["large"]
-
-        self.qualitative_colorscale = config["colorscales"]["qualitative"]
-        self.sequential_colorscale = config["colorscales"]["sequential"]
-        self.diverging_colorscale = config["colorscales"]["diverging"]
-
-        self.hi_color = config["highlight_colors"]["high"]
-        self.lo_color = config["highlight_colors"]["low"]
-        self.highlight_color = config["highlight_colors"]["general"]
+        self.config = config
 
     @classmethod
     def histogram(
@@ -133,8 +118,8 @@ class Plots:
         value_column: str,
         color_column: str | None = None,
         bins: int = 10,
-        color: str = "blue",
         ax: plt.Axes | None = None,
+        color: str = "blue",
         palette: list[tuple] | None = None,
         legend: str | mpl.legend.Legend | None = None,
         hist_kwargs: dict | None = None,
@@ -183,8 +168,7 @@ class Plots:
         if color_column is None:
             color = BaseColors.get(color)
             ax.hist(values, bins=bins, color=color, **hist_kwargs)
-
-        if color_column is not None:
+        else:
             colors = _adata_column_to_array(data, color_column)
 
             levels = np.unique(colors)

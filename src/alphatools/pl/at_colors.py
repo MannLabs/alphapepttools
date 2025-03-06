@@ -1,4 +1,12 @@
-# submodule to provide standardized colors and color maps
+# at_colors.py:
+
+# Defines the basic look and color layout of AlphaTools. This includes:
+
+# - BaseColors (for getting individual RGBA colors in AlphaTools-style), defining colors based on
+# - BasePalettes (for getting individual discrete palettes in AlphaTools-style), defined as a custom
+#   rearranged version of the spectral colorscale for maximum separation when iterating.
+# - BaseColormaps: Perceptually uniform colormaps (based on the https://github.com/callumrollo/cmcrameri.git)
+
 
 import colorsys
 

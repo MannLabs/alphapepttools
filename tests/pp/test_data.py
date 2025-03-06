@@ -7,7 +7,7 @@ import pytest
 import alphatools as at
 
 # import private method to obtain anndata object
-from alphatools.pp.data import _adata_column_to_array, _handle_overlapping_columns, _to_anndata, get_df_from_adata
+from alphatools.pp.data import _adata_column_to_array, _handle_overlapping_columns, _to_anndata
 
 ### Fixtures ###
 
@@ -192,7 +192,7 @@ def test_add_metadata(
     )
 
     # check whether data was correctly added and aligned
-    df_aligned = get_df_from_adata(adata)
+    df_aligned = adata.to_df()
     sample_metadata_aligned = adata.obs
     feature_metadata_aligned = adata.var
 

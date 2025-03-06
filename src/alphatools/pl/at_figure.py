@@ -1,3 +1,11 @@
+# at_figure.py
+
+# Defines how matplotlib figures and axes are handled. Main functions are stylize() and label(),
+# which apply a consistent layout and appropriately sized labels (based on plot_config.yaml).
+# This module also contains functions for creating and saving figures based on matplotlib's "subplots()" method.
+# Plotting is handled by the "AxisManager" class, which allows for easy (!) iteration or indexing of subplots,
+# while applying consistent styling (see 02_plotting.ipynb for examples).
+
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -28,7 +36,6 @@ def label(
 ) -> plt.Axes:
     """Apply labels to a matplotlib axes object"""
     ax.set_xlabel(xlabel, fontsize=config["axes"]["label_size"]) if xlabel is not None else ax.set_xlabel("")
-    print(config["axes"]["label_size"])
     ax.set_ylabel(ylabel, fontsize=config["axes"]["label_size"]) if ylabel is not None else ax.set_ylabel("")
     ax.set_title(title, fontsize=config["axes"]["title_size"]) if title is not None else ax.set_title("")
     return ax
@@ -72,7 +79,7 @@ class AxisManager:
     ):
         if isinstance(key, int):
             i = key
-            if key >= len(self.axs_flat):
+            if i >= len(self.axs_flat):
                 raise IndexError(f"Axes index {i} out of bounds")
             ax = self.axs_flat[i]
             self.current_i = i + 1
@@ -85,7 +92,7 @@ class AxisManager:
             self.current_i = i * self.cols + j
         return stylize(ax)
 
-    def restart(self) -> None:
+    def reset(self) -> None:
         """Reset the current index of AxisManager to 0"""
         self.current_i = 0
 
@@ -125,6 +132,8 @@ def create_figure(
     height_ratios: list[float] | None = None,
     width_ratios: list[float] | None = None,
     figure_padding: float | None = None,
+    subplots_kwargs: dict | None = None,
+    gridspec_kwargs: dict | None = None,
 ) -> tuple[plt.Figure, np.ndarray]:
     """Create a figure with a specified number of rows and columns
 
@@ -159,11 +168,16 @@ def create_figure(
     """
     figsize = _parse_figsize(figsize)
 
+    # Handle special parameters for subplots and gridspecs for more complex plots
+    subplots_kwargs = subplots_kwargs or {}
+    gridspec_kwargs = {"width_ratios": width_ratios, "height_ratios": height_ratios, **(gridspec_kwargs or {})}
+
     fig, axs = plt.subplots(
         nrows=nrows,
         ncols=ncols,
         figsize=figsize,
-        gridspec_kw={"width_ratios": width_ratios, "height_ratios": height_ratios},
+        gridspec_kw=gridspec_kwargs,
+        **subplots_kwargs,
     )
 
     fig.patch.set_facecolor("white")
@@ -171,7 +185,8 @@ def create_figure(
     if figure_padding is not None:
         fig.tight_layout(pad=figure_padding)
 
-    return fig, _indexable_axes(axs)
+    # TODO: Actually, create_figure should return an AxisManager object to enforce consistent styling
+    return fig, AxisManager(axs)
 
 
 def save_figure(
@@ -194,13 +209,10 @@ def save_figure(
         If no extension is given, the figure will be saved as a .png file.
 
     output_dir : str
-        The directory to save the figure in
+        The directory to save the figure in. Will be created in case it does not exist.
 
     dpi : int, optional
-        The resolution of the figure, by default 300
-
-    figure_padding : float, optional
-        The margin padding to apply to the figure, by default 3
+        The resolution of the figure, taken by default from config
 
     transparent : bool, optional
         Whether to save a .png figure with a transparent background.
@@ -209,8 +221,9 @@ def save_figure(
         Additional keyword arguments to pass to fig.savefig
 
     """
-    if not Path(output_dir).exists():
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_path = Path(output_dir)
+    if not output_path.exists():
+        output_path.mkdir(parents=True, exist_ok=True)
 
     if not filename.endswith(".png"):
         filename += ".png"

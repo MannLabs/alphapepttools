@@ -87,7 +87,7 @@ def add_metadata(  # noqa: C901, PLR0912
     if any(incoming_metadata.index.duplicated()):
         raise ValueError("Duplicated metadata indices are not supported.")
 
-    _raise_nonoverlapping_indices(get_df_from_adata(adata), incoming_metadata, axis)
+    _raise_nonoverlapping_indices(adata.to_df(), incoming_metadata, axis)
 
     # set join type
     join = "left" if keep_data_shape else "inner"
@@ -142,8 +142,8 @@ def add_metadata(  # noqa: C901, PLR0912
 
 
 def _raise_nonoverlapping_indices(
-    data: pd.Index,
-    metadata: pd.Index,
+    data: pd.DataFrame,
+    metadata: pd.DataFrame,
     axis: int,
 ) -> None:
     """Check if any fields overlap between two dataframes on respective axes"""
@@ -179,30 +179,6 @@ def _handle_overlapping_columns(
     )
 
 
-def get_df_from_adata(
-    adata: ad.AnnData,
-    layer: str | None = None,
-) -> pd.DataFrame:
-    """Extract dataframe from AnnData object, either from X or a layer.
-
-    Parameters
-    ----------
-    adata : ad.AnnData
-            Anndata object to extract data from.
-    layer : str, optional
-            Name of the layer to extract. If None, the data matrix X is extracted.
-
-    Returns
-    -------
-    df : pd.DataFrame
-            Dataframe with data from adata.
-
-    """
-    if layer is not None:
-        return pd.DataFrame(adata.layers[layer], index=adata.obs.index, columns=adata.var.index)
-    return pd.DataFrame(adata.X, index=adata.obs.index, columns=adata.var.index)
-
-
 def _adata_column_to_array(
     data: pd.DataFrame | ad.AnnData,
     column: str,
@@ -229,7 +205,6 @@ def _adata_column_to_array(
         if column not in data.columns:
             raise ValueError(f"Column {column} not found in DataFrame.")
         return data[column].to_numpy()
-
     if isinstance(data, ad.AnnData):
         # prioritize var_names, i.e. numeric data from X
         if column in data.var_names:
@@ -241,7 +216,6 @@ def _adata_column_to_array(
             return data.obs[column].to_numpy()
 
         raise ValueError(f"Column {column} not found in AnnData object (checked var_names or obs.columns).")
-
     raise TypeError("Data must be a pandas DataFrame or an AnnData object.")
 
 
@@ -301,6 +275,7 @@ def filter_data_completeness(
     """Filter data based on missing values
 
     Filter either samples or features based on the fraction of missing values.
+    ### NOT IMPLEMENTED YET: Group-based filtering ###
     If group_column and groups are provided, only missingness of certain metadata
     levels is considered. This is especially useful for imbalanced classes, where
     filtering by global missingness may leave too many missing values in the smaller

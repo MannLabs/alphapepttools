@@ -36,6 +36,7 @@ optional-dependencies.dev = [
   "pre-commit",
   "twine>=4.0.2",
 ]
+# TODO: decouple dependencies required for plotting from the core functionality
 optional-dependencies.doc = [
   # Until pybtex >0.23.0 releases: https://bitbucket.org/pybtex-devs/pybtex/issues/169/
   "cmcrameri==1.9",
