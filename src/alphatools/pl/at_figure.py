@@ -135,7 +135,25 @@ def create_figure(
     subplots_kwargs: dict | None = None,
     gridspec_kwargs: dict | None = None,
 ) -> tuple[plt.Figure, np.ndarray]:
-    """Create a figure with a specified number of rows and columns
+    """Create a figure with a specified number of rows and columns. Returns an AxisManager object to manage axes objects.
+
+    This is especially useful for creating subplots with consistent styling. Example:
+
+    # This works:
+    fig, axm = create_figure(nrows=2, ncols=2, figsize = (4, 4))
+    x = np.linspace(0, 10, 100)
+    functions = [lambda x: np.sin(x + 1), lambda x: np.sin(x) * 2, lambda x: np.sin(x) + 2, lambda x: np.sin(x) - 2]
+    for i, func in enumerate(functions):
+        ax = axm[i]
+        ax.scatter(x, func(x))
+
+    # Just the same as this:
+    fig, axm = create_figure(nrows=1, ncols=4, figsize = (8, 2))
+    x = np.linspace(0, 10, 100)
+    functions = [lambda x: np.sin(x + 1), lambda x: np.sin(x) * 2, lambda x: np.sin(x) + 2, lambda x: np.sin(x) - 2]
+    for i, func in enumerate(functions):
+        ax = axm[i]
+        ax.scatter(x, func(x))
 
     Parameters
     ----------
@@ -162,8 +180,8 @@ def create_figure(
     fig : plt.Figure
         The figure object
 
-    axs : list[plt.Axes]
-        A 2D array of axes objects
+    axm : AxisManager object
+        An iterable and indexable object to manage matplotlib.axes objects
 
     """
     figsize = _parse_figsize(figsize)
@@ -185,7 +203,6 @@ def create_figure(
     if figure_padding is not None:
         fig.tight_layout(pad=figure_padding)
 
-    # TODO: Actually, create_figure should return an AxisManager object to enforce consistent styling
     return fig, AxisManager(axs)
 
 
