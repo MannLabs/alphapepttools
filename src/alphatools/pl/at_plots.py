@@ -12,7 +12,8 @@ from matplotlib.patches import Patch
 from pandas.api.types import is_numeric_dtype
 
 from alphatools.pl import defaults
-from alphatools.pl.at_colors import BaseColors, BasePalettes
+from alphatools.pl.at_colors import BaseColormaps, BaseColors, BasePalettes
+from alphatools.pl.at_figure import create_figure
 from alphatools.pp.data import _adata_column_to_array
 
 # logging configuration
@@ -174,7 +175,7 @@ class Plots:
         legend_kwargs = legend_kwargs or {}
 
         if not ax:
-            _, ax = plt.subplots(1, 1)
+            _, ax = create_figure(1, 1)
 
         values = _adata_column_to_array(data, value_column)
         if not is_numeric_dtype(values):
@@ -196,3 +197,90 @@ class Plots:
                 ax.hist(values[colors == level], bins=bins, color=_color, **hist_kwargs)
 
             _parse_legend(ax, legend, palette, levels, **legend_kwargs)
+
+    @classmethod
+    def scatter(
+        cls,
+        data: pd.DataFrame | ad.AnnData,
+        x_column: str,
+        y_column: str,
+        color_column: str | None = None,
+        color: str = "blue",
+        ax: plt.Axes | None = None,
+        palette: list[tuple] | None = None,
+        legend: str | mpl.legend.Legend | None = None,
+        scatter_kwargs: dict | None = None,
+        legend_kwargs: dict | None = None,
+    ) -> None:
+        """Plot a scatterplot from a DataFrame or AnnData object
+
+        Parameters
+        ----------
+        data : pd.DataFrame | ad.AnnData
+            Data to plot, must contain the x_column and y_column and optionally the color_column.
+        x_column : str
+            Column in data to plot on the x-axis. Must contain numeric data.
+        y_column : str
+            Column in data to plot on the y-axis. Must contain numeric data.
+        color_column : str, optional
+            Column in data to use for color encoding. Overrides color parameter. By default None.
+        color : str, optional
+            Color to use for the scatterplot. By default "blue".
+        ax : plt.Axes, optional
+            Matplotlib axes object to plot on, if None a new figure is created. By default None.
+        palette : list[tuple], optional
+            List of colors to use for color encoding, if None a default palette is used. By default None.
+        legend : str | mpl.legend.Legend, optional
+            Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
+        scatter_kwargs : dict, optional
+            Additional keyword arguments for the matplotlib scatter function. By default None.
+        legend_kwargs : dict, optional
+            Additional keyword arguments for the matplotlib legend function. By default None.
+
+        Returns
+        -------
+        None
+
+        """
+        scatter_kwargs = scatter_kwargs or {}
+        legend_kwargs = legend_kwargs or {}
+
+        # Avoid overplotting legend until gradient fill Patch is implemented
+        override_legend = False
+
+        if not ax:
+            _, ax = create_figure()
+
+        x_values = _adata_column_to_array(data, x_column)
+        if not is_numeric_dtype(x_values):
+            raise ValueError("X column must contain numeric data")
+        y_values = _adata_column_to_array(data, y_column)
+        if not is_numeric_dtype(y_values):
+            raise ValueError("Y column must contain numeric data")
+
+        if color_column is None:
+            color = BaseColors.get(color)
+            ax.scatter(x_values, y_values, color=color, **scatter_kwargs)
+
+        if color_column is not None:
+            colors = _adata_column_to_array(data, color_column)
+            color_levels = np.unique(colors)
+
+            if palette is None:
+                palette = BasePalettes.get("qualitative", n=len(color_levels))
+                if len(set(palette)) < len(color_levels):
+                    logging.info(
+                        "Scatterplot got more levels than colors in qualitative palette. Switching to sequential colormap."
+                    )
+                    palette = BaseColormaps.get("sequential")(np.linspace(0, 1, len(color_levels)))
+
+                    # TODO: Add gradient patch from smallest to largest value in color_levels and generate legend
+                    override_legend = True
+
+            for _color, color_level in zip(palette, color_levels, strict=False):
+                ax.scatter(
+                    x_values[colors == color_level], y_values[colors == color_level], color=_color, **scatter_kwargs
+                )
+
+            if not override_legend:
+                _parse_legend(ax, legend, palette, color_levels, **legend_kwargs)

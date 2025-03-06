@@ -160,13 +160,13 @@ class BasePalettes:
             except ValueError as exc:
                 raise ValueError(f"Unknown palette name: {palette_name}") from exc
 
-        # if n is greater than the length of the palette, loop through the palette
         if n is not None:
             palette = _cycle_palette(palette, n)
 
         return palette
 
 
+# TODO: Fix so a defined number of colors can be retrieved with .get, as well as the whole colormap
 class BaseColormaps:
     """Base colormaps for AlphaTools plots"""
 
