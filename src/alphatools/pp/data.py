@@ -142,7 +142,7 @@ def add_metadata(  # noqa: C901, PLR0912
     return adata
 
 
-def filter_by_dict(
+def _filter_by_dict(
     data: pd.DataFrame,
     filter_dict: dict,
     logic: str = "and",
@@ -180,8 +180,7 @@ def filter_by_dict(
     """
     # data must have unique indices
     if any(data.index.duplicated()):
-        logging.warning("pp.filter_by_dict(): Duplicated indices in data, reassigning index.")
-        data = data.reset_index(drop=True)
+        raise ValueError("pp.filter_by_dict(): Duplicated indices in data, reassigning index.")
 
     if not filter_dict:
         return pd.Series(True, index=data.index)  # noqa: FBT003
@@ -199,16 +198,17 @@ def filter_by_dict(
             current_mask = feature.isin(v)
         elif isinstance(v, tuple):
             current_mask = _tuple_based_filter(feature, v)
+
         filter_masks.append(current_mask)
 
     # if 'and', all masks must be True to keep a row
     # if 'or', at least one mask must be True to keep a row
     if logic == "and":
-        data_mask = np.all(filter_masks, axis=0)
+        merged_filter_mask = np.all(filter_masks, axis=0)
     elif logic == "or":
-        data_mask = np.any(filter_masks, axis=0)
+        merged_filter_mask = np.any(filter_masks, axis=0)
 
-    return data_mask
+    return merged_filter_mask
 
 
 def _tuple_based_filter(
@@ -216,12 +216,16 @@ def _tuple_based_filter(
     input_tuple: tuple,
 ) -> pd.Series:
     """Tuple-based filtering of numeric features"""
+    errors = []
     if not is_numeric_dtype(feature):
-        raise ValueError("Tuple-based filtering only works on numeric features.")
-    if not len(input_tuple) == 2:  # noqa: PLR2004
-        raise ValueError("Tuple-based filtering requires a tuple of length 2.")
+        errors.append("Tuple-based filtering only works on numeric features.")
+    if len(input_tuple) != 2:  # noqa: PLR2004
+        errors.append("Tuple-based filtering requires a tuple of length 2.")
     if not all(isinstance(x, numbers.Number) or x is None for x in input_tuple):
-        raise ValueError("Tuple-based filtering requires numeric values or None.")
+        errors.append("Tuple-based filtering requires numeric values or None.")
+
+    if errors:
+        raise ValueError("Errors found in tuple-based filtering:\n" + "\n".join(errors))
 
     lower, upper = input_tuple
     if lower is not None and upper is not None:
@@ -230,10 +234,8 @@ def _tuple_based_filter(
         current_mask = feature >= lower
     elif upper is not None:
         current_mask = feature < upper
-    elif lower is None and upper is None:
-        current_mask = pd.Series(True, index=feature.index)  # noqa: FBT003
     else:
-        raise ValueError("Tuple-based filtering failed, check filter values.")
+        current_mask = pd.Series(True, index=feature.index)  # noqa: FBT003
 
     return current_mask
 
@@ -242,28 +244,17 @@ def _verify_filter_dict(
     filter_dict: dict,
     data: pd.DataFrame,
 ) -> None:
+    errors = []
     for k, v in filter_dict.items():
         if not isinstance(k, str):
-            raise TypeError("Filter keys must be strings.")
+            errors.append(f"Filter keys must be string, not {type(k).__name__}.")
         if k not in data.columns and k != "index":
-            raise ValueError(f"Filter key '{k}' is not 'index' and also not found in data columns.")
+            errors.append(f"Filter key '{k}' is not 'index' and also not found in data columns.")
         if not isinstance(v, str | numbers.Number | list | tuple):
-            raise TypeError(f"Filter values must be of type str, number, list or tuple, not {type(v)}.")
+            errors.append(f"Filter values must be of type str, number, list or tuple, not {type(v)}.")
 
-
-def _get_filter_mask_from_adata(
-    adata: ad.AnnData,
-    filter_dict: dict,
-    axis: int,
-    logic: str,
-) -> pd.Series:
-    # TODO: perhaps too small for a separate method?
-    if axis == 0:
-        filter_mask = filter_by_dict(adata.obs, filter_dict, logic)
-    elif axis == 1:
-        filter_mask = filter_by_dict(adata.var, filter_dict, logic)
-
-    return filter_mask
+    if errors:
+        raise ValueError("Errors found in filter_dict:\n" + "\n".join(errors))
 
 
 def filter_by_metadata(
@@ -309,18 +300,18 @@ def filter_by_metadata(
         Filtered anndata object.
 
     """
-    filter_mask = _get_filter_mask_from_adata(adata, filter_dict, axis, logic)
+    metadata_to_filter = adata.obs if axis == 0 else adata.var
+    filter_mask = _filter_by_dict(metadata_to_filter, filter_dict, logic)
 
-    if action == "keep":
-        if axis == 0:
-            adata = adata[filter_mask, :]
-        elif axis == 1:
-            adata = adata[:, filter_mask]
-    elif action == "drop":
-        if axis == 0:
-            adata = adata[~filter_mask, :]
-        elif axis == 1:
-            adata = adata[:, ~filter_mask]
+    if action == "drop":
+        filter_mask = ~filter_mask
+
+    if axis == 0:
+        adata = adata[filter_mask, :]
+    elif axis == 1:
+        adata = adata[:, filter_mask]
+    else:
+        raise ValueError("Invalid 'axis' parameter, must be 0 or 1.")
 
     return adata
 
