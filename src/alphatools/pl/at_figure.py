@@ -66,12 +66,13 @@ class AxisManager:
         axs: plt.Axes | list[plt.Axes],
     ):
         axs = _indexable_axes(axs)
-
         self.axs = axs
-        self.axs_flat = axs.flatten()
-
         self.current_i = 0
         self.rows, self.cols = self.axs.shape
+
+    @property
+    def _axs_flat(self) -> np.ndarray:
+        return self.axs.flatten()
 
     def __getitem__(
         self,
@@ -79,9 +80,9 @@ class AxisManager:
     ):
         if isinstance(key, int):
             i = key
-            if i >= len(self.axs_flat):
+            if i >= len(self._axs_flat):
                 raise IndexError(f"Axes index {i} out of bounds")
-            ax = self.axs_flat[i]
+            ax = self._axs_flat[i]
             self.current_i = i + 1
         elif isinstance(key, tuple):
             i, j = key
@@ -98,9 +99,9 @@ class AxisManager:
 
     def next(self) -> plt.Axes:
         """Get the next axes object in the sequence"""
-        if self.current_i >= len(self.axs_flat):
+        if self.current_i >= len(self._axs_flat):
             raise StopIteration("No more axes available")
-        ax = self.axs_flat[self.current_i]
+        ax = self._axs_flat[self.current_i]
         self.current_i += 1
         return stylize(ax)
 
@@ -131,7 +132,6 @@ def create_figure(
     figsize: tuple[float, float] | tuple[str, str] | None = None,
     height_ratios: list[float] | None = None,
     width_ratios: list[float] | None = None,
-    figure_padding: float | None = None,
     subplots_kwargs: dict | None = None,
     gridspec_kwargs: dict | None = None,
 ) -> tuple[plt.Figure, np.ndarray]:
@@ -172,9 +172,6 @@ def create_figure(
     width_ratios : list[float], optional
         The width ratios of the columns in the figure, by default None
 
-    figure_padding : float, optional
-        The margin padding to apply to the figure, by default None
-
     Returns
     -------
     fig : plt.Figure
@@ -187,7 +184,7 @@ def create_figure(
     figsize = _parse_figsize(figsize)
 
     # Handle special parameters for subplots and gridspecs for more complex plots
-    subplots_kwargs = subplots_kwargs or {}
+    subplots_kwargs = {"constrained_layout": True, **(subplots_kwargs or {})}
     gridspec_kwargs = {"width_ratios": width_ratios, "height_ratios": height_ratios, **(gridspec_kwargs or {})}
 
     fig, axs = plt.subplots(
@@ -199,9 +196,6 @@ def create_figure(
     )
 
     fig.patch.set_facecolor("white")
-
-    if figure_padding is not None:
-        fig.tight_layout(pad=figure_padding)
 
     return fig, AxisManager(axs)
 
