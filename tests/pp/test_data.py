@@ -7,7 +7,7 @@ import pytest
 import alphatools as at
 
 # import private method to obtain anndata object
-from alphatools.pp.data import _adata_column_to_array, _handle_overlapping_columns, _to_anndata, get_df_from_adata
+from alphatools.pp.data import _adata_column_to_array, _handle_overlapping_columns, _to_anndata
 
 ### Fixtures ###
 
@@ -53,6 +53,18 @@ def example_feature_metadata():
         )
         feature_metadata.index = ["G1", "G3", "G2", "G4"]
         return feature_metadata
+
+    return make_dummy_data()
+
+
+# example AnnData object for downstream tests
+@pytest.fixture
+def example_anndata():
+    def make_dummy_data():
+        adata = at.pp.data._to_anndata(example_data())
+        at.pp.add_metadata(adata, example_sample_metadata(), axis=0)
+        at.pp.add_metadata(adata, example_feature_metadata(), axis=1)
+        return adata
 
     return make_dummy_data()
 
@@ -192,7 +204,7 @@ def test_add_metadata(
     )
 
     # check whether data was correctly added and aligned
-    df_aligned = get_df_from_adata(adata)
+    df_aligned = adata.to_df()
     sample_metadata_aligned = adata.obs
     feature_metadata_aligned = adata.var
 
@@ -310,6 +322,332 @@ def test_handle_overlapping_columns(metadata, inplace_metadata, verbose, expecte
             result = _handle_overlapping_columns(metadata, inplace_metadata, verbose=verbose)
             assert result.equals(expected_result)
             assert len(w) == 0
+
+
+# test filtering of data based on metadata
+
+# TODO: better test logic? Combining parameters exhaustively leads to a huge number or tests
+
+
+@pytest.fixture
+def adata_for_filtering():
+    def make_dummy_data():
+        size = 5
+        # important: unique values for each row and column index
+        df = pd.DataFrame(
+            data=np.ones((size, size)),
+            index=[f"cell{i + 1}" for i in range(size)],
+            columns=[f"G{i + 1}" for i in range(size)],
+        )
+        sample_md = pd.DataFrame(
+            {
+                "sample_level": ["A", "A", "B", "B", "C"],
+                "sample_level_na": ["A", None, "B", "B", "C"],
+                "sample_value": [1, 2, 1, 2, 3],
+                "sample_value_na": [1, 2, 1, np.nan, 3],
+            },
+            index=df.index,
+        )
+        feature_md = pd.DataFrame(
+            {
+                "feature_level": ["X", "X", "Y", "Y", "Z"],
+                "feature_level_na": ["X", None, "Y", "Y", "Z"],
+                "feature_value": [10, 20, 10, 20, 30],
+                "feature_value_na": [10, 20, 10, np.nan, 30],
+            },
+            index=df.columns,
+        )
+        adata = at.pp.data._to_anndata(df)
+        adata = at.pp.add_metadata(adata, sample_md, axis=0)
+        return at.pp.add_metadata(adata, feature_md, axis=1)
+
+    return make_dummy_data()
+
+
+# 1. Establish that filtering works with "keep" and "drop" settings on sample and feature metadata
+@pytest.mark.parametrize(
+    ("expected_adata_index", "filter_dict", "axis", "logic", "action"),
+    [
+        # 1.1. Sample metadata establish basic functionality with "keep" setting
+        # 1.1.1. "and" works on strings & numbers, strings & lists and strings & tuples
+        (
+            np.array(["cell1"]),
+            {"sample_level": "A", "sample_value": 1},
+            0,
+            "and",
+            "keep",
+        ),
+        (
+            np.array(["cell1", "cell2"]),
+            {"sample_level": "A", "sample_value": [1, 2]},
+            0,
+            "and",
+            "keep",
+        ),
+        (
+            np.array(["cell1", "cell2"]),
+            {"sample_level": "A", "sample_value": (1, 3)},
+            0,
+            "and",
+            "keep",
+        ),
+        # 1.1.2. "or" works on strings & numbers, strings & lists and strings & tuples
+        (
+            np.array(["cell1", "cell2", "cell3"]),
+            {"sample_level": "A", "sample_value": 1},
+            0,
+            "or",
+            "keep",
+        ),
+        (
+            np.array(["cell1", "cell2", "cell3", "cell4"]),
+            {"sample_level": "A", "sample_value": [1, 2]},
+            0,
+            "or",
+            "keep",
+        ),
+        (
+            np.array(["cell1", "cell2", "cell3", "cell4"]),
+            {"sample_level": "A", "sample_value": (1, 3)},
+            0,
+            "or",
+            "keep",
+        ),
+        # 1.2. establish basic functionality with "drop" setting
+        # 1.2.1. "and" works on strings & numbers, strings & lists and strings & tuples
+        (
+            np.array(["cell2", "cell3", "cell4", "cell5"]),
+            {"sample_level": "A", "sample_value": 1},
+            0,
+            "and",
+            "drop",
+        ),
+        (
+            np.array(["cell3", "cell4", "cell5"]),
+            {"sample_level": "A", "sample_value": [1, 2]},
+            0,
+            "and",
+            "drop",
+        ),
+        (
+            np.array(["cell3", "cell4", "cell5"]),
+            {"sample_level": "A", "sample_value": (1, 3)},
+            0,
+            "and",
+            "drop",
+        ),
+        # 1.2.2. "or" works on strings & numbers, strings & lists and strings & tuples
+        (
+            np.array(["cell4", "cell5"]),
+            {"sample_level": "A", "sample_value": 1},
+            0,
+            "or",
+            "drop",
+        ),
+        (
+            np.array(["cell5"]),
+            {"sample_level": "A", "sample_value": [1, 2]},
+            0,
+            "or",
+            "drop",
+        ),
+        (
+            np.array(["cell5"]),
+            {"sample_level": "A", "sample_value": (1, 3)},
+            0,
+            "or",
+            "drop",
+        ),
+        # 2.1. Feature metadata: establish basic functionality with "keep" setting
+        # 2.1.1. "and" works on strings & numbers, strings & lists and strings & tuples
+        (
+            np.array(["G1"]),
+            {"feature_level": "X", "feature_value": 10},
+            1,
+            "and",
+            "keep",
+        ),
+        (
+            np.array(["G1", "G2"]),
+            {"feature_level": "X", "feature_value": [10, 20]},
+            1,
+            "and",
+            "keep",
+        ),
+        (
+            np.array(["G1", "G2"]),
+            {"feature_level": "X", "feature_value": (10, 30)},
+            1,
+            "and",
+            "keep",
+        ),
+        # 2.1.2. "or" works on strings & numbers, strings & lists and strings & tuples
+        (
+            np.array(["G1", "G2", "G3"]),
+            {"feature_level": "X", "feature_value": 10},
+            1,
+            "or",
+            "keep",
+        ),
+        (
+            np.array(["G1", "G2", "G3", "G4"]),
+            {"feature_level": "X", "feature_value": [10, 20]},
+            1,
+            "or",
+            "keep",
+        ),
+        (
+            np.array(["G1", "G2", "G3", "G4"]),
+            {"feature_level": "X", "feature_value": (10, 30)},
+            1,
+            "or",
+            "keep",
+        ),
+        # 2.2. establish basic functionality with "drop" setting
+        # 2.2.1. "and" works strings & numbers, strings & lists and strings & tuples
+        (
+            np.array(["G2", "G3", "G4", "G5"]),
+            {"feature_level": "X", "feature_value": 10},
+            1,
+            "and",
+            "drop",
+        ),
+        (
+            np.array(["G3", "G4", "G5"]),
+            {"feature_level": "X", "feature_value": [10, 20]},
+            1,
+            "and",
+            "drop",
+        ),
+        (
+            np.array(["G3", "G4", "G5"]),
+            {"feature_level": "X", "feature_value": (10, 30)},
+            1,
+            "and",
+            "drop",
+        ),
+        # 2.2.2. "or" works on strings & numbers, strings & lists and strings & tuples
+        (
+            np.array(["G4", "G5"]),
+            {"feature_level": "X", "feature_value": 10},
+            1,
+            "or",
+            "drop",
+        ),
+        (
+            np.array(["G5"]),
+            {"feature_level": "X", "feature_value": [10, 20]},
+            1,
+            "or",
+            "drop",
+        ),
+        (
+            np.array(["G5"]),
+            {"feature_level": "X", "feature_value": (10, 30)},
+            1,
+            "or",
+            "drop",
+        ),
+        # 3. Evaluate special cases on sample metadata
+        # 3.1. tuple range open to the right
+        (
+            np.array(["cell2", "cell4", "cell5"]),
+            {"sample_value": (2, None)},
+            0,
+            "and",
+            "keep",
+        ),
+        # 3.2. tuple range open to the left
+        (
+            np.array(["cell1", "cell2", "cell3", "cell4"]),
+            {"sample_value": (None, 3)},
+            0,
+            "and",
+            "keep",
+        ),
+        # 3.3. tuple range open on both sides
+        (
+            np.array(["cell1", "cell2", "cell3", "cell4", "cell5"]),
+            {"sample_value": (None, None)},
+            0,
+            "and",
+            "keep",
+        ),
+        # 3.4. empty filter_dict
+        (
+            np.array(["cell1", "cell2", "cell3", "cell4", "cell5"]),
+            {},
+            0,
+            "and",
+            "keep",
+        ),
+        # 3.5. no matches to keep
+        (
+            np.array([]),
+            {"sample_level": "E", "sample_value": 99},
+            0,
+            "and",
+            "keep",
+        ),
+        # 3.6. no matches to drop
+        (
+            np.array(["cell1", "cell2", "cell3", "cell4", "cell5"]),
+            {"sample_level": "E", "sample_value": 99},
+            0,
+            "and",
+            "drop",
+        ),
+        # 3.7. all data removed
+        (
+            np.array([]),
+            {"sample_level": ["A", "B", "C"]},
+            0,
+            "or",
+            "drop",
+        ),
+        # 3.8. NA in numeric column (tuple based filtering)
+        (
+            np.array(["cell1", "cell2", "cell3", "cell5"]),
+            {"sample_value_na": (1, 4)},
+            0,
+            "and",
+            "keep",
+        ),
+        # 3.9. NA in numeric column (list based filtering)
+        (
+            np.array(["cell1", "cell2", "cell3"]),
+            {"sample_value_na": [1, 2]},
+            0,
+            "and",
+            "keep",
+        ),
+        # 3.10. NA in string column (string based filtering)
+        (
+            np.array(["cell1"]),
+            {"sample_level_na": "A"},
+            0,
+            "and",
+            "keep",
+        ),
+        # 3.11. NA in string column (list based filtering)
+        (
+            np.array(["cell1", "cell3", "cell4"]),
+            {"sample_level_na": ["A", "B"]},
+            0,
+            "and",
+            "keep",
+        ),
+    ],
+)
+def test_filter_by_metadata(adata_for_filtering, expected_adata_index, filter_dict, axis, logic, action):
+    adata = adata_for_filtering.copy()
+    # when
+    adata = at.pp.filter_by_metadata(adata, filter_dict, axis=axis, logic=logic, action=action)
+    # then
+    if len(expected_adata_index) == 0:
+        assert adata.n_obs == 0 if axis == 0 else adata.n_vars == 0
+    else:
+        assert np.array_equal(adata.obs.index if axis == 0 else adata.var.index, expected_adata_index)
 
 
 # test scaling of data

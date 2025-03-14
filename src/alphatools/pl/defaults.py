@@ -6,20 +6,20 @@ class PlotSettings:
         self.default_font = "Arial"
 
         self.font_sizes = {
-            "small": 6.102,
-            "medium": 8.102,
-            "large": 10.102,
+            "small": 6,
+            "medium": 8,
+            "large": 10,
         }
 
         self.axes = {
-            "title_size": 8.102,
-            "label_size": 8.102,
-            "tick_size": 8.102,
+            "title_size": 8,
+            "label_size": 8,
+            "tick_size": 8,
         }
 
         self.legend = {
-            "font_size": 6.102,
-            "title_size": 8.102,
+            "font_size": 8,
+            "title_size": 8,
         }
 
         self.marker_sizes = {

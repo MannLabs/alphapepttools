@@ -24,6 +24,7 @@ classifiers = [
 ]
 dependencies = [
   "anndata==0.11.1",
+  "cmcrameri==1.9",      # TODO: remove this to optional dependencies?
   "matplotlib==3.10",
   "numpy<2",
   "pandas",              # version to be fixed: 2.2.3
@@ -36,9 +37,9 @@ optional-dependencies.dev = [
   "pre-commit",
   "twine>=4.0.2",
 ]
+# TODO: decouple dependencies required for plotting from the core functionality
 optional-dependencies.doc = [
   # Until pybtex >0.23.0 releases: https://bitbucket.org/pybtex-devs/pybtex/issues/169/
-  "cmcrameri==1.9",
   "docutils>=0.8,!=0.18.*,!=0.19.*",
   "ipykernel",
   "ipython",
