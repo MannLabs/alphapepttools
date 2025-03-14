@@ -1,4 +1,4 @@
-# at_plots.py
+# plots.py
 
 # Main plotting submodule with a private method for generating legends, and a
 # Plots class containing class methods to generate plots. The proposed
