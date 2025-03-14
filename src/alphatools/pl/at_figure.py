@@ -11,7 +11,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from alphatools.pl import at_colors, defaults
+from alphatools.pl import colors, defaults
 
 config = defaults.plot_settings.to_dict()
 
@@ -21,7 +21,7 @@ def stylize(
     ax: plt.Axes,
 ) -> plt.Axes:
     """Apply AlphaTools style to a matplotlib axes object"""
-    ax.set_prop_cycle("color", at_colors.BasePalettes.get("qualitative"))
+    ax.set_prop_cycle("color", colors.BasePalettes.get("qualitative"))
     ax.grid(visible=True, linewidth=config["linewidths"]["small"])
     ax.xaxis.set_tick_params(width=config["linewidths"]["small"], labelsize=config["axes"]["tick_size"])
     ax.yaxis.set_tick_params(width=config["linewidths"]["small"], labelsize=config["axes"]["tick_size"])

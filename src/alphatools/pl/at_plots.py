@@ -19,7 +19,7 @@ from matplotlib.patches import Patch
 from pandas.api.types import is_numeric_dtype
 
 from alphatools.pl import defaults
-from alphatools.pl.at_colors import BaseColors, BasePalettes
+from alphatools.pl.colors import BaseColors, BasePalettes
 from alphatools.pp.data import _adata_column_to_array
 
 # logging configuration
