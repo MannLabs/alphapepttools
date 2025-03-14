@@ -1,6 +1,7 @@
 # Create and manipulate Anndata objects
 
 import logging
+import numbers
 import warnings
 
 import anndata as ad
@@ -87,7 +88,7 @@ def add_metadata(  # noqa: C901, PLR0912
     if any(incoming_metadata.index.duplicated()):
         raise ValueError("Duplicated metadata indices are not supported.")
 
-    _raise_nonoverlapping_indices(get_df_from_adata(adata), incoming_metadata, axis)
+    _raise_nonoverlapping_indices(adata.to_df(), incoming_metadata, axis)
 
     # set join type
     join = "left" if keep_data_shape else "inner"
@@ -141,9 +142,183 @@ def add_metadata(  # noqa: C901, PLR0912
     return adata
 
 
+def _filter_by_dict(
+    data: pd.DataFrame,
+    filter_dict: dict,
+    logic: str = "and",
+) -> pd.Series:
+    """Core filtering function to operate on metadata
+
+    Versatile filtering for pd.DataFrames, where different filtering logic
+    can be applied: The filter_dict contains keys, which are column names,
+    and values, which can be either strings, lists or tuples (see below).
+    The 'logic' parameter determines whether multiple filters operate on
+    an 'and' or 'or' basis. Returns indices of samples that match the filter
+    conditions.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        Dataframe to filter. Columns must match with filter_dict keys.
+    filter_dict : dict
+        Dictionary with column names as keys and filter values as values.
+        Values can be either string, list or tuple. For strings, exact matches
+        are performed. For lists, matches are performed on any element in the
+        list. Tuples specify value ranges and must consist of numeric values,
+        where 'None' is interpreted as an open end. Ranges are inclusive on
+        the lower end and exclusive on the upper end to prevent double counting
+        with adjacent filters.
+    logic : str, optional
+        Filtering logic to apply in case of multiple filters. Default to 'and'.
+        Can be 'and' or 'or'.
+
+    Returns
+    -------
+    filter_mask : pd.Series
+        Boolean mask to filter the dataframe.
+
+    """
+    # data must have unique indices
+    if any(data.index.duplicated()):
+        raise ValueError("pp.filter_by_dict(): Duplicated indices in data, reassigning index.")
+
+    if not filter_dict:
+        return pd.Series(True, index=data.index)  # noqa: FBT003
+
+    _verify_filter_dict(filter_dict, data)
+
+    filter_masks = []
+    for k, v in filter_dict.items():
+        feature = data[k] if k != "index" else data.index
+        if v is None:
+            current_mask = pd.Series(True, index=data.index)  # noqa: FBT003
+        elif isinstance(v, str | numbers.Number):
+            current_mask = feature == v
+        elif isinstance(v, list):
+            current_mask = feature.isin(v)
+        elif isinstance(v, tuple):
+            current_mask = _tuple_based_filter(feature, v)
+
+        filter_masks.append(current_mask)
+
+    # if 'and', all masks must be True to keep a row
+    # if 'or', at least one mask must be True to keep a row
+    if logic == "and":
+        merged_filter_mask = np.all(filter_masks, axis=0)
+    elif logic == "or":
+        merged_filter_mask = np.any(filter_masks, axis=0)
+
+    return merged_filter_mask
+
+
+def _tuple_based_filter(
+    feature: pd.Series,
+    input_tuple: tuple,
+) -> pd.Series:
+    """Tuple-based filtering of numeric features"""
+    errors = []
+    if not is_numeric_dtype(feature):
+        errors.append("Tuple-based filtering only works on numeric features.")
+    if len(input_tuple) != 2:  # noqa: PLR2004
+        errors.append("Tuple-based filtering requires a tuple of length 2.")
+    if not all(isinstance(x, numbers.Number) or x is None for x in input_tuple):
+        errors.append("Tuple-based filtering requires numeric values or None.")
+
+    if errors:
+        raise ValueError("Errors found in tuple-based filtering:\n" + "\n".join(errors))
+
+    lower, upper = input_tuple
+    if lower is not None and upper is not None:
+        current_mask = (feature >= lower) & (feature < upper)
+    elif lower is not None:
+        current_mask = feature >= lower
+    elif upper is not None:
+        current_mask = feature < upper
+    else:
+        current_mask = pd.Series(True, index=feature.index)  # noqa: FBT003
+
+    return current_mask
+
+
+def _verify_filter_dict(
+    filter_dict: dict,
+    data: pd.DataFrame,
+) -> None:
+    errors = []
+    for k, v in filter_dict.items():
+        if not isinstance(k, str):
+            errors.append(f"Filter keys must be string, not {type(k).__name__}.")
+        if k not in data.columns and k != "index":
+            errors.append(f"Filter key '{k}' is not 'index' and also not found in data columns.")
+        if not isinstance(v, str | numbers.Number | list | tuple):
+            errors.append(f"Filter values must be of type str, number, list or tuple, not {type(v)}.")
+
+    if errors:
+        raise ValueError("Errors found in filter_dict:\n" + "\n".join(errors))
+
+
+def filter_by_metadata(
+    adata: ad.AnnData,
+    filter_dict: dict,
+    axis: int,
+    logic: str = "and",
+    action: str = "keep",
+) -> ad.AnnData:
+    """Filter based on metadata
+
+    Filter or drop rows/columns from an adata object based on filter conditions
+    specified in a filter_dict. The filter_dict contains keys, which are column
+    names, and values, which can be either strings, lists or tuples. The 'logic'
+    parameter determines whether multiple filters operate on an 'and' or 'or'
+    basis.
+
+    Parameters
+    ----------
+    adata : ad.AnnData
+        Anndata object to filter.
+    filter_dict : dict
+        Dictionary with column names as keys and filter values as values.
+        Values can be either string, list or tuple. For strings, exact matches
+        are performed. For lists, matches are performed on any element in the
+        list. Tuples specify value ranges and must consist of numeric values,
+        where 'None' is interpreted as an open end. Ranges are inclusive on
+        the lower end and exclusive on the upper end to prevent double counting
+        with adjacent filters.
+    axis : int
+        Axis to filter on. 0 for obs and 1 for var.
+    logic : str, optional
+        Filtering logic to apply in case of multiple filters. Default to 'and'.
+        Can be 'and' or 'or'.
+    action : str, optional
+        If "keep", extract rows/columns that match the filter conditions.
+        If "drop", extract rows/columns outside the filter conditions.
+        Default to "keep".
+
+    Returns
+    -------
+    adata : ad.AnnData
+        Filtered anndata object.
+
+    """
+    metadata_to_filter = adata.obs if axis == 0 else adata.var
+    filter_mask = _filter_by_dict(metadata_to_filter, filter_dict, logic)
+
+    if action == "drop":
+        filter_mask = ~filter_mask
+
+    if axis == 0:
+        adata = adata[filter_mask, :]
+    elif axis == 1:
+        adata = adata[:, filter_mask]
+    else:
+        raise ValueError("Invalid 'axis' parameter, must be 0 or 1.")
+
+    return adata
+
+
 def _raise_nonoverlapping_indices(
-    data: pd.Index,
-    metadata: pd.Index,
+    data: pd.DataFrame,
+    metadata: pd.DataFrame,
     axis: int,
 ) -> None:
     """Check if any fields overlap between two dataframes on respective axes"""
@@ -179,30 +354,6 @@ def _handle_overlapping_columns(
     )
 
 
-def get_df_from_adata(
-    adata: ad.AnnData,
-    layer: str | None = None,
-) -> pd.DataFrame:
-    """Extract dataframe from AnnData object, either from X or a layer.
-
-    Parameters
-    ----------
-    adata : ad.AnnData
-            Anndata object to extract data from.
-    layer : str, optional
-            Name of the layer to extract. If None, the data matrix X is extracted.
-
-    Returns
-    -------
-    df : pd.DataFrame
-            Dataframe with data from adata.
-
-    """
-    if layer is not None:
-        return pd.DataFrame(adata.layers[layer], index=adata.obs.index, columns=adata.var.index)
-    return pd.DataFrame(adata.X, index=adata.obs.index, columns=adata.var.index)
-
-
 def _adata_column_to_array(
     data: pd.DataFrame | ad.AnnData,
     column: str,
@@ -229,7 +380,6 @@ def _adata_column_to_array(
         if column not in data.columns:
             raise ValueError(f"Column {column} not found in DataFrame.")
         return data[column].to_numpy()
-
     if isinstance(data, ad.AnnData):
         # prioritize var_names, i.e. numeric data from X
         if column in data.var_names:
@@ -241,7 +391,6 @@ def _adata_column_to_array(
             return data.obs[column].to_numpy()
 
         raise ValueError(f"Column {column} not found in AnnData object (checked var_names or obs.columns).")
-
     raise TypeError("Data must be a pandas DataFrame or an AnnData object.")
 
 
@@ -301,6 +450,7 @@ def filter_data_completeness(
     """Filter data based on missing values
 
     Filter either samples or features based on the fraction of missing values.
+    ### NOT IMPLEMENTED YET: Group-based filtering ###
     If group_column and groups are provided, only missingness of certain metadata
     levels is considered. This is especially useful for imbalanced classes, where
     filtering by global missingness may leave too many missing values in the smaller

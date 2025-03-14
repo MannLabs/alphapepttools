@@ -1,12 +1,19 @@
+# at_figure.py
+
+# Defines how matplotlib figures and axes are handled. Main functions are stylize() and label(),
+# which apply a consistent layout and appropriately sized labels (based on plot_config.yaml).
+# This module also contains functions for creating and saving figures based on matplotlib's "subplots()" method.
+# Plotting is handled by the "AxisManager" class, which allows for easy (!) iteration or indexing of subplots,
+# while applying consistent styling (see 02_plotting.ipynb for examples).
+
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 
-from alphatools.pl import at_colors, utils
+from alphatools.pl import colors, defaults
 
-config_file = Path(Path(__file__).parent, "plot_config.yaml")
-config = utils.load_plot_config(config_file)
+config = defaults.plot_settings.to_dict()
 
 
 # Adapted from https://github.com/ersilia-os/stylia.git
@@ -14,7 +21,7 @@ def stylize(
     ax: plt.Axes,
 ) -> plt.Axes:
     """Apply AlphaTools style to a matplotlib axes object"""
-    ax.set_prop_cycle("color", at_colors.BasePalettes.get("qualitative"))
+    ax.set_prop_cycle("color", colors.BasePalettes.get("qualitative"))
     ax.grid(visible=True, linewidth=config["linewidths"]["small"])
     ax.xaxis.set_tick_params(width=config["linewidths"]["small"], labelsize=config["axes"]["tick_size"])
     ax.yaxis.set_tick_params(width=config["linewidths"]["small"], labelsize=config["axes"]["tick_size"])
@@ -59,12 +66,13 @@ class AxisManager:
         axs: plt.Axes | list[plt.Axes],
     ):
         axs = _indexable_axes(axs)
-
         self.axs = axs
-        self.axs_flat = axs.flatten()
-
         self.current_i = 0
         self.rows, self.cols = self.axs.shape
+
+    @property
+    def _axs_flat(self) -> np.ndarray:
+        return self.axs.flatten()
 
     def __getitem__(
         self,
@@ -72,9 +80,9 @@ class AxisManager:
     ):
         if isinstance(key, int):
             i = key
-            if key >= len(self.axs_flat):
+            if i >= len(self._axs_flat):
                 raise IndexError(f"Axes index {i} out of bounds")
-            ax = self.axs_flat[i]
+            ax = self._axs_flat[i]
             self.current_i = i + 1
         elif isinstance(key, tuple):
             i, j = key
@@ -85,15 +93,15 @@ class AxisManager:
             self.current_i = i * self.cols + j
         return stylize(ax)
 
-    def restart(self) -> None:
+    def reset(self) -> None:
         """Reset the current index of AxisManager to 0"""
         self.current_i = 0
 
     def next(self) -> plt.Axes:
         """Get the next axes object in the sequence"""
-        if self.current_i >= len(self.axs_flat):
+        if self.current_i >= len(self._axs_flat):
             raise StopIteration("No more axes available")
-        ax = self.axs_flat[self.current_i]
+        ax = self._axs_flat[self.current_i]
         self.current_i += 1
         return stylize(ax)
 
@@ -124,9 +132,32 @@ def create_figure(
     figsize: tuple[float, float] | tuple[str, str] | None = None,
     height_ratios: list[float] | None = None,
     width_ratios: list[float] | None = None,
-    figure_padding: float | None = None,
+    subplots_kwargs: dict | None = None,
+    gridspec_kwargs: dict | None = None,
 ) -> tuple[plt.Figure, np.ndarray]:
-    """Create a figure with a specified number of rows and columns
+    """Create a figure with a specified number of rows and columns. Returns an AxisManager object to manage axes objects.
+
+    This is especially useful for creating subplots with consistent styling. Importantly, it should completely sync the
+    plot a user sees in a jupyter notebook with the exported (e.g. .png) figure file. The aim of this is to entirely
+    eliminate time consuming iterations of checking the exported plot and going back to adjust sizes/padding in the code.
+
+    Example:
+
+    # This works:
+    fig, axm = create_figure(nrows=2, ncols=2, figsize = (4, 4))
+    x = np.linspace(0, 10, 100)
+    functions = [lambda x: np.sin(x + 1), lambda x: np.sin(x) * 2, lambda x: np.sin(x) + 2, lambda x: np.sin(x) - 2]
+    for i, func in enumerate(functions):
+        ax = axm[i]
+        ax.scatter(x, func(x))
+
+    # Just the same as this:
+    fig, axm = create_figure(nrows=1, ncols=4, figsize = (8, 2))
+    x = np.linspace(0, 10, 100)
+    functions = [lambda x: np.sin(x + 1), lambda x: np.sin(x) * 2, lambda x: np.sin(x) + 2, lambda x: np.sin(x) - 2]
+    for i, func in enumerate(functions):
+        ax = axm[i]
+        ax.scatter(x, func(x))
 
     Parameters
     ----------
@@ -145,33 +176,32 @@ def create_figure(
     width_ratios : list[float], optional
         The width ratios of the columns in the figure, by default None
 
-    figure_padding : float, optional
-        The margin padding to apply to the figure, by default None
-
     Returns
     -------
     fig : plt.Figure
         The figure object
 
-    axs : list[plt.Axes]
-        A 2D array of axes objects
+    axm : AxisManager object
+        An iterable and indexable object to manage matplotlib.axes objects
 
     """
     figsize = _parse_figsize(figsize)
+
+    # Handle special parameters for subplots and gridspecs for more complex plots
+    subplots_kwargs = {"constrained_layout": True, **(subplots_kwargs or {})}
+    gridspec_kwargs = {"width_ratios": width_ratios, "height_ratios": height_ratios, **(gridspec_kwargs or {})}
 
     fig, axs = plt.subplots(
         nrows=nrows,
         ncols=ncols,
         figsize=figsize,
-        gridspec_kw={"width_ratios": width_ratios, "height_ratios": height_ratios},
+        gridspec_kw=gridspec_kwargs,
+        **subplots_kwargs,
     )
 
     fig.patch.set_facecolor("white")
 
-    if figure_padding is not None:
-        fig.tight_layout(pad=figure_padding)
-
-    return fig, _indexable_axes(axs)
+    return fig, AxisManager(axs)
 
 
 def save_figure(
@@ -194,13 +224,10 @@ def save_figure(
         If no extension is given, the figure will be saved as a .png file.
 
     output_dir : str
-        The directory to save the figure in
+        The directory to save the figure in. Will be created in case it does not exist.
 
     dpi : int, optional
-        The resolution of the figure, by default 300
-
-    figure_padding : float, optional
-        The margin padding to apply to the figure, by default 3
+        The resolution of the figure, taken by default from config
 
     transparent : bool, optional
         Whether to save a .png figure with a transparent background.
@@ -209,8 +236,9 @@ def save_figure(
         Additional keyword arguments to pass to fig.savefig
 
     """
-    if not Path(output_dir).exists():
-        Path(output_dir).mkdir(parents=True, exist_ok=True)
+    output_path = Path(output_dir)
+    if not output_path.exists():
+        output_path.mkdir(parents=True, exist_ok=True)
 
     if not filename.endswith(".png"):
         filename += ".png"

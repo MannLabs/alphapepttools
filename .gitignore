@@ -20,4 +20,7 @@ __pycache__/
 /docs/generated/
 /docs/_build/
 
+# misc
+/notebooks/example_outputs/
+
 .idea/

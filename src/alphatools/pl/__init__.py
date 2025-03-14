@@ -1,1 +1,1 @@
-from .at_plots import Plots
+from .plots import Plots
