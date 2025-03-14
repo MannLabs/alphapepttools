@@ -137,7 +137,11 @@ def create_figure(
 ) -> tuple[plt.Figure, np.ndarray]:
     """Create a figure with a specified number of rows and columns. Returns an AxisManager object to manage axes objects.
 
-    This is especially useful for creating subplots with consistent styling. Example:
+    This is especially useful for creating subplots with consistent styling. Importantly, it should completely sync the
+    plot a user sees in a jupyter notebook with the exported (e.g. .png) figure file. The aim of this is to entirely
+    eliminate time consuming iterations of checking the exported plot and going back to adjust sizes/padding in the code.
+
+    Example:
 
     # This works:
     fig, axm = create_figure(nrows=2, ncols=2, figsize = (4, 4))
