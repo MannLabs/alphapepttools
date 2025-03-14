@@ -1,1 +1,1 @@
-from .plots import histogram
+from .plots import Plots
