@@ -23,12 +23,14 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
 ]
 dependencies = [
+  # this is the 'data_downloader_improvements' branch with all the anndata code
+  "alphabase @ git+https://github.com/MannLabs/alphabase@2a2c22ebef6e3b074cc8f4f00db85f8c176b2166",
   "anndata==0.11.1",
-  "cmcrameri==1.9",      # TODO: remove this to optional dependencies?
+  "cmcrameri==1.9",                                                                                 # TODO: remove this to optional dependencies?
   "matplotlib==3.10",
   "numpy<2",
-  "pandas",              # version to be fixed: 2.2.3
-  "pyarrow",             # version to be fixed: 19.0.1
+  "pandas",                                                                                         # version to be fixed: 2.2.3
+  "pyarrow",                                                                                        # version to be fixed: 19.0.1
   "scikit-learn==1.5.1",
   # for debug logging (referenced from the issue template)
   "session-info==1",
@@ -55,6 +57,7 @@ optional-dependencies.doc = [
 ]
 optional-dependencies.test = [
   "coverage",
+  "nbmake",
   "pytest",
 ]
 # https://docs.pypi.org/project_metadata/#project-urls
@@ -74,6 +77,9 @@ scripts.clean = "git clean -fdX -- {args:docs}"
 
 [tool.hatch.envs.hatch-test]
 features = [ "test" ]
+
+[tool.hatch.metadata]
+allow-direct-references = true # TODO remove once alphabase with anndata is released
 
 [tool.ruff]
 line-length = 120
