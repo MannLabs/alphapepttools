@@ -9,6 +9,7 @@
 # coloring it by a metadata column from obs, see 03_basic_workflow.ipynb).
 
 import logging
+from collections.abc import Callable
 
 import anndata as ad
 import matplotlib as mpl
@@ -29,19 +30,69 @@ logging.basicConfig(level=logging.INFO)
 config = defaults.plot_settings.to_dict()
 
 
-def add_vline(
+def add_lines(
     ax: plt.Axes,
-    x: float | list[float | int],
+    intercepts: float | list[float | int],
+    linetype: str = "vline",
     color: str = "black",
     linestyle: str = "--",
     linewidth: float = 1,
+    line_kwargs: dict | None = None,
 ) -> None:
-    """Add a vertical line to a matplotlib axes object"""
-    if isinstance(x, float | int):
-        ax.axvline(x=x, color=color, linestyle=linestyle, linewidth=linewidth)
-    elif isinstance(x, list):
-        for xi in x:
-            ax.axvline(x=xi, color=color, linestyle=linestyle, linewidth=linewidth)
+    """Add a vertical or horizontal line to a matplotlib axes object
+
+    Parameters
+    ----------
+    ax : plt.Axes
+        Matplotlib axes object to add the line to.
+    linetype : str
+        Type of line to add, either 'vline' or 'hline'.
+    intercepts : float | list[float | int]
+        Intercepts of the line(s) to add.
+    color : str, optional
+        Color of the line(s), by default "black".
+    linestyle : str, optional
+        Linestyle of the line(s), by default "--".
+    linewidth : float, optional
+        Linewidth of the line(s), by default 1.
+
+    Returns
+    -------
+    None
+
+    """
+    if linetype not in ["vline", "hline"]:
+        raise ValueError("linetype must be 'vline' or 'hline'")
+
+    line_kwargs = line_kwargs or {}
+
+    # handle clashes between keyword arguments and line_kwargs
+    if "color" in line_kwargs:
+        color = line_kwargs.pop("color")
+    if "linestyle" in line_kwargs:
+        linestyle = line_kwargs.pop("linestyle")
+    if "linewidth" in line_kwargs:
+        linewidth = line_kwargs.pop("linewidth")
+
+    # handle intercepts and vertical/horizontal lines
+    if isinstance(intercepts, float | int):
+        intercepts = [intercepts]
+    elif isinstance(intercepts, list):
+        pass
+    else:
+        raise TypeError("intercept must be a float or a list of floats")
+
+    line_func = ax.axvline if linetype == "vline" else ax.axhline
+
+    # add lines to ax
+    for intercept in intercepts:
+        line_func(
+            intercept,
+            color=color,
+            linestyle=linestyle,
+            linewidth=linewidth,
+            **line_kwargs,
+        )
 
 
 def _make_legend_patches(
@@ -63,12 +114,25 @@ def _make_legend_patches(
     return patches
 
 
-def _make_legend(
+def make_legend(
     ax: plt.Axes,
     patches: list[mpl.patches.Patch],
     **kwargs,
 ) -> None:
-    """Add a legend to a matplotlib axes object"""
+    """Add a legend to a matplotlib axes object
+
+    Parameters
+    ----------
+    ax : plt.Axes
+        Matplotlib axes object to add the legend to.
+    patches : list[mpl.patches.Patch]
+        List of patches to use for the legend.
+
+    Returns
+    -------
+    None
+
+    """
     # create new legend
     if "fontsize" not in kwargs:
         kwargs["fontsize"] = config["legend"]["font_size"]
@@ -88,7 +152,7 @@ def _parse_legend(
     """Parse the legend parameter of a plot method. Either create a legend or try to add the provided one"""
     if legend == "auto":
         patches = _make_legend_patches(palette, levels)
-        _make_legend(ax, patches, **legend_kwargs)
+        make_legend(ax, patches, **legend_kwargs)
     elif isinstance(legend, mpl.legend.Legend):
         try:
             ax.add_artist(legend)
@@ -96,6 +160,74 @@ def _parse_legend(
             logging.exception("Error adding legend. Ignoring legend.")
     elif legend:
         logging.warning("Invalid legend parameter. Ignoring legend.")
+
+
+def label_plot(
+    ax: plt.Axes,
+    x_values: list | np.ndarray,
+    y_values: list | np.ndarray,
+    labels: list[str] | np.ndarray,
+    x_anchors: list[int | float] | np.ndarray | None = None,
+    label_kwargs: dict | None = None,
+    line_kwargs: dict | None = None,
+    label_parser: Callable | None = None,
+    y_display_start: float = 1,
+) -> None:
+    """Add labels to a 2D axes object
+
+    Add labels to a plot based on x and y coordinates. The labels are either placed near the datapoint
+    using the automatic dodging function from adjust_text or anchored to the left or right of the plot,
+    where labels below the splitpoint are anchored to the left and labels above the splitpoint are anchored
+    to the right.
+
+    """
+    label_kwargs = {**(label_kwargs or {}), "fontsize": config["font_sizes"]["medium"]}
+    line_kwargs = {**(line_kwargs or {}), "color": BaseColors.get("black"), "linewidth": config["linewidths"]["medium"]}
+    label_parser = label_parser or (lambda x: x)
+
+    if not len(x_values) == len(y_values) == len(labels):
+        raise ValueError("x_values, y_values, and labels must have the same length")
+
+    # determine label positions based on optional x_anchors
+    if x_anchors is not None:
+        # x-values are binned to the anchor positions
+        label_x_values = []
+        for x in x_values:
+            anchor_diffs = [abs(anchor - x) for anchor in x_anchors]
+            label_x_values.append(x_anchors[np.argmin(anchor_diffs)])
+
+        # TODO: Clean and refactor this block
+        # y-values should be distributed evenly between the min and max y-values at that anchor
+        fontsize_display = config["font_sizes"]["medium"]
+        label_spacing_display = fontsize_display * 1.5
+        transform = ax.transData.inverted()
+        _, y_spacing_data = transform.transform((0, label_spacing_display)) - transform.transform((0, 0))
+
+        # get a consistent starting point for y values
+        bbox = ax.get_window_extent()
+        _, upper_bound_data = transform.transform((0, bbox.height * y_display_start))
+
+        label_y_values = []
+        for anchor in np.unique(label_x_values):
+            current_label_y_values = np.sort(y_values[np.array(label_x_values) == anchor])
+            label_y_values.extend([upper_bound_data - y_spacing_data * i for i in range(len(current_label_y_values))])
+    else:
+        label_x_values = x_values
+        label_y_values = y_values
+
+    # generate lines from data values to label positions
+    lines = []
+    for label, x, y, label_x, label_y in zip(labels, x_values, y_values, label_x_values, label_y_values, strict=False):
+        lines.append(((x, label_x), (y, label_y), label))
+
+    # Sort lines by sorting in decreasing label_y order
+    lines = sorted(lines, key=lambda line: line[1][1], reverse=True)
+
+    for line in lines:
+        ax.plot(line[0], line[1], **line_kwargs)
+        alignment = "right" if line[0][0] > line[0][1] else "left"
+        label_kwargs["ha"] = alignment
+        ax.text(line[0][1], line[1][1], label_parser(line[2]), **label_kwargs)
 
 
 class Plots:
@@ -183,7 +315,7 @@ class Plots:
             _parse_legend(ax, legend, palette, levels, **legend_kwargs)
 
     @classmethod
-    def scatter(
+    def scatter(  # noqa: C901 TODO: Refactor into smaller functions & simplify
         cls,
         data: pd.DataFrame | ad.AnnData,
         x_column: str,
@@ -195,6 +327,8 @@ class Plots:
         legend: str | mpl.legend.Legend | None = None,
         scatter_kwargs: dict | None = None,
         legend_kwargs: dict | None = None,
+        xlim: tuple[float, float] | None = None,
+        ylim: tuple[float, float] | None = None,
     ) -> None:
         """Plot a scatterplot from a DataFrame or AnnData object
 
@@ -220,6 +354,10 @@ class Plots:
             Additional keyword arguments for the matplotlib scatter function. By default None.
         legend_kwargs : dict, optional
             Additional keyword arguments for the matplotlib legend function. By default None.
+        xlim : tuple[float, float], optional
+            Limits for the x-axis. By default None.
+        ylim : tuple[float, float], optional
+            Limits for the y-axis. By default None.
 
         Returns
         -------
@@ -243,7 +381,12 @@ class Plots:
             raise ValueError("Y column must contain numeric data")
 
         if color_column is None:
-            color = BaseColors.get(color)
+            # TODO: Handle this better, e.g. eliminating ".get()" and making base colors a dict, which would allow for better dict.get(key, alternative) syntax
+            try:
+                color = BaseColors.get(color)
+            except TypeError:
+                print(f"Color {color} not found in base colors. Using {color} directly.", flush=True)
+
             ax.scatter(x_values, y_values, color=color, **scatter_kwargs)
 
         if color_column is not None:
@@ -268,3 +411,8 @@ class Plots:
 
             if not override_legend:
                 _parse_legend(ax, legend, palette, color_levels, **legend_kwargs)
+
+        if xlim:
+            ax.set_xlim(xlim)
+        if ylim:
+            ax.set_ylim(ylim)
