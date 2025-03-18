@@ -20,7 +20,7 @@ from matplotlib.patches import Patch
 from pandas.api.types import is_numeric_dtype
 
 from alphatools.pl import defaults
-from alphatools.pl.colors import BaseColormaps, BaseColors, BasePalettes
+from alphatools.pl.colors import BaseColors, BasePalettes
 from alphatools.pl.figure import create_figure
 from alphatools.pp.data import _adata_column_to_array
 
@@ -28,6 +28,26 @@ from alphatools.pp.data import _adata_column_to_array
 logging.basicConfig(level=logging.INFO)
 
 config = defaults.plot_settings.to_dict()
+
+
+def _order_rarest_to_bottom(
+    data: pd.DataFrame,
+    column: str,
+) -> pd.DataFrame:
+    """Reorder a DataFrame by the frequency of a column to avoid overplotting rarer classes with more common ones"""
+    if column not in data.columns:
+        logging.warning(f"Column {column} not found in data. Skipping reordering.")
+        return data
+
+    data = data.copy()
+
+    # Order not only by value counts but also lexically to avoid ambivalent ties
+    value_counts = data[column].value_counts().sort_index()
+    order = value_counts.index
+
+    data[column] = pd.Categorical(data[column], categories=order, ordered=True)
+
+    return data.sort_values(column, ascending=False)
 
 
 def add_lines(
@@ -142,23 +162,29 @@ def make_legend(
     _legend.set_title(_legend.get_title().get_text(), prop={"size": config["legend"]["title_size"]})
 
 
-def _parse_legend(
+def add_legend(
     ax: plt.Axes,
-    legend: str | mpl.legend.Legend | None,
-    palette: list[tuple] | None,
     levels: list[str] | None,
+    colors: list[str] | None,
+    legend: str | mpl.legend.Legend | None,
     **legend_kwargs,
 ) -> None:
     """Parse the legend parameter of a plot method. Either create a legend or try to add the provided one"""
-    if legend == "auto":
-        patches = _make_legend_patches(palette, levels)
-        make_legend(ax, patches, **legend_kwargs)
-    elif isinstance(legend, mpl.legend.Legend):
+    if isinstance(legend, mpl.legend.Legend):
         try:
             ax.add_artist(legend)
         except Exception:
             logging.exception("Error adding legend. Ignoring legend.")
-    elif legend:
+    elif isinstance(legend, str) and legend == "auto":
+        if levels is None or len(levels) == 0:
+            logging.warning("No levels provided for legend. Ignoring legend.")
+            return
+
+        unique_levels = np.unique(levels)
+        colors = colors or BasePalettes.get("qualitative", n=len(unique_levels))
+        patches = _make_legend_patches(colors, unique_levels)
+        make_legend(ax, patches, **legend_kwargs)
+    else:
         logging.warning("Invalid legend parameter. Ignoring legend.")
 
 
@@ -312,21 +338,17 @@ class Plots:
             for _color, level in zip(palette, levels, strict=False):
                 ax.hist(values[colors == level], bins=bins, color=_color, **hist_kwargs)
 
-            _parse_legend(ax, legend, palette, levels, **legend_kwargs)
+            add_legend(ax, legend, palette, levels, **legend_kwargs)
 
     @classmethod
-    def scatter(  # noqa: C901 TODO: Refactor into smaller functions & simplify
+    def scatter(
         cls,
         data: pd.DataFrame | ad.AnnData,
-        x_column: str,
         y_column: str,
+        x_column: str,
         color_column: str | None = None,
-        color: str = "blue",
         ax: plt.Axes | None = None,
-        palette: list[tuple] | None = None,
-        legend: str | mpl.legend.Legend | None = None,
         scatter_kwargs: dict | None = None,
-        legend_kwargs: dict | None = None,
         xlim: tuple[float, float] | None = None,
         ylim: tuple[float, float] | None = None,
     ) -> None:
@@ -341,19 +363,11 @@ class Plots:
         y_column : str
             Column in data to plot on the y-axis. Must contain numeric data.
         color_column : str, optional
-            Column in data to use for color encoding. Overrides color parameter. By default None.
-        color : str, optional
-            Color to use for the scatterplot. By default "blue".
+            Column in data to use for color encoding. By default None.
         ax : plt.Axes, optional
             Matplotlib axes object to plot on, if None a new figure is created. By default None.
-        palette : list[tuple], optional
-            List of colors to use for color encoding, if None a default palette is used. By default None.
-        legend : str | mpl.legend.Legend, optional
-            Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
-        legend_kwargs : dict, optional
-            Additional keyword arguments for the matplotlib legend function. By default None.
         xlim : tuple[float, float], optional
             Limits for the x-axis. By default None.
         ylim : tuple[float, float], optional
@@ -365,52 +379,25 @@ class Plots:
 
         """
         scatter_kwargs = scatter_kwargs or {}
-        legend_kwargs = legend_kwargs or {}
-
-        # Avoid overplotting legend until gradient fill Patch is implemented
-        override_legend = False
 
         if not ax:
             _, ax = create_figure()
 
-        x_values = _adata_column_to_array(data, x_column)
-        if not is_numeric_dtype(x_values):
-            raise ValueError("X column must contain numeric data")
-        y_values = _adata_column_to_array(data, y_column)
-        if not is_numeric_dtype(y_values):
-            raise ValueError("Y column must contain numeric data")
-
-        if color_column is None:
-            # TODO: Handle this better, e.g. eliminating ".get()" and making base colors a dict, which would allow for better dict.get(key, alternative) syntax
-            try:
-                color = BaseColors.get(color)
-            except TypeError:
-                print(f"Color {color} not found in base colors. Using {color} directly.", flush=True)
-
-            ax.scatter(x_values, y_values, color=color, **scatter_kwargs)
-
-        if color_column is not None:
+        if color_column and color_column in data.columns:
+            data = _order_rarest_to_bottom(data.copy(), color_column)
             colors = _adata_column_to_array(data, color_column)
-            color_levels = np.unique(colors)
+        else:
+            colors = [BaseColors.get("blue")] * len(data)
 
-            if palette is None:
-                palette = BasePalettes.get("qualitative", n=len(color_levels))
-                if len(set(palette)) < len(color_levels):
-                    logging.info(
-                        "Scatterplot got more levels than colors in qualitative palette. Switching to sequential colormap."
-                    )
-                    palette = BaseColormaps.get("sequential")(np.linspace(0, 1, len(color_levels)))
+        x_values = _adata_column_to_array(data, x_column)
+        y_values = _adata_column_to_array(data, y_column)
 
-                    # TODO: Add gradient patch from smallest to largest value in color_levels and generate legend
-                    override_legend = True
-
-            for _color, color_level in zip(palette, color_levels, strict=False):
-                ax.scatter(
-                    x_values[colors == color_level], y_values[colors == color_level], color=_color, **scatter_kwargs
-                )
-
-            if not override_legend:
-                _parse_legend(ax, legend, palette, color_levels, **legend_kwargs)
+        ax.scatter(
+            x=x_values,
+            y=y_values,
+            c=colors,
+            **scatter_kwargs,
+        )
 
         if xlim:
             ax.set_xlim(xlim)
