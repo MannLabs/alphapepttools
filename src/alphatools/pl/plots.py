@@ -409,12 +409,9 @@ class Plots:
         cls,
         data: ad.AnnData,
         layer: str = "X",
-        y_log: bool = True,
         color_column: str | None = None,
         ax: plt.Axes | None = None,
         scatter_kwargs: dict | None = None,
-        xlim: tuple[float, float] | None = None,
-        ylim: tuple[float, float] | None = None,
     ) -> None:
         """Plot the ranked protein median intensities across all samples using the scatter method
 
@@ -424,8 +421,6 @@ class Plots:
             AnnData to plot.
         layer : str
             The AnnData layer to calculate the median value (intensities) across sample. Default is "X"
-        y_log : bool
-            Log-transform the y-axis. By default True.
         color_column : str, optional
             Column in data.var to use for color encoding. By default None.
         ax : plt.Axes, optional
@@ -476,13 +471,9 @@ class Plots:
             color_column=color_column_for_scatter,
             ax=ax,
             scatter_kwargs=scatter_kwargs,
-            xlim=xlim,
-            ylim=ylim,
         )
 
-        if y_log:
-            ax.set_yscale("log")
-
+        ax.set_yscale("log")
         ax.set_xlabel("Protein Rank")
         ax.set_ylabel("Median Intensity")
         ax.set_title("Dynamic Range of Protein Median Intensities")
