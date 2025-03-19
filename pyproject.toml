@@ -24,7 +24,7 @@ classifiers = [
 ]
 dependencies = [
   # this is the 'data_downloader_improvements' branch with all the anndata code
-  "alphabase @ git+https://github.com/MannLabs/alphabase@2a2c22ebef6e3b074cc8f4f00db85f8c176b2166",
+  "alphabase @ git+https://github.com/MannLabs/alphabase@95a1cd9beafc13dfde09f813984eb1f77e3a60bc", # TODO point to next release
   "anndata==0.11.1",
   "cmcrameri==1.9",                                                                                 # TODO: remove this to optional dependencies?
   "matplotlib==3.10",
