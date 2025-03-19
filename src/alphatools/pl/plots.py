@@ -403,3 +403,61 @@ class Plots:
             ax.set_xlim(xlim)
         if ylim:
             ax.set_ylim(ylim)
+
+    @classmethod
+    def rank_median_plot(
+        cls,
+        data: ad.AnnData,
+        layer: str = "X",
+        y_log: bool = True,
+        color_column: str | None = None,
+        ax: plt.Axes | None = None,
+        scatter_kwargs: dict | None = None,
+        xlim: tuple[float, float] | None = None,
+        ylim: tuple[float, float] | None = None,
+    ) -> None:
+        """Plot a rank plot using the scatter method
+
+        Parameters
+        ----------
+        data : ad.AnnData
+            AnnData to plot.
+        layer : str
+            The AnnData layer to calculate the median value (intensities) across sample. Default is "X"
+        y_log : bool
+            Log-transform the y-axis. By default True.
+        color_column : str, optional
+            Column in data.var to use for color encoding. By default None.
+        ax : plt.Axes, optional
+            Matplotlib axes object to plot on, if None a new figure is created. By default None.
+        scatter_kwargs : dict, optional
+            Additional keyword arguments for the matplotlib scatter function. By default None.
+        xlim : tuple[float, float], optional
+            Limits for the x-axis. By default None.
+        ylim : tuple[float, float], optional
+            Limits for the y-axis. By default None.
+
+        Returns
+        -------
+        None
+
+        """
+        scatter_kwargs = scatter_kwargs or {}
+
+        # prepare a pd.DataFrame with median values across samples
+        if layer == "X"
+        else layer not in data.layers.keys():
+            logging.error(f"Layer {layer} not found in data.")
+
+        medians_df = pd.DataFrame(data[layer].mean(axis=0), columns=["median"])
+        # Use the scatter method to create the rank plot
+        cls.scatter(
+            data=medians_df,
+            y_column=value_column,
+            x_column=rank_column,
+            color_column=color_column,
+            ax=ax,
+            scatter_kwargs=scatter_kwargs,
+            xlim=xlim,
+            ylim=ylim,
+        )
