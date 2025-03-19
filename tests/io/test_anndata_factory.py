@@ -5,8 +5,9 @@ from unittest.mock import patch
 import numpy as np
 import pandas as pd
 import pytest
-from alphabase.anndata.anndata_factory import AnnDataFactory
 from alphabase.psm_reader.keys import PsmDfCols
+
+from alphatools.io.anndata_factory import AnnDataFactory
 
 
 def _get_test_psm_df():
@@ -98,7 +99,7 @@ def test_create_anndata_with_empty_dataframe():
 
 
 @patch("alphabase.psm_reader.psm_reader.psm_reader_provider.get_reader")
-@patch("alphabase.anndata.anndata_factory.AnnDataFactory._get_reader_configuration")
+@patch("alphatools.io.anndata_factory.AnnDataFactory._get_reader_configuration")
 def test_from_files(mock_get_reader_configuration, mock_reader):
     mock_reader.return_value.load.return_value = _get_test_psm_df()
 
