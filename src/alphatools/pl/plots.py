@@ -416,7 +416,7 @@ class Plots:
         xlim: tuple[float, float] | None = None,
         ylim: tuple[float, float] | None = None,
     ) -> None:
-        """Plot a rank plot using the scatter method
+        """Plot the ranked protein median intensities across all samples using the scatter method
 
         Parameters
         ----------
@@ -432,10 +432,6 @@ class Plots:
             Matplotlib axes object to plot on, if None a new figure is created. By default None.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
-        xlim : tuple[float, float], optional
-            Limits for the x-axis. By default None.
-        ylim : tuple[float, float], optional
-            Limits for the y-axis. By default None.
 
         Returns
         -------
@@ -444,20 +440,49 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        # prepare a pd.DataFrame with median values across samples
-        if layer == "X"
-        else layer not in data.layers.keys():
-            logging.error(f"Layer {layer} not found in data.")
+        if not layer == "X" and layer not in data.layers:
+            raise ValueError(f"Layer {layer} not found in AnnData object")
 
-        medians_df = pd.DataFrame(data[layer].mean(axis=0), columns=["median"])
+        # Extract values from the specified layer
+        values = np.array(data.X, dtype=np.float64) if layer == "X" else np.array(data.layers[layer], dtype=np.float64)
+
+        # Calculate the median for each protein across all samples
+        medians = np.nanmedian(values, axis=0)
+        ranked_order = np.argsort(medians)
+        ranked_medians = medians[ranked_order]
+        proteins = data.var_names[ranked_order] # TODO: add text display option for protein names
+        ranks = np.arange(1, len(ranked_medians) + 1)
+
+        # Create a DataFrame from proteins, ranks, and ranked_medians
+        ranked_medians_df = pd.DataFrame({
+            "Protein": proteins,
+            "Rank": ranks,
+            "Median": ranked_medians
+        })
+
+        # Get the (optional) color values for the proteins
+        color_column_for_scatter = None
+        if color_column and color_column in data.var.columns:
+            colors = _adata_column_to_array(data.var, color_column)
+            colors = colors[ranked_order]
+            ranked_medians_df["Color"] = colors
+            color_column_for_scatter = "Color"
+
         # Use the scatter method to create the rank plot
         cls.scatter(
-            data=medians_df,
-            y_column=value_column,
-            x_column=rank_column,
-            color_column=color_column,
+            data=ranked_medians_df,
+            x_column="Rank",
+            y_column="Median",
+            color_column=color_column_for_scatter,
             ax=ax,
             scatter_kwargs=scatter_kwargs,
             xlim=xlim,
             ylim=ylim,
         )
+
+        if y_log:
+            ax.set_yscale("log")
+
+        ax.set_xlabel("Protein Rank")
+        ax.set_ylabel("Median Intensity")
+        ax.set_title("Dynamic Range of Protein Median Intensities")
