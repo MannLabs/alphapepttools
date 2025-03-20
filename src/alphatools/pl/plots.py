@@ -408,9 +408,9 @@ class Plots:
     def rank_median_plot(
         cls,
         data: ad.AnnData,
+        ax: plt.Axes,
         layer: str = "X",
         color_column: str | None = None,
-        ax: plt.Axes | None = None,
         scatter_kwargs: dict | None = None,
     ) -> None:
         """Plot the ranked protein median intensities across all samples using the scatter method
@@ -419,12 +419,12 @@ class Plots:
         ----------
         data : ad.AnnData
             AnnData to plot.
+        ax : plt.Axes
+            Matplotlib axes object to plot on, add labels and logscale the y-axis.
         layer : str
             The AnnData layer to calculate the median value (intensities) across sample. Default is "X"
         color_column : str, optional
             Column in data.var to use for color encoding. By default None.
-        ax : plt.Axes, optional
-            Matplotlib axes object to plot on, if None a new figure is created. By default None.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
 
@@ -441,6 +441,7 @@ class Plots:
         # Extract values from the specified layer
         values = np.array(data.X, dtype=np.float64) if layer == "X" else np.array(data.layers[layer], dtype=np.float64)
 
+
         # Calculate the median for each protein across all samples
         medians = np.nanmedian(values, axis=0)
         ranked_order = np.argsort(medians)
@@ -456,14 +457,18 @@ class Plots:
         })
 
         # Get the (optional) color values for the proteins
-        color_column_for_scatter = None
         if color_column and color_column in data.var.columns:
             colors = _adata_column_to_array(data.var, color_column)
             colors = colors[ranked_order]
             ranked_medians_df["Color"] = colors
             color_column_for_scatter = "Color"
+        elif color_column and color_column not in data.var.columns:
+            logging.warning(f"Color column {color_column} not found in data.var. Ignoring color coding.")
+            color_column_for_scatter = None
+        else:
+            color_column_for_scatter = None
 
-        # Use the scatter method to create the rank plot
+        # call the Plots.scatter method to create the rank plot
         cls.scatter(
             data=ranked_medians_df,
             x_column="Rank",
