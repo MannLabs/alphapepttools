@@ -424,7 +424,7 @@ class Plots:
         layer : str
             The AnnData layer to calculate the median value (intensities) across sample. Default is "X"
         color_column : str, optional
-            Column in data.var to use for color encoding. By default None.
+            Column in data.var to use for color coding. By default None.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
 
@@ -440,7 +440,6 @@ class Plots:
 
         # Extract values from the specified layer
         values = np.array(data.X, dtype=np.float64) if layer == "X" else np.array(data.layers[layer], dtype=np.float64)
-
 
         # Calculate the median for each protein across all samples
         medians = np.nanmedian(values, axis=0)
@@ -479,6 +478,6 @@ class Plots:
         )
 
         ax.set_yscale("log")
-        ax.set_xlabel("Protein Rank")
-        ax.set_ylabel("Median Intensity")
-        ax.set_title("Dynamic Range of Protein Median Intensities")
+        ax.set_xlabel("Feature Rank")
+        ax.set_ylabel("Median across Observations")
+        ax.set_title("Dynamic Range of Features")
