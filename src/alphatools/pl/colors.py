@@ -9,6 +9,7 @@
 
 
 import colorsys
+import logging
 
 import cmcrameri.cm as cmc
 import matplotlib.pyplot as plt
@@ -132,12 +133,14 @@ class BaseColors:
         alpha: float | None = None,
     ) -> tuple:
         """Get a default color by name, optionally lightened and/or with alpha"""
-        color = getattr(cls, color_name, None)
-        if color is None:
+        if hasattr(cls, color_name):
+            color = getattr(cls, color_name, None)
+        else:
             try:
                 color = mpl_colors.to_rgba(color_name)
-            except ValueError as exc:
-                raise ValueError(f"Unknown color name: {color_name}") from exc
+            except ValueError:
+                logging.warning(f"Unknown color name: {color_name}, cannot apply lighten or alpha")
+                return color_name
 
         if lighten is not None:
             color = _lighten_color(color, lighten)

@@ -39,15 +39,17 @@ def _order_rarest_to_bottom(
         logging.warning(f"Column {column} not found in data. Skipping reordering.")
         return data
 
+    column_safe = f"{column}_safe"
     data = data.copy()
 
-    # Order not only by value counts but also lexically to avoid ambivalent ties
-    value_counts = data[column].value_counts().sort_index()
-    order = value_counts.index
+    data[column_safe] = data[column].astype(str)
+    data[column_safe] = pd.Categorical(
+        data[column_safe],
+        categories=data[column_safe].value_counts().sort_values().index.tolist(),
+        ordered=True,
+    )
 
-    data[column] = pd.Categorical(data[column], categories=order, ordered=True)
-
-    return data.sort_values(column, ascending=False)
+    return data.sort_values(column_safe).drop(columns=column_safe)
 
 
 def add_lines(
@@ -213,6 +215,16 @@ def label_plot(
 
     if not len(x_values) == len(y_values) == len(labels):
         raise ValueError("x_values, y_values, and labels must have the same length")
+
+    # convert to numpy arrays for consistency & remove any nans
+    x_values = np.array(x_values)
+    y_values = np.array(y_values)
+    labels = np.array(labels)
+
+    keep_mask = np.logical_or(np.isnan(x_values), np.isnan(y_values))
+    x_values = x_values[~keep_mask]
+    y_values = y_values[~keep_mask]
+    labels = labels[~keep_mask]
 
     # determine label positions based on optional x_anchors
     if x_anchors is not None:
