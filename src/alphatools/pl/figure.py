@@ -1,4 +1,4 @@
-# at_figure.py
+# figure.py
 
 # Defines how matplotlib figures and axes are handled. Main functions are stylize() and label(),
 # which apply a consistent layout and appropriately sized labels (based on plot_config.yaml).
