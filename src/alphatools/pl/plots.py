@@ -21,7 +21,7 @@ from pandas.api.types import is_numeric_dtype
 
 from alphatools.pl import defaults
 from alphatools.pl.colors import BaseColors, BasePalettes, get_color_mapping
-from alphatools.pl.figure import create_figure
+from alphatools.pl.figure import create_figure, label_axes
 from alphatools.pp.data import _adata_column_to_array
 
 # logging configuration
@@ -453,7 +453,7 @@ class Plots:
             color_dict = get_color_mapping(color_values, palette)
 
         # Handle ordering of plotting arrays: order by the frequency of the color column
-        order = np.argsort(color_values)
+        order = np.argsort(color_values)[::-1]
         x_values = _adata_column_to_array(data, x_column)[order]
         y_values = _adata_column_to_array(data, y_column)[order]
         color_values = np.array(color_values)[order]
@@ -485,6 +485,9 @@ class Plots:
         data: ad.AnnData,
         ax: plt.Axes,
         layer: str = "X",
+        color: str = "blue",
+        palette: list[str | tuple] | None = None,
+        legend: str | mpl.legend.Legend | None = None,
         color_column: str | None = None,
         scatter_kwargs: dict | None = None,
     ) -> None:
@@ -510,44 +513,37 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        if not layer == "X" and layer not in data.layers:
+        if layer != "X" and layer not in data.layers:
             raise ValueError(f"Layer {layer} not found in AnnData object")
 
-        # Extract values from the specified layer
-        values = np.array(data.X, dtype=np.float64) if layer == "X" else np.array(data.layers[layer], dtype=np.float64)
+        # Use AnnData's dataframe extraction to get the values + annotations
+        values = data.to_df() if layer == "X" else data.to_df(layer=layer)
 
-        # Calculate the median for each protein across all samples
-        medians = np.nanmedian(values, axis=0)
-        ranked_order = np.argsort(medians)[::-1]
-        ranked_medians = medians[ranked_order]
-        proteins = data.var_names[ranked_order]  # TODO: add text display option for protein names
-        ranks = np.arange(1, len(ranked_medians) + 1)
+        # compute medians and sort
+        medians = values.median(axis=0).sort_values(ascending=False).to_frame(name="median")
 
-        # Create a DataFrame from proteins, ranks, and ranked_medians
-        ranked_medians_df = pd.DataFrame({"Protein": proteins, "Rank": ranks, "Median": ranked_medians})
-
-        # Get the (optional) color values for the proteins
-        color_column_for_scatter = None
-        if color_column:
-            if color_column in data.var.columns:
-                colors = _adata_column_to_array(data.var, color_column)
-                colors = colors[ranked_order]
-                ranked_medians_df["Color"] = colors
-                color_column_for_scatter = "Color"
-            else:
-                logging.warning(f"Color column {color_column} not found in data.var. Ignoring color coding.")
+        # Retain information about the proteins
+        medians = medians.join(data.var)
+        medians["rank"] = np.arange(1, len(medians) + 1)
 
         # call the Plots.scatter method to create the rank plot
         cls.scatter(
-            data=ranked_medians_df,
-            x_column="Rank",
-            y_column="Median",
-            color_column=color_column_for_scatter,
+            data=medians,
+            x_column="rank",
+            y_column="median",
+            color=color,
+            color_column=color_column,
+            legend=legend,
+            palette=palette,
             ax=ax,
             scatter_kwargs=scatter_kwargs,
         )
 
+        # Adjust scale and labelling
         ax.set_yscale("log")
-        ax.set_xlabel("Feature Rank")
-        ax.set_ylabel("Median across Observations")
-        ax.set_title("Dynamic Range of Features")
+
+        label_axes(
+            ax,
+            xlabel="Rank",
+            ylabel="Median Intensity",
+        )
