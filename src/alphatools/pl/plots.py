@@ -482,7 +482,7 @@ class Plots:
     @classmethod
     def rank_median_plot(
         cls,
-        data: ad.AnnData,
+        data: ad.AnnData | pd.DataFrame,
         ax: plt.Axes,
         layer: str = "X",
         color: str = "blue",
@@ -517,13 +517,13 @@ class Plots:
             raise ValueError(f"Layer {layer} not found in AnnData object")
 
         # Use AnnData's dataframe extraction to get the values + annotations
-        values = data.to_df() if layer == "X" else data.to_df(layer=layer)
+        values = (data.to_df() if layer == "X" else data.to_df(layer=layer)) if isinstance(data, ad.AnnData) else data
 
         # compute medians and sort
         medians = values.median(axis=0).sort_values(ascending=False).to_frame(name="median")
 
         # Retain information about the proteins
-        medians = medians.join(data.var)
+        medians = medians.join(data.var) if isinstance(data, ad.AnnData) else medians
         medians["rank"] = np.arange(1, len(medians) + 1)
 
         # call the Plots.scatter method to create the rank plot
