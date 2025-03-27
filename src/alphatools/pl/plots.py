@@ -20,7 +20,7 @@ from matplotlib.patches import Patch
 from pandas.api.types import is_numeric_dtype
 
 from alphatools.pl import defaults
-from alphatools.pl.colors import BaseColors, BasePalettes
+from alphatools.pl.colors import BaseColors, BasePalettes, get_color_mapping
 from alphatools.pl.figure import create_figure
 from alphatools.pp.data import _adata_column_to_array
 
@@ -45,7 +45,7 @@ def _order_rarest_to_bottom(
     data[column_safe] = data[column].astype(str)
     data[column_safe] = pd.Categorical(
         data[column_safe],
-        categories=data[column_safe].value_counts().sort_values().index.tolist(),
+        categories=data[column_safe].value_counts().sort_values(ascending=False).index.tolist(),
         ordered=True,
     )
 
@@ -118,18 +118,17 @@ def add_lines(
 
 
 def _make_legend_patches(
-    colors: list[str],
-    levels: list[str],
+    color_dict: dict[str, str | tuple],
 ) -> list[mpl.patches.Patch]:
-    """Create legend patches for a matplotlib legend"""
+    """Create legend patches for a matplotlib legend from a value-to-color mapping"""
     patches = []
-    for color, level in zip(colors, levels, strict=False):
+    for value, color in color_dict.items():
         patches.append(
             Patch(
+                label=value,
                 facecolor=color,
-                label=level,
-                edgecolor=BaseColors.get("grey"),
-                linewidth=config["linewidths"]["small"],
+                edgecolor=BaseColors.get("black"),
+                linewidth=config["linewidths"]["medium"],
             )
         )
 
@@ -167,27 +166,44 @@ def make_legend(
 def add_legend(
     ax: plt.Axes,
     levels: list[str] | None,
-    colors: list[str] | None,
-    legend: str | mpl.legend.Legend | None,
+    palette: list[str | tuple] | None,
+    legend: str | mpl.legend.Legend | None = None,
     **legend_kwargs,
 ) -> None:
-    """Parse the legend parameter of a plot method. Either create a legend or try to add the provided one"""
-    if isinstance(legend, mpl.legend.Legend):
-        try:
-            ax.add_artist(legend)
-        except Exception:
-            logging.exception("Error adding legend. Ignoring legend.")
-    elif isinstance(legend, str) and legend == "auto":
-        if levels is None or len(levels) == 0:
-            logging.warning("No levels provided for legend. Ignoring legend.")
-            return
+    """Add a legend to an axis object.
 
-        unique_levels = np.unique(levels)
-        colors = colors or BasePalettes.get("qualitative", n=len(unique_levels))
-        patches = _make_legend_patches(colors, unique_levels)
-        make_legend(ax, patches, **legend_kwargs)
-    else:
-        logging.warning("Invalid legend parameter. Ignoring legend.")
+    If levels and palette are provided and legend is None, a legend is created automatically.
+    if legend is set to "auto", a legend is created from the levels and a default palette.
+
+    Parameters
+    ----------
+    ax : plt.Axes
+        Matplotlib axes object to add the legend to.
+    levels : list[str] | None
+        List of levels to use for the legend. Duplicates are removed.
+    palette : list[str | tuple] | None
+        List of colors to use for the legend. If None, a default palette will be used. By default None.
+
+    """
+    if legend not in ["auto", None]:
+        raise ValueError("legend must be 'auto' or None")
+
+    if levels is None:
+        logging.warning("No levels provided. Skipping legend creation.")
+        return
+
+    levels = np.unique(levels)
+
+    # Determine palette, i.e. list of colors to show in the legend
+    if palette is None:
+        if legend == "auto":
+            palette = BasePalettes.get("qualitative")
+        else:
+            raise ValueError("Palette must be provided if legend is not set to 'auto'")
+
+    color_dict = get_color_mapping(levels, palette)
+    patches = _make_legend_patches(color_dict)
+    make_legend(ax, patches, **legend_kwargs)
 
 
 def label_plot(
@@ -209,8 +225,8 @@ def label_plot(
     to the right.
 
     """
-    label_kwargs = {**(label_kwargs or {}), "fontsize": config["font_sizes"]["medium"]}
-    line_kwargs = {**(line_kwargs or {}), "color": BaseColors.get("black"), "linewidth": config["linewidths"]["medium"]}
+    label_kwargs = {"fontsize": config["font_sizes"]["medium"], **(label_kwargs or {})}
+    line_kwargs = {"color": BaseColors.get("black"), "linewidth": config["linewidths"]["medium"], **(line_kwargs or {})}
     label_parser = label_parser or (lambda x: x)
 
     if not len(x_values) == len(y_values) == len(labels):
@@ -237,7 +253,7 @@ def label_plot(
         # TODO: Clean and refactor this block
         # y-values should be distributed evenly between the min and max y-values at that anchor
         fontsize_display = config["font_sizes"]["medium"]
-        label_spacing_display = fontsize_display * 1.5
+        label_spacing_display = fontsize_display * 2
         transform = ax.transData.inverted()
         _, y_spacing_data = transform.transform((0, label_spacing_display)) - transform.transform((0, 0))
 
@@ -259,7 +275,7 @@ def label_plot(
         lines.append(((x, label_x), (y, label_y), label))
 
     # Sort lines by sorting in decreasing label_y order
-    lines = sorted(lines, key=lambda line: line[1][1], reverse=True)
+    # lines = sorted(lines, key=lambda line: line[1][1], reverse=True)
 
     for line in lines:
         ax.plot(line[0], line[1], **line_kwargs)
@@ -295,6 +311,8 @@ class Plots:
         legend: str | mpl.legend.Legend | None = None,
         hist_kwargs: dict | None = None,
         legend_kwargs: dict | None = None,
+        xlim: tuple[float, float] | None = None,
+        ylim: tuple[float, float] | None = None,
     ) -> None:
         """Plot a histogram from a DataFrame or AnnData object
 
@@ -320,6 +338,10 @@ class Plots:
             Additional keyword arguments for the matplotlib hist function. By default None.
         legend_kwargs : dict, optional
             Additional keyword arguments for the matplotlib legend function. By default None.
+        xlim : tuple[float, float], optional
+            Limits for the x-axis. By default None.
+        ylim : tuple[float, float], optional
+            Limits for the y-axis. By default None.
 
         Returns
         -------
@@ -342,15 +364,31 @@ class Plots:
         else:
             colors = _adata_column_to_array(data, color_column)
 
-            levels = np.unique(colors)
+            palette = palette or BasePalettes.get("qualitative")
 
-            if palette is None:
-                palette = BasePalettes.get("qualitative", n=len(levels))
+            color_dict = get_color_mapping(colors, palette)
 
-            for _color, level in zip(palette, levels, strict=False):
-                ax.hist(values[colors == level], bins=bins, color=_color, **hist_kwargs)
+            for level, level_color in color_dict.items():
+                ax.hist(
+                    values[colors == level],
+                    bins=bins,
+                    color=level_color,
+                    **hist_kwargs,
+                )
 
-            add_legend(ax, legend, palette, levels, **legend_kwargs)
+            if legend is not None:
+                add_legend(
+                    ax=ax,
+                    levels=list(color_dict.keys()),
+                    palette=list(color_dict.values()),
+                    legend=legend,
+                    **legend_kwargs,
+                )
+
+        if xlim:
+            ax.set_xlim(xlim)
+        if ylim:
+            ax.set_ylim(ylim)
 
     @classmethod
     def scatter(
@@ -358,9 +396,13 @@ class Plots:
         data: pd.DataFrame | ad.AnnData,
         y_column: str,
         x_column: str,
+        color: str = "blue",
         color_column: str | None = None,
         ax: plt.Axes | None = None,
+        palette: list[str | tuple] | None = None,
+        legend: str | mpl.legend.Legend | None = None,
         scatter_kwargs: dict | None = None,
+        legend_kwargs: dict | None = None,
         xlim: tuple[float, float] | None = None,
         ylim: tuple[float, float] | None = None,
     ) -> None:
@@ -378,6 +420,10 @@ class Plots:
             Column in data to use for color encoding. By default None.
         ax : plt.Axes, optional
             Matplotlib axes object to plot on, if None a new figure is created. By default None.
+        palette : list[str | tuple], optional
+            List of colors to use for color encoding, if None a default palette is used. By default None.
+        legend : str | mpl.legend.Legend, optional
+            Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
         xlim : tuple[float, float], optional
@@ -391,25 +437,42 @@ class Plots:
 
         """
         scatter_kwargs = scatter_kwargs or {}
+        legend_kwargs = legend_kwargs or {}
 
         if not ax:
-            _, ax = create_figure()
+            _, axm = create_figure()
+            ax = axm.next()
 
-        if color_column and color_column in data.columns:
-            data = _order_rarest_to_bottom(data.copy(), color_column)
-            colors = _adata_column_to_array(data, color_column)
+        if color_column is None:
+            color_values = ["data"] * len(data)
+            color_dict = {"data": BaseColors.get(color)}
         else:
-            colors = [BaseColors.get("blue")] * len(data)
+            color_values = _adata_column_to_array(data, color_column)
+            if palette is None:
+                palette = BasePalettes.get("qualitative")
+            color_dict = get_color_mapping(color_values, palette)
 
-        x_values = _adata_column_to_array(data, x_column)
-        y_values = _adata_column_to_array(data, y_column)
+        # Handle ordering of plotting arrays: order by the frequency of the color column
+        order = np.argsort(color_values)
+        x_values = _adata_column_to_array(data, x_column)[order]
+        y_values = _adata_column_to_array(data, y_column)[order]
+        color_values = np.array(color_values)[order]
 
         ax.scatter(
             x=x_values,
             y=y_values,
-            c=colors,
+            c=[color_dict[color] for color in color_values],
             **scatter_kwargs,
         )
+
+        if legend is not None:
+            add_legend(
+                ax=ax,
+                levels=list(color_dict.keys()),
+                palette=list(color_dict.values()),
+                legend=legend,
+                **legend_kwargs,
+            )
 
         if xlim:
             ax.set_xlim(xlim)

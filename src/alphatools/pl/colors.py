@@ -12,9 +12,11 @@ import colorsys
 import logging
 
 import cmcrameri.cm as cmc
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import colors as mpl_colors
+from matplotlib.colors import Colormap
 
 
 def show_rgba_color_list(colors: list) -> None:
@@ -56,7 +58,7 @@ def _cycle_palette(
     palette: list,
     n: int,
 ) -> list:
-    """Cycle through a palette to get n colors"""
+    """Cycle through a palette to get n colors. If n > len(palette), repeat the palette"""
     if n > len(palette):
         palette = palette * (n // len(palette) + 1)
     return palette[:n]
@@ -66,9 +68,9 @@ def _get_colors_from_cmap(
     cmap_name: str,
     num_colors: int,
 ) -> list:
-    """Get a list of colors from a colormap"""
+    """Use a matplotlib colormap to get a list of colors"""
     cmap = plt.get_cmap(cmap_name)
-    return [cmap(i / (num_colors - 1)) for i in range(num_colors)]
+    return [cmap(i) for i in np.linspace(0, 1, num_colors)]
 
 
 def _base_qualitative_colorscale() -> list:
@@ -97,6 +99,35 @@ def _base_qualitative_colorscale() -> list:
     picked_colors[4] = _lighten_color(picked_colors[4], -1)
 
     return picked_colors
+
+
+def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.colors.Colormap) -> dict:
+    """Map values to colors
+
+    Parameters
+    ----------
+    values : np.ndarray
+        Values to map to colors
+    palette : list[str | tuple] | mpl.colors.Colormap
+        If palette is a list, it is used as a discrete colormap with cycling colors (potential for non-unique assignment).
+        If palette is a colormap, it is used as a continuous colormap (guaranteed unique assignment).
+
+    Returns
+    -------
+    dict
+        Dictionary mapping values to colors
+
+    """
+    values = np.unique(values)
+
+    if isinstance(palette, list):
+        _palette = _cycle_palette(palette, n=len(values))
+    elif isinstance(palette, mpl.colors.Colormap):
+        _palette = _get_colors_from_cmap(palette, num_colors=len(values))
+    else:
+        raise TypeError("palette must be a list of colors or a matplotlib colormap")
+
+    return dict(zip(values, _palette, strict=False))
 
 
 def _base_binary_colorscale() -> list:
@@ -161,20 +192,17 @@ class BasePalettes:
     def get(
         cls,
         palette_name: str,
-        n: int | None = None,
+        n: int = 10,
     ) -> list:
         """Get a default color palette by name"""
         palette = getattr(cls, palette_name, None)
         if palette is None:
             try:
-                palette = _get_colors_from_cmap(palette_name, 10)
+                palette = _get_colors_from_cmap(palette_name, num_colors=n)
             except ValueError as exc:
                 raise ValueError(f"Unknown palette name: {palette_name}") from exc
 
-        if n is not None:
-            palette = _cycle_palette(palette, n)
-
-        return palette
+        return _cycle_palette(palette, n)
 
 
 # TODO: Fix so a defined number of colors can be retrieved with .get, as well as the whole colormap
@@ -189,14 +217,37 @@ class BaseColormaps:
     def get(
         cls,
         colormap_name: str,
-    ) -> list:
-        """Get a default matplotlib.pyplot cmap by name"""
+        n: int | None = None,
+    ) -> Colormap | list:
+        """Get a default matplotlib.pyplot cmap by name
+
+        Optionally, specify the number of colors to be retrieved from the colormap. defaults
+        are set for colormap_name = "sequential" and "diverging". Otherwise, colormap_name is
+        passed to plt.get_cmap().
+
+        Parameters
+        ----------
+        colormap_name : str
+            Name of the colormap to be used
+        n : int, optional
+            Number of colors to be retrieved from the colormap. If None, the full colormap is returned.
+
+        Returns
+        -------
+        Colormap | list
+            Matplotlib Colormap object or list of colors
+
+        """
         colormap = getattr(cls, colormap_name, None)
+
         if colormap is None:
             try:
                 colormap = plt.get_cmap(colormap_name)
             except ValueError as exc:
                 raise ValueError(f"Unknown colormap name: {colormap_name}") from exc
+
+        if n is not None:
+            return [colormap(i) for i in np.linspace(0, 1, n)]
 
         return colormap
 
@@ -204,9 +255,21 @@ class BaseColormaps:
 class MappedColormaps:
     """Mapped colorscales to numerical values in data
 
-    Mapping a continuous colorscale to data (e.g. in a heatmap) requires
-    that the values are normalized, that descending/ascending coloring is
-    available, and that outliers can be compressed within a reasonable range.
+    Mapping a continuous colorscale to data can suffer from compression due to outliers.
+    For example, if 90 % of values lie between 0 and 1 but 10 % of values are between 1 and 100,
+    these extreme values will cause all other values to be compressed into a small range of colors.
+    By applying normalization to a certain percentile range of the data, the colormap can be adjusted
+    accordingly. Values outside the percentile will receive the same color as the minimum or maximum,
+    respectively.
+
+    Parameters
+    ----------
+    cmap : str
+        Name of the colormap to be used
+
+    percentile : tuple[float, float], optional
+        Percentile range to be used for normalization. If None, the full range of data is used.
+        For example, (5, 95) will map colors between the 5th and 95th percentile.
 
     """
 
@@ -222,7 +285,13 @@ class MappedColormaps:
         self,
         data: np.ndarray,
     ) -> np.ndarray:
-        """Normalize data and transform it to colors"""
+        """Normalize data and transform it to colors
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be transformed into colors. Based on this data, the colormap will be normalized.
+        """
         data = np.array(data.copy())
 
         if self.percentile is not None:

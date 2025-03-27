@@ -29,7 +29,7 @@ def stylize(
     return ax
 
 
-def label(
+def label_axes(
     ax: plt.Axes,
     xlabel: str | None = None,
     ylabel: str | None = None,
