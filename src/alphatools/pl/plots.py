@@ -445,15 +445,11 @@ class Plots:
         medians = np.nanmedian(values, axis=0)
         ranked_order = np.argsort(medians)[::-1]
         ranked_medians = medians[ranked_order]
-        proteins = data.var_names[ranked_order] # TODO: add text display option for protein names
+        proteins = data.var_names[ranked_order]  # TODO: add text display option for protein names
         ranks = np.arange(1, len(ranked_medians) + 1)
 
         # Create a DataFrame from proteins, ranks, and ranked_medians
-        ranked_medians_df = pd.DataFrame({
-            "Protein": proteins,
-            "Rank": ranks,
-            "Median": ranked_medians
-        })
+        ranked_medians_df = pd.DataFrame({"Protein": proteins, "Rank": ranks, "Median": ranked_medians})
 
         # Get the (optional) color values for the proteins
         color_column_for_scatter = None
@@ -463,7 +459,7 @@ class Plots:
                 colors = colors[ranked_order]
                 ranked_medians_df["Color"] = colors
                 color_column_for_scatter = "Color"
-            else :
+            else:
                 logging.warning(f"Color column {color_column} not found in data.var. Ignoring color coding.")
 
         # call the Plots.scatter method to create the rank plot
