@@ -547,3 +547,86 @@ class Plots:
             xlabel="Rank",
             ylabel="Median Intensity",
         )
+
+    @classmethod
+    def volcanoplot(
+        cls,
+        data: pd.DataFrame | ad.AnnData,
+        x_column: str,
+        y_column: str,
+        status_column: str | None = None,
+        x_limits: tuple[float, float] | None = (-1, 1),
+        y_limit: float | None = 0.05,
+        palette: list[str | tuple] | None = None,
+        ax: plt.Axes | None = None,
+        label_points: list[str] | None = None,
+        label_match_column: str | None = None,
+        label_display_column: str | None = None,
+        scatter_kwargs: dict | None = None,
+        legend_kwargs: dict | None = None,
+        label_kwargs: dict | None = None,
+        xlim: tuple[float, float] | None = None,
+        ylim: tuple[float, float] | None = None,
+        *,
+        neg_log10_y_column: bool = True,
+    ) -> None:
+        """Create a volcano plot from a DataFrame or AnnData object
+
+        Generate a volcanoplot from a dataset, with optional coloring and labelling of points.
+
+        """
+        scatter_kwargs = scatter_kwargs or {}
+        label_kwargs = label_kwargs or {}
+
+        label_display_column = label_display_column or label_match_column
+
+        if not ax:
+            _, axm = create_figure(1, 1)
+            ax = axm.next()
+
+        x_values = _adata_column_to_array(data, x_column)
+        y_values = _adata_column_to_array(data, y_column)
+
+        if neg_log10_y_column:
+            y_values = -np.log10(y_values)
+            y_limit = -np.log10(y_limit) if y_limit is not None else None
+
+        # Auto assignment of status column if none is provided
+        if status_column is None:
+            status_column = np.array(["nonregulated"] * len(data))
+            status_column[(y_values > y_limit) & (x_values > x_limits[0])] = "upregulated"
+            status_column[(y_values > y_limit) & (x_values < x_limits[1])] = "downregulated"
+            if label_points is not None:
+                label_lookup = _adata_column_to_array(data, label_match_column)
+                status_column[label_lookup.isin(label_points)] = "highlighted"
+            if isinstance(data, ad.AnnData):
+                data.obs["_status"] = np.array(status_column)
+            else:
+                data["_status"] = np.array(status_column)
+            status_column = "_status"
+
+        # Scatterplot
+        cls.scatter(
+            data=data,
+            x_column=x_column,
+            y_column=y_column,
+            color_column=status_column,
+            ax=ax,
+            palette=palette,
+            scatter_kwargs=scatter_kwargs,
+            legend_kwargs=legend_kwargs,
+            xlim=xlim,
+            ylim=ylim,
+        )
+
+        # Labelling
+        if not any([label_points, label_match_column, label_display_column]):
+            return
+
+        label_plot(
+            ax=ax,
+            x_values=x_values[status_column == "highlighted"],
+            y_values=y_values[status_column == "highlighted"],
+            labels=_adata_column_to_array(data, label_display_column)[status_column == "highlighted"],
+            label_kwargs=label_kwargs,
+        )
