@@ -9,6 +9,7 @@
 # coloring it by a metadata column from obs, see 03_basic_workflow.ipynb).
 
 import logging
+from collections import Counter
 from collections.abc import Callable
 
 import anndata as ad
@@ -28,28 +29,6 @@ from alphatools.pp.data import _adata_column_to_array
 logging.basicConfig(level=logging.INFO)
 
 config = defaults.plot_settings.to_dict()
-
-
-def _order_rarest_to_bottom(
-    data: pd.DataFrame,
-    column: str,
-) -> pd.DataFrame:
-    """Reorder a DataFrame by the frequency of a column to avoid overplotting rarer classes with more common ones"""
-    if column not in data.columns:
-        logging.warning(f"Column {column} not found in data. Skipping reordering.")
-        return data
-
-    column_safe = f"{column}_safe"
-    data = data.copy()
-
-    data[column_safe] = data[column].astype(str)
-    data[column_safe] = pd.Categorical(
-        data[column_safe],
-        categories=data[column_safe].value_counts().sort_values(ascending=False).index.tolist(),
-        ordered=True,
-    )
-
-    return data.sort_values(column_safe).drop(columns=column_safe)
 
 
 def add_lines(
@@ -462,7 +441,8 @@ class Plots:
                 color_dict[level] = BaseColors.get("grey")
 
         # Handle ordering of plotting arrays: order by the frequency of the color column
-        order = np.argsort(color_values)[::-1]
+        counts = Counter(color_values)
+        order = np.argsort([counts[cv] for cv in color_values])[::-1]
         x_values = _adata_column_to_array(data, x_column)[order]
         y_values = _adata_column_to_array(data, y_column)[order]
         color_values = np.array(color_values)[order]
