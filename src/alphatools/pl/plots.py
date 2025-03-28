@@ -308,6 +308,7 @@ class Plots:
         ax: plt.Axes | None = None,
         color: str = "blue",
         palette: list[tuple] | None = None,
+        color_dict: dict[str, str | tuple] | None = None,
         legend: str | mpl.legend.Legend | None = None,
         hist_kwargs: dict | None = None,
         legend_kwargs: dict | None = None,
@@ -332,6 +333,8 @@ class Plots:
             Matplotlib axes object to plot on, if None a new figure is created. By default None.
         palette : list[tuple], optional
             List of colors to use for color encoding, if None a default palette is used. By default None.
+        color_dict: dict[str, str | tuple], optional
+            Supercedes palette, a dictionary mapping levels to colors. By default None. If provided, palette is ignored.
         legend : str | mpl.legend.Legend, optional
             Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
         hist_kwargs : dict, optional
@@ -362,15 +365,16 @@ class Plots:
             color = BaseColors.get(color)
             ax.hist(values, bins=bins, color=color, **hist_kwargs)
         else:
-            colors = _adata_column_to_array(data, color_column)
-
+            color_values = _adata_column_to_array(data, color_column)
             palette = palette or BasePalettes.get("qualitative")
-
-            color_dict = get_color_mapping(colors, palette)
+            color_dict = color_dict or get_color_mapping(color_values, palette)
+            missing = set(np.unique(color_values)) - set(color_dict)
+            for level in missing:
+                color_dict[level] = BaseColors.get("grey")
 
             for level, level_color in color_dict.items():
                 ax.hist(
-                    values[colors == level],
+                    values[color_values == level],
                     bins=bins,
                     color=level_color,
                     **hist_kwargs,
@@ -400,6 +404,7 @@ class Plots:
         color_column: str | None = None,
         ax: plt.Axes | None = None,
         palette: list[str | tuple] | None = None,
+        color_dict: dict[str, str | tuple] | None = None,
         legend: str | mpl.legend.Legend | None = None,
         scatter_kwargs: dict | None = None,
         legend_kwargs: dict | None = None,
@@ -422,6 +427,8 @@ class Plots:
             Matplotlib axes object to plot on, if None a new figure is created. By default None.
         palette : list[str | tuple], optional
             List of colors to use for color encoding, if None a default palette is used. By default None.
+        color_dict: dict[str, str | tuple], optional
+            Supercedes palette, a dictionary mapping levels to colors. By default None. If provided, palette is ignored.
         legend : str | mpl.legend.Legend, optional
             Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
         scatter_kwargs : dict, optional
@@ -448,9 +455,11 @@ class Plots:
             color_dict = {"data": BaseColors.get(color)}
         else:
             color_values = _adata_column_to_array(data, color_column)
-            if palette is None:
-                palette = BasePalettes.get("qualitative")
-            color_dict = get_color_mapping(color_values, palette)
+            palette = palette or BasePalettes.get("qualitative")
+            color_dict = color_dict or get_color_mapping(color_values, palette)
+            missing = set(np.unique(color_values)) - set(color_dict)
+            for level in missing:
+                color_dict[level] = BaseColors.get("grey")
 
         # Handle ordering of plotting arrays: order by the frequency of the color column
         order = np.argsort(color_values)[::-1]
@@ -487,6 +496,7 @@ class Plots:
         layer: str = "X",
         color: str = "blue",
         palette: list[str | tuple] | None = None,
+        color_dict: dict[str, str | tuple] | None = None,
         legend: str | mpl.legend.Legend | None = None,
         color_column: str | None = None,
         scatter_kwargs: dict | None = None,
@@ -535,6 +545,7 @@ class Plots:
             color_column=color_column,
             legend=legend,
             palette=palette,
+            color_dict=color_dict,
             ax=ax,
             scatter_kwargs=scatter_kwargs,
         )
@@ -546,87 +557,4 @@ class Plots:
             ax,
             xlabel="Rank",
             ylabel="Median Intensity",
-        )
-
-    @classmethod
-    def volcanoplot(
-        cls,
-        data: pd.DataFrame | ad.AnnData,
-        x_column: str,
-        y_column: str,
-        status_column: str | None = None,
-        x_limits: tuple[float, float] | None = (-1, 1),
-        y_limit: float | None = 0.05,
-        palette: list[str | tuple] | None = None,
-        ax: plt.Axes | None = None,
-        label_points: list[str] | None = None,
-        label_match_column: str | None = None,
-        label_display_column: str | None = None,
-        scatter_kwargs: dict | None = None,
-        legend_kwargs: dict | None = None,
-        label_kwargs: dict | None = None,
-        xlim: tuple[float, float] | None = None,
-        ylim: tuple[float, float] | None = None,
-        *,
-        neg_log10_y_column: bool = True,
-    ) -> None:
-        """Create a volcano plot from a DataFrame or AnnData object
-
-        Generate a volcanoplot from a dataset, with optional coloring and labelling of points.
-
-        """
-        scatter_kwargs = scatter_kwargs or {}
-        label_kwargs = label_kwargs or {}
-
-        label_display_column = label_display_column or label_match_column
-
-        if not ax:
-            _, axm = create_figure(1, 1)
-            ax = axm.next()
-
-        x_values = _adata_column_to_array(data, x_column)
-        y_values = _adata_column_to_array(data, y_column)
-
-        if neg_log10_y_column:
-            y_values = -np.log10(y_values)
-            y_limit = -np.log10(y_limit) if y_limit is not None else None
-
-        # Auto assignment of status column if none is provided
-        if status_column is None:
-            status_column = np.array(["nonregulated"] * len(data))
-            status_column[(y_values > y_limit) & (x_values > x_limits[0])] = "upregulated"
-            status_column[(y_values > y_limit) & (x_values < x_limits[1])] = "downregulated"
-            if label_points is not None:
-                label_lookup = _adata_column_to_array(data, label_match_column)
-                status_column[label_lookup.isin(label_points)] = "highlighted"
-            if isinstance(data, ad.AnnData):
-                data.obs["_status"] = np.array(status_column)
-            else:
-                data["_status"] = np.array(status_column)
-            status_column = "_status"
-
-        # Scatterplot
-        cls.scatter(
-            data=data,
-            x_column=x_column,
-            y_column=y_column,
-            color_column=status_column,
-            ax=ax,
-            palette=palette,
-            scatter_kwargs=scatter_kwargs,
-            legend_kwargs=legend_kwargs,
-            xlim=xlim,
-            ylim=ylim,
-        )
-
-        # Labelling
-        if not any([label_points, label_match_column, label_display_column]):
-            return
-
-        label_plot(
-            ax=ax,
-            x_values=x_values[status_column == "highlighted"],
-            y_values=y_values[status_column == "highlighted"],
-            labels=_adata_column_to_array(data, label_display_column)[status_column == "highlighted"],
-            label_kwargs=label_kwargs,
         )
