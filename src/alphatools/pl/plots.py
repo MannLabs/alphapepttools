@@ -18,7 +18,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.patches import Patch
-from pandas.api.types import is_numeric_dtype
 
 from alphatools.pl import defaults
 from alphatools.pl.colors import BaseColors, BasePalettes, get_color_mapping
@@ -258,8 +257,9 @@ def label_plot(
 
     for line in lines:
         ax.plot(line[0], line[1], **line_kwargs)
-        alignment = "right" if line[0][0] > line[0][1] else "left"
-        label_kwargs["ha"] = alignment
+        if x_anchors is not None:
+            alignment = "right" if line[0][0] > line[0][1] else "left"
+            label_kwargs["ha"] = alignment
         ax.text(line[0][1], line[1][1], label_parser(line[2]), **label_kwargs)
 
 
@@ -337,8 +337,6 @@ class Plots:
             _, ax = create_figure(1, 1)
 
         values = _adata_column_to_array(data, value_column)
-        if not is_numeric_dtype(values):
-            raise ValueError("Value column must contain numeric data")
 
         if color_column is None:
             color = BaseColors.get(color)
