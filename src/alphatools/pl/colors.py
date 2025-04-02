@@ -164,7 +164,7 @@ class BaseColors:
         alpha: float | None = None,
     ) -> tuple:
         """Get a default color by name, optionally lightened and/or with alpha"""
-        if hasattr(cls, color_name):
+        if isinstance(color_name, str) and hasattr(cls, color_name):
             color = getattr(cls, color_name, None)
         else:
             try:
