@@ -18,6 +18,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.patches import Patch
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import r2_score
 
 from alphatools.pl import defaults
 from alphatools.pl.colors import BaseColors, BasePalettes, get_color_mapping
@@ -182,6 +184,63 @@ def add_legend(
     color_dict = get_color_mapping(levels, palette)
     patches = _make_legend_patches(color_dict)
     make_legend(ax, patches, **legend_kwargs)
+
+
+def add_linear_regression(
+    ax: plt.Axes,
+    x_values: list | np.ndarray,
+    y_values: list | np.ndarray,
+    color: str = "red",
+    line_kwargs: dict | None = None,
+) -> tuple[float, float, float]:
+    """Add a linear regression line to a matplotlib axes object
+
+    Parameters
+    ----------
+    ax : plt.Axes
+        Matplotlib axes object to add the line to.
+    x_values : list | np.ndarray
+        x-values of the data to fit the linear regression line to.
+    y_values : list | np.ndarray
+        y-values of the data to fit the linear regression line to.
+    color : str, optional
+        Color of the line, by default "red".
+    line_kwargs : dict, optional
+        Additional keyword arguments for the matplotlib plot function. By default None.
+
+    Returns
+    -------
+    Tuple[float, float, float]
+        Tuple containing the slope, intercept, and r-value of the linear regression.
+
+    """
+    line_kwargs = line_kwargs or {}
+    line_kwargs["color"] = color
+
+    x_values = np.asarray(x_values, dtype=np.float64).reshape(-1)
+    y_values = np.asarray(y_values, dtype=np.float64).reshape(-1)
+
+    # handle missing values
+    nan_mask = np.logical_and(~np.isnan(x_values), ~np.isnan(y_values))
+    x_values = x_values[nan_mask]
+    y_values = y_values[nan_mask]
+
+    x_fit = x_values.reshape(-1, 1)
+    y_fit = y_values.reshape(-1, 1)
+
+    reg = LinearRegression().fit(x_fit, y_fit)
+
+    r2 = r2_score(y_fit, reg.predict(x_fit))
+    a = reg.coef_[0][0]
+    b = reg.intercept_[0]
+
+    # plot the linear regression line
+    x_range = np.linspace(min(x_values), max(x_values), 1000)
+    y_range = a * x_range + b
+
+    ax.plot(x_range, y_range, **line_kwargs)
+
+    return a, b, r2
 
 
 def label_plot(
@@ -441,7 +500,8 @@ class Plots:
         # If there is a color map column, map its levels to a palette
         elif color_map_column is not None:
             color_levels = _adata_column_to_array(data, color_map_column)
-            color_dict = color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
+            palette = palette or BasePalettes.get("qualitative")
+            color_dict = color_dict or get_color_mapping(color_levels, palette)
             missing = set(np.unique(color_levels)) - set(color_dict)
             for level in missing:
                 color_dict[level] = BaseColors.get("grey")

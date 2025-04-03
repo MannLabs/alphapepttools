@@ -1,2 +1,2 @@
 from .stats import pca, ttest
-from .tools import umap
+from .tools import gaussian_density, umap

@@ -35,6 +35,11 @@ def label_axes(
     ylabel: str | None = None,
     title: str | None = None,
     label_parser: Callable | None = None,
+    xlabel_fontsize: int | None = None,
+    ylabel_fontsize: int | None = None,
+    title_fontsize: int | None = None,
+    xtick_fontsize: int | None = None,
+    ytick_fontsize: int | None = None,
 ) -> plt.Axes:
     """Apply labels to a matplotlib axes object
 
@@ -52,6 +57,16 @@ def label_axes(
         A function to parse labels, by default None. This is useful to convert
         labels from a computation-context to presentation context, e.g. a column
         like upregulated_proteins could be shown as "Upregulated Proteins" in the plot.
+    xlabel_fontsize : int, optional
+        The fontsize of the x-axis label, by default None (uses default from config)
+    ylabel_fontsize : int, optional
+        The fontsize of the y-axis label, by default None (uses default from config)
+    title_fontsize : int, optional
+        The fontsize of the title, by default None (uses default from config)
+    xtick_fontsize : int, optional
+        The fontsize of the x-axis ticks, by default None (uses default from config)
+    ytick_fontsize : int, optional
+        The fontsize of the y-axis ticks, by default None (uses default from config)
 
     Returns
     -------
@@ -60,9 +75,15 @@ def label_axes(
     """
     label_parser = label_parser or (lambda x: x)
 
-    ax.set_xlabel(label_parser(xlabel), fontsize=config["axes"]["label_size"]) if xlabel is not None else None
-    ax.set_ylabel(label_parser(ylabel), fontsize=config["axes"]["label_size"]) if ylabel is not None else None
-    ax.set_title(label_parser(title), fontsize=config["axes"]["title_size"]) if title is not None else None
+    xlabel_fontsize = xlabel_fontsize or config["axes"]["label_size"]
+    ylabel_fontsize = ylabel_fontsize or config["axes"]["label_size"]
+    title_fontsize = title_fontsize or config["axes"]["title_size"]
+
+    ax.set_xlabel(label_parser(xlabel), fontsize=xlabel_fontsize) if xlabel is not None else None
+    ax.set_ylabel(label_parser(ylabel), fontsize=ylabel_fontsize) if ylabel is not None else None
+    ax.set_title(label_parser(title), fontsize=title_fontsize) if title is not None else None
+    ax.xaxis.set_tick_params(labelsize=xtick_fontsize or config["axes"]["tick_size"])
+    ax.yaxis.set_tick_params(labelsize=ytick_fontsize or config["axes"]["tick_size"])
 
 
 def _indexable_axes(
