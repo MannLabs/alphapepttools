@@ -139,8 +139,13 @@ def _parse_figsize(
     if figsize is None:
         figsize = (valid_preset_sizes["1"] / 25.4, valid_preset_sizes["1"] / 25.4)
     elif isinstance(figsize[0], str) and isinstance(figsize[1], str):
-        figsize = (valid_preset_sizes[figsize[0]] / 25.4, valid_preset_sizes[figsize[1]] / 25.4)
-    elif isinstance(figsize[0], int) and isinstance(figsize[1], int):
+        try:
+            figsize = (valid_preset_sizes[figsize[0]] / 25.4, valid_preset_sizes[figsize[1]] / 25.4)
+        except KeyError as e:
+            raise ValueError(
+                f"Invalid strings {figsize[0]} and {figsize[1]} provided. Must be valid keys in the config file"
+            ) from e
+    elif isinstance(figsize[0], int | float) and isinstance(figsize[1], int | float):
         figsize = (figsize[0], figsize[1])
     else:
         raise ValueError(
