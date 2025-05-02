@@ -31,8 +31,8 @@ dependencies = [
   "numpy<2",
   "pandas",                                                                                         # version to be fixed: 2.2.3
   "pyarrow",                                                                                        # version to be fixed: 19.0.1
+  "scanpy==1.10.4",
   "scikit-learn==1.5.1",
-  "scipy==1.10.1",
   # for debug logging (referenced from the issue template)
   "session-info==1",
 ]
