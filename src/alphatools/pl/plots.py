@@ -67,12 +67,9 @@ def add_lines(
     line_kwargs = line_kwargs or {}
 
     # handle clashes between keyword arguments and line_kwargs
-    if "color" in line_kwargs:
-        color = line_kwargs.pop("color")
-    if "linestyle" in line_kwargs:
-        linestyle = line_kwargs.pop("linestyle")
-    if "linewidth" in line_kwargs:
-        linewidth = line_kwargs.pop("linewidth")
+    color = line_kwargs.pop("color", color)
+    linestyle = line_kwargs.pop("linestyle", linestyle)
+    linewidth = line_kwargs.pop("linewidth", linewidth)
 
     # handle intercepts and vertical/horizontal lines
     if isinstance(intercepts, float | int):
