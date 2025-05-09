@@ -64,20 +64,18 @@ def add_lines(
     if linetype not in ["vline", "hline"]:
         raise ValueError("linetype must be 'vline' or 'hline'")
 
-    line_kwargs = line_kwargs or {}
-
-    # handle clashes between keyword arguments and line_kwargs
-    color = line_kwargs.pop("color", color)
-    linestyle = line_kwargs.pop("linestyle", linestyle)
-    linewidth = line_kwargs.pop("linewidth", linewidth)
+    if not isinstance(intercepts, (list | float | int)):
+        raise TypeError("intercepts must be a float, int, or list of floats/ints")
 
     # handle intercepts and vertical/horizontal lines
     if isinstance(intercepts, float | int):
         intercepts = [intercepts]
-    elif isinstance(intercepts, list):
-        pass
-    else:
-        raise TypeError("intercept must be a float or a list of floats")
+
+    # handle clashes between keyword arguments and line_kwargs
+    line_kwargs = line_kwargs or {}
+    color = line_kwargs.pop("color", color)
+    linestyle = line_kwargs.pop("linestyle", linestyle)
+    linewidth = line_kwargs.pop("linewidth", linewidth)
 
     line_func = ax.axvline if linetype == "vline" else ax.axhline
 
