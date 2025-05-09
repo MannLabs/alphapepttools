@@ -9,52 +9,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def add_core_proteome_mask(data: ad.AnnData, layer: str, namecol: str = "isCore") -> ad.AnnData:
-    """Adds a column of booleans to the adata.var table
-
-    indicates whether the protein appears in 100% of the samples (TRUE) or not (FALSE)Handle missing values in the data matrix.
-    this is useful for running PCA with the core proteome as "mask_var".
-
-    Parameters
-    ----------
-    data: ad.AnnData
-        AnnData od the protein data. The protein matrix of shape `n_obs` x `n_vars`.
-        Rows correspond to cells and columns to genes.
-    layer: str
-        Which layer of the AnnData to use for PCA (relevant when imputation is also in place).
-    namecol: str, optional (default: "isCore")
-        which name to assign to the new column in AnnData.var.
-
-    Returns
-    -------
-    adata : ad.AnnData
-        AnnData object with the added core var meta data.
-    """
-    logger.info("Adding core proteome mask to feature metadata")
-
-    # checks
-    if not isinstance(data, (ad.AnnData)):
-        raise TypeError("Data must be either AnnData object")
-    if layer and layer != "X" and layer not in data.layers:
-        raise ValueError(f"Layer {layer} not found in AnnData object")
-    mat = data.X if layer is None else data.layers[layer]
-
-    # indicate which proteins are in the core proteome
-    if namecol in data.var.columns:
-        logger.warning(f"'{namecol}' exists in data.var, overwriting")
-
-    data.var[namecol] = ~np.isnan(mat).any(axis=0)
-    logger.info(f"'{namecol}' column added to data.var to classify core proteins")
-
-    return data
-
-
-def run_pca(
-    data: ad.AnnData,
+def pca(
+    adata: ad.AnnData,
     n_comps: int | None = None,
     layer: str | None = None,
     feature_meta_data_mask: str | None = None,
-    pca_kwargs: dict | None = None,
+    **pca_kwargs: dict | None,
 ) -> ad.AnnData | np.ndarray:
     """Principal component analysis :cite:p:`Pedregosa2011`.
 
@@ -64,7 +24,7 @@ def run_pca(
 
     Parameters
     ----------
-    data: ad.AnnData
+    adata: ad.AnnData
         The (annotated) data matrix of shape `n_obs` X `n_vars`.
         Rows correspond to cells and columns to genes.
     n_comps: int, optional (default: 50)
@@ -77,9 +37,9 @@ def run_pca(
         If provided, the colname in `adata.var` to use as a mask for
         the features to be used in PCA. This is useful for running PCA with the
         core proteome as "mask_var".
-        If None, all features are used (data should not iclude NaNs!).
-    pca_kwargs: dict, optional
-        Additional keyword arguments for the PCA function. By default None.
+        If None, all features are used (data should not include NaNs!).
+    **pca_kwargs: dict, optional
+        Additional keyword arguments for the :func:`scanpy.pp.pca` By default None.
 
     Returns
     -------
@@ -99,15 +59,15 @@ def run_pca(
     logger.info("computing PCA")
     pca_kwargs = pca_kwargs or {}
 
-    if not isinstance(data, (ad.AnnData)):
+    if not isinstance(adata, (ad.AnnData)):
         raise TypeError("Data must be either AnnData object or numpy array")
-    if layer and layer != "X" and layer not in data.layers:
+    if layer not in adata.layers:
         raise ValueError(f"Layer {layer} not found in AnnData object")
 
     # Add feature mask to kwargs if provided
     if feature_meta_data_mask is not None:
-        if feature_meta_data_mask not in data.var.columns:
+        if feature_meta_data_mask not in adata.var.columns:
             raise ValueError(f"Column {feature_meta_data_mask} not found in data.var")
-        pca_kwargs["mask_var"] = data.var[feature_meta_data_mask]
+        pca_kwargs["mask_var"] = adata.var[feature_meta_data_mask]
 
-    return scpp.pca(data, n_comps=n_comps, layer=layer, **pca_kwargs)
+    return scpp.pca(adata, n_comps=n_comps, layer=layer, **pca_kwargs)
