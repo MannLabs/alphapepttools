@@ -55,6 +55,8 @@ def add_lines(
         Linestyle of the line(s), by default "--".
     linewidth : float, optional
         Linewidth of the line(s), by default 1.
+    line_kwargs : dict, optional
+        Additional keyword arguments for the line function, by default None. Will be overridden by color, linestyle, and linewidth arguments.
 
     Returns
     -------
@@ -63,6 +65,7 @@ def add_lines(
     """
     if linetype not in ["vline", "hline"]:
         raise ValueError("linetype must be 'vline' or 'hline'")
+    line_func = ax.axvline if linetype == "vline" else ax.axhline
 
     if not isinstance(intercepts, (list | float | int)):
         raise TypeError("intercepts must be a float, int, or list of floats/ints")
@@ -76,8 +79,6 @@ def add_lines(
     color = line_kwargs.pop("color", color)
     linestyle = line_kwargs.pop("linestyle", linestyle)
     linewidth = line_kwargs.pop("linewidth", linewidth)
-
-    line_func = ax.axvline if linetype == "vline" else ax.axhline
 
     # add lines to ax
     for intercept in intercepts:
