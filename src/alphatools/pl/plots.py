@@ -131,6 +131,7 @@ def make_legend(
     # create new legend
     if "fontsize" not in kwargs:
         kwargs["fontsize"] = config["legend"]["font_size"]
+
     _legend = ax.legend(handles=patches, **kwargs)
 
     # handle the title separately
@@ -180,6 +181,34 @@ def add_legend(
     make_legend(ax, patches, **legend_kwargs)
 
 
+def _drop_nans_from_plot_arrays(
+    x_values: np.ndarray,
+    y_values: np.ndarray,
+    labels: np.ndarray | list[str],
+) -> tuple:
+    # Missing x or y values are breaking and should be dropped
+    keep_mask = ~np.logical_or(np.isnan(x_values), np.isnan(y_values))
+
+    return x_values[keep_mask], y_values[keep_mask], labels[keep_mask]
+
+
+def _assign_nearest_anchor_position_to_values(
+    values: np.ndarray,
+    anchors: list[int | float] | np.ndarray | None,
+) -> list:
+    if anchors is None:
+        return values
+
+    # x-values are binned to the anchor positions
+    anchored_values = []
+
+    for val in values:
+        anchor_diffs = [abs(anchor - val) for anchor in anchors]
+        anchored_values.append(anchors[np.argmin(anchor_diffs)])
+
+    return anchored_values
+
+
 def label_plot(
     ax: plt.Axes,
     x_values: list | np.ndarray,
@@ -190,6 +219,7 @@ def label_plot(
     line_kwargs: dict | None = None,
     label_parser: Callable | None = None,
     y_display_start: float = 1,
+    y_padding_factor: float = 3,
 ) -> None:
     """Add labels to a 2D axes object
 
@@ -197,6 +227,33 @@ def label_plot(
     using the automatic dodging function from adjust_text or anchored to the left or right of the plot,
     where labels below the splitpoint are anchored to the left and labels above the splitpoint are anchored
     to the right.
+
+    Parameters
+    ----------
+    ax : plt.Axes
+        Matplotlib axes object to add the labels to.
+    x_values : list | np.ndarray
+        x-coordinates of the labels.
+    y_values : list | np.ndarray
+        y-coordinates of the labels.
+    labels : list[str] | np.ndarray
+        Labels to add to the plot.
+    x_anchors : list[int | float] | np.ndarray | None, optional
+        x-coordinates of the anchors to use for the labels. If None, labels are placed at the x-coordinates of the data points. By default None.
+    label_kwargs : dict | None, optional
+        Additional keyword arguments for the label text, by default None.
+    line_kwargs : dict | None, optional
+        Additional keyword arguments for the line connecting the label to the data point, by default None.
+    label_parser : Callable | None, optional
+        Function to parse the labels, by default None. This is useful to convert
+        labels from a computation-context to presentation context, e.g. a column
+        like upregulated_proteins could be shown as "Upregulated Proteins" in the plot.
+    y_display_start : float, optional
+        Starting point for the y-coordinates of the labels, by default 1. This is used to determine the spacing between labels.
+        The y-coordinates of the labels are adjusted to be evenly spaced between the min and max y-coordinates at that anchor.
+        This is useful for avoiding label overlap.
+    y_padding_factor: float, optional
+        Factor to increase or decrease how far apart labels are spread in the y-direction when stacked into a column over x-anchors
 
     """
     label_kwargs = {"fontsize": config["font_sizes"]["medium"], **(label_kwargs or {})}
@@ -207,38 +264,30 @@ def label_plot(
         raise ValueError("x_values, y_values, and labels must have the same length")
 
     # convert to numpy arrays for consistency & remove any nans
-    x_values = np.array(x_values)
-    y_values = np.array(y_values)
-    labels = np.array(labels)
-
-    keep_mask = np.logical_or(np.isnan(x_values), np.isnan(y_values))
-    x_values = x_values[~keep_mask]
-    y_values = y_values[~keep_mask]
-    labels = labels[~keep_mask]
+    x_values, y_values, labels = _drop_nans_from_plot_arrays(np.array(x_values), np.array(y_values), np.array(labels))
 
     # determine label positions based on optional x_anchors
     if x_anchors is not None:
         # x-values are binned to the anchor positions
-        label_x_values = []
-        for x in x_values:
-            anchor_diffs = [abs(anchor - x) for anchor in x_anchors]
-            label_x_values.append(x_anchors[np.argmin(anchor_diffs)])
+        label_x_values = _assign_nearest_anchor_position_to_values(x_values, x_anchors)
 
-        # TODO: Clean and refactor this block
         # y-values should be distributed evenly between the min and max y-values at that anchor
-        fontsize_display = config["font_sizes"]["medium"]
-        label_spacing_display = fontsize_display * 2
+        label_spacing_display = config["font_sizes"]["medium"] * y_padding_factor
+
+        # Translate label spacing from display coordinates to axes coordinates, since the same spacing should appear regardless of y-values
         transform = ax.transData.inverted()
-        _, y_spacing_data = transform.transform((0, label_spacing_display)) - transform.transform((0, 0))
+        _, y_spacing_in_data_coords = transform.transform((0, label_spacing_display)) - transform.transform((0, 0))
 
-        # get a consistent starting point for y values
-        bbox = ax.get_window_extent()
-        _, upper_bound_data = transform.transform((0, bbox.height * y_display_start))
+        # get a consistent starting point for y values with respect to the actual display window
+        _, upper_bound_in_data_coords = transform.transform((0, ax.get_window_extent().height * y_display_start))
 
+        # Iterate over all unique x_anchors and assign y-values in data coordinates to the respective labels
         label_y_values = []
         for anchor in np.unique(label_x_values):
             current_label_y_values = np.sort(y_values[np.array(label_x_values) == anchor])
-            label_y_values.extend([upper_bound_data - y_spacing_data * i for i in range(len(current_label_y_values))])
+            label_y_values.extend(
+                [upper_bound_in_data_coords - y_spacing_in_data_coords * i for i in range(len(current_label_y_values))]
+            )
     else:
         label_x_values = x_values
         label_y_values = y_values
@@ -247,9 +296,6 @@ def label_plot(
     lines = []
     for label, x, y, label_x, label_y in zip(labels, x_values, y_values, label_x_values, label_y_values, strict=False):
         lines.append(((x, label_x), (y, label_y), label))
-
-    # Sort lines by sorting in decreasing label_y order
-    # lines = sorted(lines, key=lambda line: line[1][1], reverse=True)
 
     for line in lines:
         ax.plot(line[0], line[1], **line_kwargs)
