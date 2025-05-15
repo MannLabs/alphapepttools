@@ -18,16 +18,16 @@ def toy_adata():
 # now test the PCA function
 def test_run_pca(toy_adata):
     """Test the run_pca function on a toy dataset."""
-    toy_adata["norm"] = toy_adata.X.copy()
-    adata = at.pp.pca(toy_adata, layer="norm")
+    toy_adata.layers["norm"] = toy_adata.X.copy()
+    at.pp.pca(toy_adata, layer="norm")
 
     # Assertions for Expected Outputs
-    assert "X_pca" in adata.obsm, "PCA results not found in obsm"
-    assert "pca" in adata.uns, "PCA metadata not found in uns"
-    assert "PCs" in adata.varm, "Principal components not found in varm"
+    assert "X_pca" in toy_adata.obsm, "PCA results not found in obsm"
+    assert "pca" in toy_adata.uns, "PCA metadata not found in uns"
+    assert "PCs" in toy_adata.varm, "Principal components not found in varm"
 
     # Check for API Changes
     required_attrs = {"X_pca", "pca", "PCs"}
-    existing_attrs = set(adata.obsm.keys()).union(adata.uns.keys(), adata.varm.keys())
+    existing_attrs = set(toy_adata.obsm.keys()).union(toy_adata.uns.keys(), toy_adata.varm.keys())
     missing_attrs = required_attrs - existing_attrs
     assert not missing_attrs, f"Scanpy API may have changed, missing attributes: {missing_attrs}"
