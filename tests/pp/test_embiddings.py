@@ -18,7 +18,8 @@ def toy_adata():
 # now test the PCA function
 def test_run_pca(toy_adata):
     """Test the run_pca function on a toy dataset."""
-    adata = at.pp.pca(toy_adata)
+    toy_adata["norm"] = toy_adata.X.copy()
+    adata = at.pp.pca(toy_adata, layer="norm")
 
     # Assertions for Expected Outputs
     assert "X_pca" in adata.obsm, "PCA results not found in obsm"
