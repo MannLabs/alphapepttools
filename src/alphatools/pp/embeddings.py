@@ -11,15 +11,15 @@ logger = logging.getLogger(__name__)
 
 def pca(
     adata: ad.AnnData,
-    n_comps: int | None = None,
     layer: str | None = None,
-    feature_meta_data_mask: str | None = None,
+    n_comps: int | None = None,
+    meta_data_mask_column_name: str | None = None,
     **pca_kwargs: dict | None,
 ) -> ad.AnnData | np.ndarray:
     """Principal component analysis :cite:p:`Pedregosa2011`.
 
-    Computes PCA coordinates, loadings and variance decomposition. Uses the
-    implementation of Scanpy (v 1.10.4), which in turn uses implementation of
+    Computes PCA coordinates, loadings and variance decomposition. adata will be changed as a result to include the pca calculationd.
+    Uses the implementation of Scanpy (v 1.10.4), which in turn uses implementation of
     *scikit-learn* :cite:p:`Pedregosa2011`.
 
     Parameters
@@ -27,13 +27,13 @@ def pca(
     adata: ad.AnnData
         The (annotated) data matrix of shape `n_obs` X `n_vars`.
         Rows correspond to cells and columns to genes.
-    n_comps: int, optional (default: 50)
-        Number of principal components to compute. Defaults to 50, or 1 - minimum
-        dimension size of selected representation.
     layer: str, optional (default: "X")
         If provided, which element of layers to use for PCA.
         If a np.array is provided, it is used directly.
-    feature_meta_data_mask: str, optional (default: None)
+    n_comps: int, optional (default: 50)
+        Number of principal components to compute. Defaults to 50, or 1 - minimum
+        dimension size of selected representation.
+    meta_data_mask_column_name: str, optional (default: None)
         If provided, the colname in `adata.var` to use as a mask for
         the features to be used in PCA. This is useful for running PCA with the
         core proteome as "mask_var".
@@ -60,14 +60,14 @@ def pca(
     pca_kwargs = pca_kwargs or {}
 
     if not isinstance(adata, (ad.AnnData)):
-        raise TypeError("Data must be either AnnData object or numpy array")
+        raise TypeError("Data should be AnnData object")
     if layer not in adata.layers:
         raise ValueError(f"Layer {layer} not found in AnnData object")
 
     # Add feature mask to kwargs if provided
-    if feature_meta_data_mask is not None:
-        if feature_meta_data_mask not in adata.var.columns:
-            raise ValueError(f"Column {feature_meta_data_mask} not found in data.var")
-        pca_kwargs["mask_var"] = adata.var[feature_meta_data_mask]
+    if meta_data_mask_column_name is not None:
+        if meta_data_mask_column_name not in adata.var.columns:
+            raise ValueError(f"Column {meta_data_mask_column_name} not found in data.var")
+        pca_kwargs["mask_var"] = adata.var[meta_data_mask_column_name]
 
     return scpp.pca(adata, n_comps=n_comps, layer=layer, **pca_kwargs)
