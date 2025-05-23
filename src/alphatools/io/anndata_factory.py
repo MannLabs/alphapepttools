@@ -1,6 +1,5 @@
 """Factory class to convert PSM DataFrames to AnnData format."""
 
-import warnings
 from typing import Any
 
 import anndata as ad
@@ -32,9 +31,10 @@ class AnnDataFactory:
 
         self._psm_df = psm_df
 
-        duplicated_proteins = self._psm_df[PsmDfCols.PROTEINS].duplicated()
-        if duplicated_proteins.sum() > 0:
-            warnings.warn(f"Found {duplicated_proteins.sum()} duplicated protein groups. Using only first.")
+        # TODO: figure out why this is here in the first place, since PSM longtables would undoubtedly have countless duplicates in this column by design?
+        # duplicated_proteins = self._psm_df[PsmDfCols.PROTEINS].duplicated()
+        # if duplicated_proteins.sum() > 0:
+        #     warnings.warn(f"Found {duplicated_proteins.sum()} duplicated protein groups. Using only first.")
 
     def create_anndata(self) -> ad.AnnData:
         """Create AnnData object from PSM DataFrame.
@@ -58,6 +58,10 @@ class AnnDataFactory:
             fill_value=np.nan,
             dropna=False,
         )
+
+        # Remove the unnamed column from the pivot table (artifact of pivoting without index name)
+        if "" in pivot_df.columns:
+            pivot_df = pivot_df.drop(columns=[""])
 
         return ad.AnnData(
             X=pivot_df.values,
@@ -119,6 +123,7 @@ class AnnDataFactory:
             reader.add_column_mapping(custom_column_mapping)
 
         psm_df = reader.load(file_paths)
+
         return cls(psm_df)
 
     @classmethod
