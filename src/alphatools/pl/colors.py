@@ -253,8 +253,7 @@ class BaseColormaps:
         """
         if colormap_name in cls.default_colormaps:
             colormap = cls.default_colormaps[colormap_name]
-
-        if colormap is None:
+        else:
             try:
                 colormap = plt.get_cmap(colormap_name)
             except ValueError as exc:
