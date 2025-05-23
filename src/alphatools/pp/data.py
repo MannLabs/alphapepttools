@@ -445,7 +445,7 @@ def filter_data_completeness(
     max_missing: float,
     group_column: str | None = None,
     groups: list[str] | None = None,
-    axis: int = 0,
+    axis: int = 1,
 ) -> ad.AnnData:
     """Filter data based on missing values
 
@@ -468,7 +468,7 @@ def filter_data_completeness(
     groups : list[str], optional
         List of groups to consider in filtering.
     axis : int, optional
-        Whether to check completeness of samples (0) or features (1).
+        Whether to check completeness of features (0) or samples (1).
 
     """
     if max_missing < 0 or max_missing > 1:
@@ -482,11 +482,11 @@ def filter_data_completeness(
     if not is_numeric_dtype(adata.X):
         raise ValueError("Data must be numeric.")
 
-    if axis == 0:  # check completeness of samples
+    if axis == 1:  # check completeness of samples
         missing_fraction = np.isnan(adata.X).mean(axis=1)
         missing_above_cutoff = missing_fraction > max_missing
         adata = adata[~missing_above_cutoff, :]
-    elif axis == 1:  # check completeness of features
+    elif axis == 0:  # check completeness of features
         missing_fraction = np.isnan(adata.X).mean(axis=0)
         missing_above_cutoff = missing_fraction > max_missing
         adata = adata[:, ~missing_above_cutoff]
