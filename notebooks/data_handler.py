@@ -6,7 +6,8 @@ from pathlib import Path
 import anndata as ad
 import numpy as np
 import pandas as pd
-from alphabase.anndata.anndata_factory import AnnDataFactory
+
+from alphatools.io.anndata_factory import AnnDataFactory
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", message=".*'progressbar' not installed.*")

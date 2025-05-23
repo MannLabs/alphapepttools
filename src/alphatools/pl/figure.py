@@ -6,6 +6,7 @@
 # Plotting is handled by the "AxisManager" class, which allows for easy (!) iteration or indexing of subplots,
 # while applying consistent styling (see 02_plotting.ipynb for examples).
 
+from collections.abc import Callable
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -28,17 +29,40 @@ def stylize(
     return ax
 
 
-def label(
+def label_axes(
     ax: plt.Axes,
     xlabel: str | None = None,
     ylabel: str | None = None,
     title: str | None = None,
+    label_parser: Callable | None = None,
 ) -> plt.Axes:
-    """Apply labels to a matplotlib axes object"""
-    ax.set_xlabel(xlabel, fontsize=config["axes"]["label_size"]) if xlabel is not None else ax.set_xlabel("")
-    ax.set_ylabel(ylabel, fontsize=config["axes"]["label_size"]) if ylabel is not None else ax.set_ylabel("")
-    ax.set_title(title, fontsize=config["axes"]["title_size"]) if title is not None else ax.set_title("")
-    return ax
+    """Apply labels to a matplotlib axes object
+
+    Parameters
+    ----------
+    ax : plt.Axes
+        The axes object to apply labels to
+    xlabel : str, optional
+        The x-axis label, by default None (existing label is not changed)
+    ylabel : str, optional
+        The y-axis label, by default None (existing label is not changed)
+    title : str, optional
+        The title of the axes, by default None (existing title is not changed)
+    label_parser : Callable, optional
+        A function to parse labels, by default None. This is useful to convert
+        labels from a computation-context to presentation context, e.g. a column
+        like upregulated_proteins could be shown as "Upregulated Proteins" in the plot.
+
+    Returns
+    -------
+    None
+
+    """
+    label_parser = label_parser or (lambda x: x)
+
+    ax.set_xlabel(label_parser(xlabel), fontsize=config["axes"]["label_size"]) if xlabel is not None else None
+    ax.set_ylabel(label_parser(ylabel), fontsize=config["axes"]["label_size"]) if ylabel is not None else None
+    ax.set_title(label_parser(title), fontsize=config["axes"]["title_size"]) if title is not None else None
 
 
 def _indexable_axes(
@@ -115,8 +139,13 @@ def _parse_figsize(
     if figsize is None:
         figsize = (valid_preset_sizes["1"] / 25.4, valid_preset_sizes["1"] / 25.4)
     elif isinstance(figsize[0], str) and isinstance(figsize[1], str):
-        figsize = (valid_preset_sizes[figsize[0]] / 25.4, valid_preset_sizes[figsize[1]] / 25.4)
-    elif isinstance(figsize[0], int) and isinstance(figsize[1], int):
+        try:
+            figsize = (valid_preset_sizes[figsize[0]] / 25.4, valid_preset_sizes[figsize[1]] / 25.4)
+        except KeyError as e:
+            raise ValueError(
+                f"Invalid strings {figsize[0]} and {figsize[1]} provided. Must be valid keys in the config file"
+            ) from e
+    elif isinstance(figsize[0], int | float) and isinstance(figsize[1], int | float):
         figsize = (figsize[0], figsize[1])
     else:
         raise ValueError(
@@ -185,6 +214,18 @@ def create_figure(
         An iterable and indexable object to manage matplotlib.axes objects
 
     """
+    # set global rcParams
+    plt.rcParams.update(
+        {
+            "svg.fonttype": "none",
+            "font.family": config["font_family"],
+            "font.sans-serif": config["default_font"],
+            "pdf.fonttype": 42,
+            "ps.fonttype": 42,
+        }
+    )
+
+    # parse figure size, fall back to defaults if none is given
     figsize = _parse_figsize(figsize)
 
     # Handle special parameters for subplots and gridspecs for more complex plots
@@ -239,9 +280,6 @@ def save_figure(
     output_path = Path(output_dir)
     if not output_path.exists():
         output_path.mkdir(parents=True, exist_ok=True)
-
-    if not filename.endswith(".png"):
-        filename += ".png"
 
     if dpi is None:
         dpi = config["resolution"]["dpi"]

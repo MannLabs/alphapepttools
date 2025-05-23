@@ -1,7 +1,6 @@
 """Factory class to convert PSM DataFrames to AnnData format."""
 
 import warnings
-from collections import defaultdict
 from typing import Any
 
 import anndata as ad
@@ -125,11 +124,10 @@ class AnnDataFactory:
     @classmethod
     def _get_reader_configuration(cls, reader_type: str) -> dict[str, dict[str, Any]]:
         """Get reader-specific configuration for mapping PSMs to anndata."""
-        reader_kwargs = defaultdict(dict)
-
-        reader_kwargs["diann"] = {
-            "filter_first_search_fdr": True,
-            "filter_second_search_fdr": True,
+        reader_configs = {
+            "diann": {
+                "filter_first_search_fdr": True,
+                "filter_second_search_fdr": True,
+            }
         }
-
-        return reader_kwargs[reader_type]
+        return reader_configs.get(reader_type, {})
