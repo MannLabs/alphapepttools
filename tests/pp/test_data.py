@@ -781,28 +781,28 @@ def data_test_completeness_filter():
             ["A", "B", "C"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
             0.5,
-            1,
+            0,
         ),
         # 1.2. Filter columns with 0.6 threshold so that one value lies exactly on the threshold --> this should be kept since ">" is used
         (
             ["A", "B", "C", "D"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
             0.6,
-            1,
+            0,
         ),
         # 1.3. Filter columns with 1.0 threshold: keep all columns
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
             1.0,
-            1,
+            0,
         ),
         # 1.4. Filter columns with 0.0 threshold: remove columns with any missing values
         (
             ["A"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
             0.0,
-            1,
+            0,
         ),
         # 2. Check filtering of rows (samples)
         # 2.1. Filter rows with 0.5 threshold
@@ -810,28 +810,28 @@ def data_test_completeness_filter():
             ["A", "B", "C", "D", "E"],
             ["cell3", "cell4", "cell5"],
             0.5,
-            0,
+            1,
         ),
         # 2.2. Filter rows with 0.6 threshold so that one value lies exactly on the threshold --> this should be kept since ">" is used
         (
             ["A", "B", "C", "D", "E"],
             ["cell2", "cell3", "cell4", "cell5"],
             0.6,
-            0,
+            1,
         ),
         # 2.3. Filter rows with 1.0 threshold: keep all rows
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
             1.0,
-            0,
+            1,
         ),
         # 2.4. Filter rows with 0.0 threshold: remove rows with any missing values
         (
             ["A", "B", "C", "D", "E"],
             ["cell5"],
             0.0,
-            0,
+            1,
         ),
     ],
 )
