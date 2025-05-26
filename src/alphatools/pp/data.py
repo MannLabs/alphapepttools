@@ -270,7 +270,7 @@ def filter_by_metadata(
     specified in a filter_dict. The filter_dict contains keys, which are column
     names, and values, which can be either strings, lists or tuples. The 'logic'
     parameter determines whether multiple filters operate on an 'and' or 'or'
-    basis.
+    basis. The function does not modify the original adata object inplace.
 
     Parameters
     ----------
@@ -306,6 +306,7 @@ def filter_by_metadata(
     if action == "drop":
         filter_mask = ~filter_mask
 
+    # Do not modify the original adata object, but return a new one
     if axis == 0:
         adata = adata[filter_mask, :]
     elif axis == 1:
