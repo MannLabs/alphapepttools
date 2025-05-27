@@ -138,6 +138,7 @@ def make_legend(
     _legend.set_title(_legend.get_title().get_text(), prop={"size": config["legend"]["title_size"]})
 
 
+# TODO: refactor this to take not levels and palette, but a dict of values & colors
 def add_legend(
     ax: plt.Axes,
     levels: list[str] | None,
