@@ -141,9 +141,9 @@ def make_legend(
 # TODO: refactor this to take not levels and palette, but a dict of values & colors
 def add_legend(
     ax: plt.Axes,
-    levels: list[str] | None,
-    palette: list[str | tuple] | None,
-    legend: str | mpl.legend.Legend | None = None,
+    levels: list | dict[str, str | tuple] | None = None,
+    legend: str | mpl.legend.Legend | None = "auto",
+    palette: list[str | tuple] | None = None,
     **legend_kwargs,
 ) -> None:
     """Add a legend to an axis object.
@@ -161,25 +161,29 @@ def add_legend(
         List of colors to use for the legend. If None, a default palette will be used. By default None.
 
     """
-    if legend not in ["auto", None]:
-        raise ValueError("legend must be 'auto' or None")
-
-    if levels is None:
-        logging.warning("No levels provided. Skipping legend creation.")
+    # If legend is already a Legend object, just add it to the axes
+    if isinstance(legend, mpl.legend.Legend):
+        ax.add_artist(legend)
         return
-
-    levels = np.unique(levels)
-
-    # Determine palette, i.e. list of colors to show in the legend
-    if palette is None:
-        if legend == "auto":
-            palette = BasePalettes.get("qualitative")
+    if legend == "auto":
+        if isinstance(levels, dict):
+            patches = _make_legend_patches(levels)
+            make_legend(ax, patches, **legend_kwargs)
+        elif isinstance(levels, list):
+            levels = np.unique(levels)
+            if palette is None:
+                palette = BasePalettes.get("qualitative")
+                if len(levels) > len(palette):
+                    palette = BasePalettes.get("sequential")
+            color_dict = get_color_mapping(levels, palette)
+            patches = _make_legend_patches(color_dict)
+            make_legend(ax, patches, **legend_kwargs)
         else:
-            raise ValueError("Palette must be provided if legend is not set to 'auto'")
+            logging.warning("No valid 'levels' parameter provided. Skipping legend creation.")
+    else:
+        logging.warning("No valid 'legend' parameter provided. Skipping legend creation.")
 
-    color_dict = get_color_mapping(levels, palette)
-    patches = _make_legend_patches(color_dict)
-    make_legend(ax, patches, **legend_kwargs)
+    # Match levels to colors and create patches in the figure
 
 
 def _drop_nans_from_plot_arrays(
@@ -403,8 +407,7 @@ class Plots:
             if legend is not None:
                 add_legend(
                     ax=ax,
-                    levels=list(color_dict.keys()),
-                    palette=list(color_dict.values()),
+                    levels=color_dict,
                     legend=legend,
                     **legend_kwargs,
                 )
@@ -498,8 +501,7 @@ class Plots:
         if legend is not None:
             add_legend(
                 ax=ax,
-                levels=list(color_dict.keys()),
-                palette=list(color_dict.values()),
+                levels=color_dict,
                 legend=legend,
                 **legend_kwargs,
             )
