@@ -2,7 +2,6 @@
 
 import logging
 
-# logging configuration
 logging.basicConfig(level=logging.INFO)
 
 
