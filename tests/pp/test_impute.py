@@ -7,7 +7,7 @@ from alphatools.pp.impute import impute_gaussian
 
 
 @pytest.fixture
-def dummy_data_for_imputation():
+def gaussian_imputation_dummy_data():
     def create_data():
         data = pd.DataFrame(
             {
@@ -21,21 +21,28 @@ def dummy_data_for_imputation():
     return create_data()
 
 
-def test_impute_gaussian_reproducibility(dummy_data_for_imputation):
+def test_impute_gaussian(gaussian_imputation_dummy_data):
     """Test that imputation with fixed random state produces reproducible results."""
 
-    adata = dummy_data_for_imputation()
-    adata_imputed = impute_gaussian(adata, std_offset=3, std_factor=0.3, random_state=0)
+    RANDOM_STATE = 42
+    STD_FACTOR = 0.3
+    STD_OFFSET = 3
+    A_VALS = [1, 2, 4, 5]
+    B_VALS = [10, 30, 40, 50]
 
-    # These values are hardcoded based on random_state=0, so we know what to expect
-    # Compute manually once, then freeze here
-    expected_A3 = np.random.RandomState(0).normal(
-        loc=np.nanmean([1, 2, 4, 5]) - 3 * np.nanstd([1, 2, 4, 5]), scale=np.nanstd([1, 2, 4, 5]) * 0.3, size=1
+    adata_imputed = impute_gaussian(
+        gaussian_imputation_dummy_data, std_offset=STD_OFFSET, std_factor=STD_FACTOR, random_state=RANDOM_STATE
+    )
+
+    rng = np.random.default_rng(RANDOM_STATE)
+
+    expected_A3 = rng.normal(
+        loc=np.nanmean(A_VALS) - STD_OFFSET * np.nanstd(A_VALS), scale=np.nanstd(A_VALS) * STD_FACTOR, size=1
     )[0]
 
-    expected_B2 = np.random.RandomState(0).normal(
-        loc=np.nanmean([10, 30, 40, 50]) - 3 * np.nanstd([10, 30, 40, 50]),
-        scale=np.nanstd([10, 30, 40, 50]) * 0.3,
+    expected_B2 = rng.normal(
+        loc=np.nanmean(B_VALS) - STD_OFFSET * np.nanstd(B_VALS),
+        scale=np.nanstd(B_VALS) * STD_FACTOR,
         size=1,
     )[0]
 

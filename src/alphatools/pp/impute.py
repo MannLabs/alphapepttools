@@ -51,7 +51,7 @@ def impute_gaussian(
         raise ValueError("adata.X must be numeric.")
 
     # Get the indices of those columns that have missing values: we are going to need downshifted Gaussian's for those
-    np.random.seed(random_state)
+    rng = np.random.default_rng(random_state)
     na_col_idxs = np.where(np.isnan(X).sum(axis=0) > 0)[0]
 
     # generate corresponding downshifted features
@@ -63,7 +63,7 @@ def impute_gaussian(
     # iterate over nan-containing columns and impute from corresponding gaussian
     for i in na_col_idxs:
         na_row_idxs = np.where(np.isnan(X[:, i]))[0]
-        X[na_row_idxs, i] = np.random.normal(shifted_means[i], shifted_stds[i], len(na_row_idxs))
+        X[na_row_idxs, i] = rng.normal(shifted_means[i], shifted_stds[i], len(na_row_idxs))
 
     if not X.shape == adata.X.shape:
         raise ValueError("Imputed data shape does not match original data shape.")
