@@ -119,6 +119,8 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
         Dictionary mapping values to colors
 
     """
+    # Cast values to type str
+    values = values.astype(str)
     values = np.unique(values)
 
     if isinstance(palette, list):
