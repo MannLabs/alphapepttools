@@ -9,7 +9,14 @@
 .. autosummary::
     :toctree: generated
 
-    pp.basic_preproc
+    pp.add_metadata
+    pp.filter_by_metadata
+    pp.filter_data_completeness
+    pp.load_diann_pg_matrix
+    pp.scale_and_center
+    pp.pca
+    pp.impute
+    pp.add_core_proteome_mask
 ```
 
 ## Tools
@@ -21,7 +28,9 @@
 .. autosummary::
     :toctree: generated
 
-    tl.basic_tool
+    tl.pca
+    tl.ttest
+    tl.umap
 ```
 
 ## Plotting
@@ -33,6 +42,19 @@
 .. autosummary::
     :toctree: generated
 
-    pl.basic_plot
-    pl.BasicClass
+    pl.Plots
+    pl.add_lines
+    pl.label_plot
+```
+
+## IO
+
+```{eval-rst}
+.. module:: alphatools.io
+.. currentmodule:: alphatools
+
+.. autosummary::
+    :toctree: generated
+
+    io.anndata_factory
 ```
