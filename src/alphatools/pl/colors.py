@@ -16,6 +16,7 @@ import cmcrameri.cm as cmc
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from matplotlib import colors as mpl_colors
 from matplotlib.colors import Colormap
 
@@ -119,7 +120,7 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
         Dictionary mapping values to colors
 
     """
-    values = np.unique(values)
+    values = pd.unique(values)
 
     if isinstance(palette, list):
         _palette = _cycle_palette(palette, n=len(values))

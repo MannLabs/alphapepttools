@@ -392,7 +392,7 @@ class Plots:
             color_values = _adata_column_to_array(data, color_column)
             palette = palette or BasePalettes.get("qualitative")
             color_dict = color_dict or get_color_mapping(color_values, palette)
-            missing = set(np.unique(color_values)) - set(color_dict)
+            missing = set(pd.unique(color_values)) - set(color_dict)
             for level in missing:
                 color_dict[level] = BaseColors.get("grey")
 
@@ -480,7 +480,7 @@ class Plots:
             color_values = _adata_column_to_array(data, color_column)
             palette = palette or BasePalettes.get("qualitative")
             color_dict = color_dict or get_color_mapping(color_values, palette)
-            missing = set(np.unique(color_values)) - set(color_dict)
+            missing = set(pd.unique(color_values)) - set(color_dict)
             for level in missing:
                 color_dict[level] = BaseColors.get("grey")
 
