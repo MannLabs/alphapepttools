@@ -379,19 +379,19 @@ def _adata_column_to_array(
     if isinstance(data, pd.DataFrame):
         if column not in data.columns:
             raise ValueError(f"Column {column} not found in DataFrame.")
-        return data[column].to_numpy()
-    if isinstance(data, ad.AnnData):
-        # prioritize var_names, i.e. numeric data from X
+        extracted_array = data[column].to_numpy()
+    elif isinstance(data, ad.AnnData):
         if column in data.var_names:
             col_idx = data.var_names.get_loc(column)
-            return data.X[:, col_idx].flatten()
+            extracted_array = data.X[:, col_idx].flatten()
+        elif column in data.obs.columns:
+            extracted_array = data.obs[column].to_numpy()
+        else:
+            raise ValueError(f"Column {column} not found in AnnData object (checked var_names or obs.columns).")
+    else:
+        raise TypeError("Data must be a pd.DataFrame or an ad.AnnData object.")
 
-        # if the column is not found in var_names, check the columns of obs (metadata)
-        if column in data.obs.columns:
-            return data.obs[column].to_numpy()
-
-        raise ValueError(f"Column {column} not found in AnnData object (checked var_names or obs.columns).")
-    raise TypeError("Data must be a pd.DataFrame or ad.AnnData.")
+    return extracted_array
 
 
 def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
