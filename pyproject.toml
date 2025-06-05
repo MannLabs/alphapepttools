@@ -125,6 +125,7 @@ lint.ignore = [
   "G004",
   "INP001",  # implicit namespace package.
   "ISC001",  #may cause conflicts when used with the formatter
+  "LOG015",  # call on root logger  # TODO remove soon
   "N806",    # Variable X in uppercase is commonplace in AnnData and should be allowed
   "NPY002",  # Replace legacy `np.random.normal` # TODO: remove soon
   "PD901",   # Avoid using the generic variable name `df` for DataFrames
