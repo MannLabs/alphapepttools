@@ -111,10 +111,16 @@ def principal_component_regression(
         at.metrics.principal_component_regression(adata, covariate="batch")
 
         # With custom PCA keys
-        at.pp.pca(adata, layer="layer1", key_added="pca_layer1")
+        at.pp.pca(adata, layer="layer_batch_corrected", key_added="pca_batch_corrected")
         at.metrics.principal_component_regression(
-            adata, covariate="batch", pca_key="pca_layer1", pca_uns_key="pca_layer1"
+            adata, covariate="batch", pca_key="pca_batch_corrected", pca_uns_key="pca_batch_corrected"
         )
+
+    Notes
+    -----
+    As discussed in the original publication (Büttner et al, 2019), principal component regression assumes a
+    linear relationship between batch effect and each principal component, which might not be valid. As this implementation also
+    considers spurious correlations, it might overestimate the actual batch effect.
 
     See Also
     --------
