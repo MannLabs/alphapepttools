@@ -33,41 +33,41 @@ def adata_dummy():
     )
 
 
-def test_pcr_continuous(adata_dummy):
+def test_principal_component_regression_continuous(adata_dummy):
     score = principal_component_regression(adata_dummy, covariate="continuous")
     assert isinstance(score, float)
     assert score >= 0
 
 
-def test_pcr_categorical(adata_dummy):
+def test_principal_component_regression_categorical(adata_dummy):
     score = principal_component_regression(adata_dummy, covariate="categorical")
     assert isinstance(score, float)
     assert score >= 0
 
 
-def test_pcr_subset_components(adata_dummy):
+def test_principal_component_regression_subset_components(adata_dummy):
     score_all = principal_component_regression(adata_dummy, covariate="continuous")
     score_subset = principal_component_regression(adata_dummy, covariate="continuous", n_components=5)
     assert score_subset <= score_all
 
 
-def test_missing_covariate(adata_dummy):
-    with pytest.raises(ValueError, match="not found in `adata.obs`"):
+def test_principal_component_regression_missing_covariate(adata_dummy):
+    with pytest.raises(KeyError, match="not found in `adata.obs`"):
         principal_component_regression(adata_dummy, covariate="missing")
 
 
-def test_unsupported_dtype(adata_dummy):
+def test_principal_component_regression_missing_pca_key(adata_dummy):
+    adata_dummy.obsm.pop("X_pca")
+    with pytest.raises(KeyError, match="was not found in `adata.obsm`"):
+        principal_component_regression(adata_dummy, covariate="continuous")
+
+
+def test_principal_component_regression_missing_pca_uns_key(adata_dummy):
+    adata_dummy.uns.pop("pca")
+    with pytest.raises(KeyError, match="was not found in `adata.uns`"):
+        principal_component_regression(adata_dummy, covariate="continuous")
+
+
+def test_principal_component_regression_unsupported_dtype(adata_dummy):
     with pytest.raises(TypeError, match="not supported. Must be numeric or categorical"):
         principal_component_regression(adata_dummy, covariate="string")
-
-
-def test_missing_pca_key(adata_dummy):
-    adata_dummy.obsm.pop("X_pca")
-    with pytest.raises(ValueError, match="was not found in `adata.obsm`"):
-        principal_component_regression(adata_dummy, covariate="continuous")
-
-
-def test_missing_pca_uns_key(adata_dummy):
-    adata_dummy.uns.pop("pca")
-    with pytest.raises(ValueError, match="was not found in `adata.uns`"):
-        principal_component_regression(adata_dummy, covariate="continuous")
