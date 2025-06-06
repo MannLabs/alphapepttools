@@ -127,9 +127,7 @@ def principal_component_regression(
     - Luecken, M.D., Büttner, M., Chaichoompu, K. et al. Benchmarking atlas-level data integration in single-cell genomics. Nat Methods 19, 41-50 (2022). https://doi.org/10.1038/s41592-021-01336-8
     - Büttner, M., Miao, Z., Wolf, F.A. et al. A test metric for assessing single-cell RNA-seq batch correction. Nat Methods 16, 43-49 (2019). https://doi.org/10.1038/s41592-018-0254-1
     """
-    _verify_keys__principal_component_regression(
-        adata, covariate_key=covariate, pca_key=pca_key, pca_uns_key=pca_key_uns
-    )
+    _verify_keys__principal_component_regression(adata, covariate=covariate, pca_key=pca_key, pca_uns_key=pca_key_uns)
 
     pca_embeddings = adata.obsm[pca_key]
     explained_variance = adata.uns[pca_key_uns][_PCA_VARIANCE_RATIO]
