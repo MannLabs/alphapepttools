@@ -36,13 +36,13 @@ def adata_dummy():
 def test_principal_component_regression_continuous(adata_dummy):
     score = principal_component_regression(adata_dummy, covariate="continuous")
     assert isinstance(score, float)
-    assert score >= 0
+    assert np.isclose(score, 0.0067, atol=1e-4)
 
 
 def test_principal_component_regression_categorical(adata_dummy):
     score = principal_component_regression(adata_dummy, covariate="categorical")
     assert isinstance(score, float)
-    assert score >= 0
+    assert np.isclose(score, 0, atol=1e-4)
 
 
 def test_principal_component_regression_subset_components(adata_dummy):
