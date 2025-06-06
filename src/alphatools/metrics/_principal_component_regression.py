@@ -30,12 +30,12 @@ def _verify_keys__principal_component_regression(
         raise KeyError(f"Column `{covariate}` not found in `adata.obs`")
 
 
-def _pcr(pc: np.ndarray, covariate: np.ndarray, explained_variance: np.ndarray) -> float:
+def _pcr(principal_component_embeddings: np.ndarray, covariate: np.ndarray, explained_variance: np.ndarray) -> float:
     """Weighted mean of explained variance
 
     Parameters
     ----------
-    pc
+    principal_component_embeddings
         PCA embeddings matrix (N observations x C components).
     covariate
         Values of covariate (N observations x 1 | L levels (covariate, encoded)).
@@ -46,12 +46,12 @@ def _pcr(pc: np.ndarray, covariate: np.ndarray, explained_variance: np.ndarray) 
     -------
     Explained variance of covariate over C components assuming a linear relationship
     """
-    # Transpose from (samples, PCs) to (PCs, samples) to iterate through PCs
-    pc = pc.T
+    # Transpose from (samples, PCs) to (PCs, samples) to easily iterate through PCs
+    principal_component_embeddings = principal_component_embeddings.T
 
     return sum(
-        var_explained * LinearRegression(fit_intercept=True).fit(covariate, pci).score(covariate, pci)
-        for pci, var_explained in zip(pc, explained_variance, strict=True)
+        var_explained * LinearRegression(fit_intercept=True).fit(covariate, pc_i).score(covariate, pc_i)
+        for pc_i, var_explained in zip(principal_component_embeddings, explained_variance, strict=True)
     )
 
 
