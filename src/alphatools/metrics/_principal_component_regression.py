@@ -6,6 +6,30 @@ import pandas as pd
 from sklearn.linear_model import LinearRegression
 
 
+def _verify_keys__principal_component_regression(
+    adata: ad.AnnData, covariate: str, pca_key: str, pca_uns_key: str
+) -> None:
+    """Validate keys required for PCR
+
+    Raises
+    ------
+    KeyError
+        For missing keys
+    """
+    if pca_key not in adata.obsm:
+        raise KeyError(
+            f"Key `pca_key={pca_key}` was not found in `adata.obsm`. Run `alphatools.pp.pca` first or specify correct key."
+        )
+
+    if pca_uns_key not in adata.uns:
+        raise KeyError(
+            f"Key `pca_key_uns={pca_uns_key}` was not found in `adata.uns`. Run `alphatools.pp.pca` first or specify correct key."
+        )
+
+    if covariate not in adata.obs:
+        raise KeyError(f"Column `{covariate}` not found in `adata.obs`")
+
+
 def _pcr(pc: np.ndarray, covariate: np.ndarray, explained_variance: np.ndarray) -> float:
     """Weighted mean of explained variance
 
@@ -92,18 +116,9 @@ def principal_component_regression(
     - Luecken, M.D., Büttner, M., Chaichoompu, K. et al. Benchmarking atlas-level data integration in single-cell genomics. Nat Methods 19, 41-50 (2022). https://doi.org/10.1038/s41592-021-01336-8
     - Büttner, M., Miao, Z., Wolf, F.A. et al. A test metric for assessing single-cell RNA-seq batch correction. Nat Methods 16, 43-49 (2019). https://doi.org/10.1038/s41592-018-0254-1
     """
-    if pca_key not in adata.obsm:
-        raise KeyError(
-            f"Key `pca_key={pca_key}` was not found in `adata.obsm`. Run `alphatools.pp.pca` first or specify correct key."
-        )
-
-    if pca_key_uns not in adata.uns:
-        raise KeyError(
-            f"Key `pca_key_uns={pca_key_uns}` was not found in `adata.uns`. Run `alphatools.pp.pca` first or specify correct key."
-        )
-
-    if covariate not in adata.obs:
-        raise KeyError(f"Column `{covariate}` not found in `adata.obs`")
+    _verify_keys__principal_component_regression(
+        adata, covariate_key=covariate, pca_key=pca_key, pca_uns_key=pca_key_uns
+    )
 
     pca_embeddings = adata.obsm[pca_key]
     explained_variance = adata.uns[pca_key_uns]["variance_ratio"]
