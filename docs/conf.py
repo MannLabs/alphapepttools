@@ -47,6 +47,7 @@ html_context = {
 # Add any Sphinx extension module names here, as strings.
 # They can be extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = [
+    "sphinx.ext.autodoc",
     "myst_nb",
     "sphinx_copybutton",
     "sphinx.ext.autodoc",
@@ -129,3 +130,35 @@ nitpick_ignore = [
     # you can add an exception to this list.
     #     ("py:class", "igraph.Graph"),
 ]
+
+
+# -- Options for HTML output -------------------------------------------------
+import os  # noqa: E402 Module level import not at top of file | This way it's close to the actual functions for better overview
+from sphinx.ext import apidoc  # noqa: E402 Module level import not at top of file | This way it's close to the actual functions for better overview
+from typing import Any  # noqa: E402 Module level import not at top of file | This way it's close to the actual functions for better overview
+from sphinx.application import Sphinx  # noqa: E402 Module level import not at top of file | This way it's close to the actual functions for better overview
+
+
+def run_apidoc(*args: tuple[Any, ...], **kwargs: dict[str, Any]) -> None:
+    """Run sphinx-apidoc to auto-generate .rst files."""
+    # args, kwargs are unused and utilized to capture parameters passed by sphinx
+    cur_dir = os.path.abspath(os.path.dirname(__file__))  # noqa: PTH100,PTH120
+    src_dir = os.path.abspath(os.path.join(cur_dir, "..", "src"))  # noqa: PTH100,PTH118
+    output_dir = os.path.join(cur_dir, "generated", "api")  # noqa: PTH118
+    os.makedirs(output_dir, exist_ok=True)  # noqa: PTH103
+
+    apidoc.main(
+        [
+            "--force",
+            "--module-first",
+            "--output-dir",
+            output_dir,
+            src_dir,
+        ]
+    )
+
+
+def setup(app: Sphinx) -> None:
+    """Hook custom functions into the build logic"""
+    # Autobuild full documentation
+    app.connect("builder-inited", run_apidoc)
