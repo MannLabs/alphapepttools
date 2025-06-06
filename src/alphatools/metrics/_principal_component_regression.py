@@ -36,16 +36,19 @@ def _pcr(pc: np.ndarray, covariate: np.ndarray, explained_variance: np.ndarray) 
     Parameters
     ----------
     pc
-        C components x N observations. PCA usage matrix.
+        PCA embeddings matrix (N observations x C components).
     covariate
-        N observations x 1 | L levels (covariate, encoded). Values of covariate
+        Values of covariate (N observations x 1 | L levels (covariate, encoded)).
     explained_variance
-        C components x 1. Explained variance per component/weighting factor
+        Explained variance per component/weighting factor (C components x 1).
 
     Returns
     -------
     Explained variance of covariate over C components assuming a linear relationship
     """
+    # Transpose from (samples, PCs) to (PCs, samples) to iterate through PCs
+    pc = pc.T
+
     return sum(
         var_explained * LinearRegression(fit_intercept=True).fit(covariate, pci).score(covariate, pci)
         for pci, var_explained in zip(pc, explained_variance, strict=True)
@@ -135,5 +138,4 @@ def principal_component_regression(
     else:
         raise TypeError(f"Dtype of column {y.dtype} not supported. Must be numeric or categorical")
 
-    # Transpose from (samples, PCs) to (PCs, samples) to iterate through PCs
-    return _pcr(pca_embeddings.T, y, explained_variance)
+    return _pcr(pca_embeddings, y, explained_variance)
