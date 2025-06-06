@@ -79,11 +79,13 @@ def principal_component_regression(
         import alphatools as at
 
         at.pp.pca(adata)
-        at.metrics.principal_regression(adata, covariate="batch")
+        at.metrics.principal_component_regression(adata, covariate="batch")
 
         # With custom PCA keys
         at.pp.pca(adata, layer="layer1", key_added="pca_layer1")
-        at.metrics.principal_regression(adata, covariate="batch", pca_key="pca_layer1", pca_uns_key="pca_layer1")
+        at.metrics.principal_component_regression(
+            adata, covariate="batch", pca_key="pca_layer1", pca_uns_key="pca_layer1"
+        )
 
     See Also
     --------
