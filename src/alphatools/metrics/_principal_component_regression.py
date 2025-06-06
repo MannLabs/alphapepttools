@@ -5,6 +5,8 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 
+_PCA_VARIANCE_RATIO = "variance_ratio"
+
 
 def _verify_keys__principal_component_regression(
     adata: ad.AnnData, covariate: str, pca_key: str, pca_uns_key: str
@@ -124,7 +126,7 @@ def principal_component_regression(
     )
 
     pca_embeddings = adata.obsm[pca_key]
-    explained_variance = adata.uns[pca_key_uns]["variance_ratio"]
+    explained_variance = adata.uns[pca_key_uns][_PCA_VARIANCE_RATIO]
 
     if n_components is not None:
         pca_embeddings = pca_embeddings[:, :n_components]
