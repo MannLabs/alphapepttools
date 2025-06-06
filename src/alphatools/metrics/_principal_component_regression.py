@@ -66,7 +66,7 @@ def principal_component_regression(
 
     Raises
     ------
-    ValueError
+    KeyError
         For missing keys
     TypeError
         If `covariate` dtype is not numeric or categorical
@@ -91,17 +91,17 @@ def principal_component_regression(
     - Büttner, M., Miao, Z., Wolf, F.A. et al. A test metric for assessing single-cell RNA-seq batch correction. Nat Methods 16, 43-49 (2019). https://doi.org/10.1038/s41592-018-0254-1
     """
     if pca_key not in adata.obsm:
-        raise ValueError(
+        raise KeyError(
             f"Key `pca_key={pca_key}` was not found in `adata.obsm`. Run `alphatools.pp.pca` first or specify correct key."
         )
 
     if pca_key_uns not in adata.uns:
-        raise ValueError(
+        raise KeyError(
             f"Key `pca_key_uns={pca_key_uns}` was not found in `adata.uns`. Run `alphatools.pp.pca` first or specify correct key."
         )
 
     if covariate not in adata.obs:
-        raise ValueError(f"Column `{covariate}` not found in `adata.obs`")
+        raise KeyError(f"Column `{covariate}` not found in `adata.obs`")
 
     pca_embeddings = adata.obsm[pca_key]
     explained_variance = adata.uns[pca_key_uns]["variance_ratio"]
