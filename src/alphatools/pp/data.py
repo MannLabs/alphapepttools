@@ -479,19 +479,17 @@ def filter_data_completeness(
     if not is_numeric_dtype(adata.X):
         raise ValueError("Data must be numeric.")
 
-    # def _metadata_column_from_adata(
-    #     name: str,
-    #     axis: int,
-    # ) -> np.ndarray:
-    #     """Extract a metadata column from an AnnData object based on the axis."""
-    #     if axis == 0:
-    #         return _adata_column_to_array(adata.obs, name)
-    #     if axis == 1:
-    #         return _adata_column_to_array(adata.var, name)
-    #     raise ValueError("Axis must be 0 (samples) or 1 (features).")
+    def _metadata_column_from_adata(
+        name: str,
+        axis: int,
+    ) -> np.ndarray:
+        """Extract a metadata column from an AnnData object based on the axis."""
+        return _adata_column_to_array(adata.obs, name) if axis == 0 else _adata_column_to_array(adata.var, name)
 
-    # OP_LEN = adata.X.shape[0] if axis == 0 else adata.X.shape[1]
-    # grouping_reference = ["all"] * OP_LEN if group_column is None else _metadata_column_from_adata(group_column, axis)
+    OP_LEN = adata.X.shape[0] if axis == 0 else adata.X.shape[1]
+    grouping_lookup = ["all"] * OP_LEN if group_column is None else _metadata_column_from_adata(group_column, axis)
+    grouping_values = np.unique(grouping_lookup)
+    print(len(grouping_values))
 
     # # Transposing the adata object allows for sample-filtering as well
     # def _drop_fields_per_cutoff(
