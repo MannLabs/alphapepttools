@@ -466,7 +466,9 @@ def filter_data_completeness(
     group_column : str, optional
         Column in obs or var to determine groups for filtering.
     groups : list[str], optional
-        List of groups to consider in filtering.
+        List of levels of the group_column to consider in filtering. E.g. if the column has the levels
+        ['A', 'B', 'C'], and groups = ['A', 'B'], only missingness of samples or features in these
+        groups is considered. If None, all groups are considered.
     axis : int, optional
         Whether to check completeness of samples (0) or features (1).
 
@@ -474,21 +476,73 @@ def filter_data_completeness(
     if max_missing < 0 or max_missing > 1:
         raise ValueError("Threshold must be between 0 and 1.")
 
-    if group_column:
-        raise NotImplementedError("Group-based filtering not implemented yet.")
-    if groups:
-        raise NotImplementedError("Group-based filtering not implemented yet.")
-
     if not is_numeric_dtype(adata.X):
         raise ValueError("Data must be numeric.")
 
-    if axis == 0:  # check completeness of samples
-        missing_fraction = np.isnan(adata.X).mean(axis=1)
-        missing_above_cutoff = missing_fraction > max_missing
-        adata = adata[~missing_above_cutoff, :]
-    elif axis == 1:  # check completeness of features
-        missing_fraction = np.isnan(adata.X).mean(axis=0)
-        missing_above_cutoff = missing_fraction > max_missing
-        adata = adata[:, ~missing_above_cutoff]
+    # def _metadata_column_from_adata(
+    #     name: str,
+    #     axis: int,
+    # ) -> np.ndarray:
+    #     """Extract a metadata column from an AnnData object based on the axis."""
+    #     if axis == 0:
+    #         return _adata_column_to_array(adata.obs, name)
+    #     if axis == 1:
+    #         return _adata_column_to_array(adata.var, name)
+    #     raise ValueError("Axis must be 0 (samples) or 1 (features).")
 
-    return adata
+    # OP_LEN = adata.X.shape[0] if axis == 0 else adata.X.shape[1]
+    # grouping_reference = ["all"] * OP_LEN if group_column is None else _metadata_column_from_adata(group_column, axis)
+
+    # # Transposing the adata object allows for sample-filtering as well
+    # def _drop_fields_per_cutoff(
+    #     adata: ad.AnnData,
+    #     max_missing: float,
+    #     axis: int = 0,
+    # ):
+    #     """Drop columns based on the maximum allowed missingness"""
+    #     missing_fraction = np.isnan(adata.X).mean(axis=axis)
+    #     missing_above_cutoff = missing_fraction > max_missing
+    #     return adata[:, ~missing_above_cutoff] if axis == 0 else adata[~missing_above_cutoff, :]
+
+    # # Extract indices and grouping values per current axis
+    # if axis == 0:
+    #     indices = adata.obs.index
+    #     group_values = adata.obs[group_column] if group_column else None
+    # elif axis == 1:
+    #     indices = adata.var.index
+    #     group_values = adata.var[group_column] if group_column else None
+    # else:
+    #     raise ValueError("Axis must be 0 (samples) or 1 (features).")
+
+    # # Ensure that all groups are covered by the corresponding column, or default to 'all'
+    # if group_values is None:
+    #     group_indices = {"all": indices}
+    # elif set(groups).issubset(set(group_values)):
+    #     group_indices = {group: indices[group_values == group] for group in groups}
+    # else:
+    #     raise ValueError(f"Provided groups {groups} are not a subset of the group_column {group_column} levels.")
+
+    # for current_group, indices in group_indices.items():
+    #     if current_group == "all":
+    #         adata = _drop_fields_per_cutoff(adata, max_missing, axis)
+    #     else:
+    #         group_mask = group_values == current_group
+    #         if axis == 0:
+    #             adata = adata[group_mask, :]
+    #         elif axis == 1:
+    #             adata = adata[:, group_mask]
+
+    if group_column is None:
+        if axis == 0:  # check completeness of samples
+            missing_fraction = np.isnan(adata.X).mean(axis=1)
+            missing_above_cutoff = missing_fraction > max_missing
+            adata = adata[~missing_above_cutoff, :]
+        elif axis == 1:  # check completeness of features
+            missing_fraction = np.isnan(adata.X).mean(axis=0)
+            missing_above_cutoff = missing_fraction > max_missing
+            adata = adata[:, ~missing_above_cutoff]
+
+        return adata
+    raise NotImplementedError(
+        "Group-based filtering is not implemented yet. Please provide a group_column and groups to filter by."
+    )
