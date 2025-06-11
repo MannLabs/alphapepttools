@@ -588,6 +588,8 @@ class Plots:
         dim2: int = 2,
         pca_name: str = "pca",
         pca_exp_var_name: str = "variance_ratio",
+        label: bool = False,  # noqa: FBT001, FBT002
+        label_column: str | None = None,
         color: str = "blue",
         palette: list[str | tuple] | None = None,
         color_dict: dict[str, str | tuple] | None = None,
@@ -603,10 +605,18 @@ class Plots:
             AnnData to plot.
         ax : plt.Axes
             Matplotlib axes object to plot on, add labels and logscale the y-axis.
-        dim1 : int, the PC number of the first dimension to plot (x), by default 1
-        dim2 : int, the PC number of the second dimension to plot (y), by default 2
-        pca_name : str, the name of the PCA layer in the AnnData object, by default "X_pca"
-        pca_exp_var_name : str, the name of the PCA explained variance ratio column in the AnnData object, by default "variance_ratio"
+        dim1 : int
+            The PC number of the first dimension to plot (x), by default 1
+        dim2 : int
+            The PC number of the second dimension to plot (y), by default 2
+        pca_name : str,
+            The name of the PCA layer in the AnnData object, by default "X_pca"
+        pca_exp_var_name : str,
+            The name of the PCA explained variance ratio column in the AnnData object, by default "variance_ratio"
+        label: bool = False,
+            Whether to add labels to the points in the scatter plot.
+        label_column: str | None = None,
+            Column in data.obs to use for labeling the points. If None, and label is True, data.obs.index labels are added. By default None.
         color : str, optional
             Color to use for the scatter plot. By default "blue".
         palette : list[str | tuple], optional
@@ -653,8 +663,6 @@ class Plots:
         var_dim2 = data.uns[pca_name][pca_exp_var_name][dim2]
         var_dim2 = round(var_dim2 * 100, 2)
 
-        print(var_dim1, var_dim2)
-
         # call the Plots.scatter method to create the rank plot
         cls.scatter(
             data=values,
@@ -669,7 +677,12 @@ class Plots:
             scatter_kwargs=scatter_kwargs,
         )
 
-        # set labels
+        # add labels if requested
+        if label:
+            labels = data.obs.index if label_column is None else _adata_column_to_array(data, label_column)
+            label_plot(ax=ax, x_values=values["dim1"], y_values=values["dim2"], labels=labels, x_anchors=None)
+
+        # set axislabels
         label_axes(ax, xlabel=f"PC{dim1 + 1} ({var_dim1}%)", ylabel=f"PC{dim2 + 1} ({var_dim2}%)")
 
     @classmethod
@@ -739,3 +752,79 @@ class Plots:
 
         # set labels
         label_axes(ax, xlabel="PC number", ylabel="Explained variance")
+
+    @classmethod
+    def plot_pca_loadings(
+        cls,
+        data: ad.AnnData | pd.DataFrame,
+        ax: plt.Axes,
+        loadings_name: str = "PCs",
+        dim: int = 1,
+        nfeatures: int = 20,
+        scatter_kwargs: dict | None = None,
+    ) -> None:
+        """Plot the gene loadings of a PC using the scatter method
+
+        Parameters
+        ----------
+        data : ad.AnnData
+            AnnData to plot.
+        ax : plt.Axes
+            Matplotlib axes object to plot on, add labels and logscale the y-axis.
+        loadings_name : str
+            The name of the PCA loadings layer in the AnnData object (data.varm.keys), by default "PCs"
+        dim : int
+            The PC number from which to get loadings, by default 1
+        nfeatures : int
+            The number of top absolute loadings features to plot, by default 20
+        scatter_kwargs : dict, optional
+            Additional keyword arguments for the matplotlib scatter function. By default None.
+
+        Returns
+        -------
+        None
+
+        """
+        scatter_kwargs = scatter_kwargs or {}
+
+        # Input checks
+        if not isinstance(data, (ad.AnnData)):
+            raise TypeError("data must be an AnnData object")
+
+        if loadings_name not in data.varm:
+            raise ValueError(
+                f"PCA feature loadings layer '{loadings_name}' not found in AnnData object, found these layers: {data.varm.keys()}"
+            )
+
+        n_pcs = data.varm[loadings_name].shape[1]
+        if not (1 <= dim <= n_pcs):
+            raise ValueError(f"dim must be between 1 and {n_pcs} (inclusive). Got dim={dim}.")
+
+        n_features = data.varm[loadings_name].shape[0]
+        if not (1 <= nfeatures <= n_features):
+            raise ValueError(f"number of features must be between 1 and {n_features} (inclusive). Got dim={nfeatures}.")
+
+        # create the dataframe for plotting
+        dim = dim - 1  # to account from 0 indexing
+        loadings = pd.DataFrame({"dim_loadings": data.varm[loadings_name][:, dim]})
+        loadings["feature"] = data.var.index.astype("string")
+        loadings["abs_loadings"] = loadings["dim_loadings"].abs()
+        # Sort the DataFrame by absolute loadings and select the top features
+        top_loadings = loadings.sort_values(by="abs_loadings", ascending=False).copy().head(nfeatures)
+        top_loadings = top_loadings.reset_index(drop=True)
+        top_loadings["index_int"] = range(nfeatures, 0, -1)
+
+        # call the Plots.scatter method to create the rank plot
+        cls.scatter(
+            data=top_loadings,
+            x_column="dim_loadings",
+            y_column="index_int",
+            ax=ax,
+            color="green",
+            scatter_kwargs=scatter_kwargs,
+        )
+
+        # set axis labels
+        label_axes(ax, xlabel=f"PC{dim + 1} loadings", ylabel="Top features")
+        ax.set_yticks(top_loadings["index_int"])
+        ax.set_yticklabels(top_loadings["feature"], rotation=0, ha="right")
