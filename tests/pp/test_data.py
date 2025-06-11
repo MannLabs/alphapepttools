@@ -722,11 +722,11 @@ def test_scale_and_center(
     elif from_layer is not None:
         adata = _to_anndata(df)
         adata.layers[from_layer] = adata.X.copy()
-        # remove X to test whether data is scaled correctly
-        adata.X = 0
+        # remove X to ensure that scaling can only be done from layer
+        adata.X = np.zeros_like(adata.layers[from_layer])
 
     # scale data
-    at.pp.scale_and_center(adata, scaler=scaler, to_layer=to_layer, from_layer=from_layer)
+    adata = at.pp.scale_and_center(adata, scaler=scaler, to_layer=to_layer, from_layer=from_layer)
 
     # check whether data was correctly scaled
     if to_layer is None:
