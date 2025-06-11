@@ -440,107 +440,69 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
         adata.layers[to_layer] = result
 
 
-def filter_data_completeness(
-    adata: ad.AnnData,
-    max_missing: float,
-    group_column: str | None = None,
-    groups: list[str] | None = None,
-    axis: int = 0,
-) -> ad.AnnData:
-    """Filter data based on missing values
+# def filter_data_completeness(
+#     adata: ad.AnnData,
+#     max_missing: float,
+#     group_column: str | None = None,
+#     groups: list[str] | None = None,
+# ) -> ad.AnnData:
+#     """Filter data based on missing values
 
-    Filter either samples or features based on the fraction of missing values.
-    ### NOT IMPLEMENTED YET: Group-based filtering ###
-    If group_column and groups are provided, only missingness of certain metadata
-    levels is considered. This is especially useful for imbalanced classes, where
-    filtering by global missingness may leave too many missing values in the smaller
-    class.
+#     Filter either features based on the fraction of missing values.
+#     If group_column and groups are provided, only missingness of certain metadata
+#     levels is considered. This is especially useful for imbalanced classes, where
+#     filtering by global missingness may leave too many missing values in the smaller
+#     class.
 
-    Parameters
-    ----------
-    max_missing : float
-        Maximum fraction of missing values allowed. Compared with the fraction of missing values
-        in a "greater than" fashion, i.e. if max_missing is 0.6 and the fraction of missing values
-        is 0.6, the sample or feature is kept. Greater than comparison is used here since the
-        missing fraction may be 0.0, in which case the sample or feature should be kept.
-    group_column : str, optional
-        Column in obs or var to determine groups for filtering.
-    groups : list[str], optional
-        List of levels of the group_column to consider in filtering. E.g. if the column has the levels
-        ['A', 'B', 'C'], and groups = ['A', 'B'], only missingness of samples or features in these
-        groups is considered. If None, all groups are considered.
-    axis : int, optional
-        Whether to check completeness of samples (0) or features (1).
+#     Parameters
+#     ----------
+#     max_missing : float
+#         Maximum fraction of missing values allowed. Compared with the fraction of missing values
+#         in a "greater than" fashion, i.e. if max_missing is 0.6 and the fraction of missing values
+#         is 0.6, the sample or feature is kept. Greater than comparison is used here since the
+#         missing fraction may be 0.0, in which case the sample or feature should be kept.
+#     group_column : str, optional
+#         Column in obs to determine groups for filtering.
+#     groups : list[str], optional
+#         List of levels of the group_column to consider in filtering. E.g. if the column has the levels
+#         ['A', 'B', 'C'], and groups = ['A', 'B'], only missingness of features in these
+#         groups is considered. If None, all groups are considered.
 
-    """
-    if max_missing < 0 or max_missing > 1:
-        raise ValueError("Threshold must be between 0 and 1.")
+#     """
+#     if max_missing < 0 or max_missing > 1:
+#         raise ValueError("Threshold must be between 0 and 1.")
 
-    if not is_numeric_dtype(adata.X):
-        raise ValueError("Data must be numeric.")
+#     if not is_numeric_dtype(adata.X):
+#         raise ValueError("Data must be numeric.")
 
-    def _metadata_column_from_adata(
-        name: str,
-        axis: int,
-    ) -> np.ndarray:
-        """Extract a metadata column from an AnnData object based on the axis."""
-        return _adata_column_to_array(adata.obs, name) if axis == 0 else _adata_column_to_array(adata.var, name)
+#     # Resolve group indices
+#     group_indices = {}
+#     if group_column is not None:
+#         if group_column not in adata.obs.columns:
+#             raise ValueError(f"Group column '{group_column}' not found in obs.")
+#         group_column_values = adata.obs[group_column].unique()
+#         if groups is not None:
+#             if not set(groups).issubset(set(group_column_values)):
+#                 raise ValueError(f"Groups {groups} not found in group column '{group_column}'.")
+#             for group in np.unique(groups):
+#                 group_indices[group] = adata.obs.index[adata.obs[group_column] == group]
+#         else:
+#             for group in group_column_values:
+#                 group_indices[group] = adata.obs.index[adata.obs[group_column] == group]
+#     else:
+#         group_indices["all"] = adata.obs.index
 
-    OP_LEN = adata.X.shape[0] if axis == 0 else adata.X.shape[1]
-    grouping_lookup = ["all"] * OP_LEN if group_column is None else _metadata_column_from_adata(group_column, axis)
-    grouping_values = np.unique(grouping_lookup)
-    print(len(grouping_values))
+#     # Calculate missingness for each group
+#     drop = np.array([False] * adata.shape[1])
+#     for group, indices in group_indices.items():
+#         missing_fraction = adata[indices, :].X.isnull().mean(axis=0)
+#         drop |= missing_fraction > max_missing
 
-    # # Transposing the adata object allows for sample-filtering as well
-    # def _drop_fields_per_cutoff(
-    #     adata: ad.AnnData,
-    #     max_missing: float,
-    #     axis: int = 0,
-    # ):
-    #     """Drop columns based on the maximum allowed missingness"""
-    #     missing_fraction = np.isnan(adata.X).mean(axis=axis)
-    #     missing_above_cutoff = missing_fraction > max_missing
-    #     return adata[:, ~missing_above_cutoff] if axis == 0 else adata[~missing_above_cutoff, :]
+#     # Drop columns with too many missing values from data
+#     if drop.any():
+#         adata = adata[:, ~drop].copy()
+#         logging.info(
+#             f"pp.filter_data_completeness(): Dropped {drop.size} features with >{max_missing:.2f} missing values."
+#         )
 
-    # # Extract indices and grouping values per current axis
-    # if axis == 0:
-    #     indices = adata.obs.index
-    #     group_values = adata.obs[group_column] if group_column else None
-    # elif axis == 1:
-    #     indices = adata.var.index
-    #     group_values = adata.var[group_column] if group_column else None
-    # else:
-    #     raise ValueError("Axis must be 0 (samples) or 1 (features).")
-
-    # # Ensure that all groups are covered by the corresponding column, or default to 'all'
-    # if group_values is None:
-    #     group_indices = {"all": indices}
-    # elif set(groups).issubset(set(group_values)):
-    #     group_indices = {group: indices[group_values == group] for group in groups}
-    # else:
-    #     raise ValueError(f"Provided groups {groups} are not a subset of the group_column {group_column} levels.")
-
-    # for current_group, indices in group_indices.items():
-    #     if current_group == "all":
-    #         adata = _drop_fields_per_cutoff(adata, max_missing, axis)
-    #     else:
-    #         group_mask = group_values == current_group
-    #         if axis == 0:
-    #             adata = adata[group_mask, :]
-    #         elif axis == 1:
-    #             adata = adata[:, group_mask]
-
-    if group_column is None:
-        if axis == 0:  # check completeness of samples
-            missing_fraction = np.isnan(adata.X).mean(axis=1)
-            missing_above_cutoff = missing_fraction > max_missing
-            adata = adata[~missing_above_cutoff, :]
-        elif axis == 1:  # check completeness of features
-            missing_fraction = np.isnan(adata.X).mean(axis=0)
-            missing_above_cutoff = missing_fraction > max_missing
-            adata = adata[:, ~missing_above_cutoff]
-
-        return adata
-    raise NotImplementedError(
-        "Group-based filtering is not implemented yet. Please provide a group_column and groups to filter by."
-    )
+#     return adata
