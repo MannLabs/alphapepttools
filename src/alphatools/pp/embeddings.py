@@ -18,8 +18,10 @@ def pca(
 ) -> ad.AnnData | np.ndarray:
     """Principal component analysis :cite:p:`Pedregosa2011`.
 
-    Computes PCA coordinates, loadings and variance decomposition. adata will be changed as a result to include the pca calculationd.
-    Uses the implementation of Scanpy (v 1.10.4), which in turn uses implementation of
+    Computes PCA coordinates, loadings and variance decomposition. The passed adata will be changed as a result to include the pca calculations.
+    After PCA, the updated adata object will include `adata.obsm` layer (for PCA coordinates),
+    `adata.varm` layer (for PCA loadings), and `adata.uns` layer (for PCA variance decomposition).
+    Uses the implementation of Scanpy, which in turn uses implementation of
     *scikit-learn* :cite:p:`Pedregosa2011`.
 
     Parameters
@@ -60,9 +62,9 @@ def pca(
     pca_kwargs = pca_kwargs or {}
 
     if not isinstance(adata, (ad.AnnData)):
-        raise TypeError("Data should be AnnData object")
+        raise TypeError(f"Data should be AnnData object, got {type(adata)}")
     if layer not in adata.layers:
-        raise ValueError(f"Layer {layer} not found in AnnData object")
+        raise ValueError(f"Layer {layer} not found in AnnData object, available layers: {adata.layers.keys()}")
 
     # Add feature mask to kwargs if provided
     if meta_data_mask_column_name is not None:
