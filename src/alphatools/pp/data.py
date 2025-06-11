@@ -399,7 +399,7 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     scaler: str = "standard",
     from_layer: str | None = None,
     to_layer: str | None = None,
-) -> None:
+) -> ad.AnnData:
     """Scale and center data.
 
     Either use standard or robust scaling. 'robust' scaling relies
@@ -419,8 +419,12 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
 
     Returns
     -------
-    None
+    adata : ad.AnnData
+        Anndata object with scaled data in X or specified layer.
+
     """
+    adata = adata.copy()
+
     mod_status = "inplace" if to_layer is None else f"to layer '{to_layer}'"
 
     logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler {mod_status}.")
@@ -438,6 +442,8 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
         adata.X = result
     else:
         adata.layers[to_layer] = result
+
+    # return adata
 
 
 def filter_data_completeness(

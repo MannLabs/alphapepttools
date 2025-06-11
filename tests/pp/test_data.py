@@ -726,7 +726,7 @@ def test_scale_and_center(
         adata.X = 0
 
     # scale data
-    at.pp.scale_and_center(adata, scaler=scaler, to_layer=to_layer, from_layer=from_layer)
+    _ = at.pp.scale_and_center(adata, scaler=scaler, to_layer=to_layer, from_layer=from_layer)
 
     # check whether data was correctly scaled
     if to_layer is None:
