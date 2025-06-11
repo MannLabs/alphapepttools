@@ -425,10 +425,6 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     """
     adata = adata.copy()
 
-    mod_status = "inplace" if to_layer is None else f"to layer '{to_layer}'"
-
-    logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler {mod_status}.")
-
     if scaler == "standard":
         scaler = StandardScaler(with_mean=True, with_std=True)
     elif scaler == "robust":
@@ -443,7 +439,7 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     else:
         adata.layers[to_layer] = result
 
-    # return adata
+    return adata
 
 
 def filter_data_completeness(
