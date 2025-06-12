@@ -31,7 +31,7 @@ def _pmad(x: np.ndarray) -> float:
     r"""Compute pooled median absolute deviation for a single homogenous group
 
     .. math ::
-        \text{PMAD} = \frac{\sum_{f\in F}{\text{MAD_g(f)}}}{|F|}
+        \text{PMAD} = \frac{\sum_{f\in F}{\text{MAD}_{g}(f)}}{|F|}
 
     - g: Group (here homogenous)
     - f: Feature out of all features
@@ -67,7 +67,7 @@ def pooled_median_absolute_deviation(
     of the group
 
     .. math ::
-        \text{PMAD_g} = \frac{\sum_{g, f\in F}{\text{MAD_g(f)}}}{|F|}
+        \text{PMAD}_{g} = \frac{\sum_{g, f\in F}{\text{MAD}_{g}(f)}}{|F|}
 
     In the original publication, the PMAD is computed for every sample group and compared between
     normalization approaches. Lower PMADs indicate lower intra-group variability which might indicate
