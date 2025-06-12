@@ -53,7 +53,7 @@ def test_set_recursive_dict_keys(
     assert result == reference
 
 
-def test_pmad(count_data_pmad) -> None:
+def test__pmad(count_data_pmad) -> None:
     X, pmad = count_data_pmad
 
     assert _pmad(x=X) == pmad
