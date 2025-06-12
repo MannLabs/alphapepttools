@@ -21,9 +21,17 @@ def _set_nested_dict_keys(
     dictionary
         Dictionary
     keys
-        Path to value
+        Path to value, assigned in the order of the indices
     value
-        Added value at end of path
+        Assigned value at end of path
+
+    Example
+    -------
+
+    .. code-block:: python
+
+        _set_nested_dict_keys(dictionary={}, keys=["key1", "key2", "key3"], value="value")
+        > {"key1": {"key2": {"key3": value}}}
     """
     current = dictionary
 
