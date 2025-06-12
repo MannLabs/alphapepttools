@@ -9,7 +9,7 @@ METRICS_KEY = "metrics"
 PMAD_KEY = "pmad"
 
 
-def _set_nested_dict_keys(
+def _set_nested_dict(
     dictionary: dict[str, object],
     keys: list[str],
     value: object,
@@ -116,6 +116,6 @@ def pooled_median_absolute_deviation(
         pmad_groupwise[group_name] = _pmad(adata[indices, :].X)
 
     if inplace:
-        adata.uns = _set_nested_dict_keys(adata.uns, value=pmad_groupwise, keys=[METRICS_KEY, PMAD_KEY])
+        adata.uns = _set_nested_dict(adata.uns, value=pmad_groupwise, keys=[METRICS_KEY, PMAD_KEY])
         return adata
     return pd.DataFrame.from_dict(pmad_groupwise, orient="index", columns=[PMAD_KEY])

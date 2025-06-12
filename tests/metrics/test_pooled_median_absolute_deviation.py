@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from alphatools.metrics import pooled_median_absolute_deviation
-from alphatools.metrics._pmad import _pmad, _set_nested_dict_keys
+from alphatools.metrics._pmad import _pmad, _set_nested_dict
 
 
 @pytest.fixture
@@ -44,11 +44,9 @@ def adata_pmad(count_data_pmad) -> tuple[np.ndarray, float]:
         ({}, ["key1", "key2"], [], {"key1": {"key2": []}}),
     ],
 )
-def test__set_nested_dict_keys(
-    dictionary: dict[str, Any], value: Any, keys: list[str], reference: dict[str, Any]
-) -> None:
+def test__set_nested_dict(dictionary: dict[str, Any], value: Any, keys: list[str], reference: dict[str, Any]) -> None:
     """Test recursively setting dictionary keys in a dictionary"""
-    result = _set_nested_dict_keys(dictionary=dictionary, keys=keys, value=value)
+    result = _set_nested_dict(dictionary=dictionary, keys=keys, value=value)
 
     assert result == reference
 
