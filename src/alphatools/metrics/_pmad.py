@@ -9,23 +9,32 @@ METRICS_KEY = "metrics"
 PMAD_KEY = "pmad"
 
 
-def _set_recursive_dict_keys(
+def _set_nested_dict_keys(
     dictionary: dict[str, object],
     keys: list[str],
     value: object,
 ) -> dict[str, object]:
-    """Set the value in a nested dictionary and create non-existent keys"""
-    k = keys.pop(0)
+    """Set value in nested dictionary, creating missing keys as needed
 
-    if len(keys) == 0:
-        dictionary[k] = value
-        return dictionary
+    Parameters
+    ----------
+    dictionary
+        Dictionary
+    keys
+        Path to value
+    value
+        Added value at end of path
+    """
+    current = dictionary
 
-    if k not in dictionary:
-        dictionary[k] = _set_recursive_dict_keys({}, keys=keys, value=value)
-    else:
-        dictionary[k] = _set_recursive_dict_keys(dictionary[k], keys=keys, value=value)
+    # Navigate to the parent of the final key
+    for key in keys[:-1]:
+        if key not in current:
+            current[key] = {}
+        current = current[key]
 
+    # Set the final value
+    current[keys[-1]] = value
     return dictionary
 
 
@@ -99,6 +108,6 @@ def pooled_median_absolute_deviation(
         pmad_groupwise[group_name] = _pmad(adata[indices, :].X)
 
     if inplace:
-        adata.uns = _set_recursive_dict_keys(adata.uns, value=pmad_groupwise, keys=[METRICS_KEY, PMAD_KEY])
+        adata.uns = _set_nested_dict_keys(adata.uns, value=pmad_groupwise, keys=[METRICS_KEY, PMAD_KEY])
         return adata
     return pd.DataFrame.from_dict(pmad_groupwise, orient="index", columns=[PMAD_KEY])
