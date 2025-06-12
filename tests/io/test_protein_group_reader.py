@@ -22,7 +22,8 @@ from alphatools.io import read_pg_matrix
         {"feature_name": "protein_group", "sample_name": "sample_name", "set_index": False, "row_type": "observations"},
     ]
 )
-def pg_matrix(tmpdir, request) -> Generator[tuple[str, ad.AnnData], None, None]:
+def pg_matrix(tmpdir, request) -> Generator[tuple[str, ad.AnnData, dict[str, str]], None, None]:
+    """Generate protein group matrix, reference :class:`anndata.AnnData` object for various argument combinations"""
     tmppath = tmpdir / "pg.tsv"
 
     feature_name = request.param["feature_name"]
@@ -59,16 +60,14 @@ def pg_matrix(tmpdir, request) -> Generator[tuple[str, ad.AnnData], None, None]:
         {"feature_name": feature_name, "sample_name": sample_name, "set_index": set_index, "row_type": row_type},
     )
 
-    tmppath.remove()
+    tmppath.unlink()
 
 
 def test_read_pg_matrix(pg_matrix) -> None:
+    """Test correct parsing of locally stored protein group matrices"""
     path, adata_ref, kwargs = pg_matrix
 
     adata = read_pg_matrix(path, **kwargs)
-
-    print(adata.obs.dtypes)
-    print(adata_ref.obs.dtypes)
 
     assert (adata_ref.X == adata.X).all()
     assert adata.obs.equals(adata_ref.obs)
