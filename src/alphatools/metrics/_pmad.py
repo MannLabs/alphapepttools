@@ -27,7 +27,7 @@ def _set_recursive_dict_keys(dictionary: dict[str, Any], value: Any, keys: list[
     return dictionary
 
 
-def _pmad(adata: ad.AnnData) -> float:
+def _pmad(x: np.ndarray) -> float:
     r"""Compute pooled median absolute deviation for a single homogenous group
 
     .. math ::
@@ -37,13 +37,25 @@ def _pmad(adata: ad.AnnData) -> float:
     - f: Feature out of all features
     - MAD: Median absolute deviation
     - |F|: Size of all features
+
+    Parameters
+    ----------
+    x
+        Count data of shape (observations, features)
+
+    Returns
+    -------
+    float
+        Pooled median absolute deviation over features
     """
     # Compute feature-wise MAD (axis=0) and aggregate over all features
-    mad = median_abs_deviation(adata.X, axis=0)
+    mad = median_abs_deviation(x, axis=0)
     return np.mean(mad)
 
 
-def pmad(adata: ad.AnnData, group_key: str, *, inplace: bool = True) -> ad.AnnData | pd.DataFrame:
+def pooled_median_absolute_deviation(
+    adata: ad.AnnData, group_key: str, *, inplace: bool = True
+) -> ad.AnnData | pd.DataFrame:
     r"""Pooled median absolute deviation
 
     Quantifies the variation of counts between samples of a defined group of samples.
@@ -82,7 +94,7 @@ def pmad(adata: ad.AnnData, group_key: str, *, inplace: bool = True) -> ad.AnnDa
 
     pmad_groupwise = {}
     for group_name, indices in groups.indices.items():
-        pmad_groupwise[group_name] = _pmad(adata[indices, :])
+        pmad_groupwise[group_name] = _pmad(adata[indices, :].X)
 
     if inplace:
         adata.uns = _set_recursive_dict_keys(adata.uns, value=pmad_groupwise, keys=[METRICS_KEY, PMAD_KEY])
