@@ -32,23 +32,23 @@ def adata_pmad(count_data_pmad) -> tuple[np.ndarray, float]:
 
 
 @pytest.mark.parametrize(
-    ("dictionary", "value", "keys", "reference"),
+    ("dictionary", "keys", "value", "reference"),
     [
         # Initial test
-        ({}, "value", ["key1"], {"key1": "value"}),
+        ({}, ["key1"], "value", {"key1": "value"}),
         # Do not overwrite existing keys
-        ({"existing_key": "existing_value"}, "value", ["key1"], {"existing_key": "existing_value", "key1": "value"}),
+        ({"existing_key": "existing_value"}, ["key1"], "value", {"existing_key": "existing_value", "key1": "value"}),
         # Multiple keys
-        ({}, "value", ["key1", "key2"], {"key1": {"key2": "value"}}),
+        ({}, ["key1", "key2"], "value", {"key1": {"key2": "value"}}),
         # Write non-string values
-        ({}, [], ["key1", "key2"], {"key1": {"key2": []}}),
+        ({}, ["key1", "key2"], [], {"key1": {"key2": []}}),
     ],
 )
 def test_set_recursive_dict_keys(
     dictionary: dict[str, Any], value: Any, keys: list[str], reference: dict[str, Any]
 ) -> None:
     """Test recursively setting dictionary keys in a dictionary"""
-    result = _set_recursive_dict_keys(dictionary=dictionary, value=value, keys=keys)
+    result = _set_recursive_dict_keys(dictionary=dictionary, keys=keys, value=value)
 
     assert result == reference
 

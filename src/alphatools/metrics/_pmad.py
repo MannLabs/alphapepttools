@@ -1,7 +1,5 @@
 """Pooled median absolute deviation"""
 
-from typing import Any
-
 import anndata as ad
 import numpy as np
 import pandas as pd
@@ -11,7 +9,11 @@ METRICS_KEY = "metrics"
 PMAD_KEY = "pmad"
 
 
-def _set_recursive_dict_keys(dictionary: dict[str, Any], value: Any, keys: list[str]) -> dict[str, Any]:  # noqa: ANN401
+def _set_recursive_dict_keys(
+    dictionary: dict[str, object],
+    keys: list[str],
+    value: object,
+) -> dict[str, object]:
     """Set the value in a nested dictionary and create non-existent keys"""
     k = keys.pop(0)
 
@@ -20,9 +22,9 @@ def _set_recursive_dict_keys(dictionary: dict[str, Any], value: Any, keys: list[
         return dictionary
 
     if k not in dictionary:
-        dictionary[k] = _set_recursive_dict_keys({}, value=value, keys=keys)
+        dictionary[k] = _set_recursive_dict_keys({}, keys=keys, value=value)
     else:
-        dictionary[k] = _set_recursive_dict_keys(dictionary[k], value=value, keys=keys)
+        dictionary[k] = _set_recursive_dict_keys(dictionary[k], keys=keys, value=value)
 
     return dictionary
 
