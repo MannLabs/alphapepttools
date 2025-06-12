@@ -60,7 +60,7 @@ def pg_matrix(tmpdir, request) -> Generator[tuple[str, ad.AnnData, dict[str, str
         {"feature_name": feature_name, "sample_name": sample_name, "set_index": set_index, "row_type": row_type},
     )
 
-    tmppath.unlink()
+    tmppath.remove()
 
 
 def test_read_pg_matrix(pg_matrix) -> None:
