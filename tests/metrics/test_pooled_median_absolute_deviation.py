@@ -35,13 +35,13 @@ def adata_pmad(count_data_pmad) -> tuple[np.ndarray, float]:
     ("dictionary", "value", "keys", "reference"),
     [
         # Initial test
-        ({}, "a", ["a"], {"a": "a"}),
+        ({}, "value", ["key1"], {"key1": "value"}),
         # Do not overwrite existing keys
-        ({"A": "A"}, "a", ["a"], {"A": "A", "a": "a"}),
+        ({"existing_key": "existing_value"}, "value", ["key1"], {"existing_key": "existing_value", "key1": "value"}),
         # Multiple keys
-        ({}, "a", ["a", "b"], {"a": {"b": "a"}}),
+        ({}, "value", ["key1", "key2"], {"key1": {"key2": "value"}}),
         # Write non-string values
-        ({}, ["a", "b", "c"], ["a", "b"], {"a": {"b": ["a", "b", "c"]}}),
+        ({}, [], ["key1", "key2"], {"key1": {"key2": []}}),
     ],
 )
 def test_set_recursive_dict_keys(
