@@ -67,6 +67,56 @@ def normalize(
             total sample intensity is equal to the mean of the total sample intensities across all samples
     key_added
         If not None, adds normalization factors to column in `adata.obs`
+
+    Returns
+    -------
+    None
+        Modifies the :class:`anndata.AnnData` object in place
+
+    Example
+    -------
+
+    .. code-block:: python
+
+        adata = ad.AnnData(X=np.array([[0.8, 1.0], [2.0, 0.0], [0.0, 2.0]]))
+        adata.X
+        > np.array([
+            [0.8, 1. ],
+            [2. , 0. ],
+            [0. , 2. ]
+        ])
+
+    The anndata object gets normalized in place. Per default, the `.X` attribute will be modified
+
+    .. code-block:: python
+
+        normalize(adata)
+        adata.X
+        > np.array([
+        [0.85925926, 1.07407407],
+        [1.93333333, 0.        ],
+        [0.        , 1.93333333]]
+        )
+
+    Alternatively, we can generate a new layer
+
+    .. code-block:: python
+        normalize(adata, strategy="mean", to_layer="normalized")
+        adata.X
+        # Unchanged
+        > array([
+            [0.8, 1. ],
+            [2. , 0. ],
+            [0. , 2. ]
+        ])
+
+        # Normalized
+        adata.layers["normalized"]
+        > np.array([
+        [0.85925926, 1.07407407],
+        [1.93333333, 0.        ],
+        [0.        , 1.93333333]]
+        )
     """
     _validate_strategies(strategy=strategy)
 
