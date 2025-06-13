@@ -140,7 +140,7 @@ def make_legend(
 
 def add_legend(
     ax: plt.Axes,
-    levels: list | dict[str, str | tuple] | None = None,
+    levels: list[str] | dict[str, str | tuple] | None = None,
     legend: str | mpl.legend.Legend | None = "auto",
     palette: list[str | tuple] | None = None,
     **legend_kwargs,
@@ -154,10 +154,17 @@ def add_legend(
     ----------
     ax : plt.Axes
         Matplotlib axes object to add the legend to.
-    levels : list[str] | None
-        List of levels to use for the legend. Duplicates are removed.
+    levels : list[str] | dict[str, str | tuple] | None
+        List of levels to use for the legend. Duplicates are removed. Colors from the palette are assigned to unique values from this list,
+        but no particular color-binding is enforced. If this is a dictionary, the legend contains exactly the labels (keys) and colors (values) provided.
+    legend : str | mpl.legend.Legend | None
+        Legend to add to the plot. If "auto", a legend is created based on levels. If a Legend object, it is added directly to the axes. By default "auto".
     palette : list[str | tuple] | None
-        List of colors to use for the legend. If None, a default palette will be used. By default None.
+        List of colors to use for the legend. If None, a default palette will be used. By default None. Only relevant when levels is a list, i.e. when matching
+        of values to colors happens automatically.
+    legend_kwargs : dict, optional
+        Additional keyword arguments for the legend, by default {}. This can include 'fontsize', 'title', etc. These kwargs are not enforced if a matplotlib legend object
+        is passed as the `legend` parameter.
 
     """
     # If legend is already a Legend object, just add it to the axes
