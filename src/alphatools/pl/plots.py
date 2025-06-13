@@ -182,8 +182,6 @@ def add_legend(
     else:
         logging.warning("No valid 'legend' parameter provided. Skipping legend creation.")
 
-    # Match levels to colors and create patches in the figure
-
 
 def _drop_nans_from_plot_arrays(
     x_values: np.ndarray,
