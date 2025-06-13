@@ -3,7 +3,7 @@ import numpy as np
 import pytest
 
 from alphatools.pp import normalize
-from alphatools.pp.norm import _mean_normalization, _validate_strategies
+from alphatools.pp.norm import _total_mean_normalization, _validate_strategies
 
 
 @pytest.fixture
@@ -33,16 +33,16 @@ def different_count_data() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
 def test__validate_strategies() -> None:
     # Valid strategy
-    _validate_strategies("mean")
+    _validate_strategies("total_mean")
 
     # Invalid strategy
     with pytest.raises(ValueError, match="`strategy` must be one of"):
         _validate_strategies("invalid_strategy")
 
 
-def test__mean_normalization_all_equal(all_equal_count_data) -> None:
+def test__total_mean_normalization_all_equal(all_equal_count_data) -> None:
     array, norm_array_ref, norm_factors_ref = all_equal_count_data
-    norm_array, norm_factors = _mean_normalization(array)
+    norm_array, norm_factors = _total_mean_normalization(array)
 
     assert np.isclose(norm_array, norm_array_ref, atol=1e-6).all()
     assert np.isclose(norm_factors, norm_factors_ref, atol=1e-6).all()
@@ -50,7 +50,7 @@ def test__mean_normalization_all_equal(all_equal_count_data) -> None:
 
 def test__mean_normalization_different(different_count_data) -> None:
     array, norm_array_ref, norm_factors_ref = different_count_data
-    norm_array, norm_factors = _mean_normalization(array)
+    norm_array, norm_factors = _total_mean_normalization(array)
 
     assert np.isclose(norm_array, norm_array_ref, atol=1e-6).all()
     assert np.isclose(norm_factors, norm_factors_ref, atol=1e-6).all()

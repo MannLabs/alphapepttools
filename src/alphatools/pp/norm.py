@@ -4,7 +4,7 @@ from typing import Literal
 import anndata as ad
 import numpy as np
 
-STRATEGIES = ["mean"]
+STRATEGIES = ["total_mean"]
 
 
 def _validate_strategies(strategy: str) -> None:
@@ -13,8 +13,8 @@ def _validate_strategies(strategy: str) -> None:
         raise ValueError(f"`strategy` must be one of {STRATEGIES}, not {strategy}")
 
 
-def _mean_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Mean normalization
+def _total_mean_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Total normalization
 
     Normalizes total intensity in each sample (row) to mean of the total intensities
 
@@ -30,11 +30,11 @@ def _mean_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 
         # Each sample is the same
         arr = np.array([[1, 1], [2, 0], [0, 2]])
-        assert (_mean_normalization(arr) == arr).all()
+        assert (_total_mean_normalization(arr) == arr).all()
 
         # Sample 0 has a lower total intensity
         arr = np.array([[0.8, 1], [2, 0], [0, 2]])
-        arr_norm = _mean_normalization(arr)
+        arr_norm = _total_mean_normalization(arr)
         arr_norm.sum(axis=1)
         > array([1.93333333, 1.93333333, 1.93333333])
     """
@@ -49,7 +49,7 @@ def normalize(
     adata: ad.AnnData,
     from_layer: str | None = None,
     to_layer: str | None = None,
-    strategy: Literal["mean"] = "mean",
+    strategy: Literal["total_mean"] = "total_mean",
     key_added: str | None = None,
 ) -> ad.AnnData:
     """Normalize measured counts per sample
@@ -63,7 +63,7 @@ def normalize(
     strategy
         Normalization strategy
 
-            - *mean* The intensity of each feature is adjusted by a normalizing factor so that the
+            - *total_mean* The intensity of each feature is adjusted by a normalizing factor so that the
             total sample intensity is equal to the mean of the total sample intensities across all samples
     key_added
         If not None, adds normalization factors to column in `adata.obs`
@@ -101,7 +101,7 @@ def normalize(
     Alternatively, we can generate a new layer
 
     .. code-block:: python
-        normalize(adata, strategy="mean", to_layer="normalized")
+        normalize(adata, strategy="total_mean", to_layer="normalized")
         adata.X
         # Unchanged
         > array([
@@ -125,8 +125,8 @@ def normalize(
 
     data = adata.layers[from_layer] if from_layer is not None else adata.X
 
-    if strategy == "mean":
-        normalized_data, norm_factors = _mean_normalization(data)
+    if strategy == "total_mean":
+        normalized_data, norm_factors = _total_mean_normalization(data)
 
     # Reassign to anndata
     if to_layer is None:
