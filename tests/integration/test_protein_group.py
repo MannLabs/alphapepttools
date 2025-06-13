@@ -1,7 +1,35 @@
 from pathlib import Path
 
+from alphabase.tools.data_downloader import DataShareDownloader
+
+from alphatools.io import read_pg_matrix
+
+from .test_anndata import _assert_reference_df_equal
+
 current_file_directory = Path(__file__).resolve().parent
 test_data_path = Path(f"{current_file_directory}/reference_data")
 
 
-def test_protein_group_reader(): ...
+def test_pg_alphadia_110(tmpdir):
+    """Test creating anndata from alphadia protein group table using alphaDIA output."""
+    # Create directly from files
+    url = "https://datashare.biochem.mpg.de/s/gXVFPZBBkEN5FXi"
+
+    file_path = DataShareDownloader(url=url, output_dir=tmpdir).download()
+
+    adata = read_pg_matrix(file_path=file_path)
+
+    _assert_reference_df_equal(adata.to_df(), "pg_alphadia110", check_psf_df_columns=False)
+
+
+def test_pg_rosenberger2023(tmpdir):
+    """Test creating anndata from alphadia protein group table using single-cell data by
+    Rosenberger et al, 2023."""
+    # Create directly from files
+    url = "https://datashare.biochem.mpg.de/s/eX2NJ39o9ZaFGMo"
+
+    file_path = DataShareDownloader(url=url, output_dir=tmpdir).download()
+
+    adata = read_pg_matrix(file_path=file_path)
+
+    _assert_reference_df_equal(adata.to_df(), "pg_rosenberger2023", check_psf_df_columns=False)
