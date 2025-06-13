@@ -8,7 +8,7 @@ from alphatools.pp.norm import _mean_normalization, _validate_strategies
 
 @pytest.fixture
 def all_equal_count_data() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Generate count data (samples, featuers) where all samples have the same intensity"""
+    """Generate count data (samples, features) where all samples have the same intensity"""
     X = np.array([[1.0, 1.0], [2.0, 0.0], [0.0, 2.0]])
 
     assert X.sum(axis=1).all()
