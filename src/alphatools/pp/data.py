@@ -454,6 +454,9 @@ def filter_data_completeness(
     filtering by global missingness may leave too many missing values in the smaller
     class.
 
+    (In case rows should be filtered, it is recommended to transpose the adata
+    object prior to calling this function and reverting the transpose afterwards.)
+
     Parameters
     ----------
     max_missing : float
