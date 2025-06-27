@@ -43,12 +43,15 @@ def impute_gaussian(
 
     """
     # always copy for now, implement inplace later if needed
+    input_X_shape = adata.X.shape
     adata = adata.copy()
     X = adata.X
 
     # All columns must be either int or float
     if not np.issubdtype(X.dtype, np.number):
         raise ValueError("adata.X must be numeric.")
+
+    nan_count = np.isnan(X).sum()
 
     # Get the indices of those columns that have missing values: we are going to need downshifted Gaussian's for those
     rng = np.random.default_rng(random_state)
@@ -65,10 +68,11 @@ def impute_gaussian(
         na_row_idxs = np.where(np.isnan(X[:, i]))[0]
         X[na_row_idxs, i] = rng.normal(shifted_means[i], shifted_stds[i], len(na_row_idxs))
 
-    if not X.shape == adata.X.shape:
+    if not X.shape == input_X_shape:
         raise ValueError("Imputed data shape does not match original data shape.")
 
-    # set imputed values back to adata
-    adata.X = X
-    logging.info("Imputation complete.")
+    if np.isnan(X).any():
+        raise ValueError("Imputation failed, data retained NaN values.")
+
+    logging.info(f"Imputation complete. Imputed {nan_count} NaN values with Gaussian distribution.")
     return adata
