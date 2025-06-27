@@ -306,7 +306,7 @@ def label_plot(
 
 
 def _validate_pca_plot_input(
-    data: ad.AnnData, pca_embeddings_layer_name: str, pca_variance_layer_name: str, dim1: int, dim2: int
+    data: ad.AnnData, pca_embeddings_layer_name: str, pca_variance_layer_name: str, pc_x: int, pc_y: int
 ) -> None:
     """
     Validates the AnnData object for PCA-related data and dimensions.
@@ -319,10 +319,10 @@ def _validate_pca_plot_input(
         Name of the PCA layer to be checked.
     pca_variance_layer_name:
         Name of the column for explained variance to be checked.
-    dim1:
-        First PCA dimension to be validated.
-    dim2:
-        Second PCA dimension to be validated.
+    pc_x:
+        First PCA dimension to be validated (1-indexed, i.e. the first PC is 1, not 0).
+    pc_y:
+        Second PCA dimension to be validated (1-indexed, i.e. the first PC is 1, not 0).
     """
     if not isinstance(data, ad.AnnData):
         raise TypeError("data must be an AnnData object")
@@ -340,8 +340,8 @@ def _validate_pca_plot_input(
         )
 
     n_pcs = data.obsm[pca_embeddings_layer_name].shape[1]
-    if not (1 <= dim1 <= n_pcs) or not (1 <= dim2 <= n_pcs):
-        raise ValueError(f"dim1 and dim2 must be between 1 and {n_pcs} (inclusive). Got dim1={dim1}, dim2={dim2}.")
+    if not (1 <= pc_x <= n_pcs) or not (1 <= pc_y <= n_pcs):
+        raise ValueError(f"pc_x and pc_y must be between 1 and {n_pcs} (inclusive). Got pc_x={pc_x}, pc_y={pc_y}.")
 
 
 def _validate_scree_plot_input(
@@ -692,8 +692,8 @@ class Plots:
         cls,
         data: ad.AnnData | pd.DataFrame,
         ax: plt.Axes,
-        dim1: int = 1,
-        dim2: int = 2,
+        pc_x: int = 1,
+        pc_y: int = 2,
         pca_embeddings_layer_name: str = "X_pca",
         pca_variance_layer_name: str = "pca",
         label: bool = False,  # noqa: FBT001, FBT002
@@ -713,14 +713,14 @@ class Plots:
             AnnData to plot.
         ax : plt.Axes
             Matplotlib axes object to plot on, add labels and logscale the y-axis.
-        dim1 : int
-            The PC number of the first dimension to plot (x), by default 1
-        dim2 : int
-            The PC number of the second dimension to plot (y), by default 2
+        pc_x : int
+            The PC principal component index to plot on the x axis, by default 1. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
+        pc_y : int
+            The principal component index to plot on the y axis, by default 2. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
         pca_embeddings_layer_name : str,
-            The name of the PCA layer in the AnnData object (in `data.obsm`), by default "X_pca"
-        pca_variance_layer_name : str,
-            The name of the PCA layer in the AnnData object (in `data.uns`) that contains the explained variance, by default "pca"
+            The name of the PCA layer in the AnnData object (in `data.obsm`), by default "X_pca". Different name should be used in case `key_added` was specifically set in `pca()` function under `**pca_kwargs`.
+        label: bool,
+            The name of the PCA layer in the AnnData object (in `data.uns`) that contains the explained variance, by default "pca". Different name should be used in case `key_added` was specifically set in `pca()` function under `**pca_kwargs`.
         label: bool,
             Whether to add labels to the points in the scatter plot. by default False.
         label_column: str | None = None,
@@ -746,11 +746,11 @@ class Plots:
         scatter_kwargs = scatter_kwargs or {}
 
         # Input checks
-        _validate_pca_plot_input(data, pca_embeddings_layer_name, pca_variance_layer_name, dim1, dim2)
+        _validate_pca_plot_input(data, pca_embeddings_layer_name, pca_variance_layer_name, pc_x, pc_y)
 
         # create the dataframe for plotting
-        dim1_z = dim1 - 1  # to account from 0 indexing
-        dim2_z = dim2 - 1  # to account from 0 indexing
+        dim1_z = pc_x - 1  # to account for 0 indexing
+        dim2_z = pc_y - 1  # to account for 0 indexing
         values = pd.DataFrame(data.obsm[pca_embeddings_layer_name][:, [dim1_z, dim2_z]], columns=["dim1", "dim2"])
 
         # get the explained variance ratio for the dimensions
@@ -784,7 +784,7 @@ class Plots:
             label_plot(ax=ax, x_values=values["dim1"], y_values=values["dim2"], labels=labels, x_anchors=None)
 
         # set axislabels
-        label_axes(ax, xlabel=f"PC{dim1} ({var_dim1}%)", ylabel=f"PC{dim2} ({var_dim2}%)")
+        label_axes(ax, xlabel=f"PC{pc_x} ({var_dim1}%)", ylabel=f"PC{pc_y} ({var_dim2}%)")
 
     @classmethod
     def scree_plot(
@@ -806,7 +806,7 @@ class Plots:
         n_pcs : int,
             number of PCs to plot, by default 20
         pca_variance_layer_name : str,
-            The name of the PCA layer in the AnnData object (in `data.uns`) that contains the explained variance, by default "pca"
+            The name of the PCA layer in the AnnData object (in `data.uns`) that contains the explained variance, by default "pca". Different name should be used in case `key_added` was specifically set in `pca()` function under `**pca_kwargs`.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
 
@@ -862,9 +862,9 @@ class Plots:
         ax : plt.Axes
             Matplotlib axes object to plot on, add labels and logscale the y-axis.
         loadings_name : str
-            The name of the PCA loadings layer in the AnnData object (data.varm.keys), by default "PCs"
+            The name of the PCA loadings layer in the AnnData object (data.varm.keys), by default "PCs". Different name should be used in case `key_added` was specifically set in `pca()` function under `**pca_kwargs`.
         dim : int
-            The PC number from which to get loadings, by default 1
+            The PC number from which to get loadings, by default 1 (1-indexed, i.e. the first PC is 1, not 0).
         nfeatures : int
             The number of top absolute loadings features to plot, by default 20
         scatter_kwargs : dict, optional
