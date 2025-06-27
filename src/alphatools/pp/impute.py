@@ -20,10 +20,11 @@ def impute_gaussian(
     std_factor: float = 0.3,
     random_state: int = 42,
 ) -> ad.AnnData:
-    """Impute missing values in each column by sampling from a gaussian distribution.
+    """Impute missing values in each column by random sampling from a gaussian distribution.
 
-    The distribution is centered at std_offset standard deviations below the mean of
-    the feature and has a standard deviation of std_factor times the feature's.
+    The distribution is centered at std_offset * feature standard deviation below the
+    feature mean and has a standard deviation of std_factor * feature standard deviation.
+    The function returns a copy of the AnnData object with imputed values in place of NaNs.
 
     Parameters
     ----------
@@ -39,7 +40,7 @@ def impute_gaussian(
     Returns
     -------
     anndata.AnnData
-        AnnData object with imputed values in place of NaNs.
+        Copy of AnnData object with imputed values in place of NaNs.
 
     """
     # always copy for now, implement inplace later if needed
