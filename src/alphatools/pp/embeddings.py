@@ -29,9 +29,9 @@ def pca(
     adata: ad.AnnData
         The (annotated) data matrix of shape `n_obs` X `n_vars`.
         Rows correspond to cells and columns to genes.
-    layer: str, optional (default: "X")
+    layer: str, optional (default: None)
         If provided, which element of layers to use for PCA.
-        If a np.array is provided, it is used directly.
+        If None, the `.X` attribute of `adata` is used.
     n_comps: int, optional (default: 50)
         Number of principal components to compute. Defaults to 50, or 1 - minimum
         dimension size of selected representation.
@@ -63,7 +63,7 @@ def pca(
 
     if not isinstance(adata, (ad.AnnData)):
         raise TypeError(f"Data should be AnnData object, got {type(adata)}")
-    if layer not in adata.layers:
+    if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer {layer} not found in AnnData object, available layers: {adata.layers.keys()}")
 
     # Add feature mask to kwargs if provided

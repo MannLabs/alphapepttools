@@ -305,6 +305,114 @@ def label_plot(
         ax.text(line[0][1], line[1][1], label_parser(line[2]), **label_kwargs)
 
 
+def _validate_pca_plot_input(
+    data: ad.AnnData, pca_embeddings_layer_name: str, pca_variance_layer_name: str, dim1: int, dim2: int
+) -> None:
+    """
+    Validates the AnnData object for PCA-related data and dimensions.
+
+    Parameters
+    ----------
+    data:
+        AnnData object to be validated.
+    pca_embeddings_layer_name:
+        Name of the PCA layer to be checked.
+    pca_variance_layer_name:
+        Name of the column for explained variance to be checked.
+    dim1:
+        First PCA dimension to be validated.
+    dim2:
+        Second PCA dimension to be validated.
+    """
+    if not isinstance(data, ad.AnnData):
+        raise TypeError("data must be an AnnData object")
+
+    if pca_embeddings_layer_name not in data.obsm:
+        raise ValueError(
+            f"PCA embeddings layer '{pca_embeddings_layer_name}' not found in AnnData object. "
+            f"Found layers: {list(data.obsm.keys())}"
+        )
+
+    if pca_variance_layer_name not in data.uns:
+        raise ValueError(
+            f"PCA metadata layer '{pca_variance_layer_name}' not found in AnnData object. "
+            f"Found layers: {list(data.uns.keys())}"
+        )
+
+    n_pcs = data.obsm[pca_embeddings_layer_name].shape[1]
+    if not (1 <= dim1 <= n_pcs) or not (1 <= dim2 <= n_pcs):
+        raise ValueError(f"dim1 and dim2 must be between 1 and {n_pcs} (inclusive). Got dim1={dim1}, dim2={dim2}.")
+
+
+def _validate_scree_plot_input(
+    data: ad.AnnData,
+    pca_variance_layer_name: str,
+    n_pcs: int,
+) -> None:
+    """
+    Validate inputs for scree plot of the PCA dimension.
+
+    Parameters
+    ----------
+    data : anndata.AnnData
+        The AnnData object containing PCA results.
+    pca_variance_layer_name : str
+        The name of the PCA layer (used to construct the embedding key as `data.uns[pca_name]`).
+    n_pcs : int
+        The number of principal components requested for plotting.
+
+    """
+    if not isinstance(data, ad.AnnData):
+        raise TypeError("data must be an AnnData object")
+
+    if pca_variance_layer_name not in data.uns:
+        raise ValueError(
+            f"PCA metadata layer '{pca_variance_layer_name}' not found in AnnData object. "
+            f"Found layers: {list(data.uns.keys())}"
+        )
+
+    n_pcs_avail = len(data.uns[pca_variance_layer_name]["variance_ratio"])
+    if n_pcs > n_pcs_avail:
+        logging.warning(
+            f"Requested {n_pcs} PCs, but only {n_pcs_avail} PCs are available. Plotting only the available PCs."
+        )
+
+
+def _validate_pca_loadings_plot_inputs(data: ad.AnnData, loadings_name: str, dim: int, nfeatures: int) -> None:
+    """
+    Validate inputs for accessing PCA feature loadings from an AnnData object.
+
+    Parameters
+    ----------
+    data : anndata.AnnData
+        The AnnData object containing PCA loadings data.
+    loadings_name : str
+        The key in `data.varm` that stores PCA feature loadings (e.g., "PCs").
+    dim : int
+        The principal component index (1-based) to extract loadings for.
+    nfeatures : int
+        The number of top features to consider for the given component.
+    """
+    if not isinstance(data, ad.AnnData):
+        raise TypeError("data must be an AnnData object")
+
+    if loadings_name not in data.varm:
+        raise ValueError(
+            f"PCA feature loadings layer '{loadings_name}' not found in AnnData object. "
+            f"Found layers: {list(data.varm.keys())}"
+        )
+
+    n_pcs = data.varm[loadings_name].shape[1]
+    if not (1 <= dim <= n_pcs):
+        raise ValueError(f"dim must be between 1 and {n_pcs} (inclusive). Got dim={dim}.")
+
+    n_features = data.varm[loadings_name].shape[0]
+    if not (1 <= nfeatures <= n_features):
+        raise ValueError(
+            f"Number of features must be between 1 and {n_features} (inclusive). Got nfeatures={nfeatures}."
+        )
+
+
 class Plots:
     """Class for creating figures with matplotlib
 
@@ -586,8 +694,8 @@ class Plots:
         ax: plt.Axes,
         dim1: int = 1,
         dim2: int = 2,
-        pca_name: str = "pca",
-        pca_exp_var_name: str = "variance_ratio",
+        pca_embeddings_layer_name: str = "X_pca",
+        pca_variance_layer_name: str = "pca",
         label: bool = False,  # noqa: FBT001, FBT002
         label_column: str | None = None,
         color: str = "blue",
@@ -609,12 +717,12 @@ class Plots:
             The PC number of the first dimension to plot (x), by default 1
         dim2 : int
             The PC number of the second dimension to plot (y), by default 2
-        pca_name : str,
-            The name of the PCA layer in the AnnData object, by default "X_pca"
-        pca_exp_var_name : str,
-            The name of the PCA explained variance ratio column in the AnnData object, by default "variance_ratio"
-        label: bool = False,
-            Whether to add labels to the points in the scatter plot.
+        pca_embeddings_layer_name : str,
+            The name of the PCA layer in the AnnData object (in `data.obsm`), by default "X_pca"
+        pca_variance_layer_name : str,
+            The name of the PCA layer in the AnnData object (in `data.uns`) that contains the explained variance, by default "pca"
+        label: bool,
+            Whether to add labels to the points in the scatter plot. by default False.
         label_column: str | None = None,
             Column in data.obs to use for labeling the points. If None, and label is True, data.obs.index labels are added. By default None.
         color : str, optional
@@ -636,32 +744,25 @@ class Plots:
 
         """
         scatter_kwargs = scatter_kwargs or {}
+
         # Input checks
-        if not isinstance(data, (ad.AnnData)):
-            raise TypeError("data must be an AnnData object")
-        pca_embed_name = "X_" + pca_name
-        if pca_embed_name not in data.obsm:
-            raise ValueError(
-                f"PCA layer '{pca_embed_name}' not found in AnnData object, found these layer: {data.obsm.keys()}"
-            )
-        if pca_exp_var_name not in data.uns[pca_name]:
-            raise ValueError(
-                f"PCA explained variance '{pca_exp_var_name}' not found in AnnData object, found these keys: {data.uns[pca_name].keys()}"
-            )
-        n_pcs = data.obsm[pca_embed_name].shape[1]
-        if not (1 <= dim1 <= n_pcs) or not (1 <= dim2 <= n_pcs):
-            raise ValueError(f"dim1 and dim2 must be between 1 and {n_pcs} (inclusive). Got dim1={dim1}, dim2={dim2}.")
+        _validate_pca_plot_input(data, pca_embeddings_layer_name, pca_variance_layer_name, dim1, dim2)
 
         # create the dataframe for plotting
-        dim1 = dim1 - 1  # to account from 0 indexing
-        dim2 = dim2 - 1  # to account from 0 indexing
-        values = pd.DataFrame(data.obsm[pca_embed_name][:, [dim1, dim2]], columns=["dim1", "dim2"])
+        dim1_z = dim1 - 1  # to account from 0 indexing
+        dim2_z = dim2 - 1  # to account from 0 indexing
+        values = pd.DataFrame(data.obsm[pca_embeddings_layer_name][:, [dim1_z, dim2_z]], columns=["dim1", "dim2"])
 
         # get the explained variance ratio for the dimensions
-        var_dim1 = data.uns[pca_name][pca_exp_var_name][dim1]
+        var_dim1 = data.uns[pca_variance_layer_name]["variance_ratio"][dim1_z]
         var_dim1 = round(var_dim1 * 100, 2)
-        var_dim2 = data.uns[pca_name][pca_exp_var_name][dim2]
+        var_dim2 = data.uns[pca_variance_layer_name]["variance_ratio"][dim2_z]
         var_dim2 = round(var_dim2 * 100, 2)
+
+        # add color column
+        if color_column is not None:
+            color_values = _adata_column_to_array(data, color_column)
+            values[color_column] = color_values
 
         # call the Plots.scatter method to create the rank plot
         cls.scatter(
@@ -683,7 +784,7 @@ class Plots:
             label_plot(ax=ax, x_values=values["dim1"], y_values=values["dim2"], labels=labels, x_anchors=None)
 
         # set axislabels
-        label_axes(ax, xlabel=f"PC{dim1 + 1} ({var_dim1}%)", ylabel=f"PC{dim2 + 1} ({var_dim2}%)")
+        label_axes(ax, xlabel=f"PC{dim1} ({var_dim1}%)", ylabel=f"PC{dim2} ({var_dim2}%)")
 
     @classmethod
     def scree_plot(
@@ -691,8 +792,7 @@ class Plots:
         data: ad.AnnData | pd.DataFrame,
         ax: plt.Axes,
         n_pcs: int = 20,
-        pca_name: str = "pca",
-        pca_exp_var_name: str = "variance_ratio",
+        pca_variance_layer_name: str = "pca",
         scatter_kwargs: dict | None = None,
     ) -> None:
         """Plot the eigenvalues of each of the PCs using the scatter method
@@ -703,9 +803,10 @@ class Plots:
             AnnData to plot.
         ax : plt.Axes
             Matplotlib axes object to plot on, add labels and logscale the y-axis.
-        n_pcs : int, number of PCs to plot, by default 20
-        pca_name : str, the name of the PCA layer in the AnnData object, by default "X_pca"
-        pca_exp_var_name : str, the name of the PCA explained variance ratio column in the AnnData object, by default "variance_ratio"
+        n_pcs : int,
+            number of PCs to plot, by default 20
+        pca_variance_layer_name : str,
+            The name of the PCA layer in the AnnData object (in `data.uns`) that contains the explained variance, by default "pca"
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
 
@@ -715,30 +816,19 @@ class Plots:
 
         """
         scatter_kwargs = scatter_kwargs or {}
+
         # Input checks
+        _validate_scree_plot_input(data, pca_variance_layer_name, n_pcs)
 
-        if not isinstance(data, (ad.AnnData)):
-            raise TypeError("data must be an AnnData object")
-        pca_embed_name = "X_" + pca_name
-        if pca_embed_name not in data.obsm:
-            raise ValueError(
-                f"PCA layer '{pca_embed_name}' not found in AnnData object, found these layer: {data.obsm.keys()}"
-            )
-        if pca_exp_var_name not in data.uns[pca_name]:
-            raise ValueError(
-                f"PCA explained variance '{pca_exp_var_name}' not found in AnnData object, found these keys: {data.uns[pca_name].keys()}"
-            )
-
-        n_pcs_avail = data.obsm[pca_embed_name].shape[1]
-        if n_pcs > n_pcs_avail:
-            logging.warning(
-                f"Requested {n_pcs} PCs, but only {n_pcs_avail} PCs were calculated. Plotting only available PCs."
-            )
+        n_pcs_avail = len(data.uns[pca_variance_layer_name]["variance_ratio"])
         n_pcs = min(n_pcs, n_pcs_avail)
 
         # create the dataframe for plotting, X = pcs, y = explained variance
         values = pd.DataFrame(
-            {"PC": np.arange(n_pcs) + 1, "explained_variance": data.uns[pca_name][pca_exp_var_name][:n_pcs]}
+            {
+                "PC": np.arange(n_pcs) + 1,
+                "explained_variance": data.uns[pca_variance_layer_name]["variance_ratio"][:n_pcs],
+            }
         )
 
         # call the Plots.scatter method to create the rank plot
@@ -751,7 +841,7 @@ class Plots:
         )
 
         # set labels
-        label_axes(ax, xlabel="PC number", ylabel="Explained variance")
+        label_axes(ax, xlabel="PC number", ylabel="Explained variance (%)")
 
     @classmethod
     def plot_pca_loadings(
@@ -787,26 +877,11 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        # Input checks
-        if not isinstance(data, (ad.AnnData)):
-            raise TypeError("data must be an AnnData object")
-
-        if loadings_name not in data.varm:
-            raise ValueError(
-                f"PCA feature loadings layer '{loadings_name}' not found in AnnData object, found these layers: {data.varm.keys()}"
-            )
-
-        n_pcs = data.varm[loadings_name].shape[1]
-        if not (1 <= dim <= n_pcs):
-            raise ValueError(f"dim must be between 1 and {n_pcs} (inclusive). Got dim={dim}.")
-
-        n_features = data.varm[loadings_name].shape[0]
-        if not (1 <= nfeatures <= n_features):
-            raise ValueError(f"number of features must be between 1 and {n_features} (inclusive). Got dim={nfeatures}.")
+        _validate_pca_loadings_plot_inputs(data, loadings_name, dim, nfeatures)
 
         # create the dataframe for plotting
-        dim = dim - 1  # to account from 0 indexing
-        loadings = pd.DataFrame({"dim_loadings": data.varm[loadings_name][:, dim]})
+        dim_z = dim - 1  # to account from 0 indexing
+        loadings = pd.DataFrame({"dim_loadings": data.varm[loadings_name][:, dim_z]})
         loadings["feature"] = data.var.index.astype("string")
         loadings["abs_loadings"] = loadings["dim_loadings"].abs()
         # Sort the DataFrame by absolute loadings and select the top features
@@ -825,6 +900,6 @@ class Plots:
         )
 
         # set axis labels
-        label_axes(ax, xlabel=f"PC{dim + 1} loadings", ylabel="Top features")
+        label_axes(ax, xlabel=f"PC{dim} loadings", ylabel="Top features")
         ax.set_yticks(top_loadings["index_int"])
         ax.set_yticklabels(top_loadings["feature"], rotation=0, ha="right")
