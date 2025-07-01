@@ -120,9 +120,6 @@ def normalize(
     """
     _validate_strategies(strategy=strategy)
 
-    if (not isinstance(key_added, str)) and (key_added is not None):
-        raise TypeError(f"`key_added` must be str not {type(key_added)}")
-
     data = adata.layers[from_layer] if from_layer is not None else adata.X
 
     if strategy == "total_mean":
