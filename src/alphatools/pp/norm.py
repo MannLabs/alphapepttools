@@ -58,8 +58,10 @@ def normalize(
     ----------
     adata
         Count data
-    layer:
-        Count layer. If `None` uses `anndata.AnnData.X`
+    from_layer:
+        Layer that will be normalized. If `None` uses `anndata.AnnData.X`
+    to_layer:
+        Layer to which the normalized data will be added. If `None` overwrites `anndata.AnnData.X`
     strategy
         Normalization strategy
 
