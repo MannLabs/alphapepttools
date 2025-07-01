@@ -49,12 +49,14 @@
 
 ## IO
 
+### alphatools.io.anndata_factory
+
 ```{eval-rst}
-.. module:: alphatools.io
-.. currentmodule:: alphatools
+.. module:: alphatools.io.anndata_factory
+.. currentmodule:: alphatools.io.anndata_factory
 
 .. autosummary::
     :toctree: generated
 
-    io.anndata_factory
+    AnnDataFactory
 ```
