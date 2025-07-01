@@ -33,6 +33,18 @@
     tl.umap
 ```
 
+## Metrics
+
+```{eval-rst}
+.. module:: alphatools.metrics
+.. currentmodule:: alphatools
+
+.. autosummary::
+    :toctree: generated
+
+    metrics.principal_component_regression
+```
+
 ## Plotting
 
 ```{eval-rst}
