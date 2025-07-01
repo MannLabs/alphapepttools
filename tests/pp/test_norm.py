@@ -23,7 +23,8 @@ def all_equal_count_data() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
 @pytest.fixture
 def different_count_data() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Generate count data (samples, features) where samples have different intensities"""
+    """Generate count data (samples, features) where samples have different intensities,
+    the expected result and the expected normalization factors"""
     # Reduce total intensity of sample 0
     return (
         np.array([[0.8, 1.0], [2.0, 0.0], [0.0, 2.0]]),
