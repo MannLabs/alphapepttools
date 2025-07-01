@@ -28,7 +28,7 @@ def _total_mean_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]
 
     .. code-block:: python
 
-        # Each sample is the same
+        # Each sample has the same total intensity
         arr = np.array([[1, 1], [2, 0], [0, 2]])
         assert (_total_mean_normalization(arr) == arr).all()
 
