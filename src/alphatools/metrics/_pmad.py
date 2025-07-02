@@ -1,0 +1,121 @@
+"""Pooled median absolute deviation"""
+
+import anndata as ad
+import numpy as np
+import pandas as pd
+from scipy.stats import median_abs_deviation
+
+METRICS_KEY = "metrics"
+PMAD_KEY = "pmad"
+
+
+def _set_nested_dict(
+    dictionary: dict[str, object],
+    keys: list[str],
+    value: object,
+) -> dict[str, object]:
+    """Set value in nested dictionary, creating missing keys as needed
+
+    Parameters
+    ----------
+    dictionary
+        Dictionary
+    keys
+        Path to value, assigned in the order of the indices
+    value
+        Assigned value at end of path
+
+    Example
+    -------
+
+    .. code-block:: python
+
+        _set_nested_dict_keys(dictionary={}, keys=["key1", "key2", "key3"], value="value")
+        > {"key1": {"key2": {"key3": value}}}
+    """
+    current = dictionary
+
+    # Navigate to the parent of the final key
+    for key in keys[:-1]:
+        if key not in current:
+            current[key] = {}
+        current = current[key]
+
+    # Set the final value
+    current[keys[-1]] = value
+    return dictionary
+
+
+def _pmad(x: np.ndarray) -> float:
+    r"""Compute pooled median absolute deviation for a single homogenous group
+
+    .. math ::
+        \text{PMAD} = \frac{\sum_{f\in F}{\text{MAD}_{g}(f)}}{|F|}
+
+    - g: Group (here homogenous)
+    - f: Feature out of all features
+    - MAD: Median absolute deviation
+    - |F|: Size of all features
+
+    Parameters
+    ----------
+    x
+        Count data of shape (observations, features)
+
+    Returns
+    -------
+    float
+        Pooled median absolute deviation over features
+    """
+    # Compute feature-wise MAD (axis=0) and aggregate over all features
+    mad = median_abs_deviation(x, axis=0)
+    return np.mean(mad)
+
+
+def pooled_median_absolute_deviation(
+    adata: ad.AnnData, group_key: str, *, inplace: bool = True
+) -> ad.AnnData | pd.DataFrame:
+    r"""Pooled median absolute deviation
+
+    Quantifies the variation of counts between samples of a defined group of samples.
+    If the grouping is expected to represent a biologically homogenous collection, the PMAD can
+    be used to compare the effect of normalization approaches, as proposed in (Arend et al, 2025).
+
+    The pooled median absolute deviation within a group of samples g out of all sample groups G is defined as
+    the median absolute deviation over all |F| features $f \in F$
+    of the group
+
+    .. math ::
+        \text{PMAD}_{g} = \frac{\sum_{g, f\in F}{\text{MAD}_{g}(f)}}{|F|}
+
+    In the original publication, the PMAD is computed for every sample group and compared between
+    normalization approaches. Lower PMADs indicate lower intra-group variability which might indicate
+    a better normalization.
+
+    Parameters
+    ----------
+    adata
+        :class:`anndata.AnnData` object
+    group_key
+        Grouping variable. Column in `adata.obs` representing a meaningful biological group
+
+    Notes
+    -----
+    Note that normalization approaches such as the Median absolute deviation normalization explicitly normalize
+    by the MAD, i.e. they explicitly optimize for this metric. The PMAD should therefore be only considered in
+    conjunction with other metrics.
+
+    References
+    ----------
+    - Arend, L. et al. Systematic evaluation of normalization approaches in tandem mass tag and label-free protein quantification data using PRONE. Briefings in Bioinformatics 26, bbaf201 (2025).
+    """
+    groups = adata.obs.groupby(group_key)
+
+    pmad_groupwise = {}
+    for group_name, indices in groups.indices.items():
+        pmad_groupwise[group_name] = _pmad(adata[indices, :].X)
+
+    if inplace:
+        adata.uns = _set_nested_dict(adata.uns, value=pmad_groupwise, keys=[METRICS_KEY, PMAD_KEY])
+        return adata
+    return pd.DataFrame.from_dict(pmad_groupwise, orient="index", columns=[PMAD_KEY])
