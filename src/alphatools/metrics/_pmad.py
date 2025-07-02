@@ -75,39 +75,50 @@ def _pmad(x: np.ndarray) -> float:
 def pooled_median_absolute_deviation(
     adata: ad.AnnData, group_key: str, *, inplace: bool = True
 ) -> ad.AnnData | pd.DataFrame:
-    r"""Pooled median absolute deviation
+    r"""Compute pooled median absolute deviation (PMAD) within sample groups.
 
-    Quantifies the variation of counts between samples of a defined group of samples.
-    If the grouping is expected to represent a biologically homogenous collection, the PMAD can
-    be used to compare the effect of normalization approaches, as proposed in (Arend et al, 2025).
+    The PMAD quantifies the variability of features across samples within biologically defined groups.
+    It is particularly useful for assessing the performance of normalization approaches, especially when groups
+    are expected to be biologically homogeneous (Arend et al., 2025).
 
-    The pooled median absolute deviation within a group of samples g out of all sample groups G is defined as
-    the median absolute deviation over all |F| features $f \in F$
-    of the group
+    For each group :math:`g` in a set of sample groups :math:`G`, the PMAD is calculated as the average
+    median absolute deviation (MAD) across all features :math:`f \in F`:
 
-    .. math ::
-        \text{PMAD}_{g} = \frac{\sum_{g, f\in F}{\text{MAD}_{g}(f)}}{|F|}
+    .. math::
 
-    In the original publication, the PMAD is computed for every sample group and compared between
-    normalization approaches. Lower PMADs indicate lower intra-group variability which might indicate
-    a better normalization.
+        \text{PMAD}_g = \frac{1}{|F|} \sum_{f \in F} \mathrm{MAD}_g(f)
+
+    where :math:`\mathrm{MAD}_g(f)` is the median absolute deviation of feature :math:`f` within group :math:`g`.
+
+    In the original publication, PMAD was computed for each group and used to compare different normalization strategies.
+    Lower PMAD values indicate reduced intra-group variability and may suggest improved normalization.
 
     Parameters
     ----------
-    adata
-        :class:`anndata.AnnData` object
-    group_key
-        Grouping variable. Column in `adata.obs` representing a meaningful biological group
+    adata : AnnData
+        Annotated data matrix.
+    group_key : str
+        Column in `adata.obs` that defines the sample groups to evaluate (e.g., biological replicates or batches).
+    inplace : bool, default: True
+        If `True`, the results are added to `adata.uns['pmad']`.
+        If `False`, a :class:`pandas.DataFrame` with the PMAD values is returned.
+
+    Returns
+    -------
+    AnnData or pandas.DataFrame
+        If `inplace=True`, returns the input `adata` with PMAD values stored in `adata.uns["metrics"]["pmad"]`.
+        If `inplace=False`, returns a DataFrame containing PMAD values per group.
 
     Notes
     -----
-    Note that normalization approaches such as the Median absolute deviation normalization explicitly normalize
-    by the MAD, i.e. they explicitly optimize for this metric. The PMAD should therefore be only considered in
-    conjunction with other metrics.
+    Some normalization approaches, such as MAD-based normalization, explicitly minimize intra-group variability.
+    In such cases, PMAD may directly reflect the objective of the normalization procedure, and its interpretation
+    should be made alongside other complementary metrics.
 
     References
     ----------
-    - Arend, L. et al. Systematic evaluation of normalization approaches in tandem mass tag and label-free protein quantification data using PRONE. Briefings in Bioinformatics 26, bbaf201 (2025).
+    - Arend, L. et al. Systematic evaluation of normalization approaches in tandem mass tag and label-free protein
+      quantification data using PRONE. *Briefings in Bioinformatics*, 26, bbaf201 (2025).
     """
     groups = adata.obs.groupby(group_key)
 
