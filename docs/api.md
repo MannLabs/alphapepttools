@@ -14,6 +14,7 @@
     pp.filter_data_completeness
     pp.load_diann_pg_matrix
     pp.scale_and_center
+    pp.normalize
     pp.pca
     pp.impute
     pp.add_core_proteome_mask
@@ -43,6 +44,7 @@
     :toctree: generated
 
     metrics.principal_component_regression
+    metrics.pooled_median_absolute_deviation
 ```
 
 ## Plotting
