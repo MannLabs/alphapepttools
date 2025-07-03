@@ -378,7 +378,9 @@ def _validate_scree_plot_input(
         )
 
 
-def _validate_pca_loadings_plot_inputs(data: ad.AnnData, loadings_name: str, dim: int, nfeatures: int) -> None:
+def _validate_pca_loadings_plot_inputs(
+    data: ad.AnnData, loadings_name: str, dim: int, dim2: int | None, nfeatures: int
+) -> None:
     """
     Validate inputs for accessing PCA feature loadings from an AnnData object.
 
@@ -390,6 +392,8 @@ def _validate_pca_loadings_plot_inputs(data: ad.AnnData, loadings_name: str, dim
         The key in `data.varm` that stores PCA feature loadings (e.g., "PCs").
     dim : int
         The principal component index (1-based) to extract loadings for.
+    dim2 : int | None
+        The second principal component index (1-based) to extract loadings for, if applicable.
     nfeatures : int
         The number of top features to consider for the given component.
     """
@@ -404,13 +408,85 @@ def _validate_pca_loadings_plot_inputs(data: ad.AnnData, loadings_name: str, dim
 
     n_pcs = data.varm[loadings_name].shape[1]
     if not (1 <= dim <= n_pcs):
-        raise ValueError(f"dim must be between 1 and {n_pcs} (inclusive). Got dim={dim}.")
+        raise ValueError(f"PC must be between 1 and {n_pcs} (inclusive). Got dim={dim}.")
+    if dim2 is not None and not (1 <= dim2 <= n_pcs):
+        raise ValueError(f"second PC must be between 1 and {n_pcs} (inclusive). Got pc_y={dim2}.")
 
     n_features = data.varm[loadings_name].shape[0]
     if not (1 <= nfeatures <= n_features):
         raise ValueError(
             f"Number of features must be between 1 and {n_features} (inclusive). Got nfeatures={nfeatures}."
         )
+
+
+def _prepare_loding_df_to_plot(
+    data: ad.AnnData,
+    loadings_name: str,
+    pc_x: int,
+    pc_y: int,
+    nfeatures: int,
+) -> pd.DataFrame:
+    """
+    Prepare a DataFrame with PCA feature loadings for plotting.
+
+    This function extracts the loadings of two specified principal components (PCs) from
+    an AnnData object, filters features that contributed to the PCA (non-zero loadings),
+    and flags the top nfeatures for each selected PC dimension.
+
+    Parameters
+    ----------
+    data : anndata.AnnData
+        The AnnData object containing PCA results.
+    loadings_name : str
+        The key in `data.varm` where PCA loadings are stored.
+    pc_x : int
+        The first principal component index (1-based) to extract loadings for.
+    pc_y : int
+        The second principal component index (1-based) to extract loadings for.
+    nfeatures : int
+        Number of top features per PC to highlight based on absolute loadings.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing loadings for the selected PCs, feature names, boolean columns
+        indicating if a feature was used in PCA and whether it is among the top features in either dimension.
+    """
+    dim1_z = pc_x - 1  # convert to 0-based index
+    dim2_z = pc_y - 1  # convert to 0-based index
+
+    orig_loadings = data.varm[loadings_name]
+
+    loadings = pd.DataFrame(
+        {
+            "dim1_loadings": orig_loadings[:, dim1_z],
+            "dim2_loadings": orig_loadings[:, dim2_z],
+        }
+    )
+
+    # Add feature names and absolute loadings
+    loadings["feature"] = data.var_names
+
+    # get only features that were used in the PCA (e.g., those that are part of the core proteome)
+    # these would be features with 0 loadings in all PC dimensions
+    loading_sums = np.nansum(orig_loadings, axis=1)
+    non_sum_zero = np.where(loading_sums != 0)[0]
+    is_in_pca = np.zeros(data.n_vars, dtype=bool)
+    is_in_pca[non_sum_zero] = True
+    loadings["is_in_pca"] = is_in_pca
+
+    # filter the loadings to only include features that were used in the PCA
+    loadings = loadings[loadings["is_in_pca"]]
+
+    # add the top N features for each dimension
+    loadings["abs_dim1"] = loadings["dim1_loadings"].abs()
+    loadings["abs_dim2"] = loadings["dim2_loadings"].abs()
+
+    loadings["is_top"] = False
+    loadings.loc[loadings.nlargest(nfeatures, "abs_dim1").index, "is_top"] = True
+    loadings.loc[loadings.nlargest(nfeatures, "abs_dim2").index, "is_top"] = True
+
+    return loadings
 
 
 class Plots:
@@ -764,7 +840,6 @@ class Plots:
             color_values = _adata_column_to_array(data, color_column)
             values[color_column] = color_values
 
-        # call the Plots.scatter method to create the rank plot
         cls.scatter(
             data=values,
             x_column="dim1",
@@ -831,7 +906,6 @@ class Plots:
             }
         )
 
-        # call the Plots.scatter method to create the rank plot
         cls.scatter(
             data=values,
             x_column="PC",
@@ -877,7 +951,9 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        _validate_pca_loadings_plot_inputs(data, loadings_name, dim, nfeatures)
+        _validate_pca_loadings_plot_inputs(
+            data=data, loadings_name=loadings_name, dim=dim, dim2=None, nfeatures=nfeatures
+        )
 
         # create the dataframe for plotting
         dim_z = dim - 1  # to account from 0 indexing
@@ -889,13 +965,11 @@ class Plots:
         top_loadings = top_loadings.reset_index(drop=True)
         top_loadings["index_int"] = range(nfeatures, 0, -1)
 
-        # call the Plots.scatter method to create the rank plot
         cls.scatter(
             data=top_loadings,
             x_column="dim_loadings",
             y_column="index_int",
             ax=ax,
-            color="green",
             scatter_kwargs=scatter_kwargs,
         )
 
@@ -903,3 +977,100 @@ class Plots:
         label_axes(ax, xlabel=f"PC{dim} loadings", ylabel="Top features")
         ax.set_yticks(top_loadings["index_int"])
         ax.set_yticklabels(top_loadings["feature"], rotation=0, ha="right")
+
+    @classmethod
+    def plot_pca_loadings_2d(
+        cls,
+        data: ad.AnnData | pd.DataFrame,
+        ax: plt.Axes,
+        loadings_name: str = "PCs",
+        pc_x: int = 1,
+        pc_y: int = 2,
+        nfeatures: int = 20,
+        *,
+        add_labels: bool = True,
+        add_lines: bool = False,
+        scatter_kwargs: dict | None = None,
+    ) -> None:
+        """Plot the gene loadings of a PC using the scatter method
+
+        Parameters
+        ----------
+        data : ad.AnnData
+            AnnData to plot.
+        ax : plt.Axes
+            Matplotlib axes object to plot on, add labels and logscale the y-axis.
+        loadings_name : str
+            The name of the PCA loadings layer in the AnnData object (data.varm.keys), by default "PCs". Different name should be used in case `key_added` was specifically set in `pca()` function under `**pca_kwargs`.
+        pc_x : int
+            The PC principal component index to plot on the x axis, by default 1. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
+        pc_y : int
+            The principal component index to plot on the y axis, by default 2. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
+        nfeatures : int
+            The number of top absolute loadings features to label from each component, by default 20
+        add_labels : bool
+            Whether to add feature labels of the top `nfeatures` loadings. by default `True`.
+        add_lines : bool
+        If True, draw lines connecting the origin (0,0) to the points representing the top `nfeatures` loadings. Default is `False`.
+        scatter_kwargs : dict, optional
+            Additional keyword arguments for the matplotlib scatter function. By default None.
+
+        Returns
+        -------
+        None
+
+        """
+        scatter_kwargs = scatter_kwargs or {}
+
+        _validate_pca_loadings_plot_inputs(
+            data=data, loadings_name=loadings_name, dim=pc_x, dim2=pc_y, nfeatures=nfeatures
+        )
+
+        loadings = _prepare_loding_df_to_plot(
+            data=data, loadings_name=loadings_name, pc_x=pc_x, pc_y=pc_y, nfeatures=nfeatures
+        )
+
+        # plot the loadings of all features (used in PCA) first
+        scatter_kwargs.update({"alpha": 0.3, "s": 10, "edgecolors": "none"})
+
+        cls.scatter(
+            data=loadings,
+            x_column="dim1_loadings",
+            y_column="dim2_loadings",
+            ax=ax,
+            color="grey",
+            scatter_kwargs=scatter_kwargs,
+        )
+
+        loadings_top = loadings[loadings["is_top"]]
+
+        # plot the top features on top
+        scatter_kwargs.update({"alpha": 1, "s": 20, "edgecolors": "none"})
+
+        cls.scatter(
+            data=loadings_top,
+            x_column="dim1_loadings",
+            y_column="dim2_loadings",
+            ax=ax,
+            color="blue",
+            scatter_kwargs=scatter_kwargs,
+        )
+
+        # add labels to the top features
+        if add_labels:
+            label_plot(
+                ax=ax,
+                x_values=loadings_top["dim1_loadings"],
+                y_values=loadings_top["dim2_loadings"],
+                labels=loadings_top["feature"],
+                x_anchors=None,
+                label_kwargs={"fontsize": config["font_sizes"]["medium"], "ha": "center", "va": "bottom"},
+                line_kwargs={"color": BaseColors.get("black"), "linewidth": config["linewidths"]["medium"]},
+            )
+        # draw lines from the origin to the top features if specified
+        if add_lines:
+            for xi, yi in zip(loadings_top["dim1_loadings"], loadings_top["dim2_loadings"], strict=False):
+                ax.plot([0, xi], [0, yi], color="gray", linestyle="-", linewidth=0.2)
+
+        # set axis labels
+        label_axes(ax, xlabel=f"PC{pc_x}", ylabel=f"PC{pc_y}")
