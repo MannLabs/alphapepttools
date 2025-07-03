@@ -440,15 +440,33 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
         adata.layers[to_layer] = result
 
 
+# TODO: Abstract class for validation of AnnData objects?
+def _validate_adata_for_completeness_filter(
+    adata: ad.AnnData,
+) -> None:
+    """Validate AnnData object for data completeness filtering"""
+    if not isinstance(adata, ad.AnnData):
+        raise TypeError("adata must be an AnnData object.")
+
+    if adata.shape[1] == 0:
+        raise ValueError("adata has no features (columns).")
+
+    if not is_numeric_dtype(adata.X):
+        raise ValueError("adata.X must be numeric.")
+
+    if any(adata.obs.index.duplicated()):
+        raise ValueError("pp.filter_data_completeness(): Duplicated indices in obs")
+
+
 def filter_data_completeness(
     adata: ad.AnnData,
     max_missing: float,
     group_column: str | None = None,
     groups: list[str] | None = None,
 ) -> ad.AnnData:
-    """Filter data based on missing values
+    """Filter features based on missing values
 
-    Filter either features based on the fraction of missing values.
+    Filters AnnData features (columns) based on the fraction of missing values.
     If group_column and groups are provided, only missingness of certain metadata
     levels is considered. This is especially useful for imbalanced classes, where
     filtering by global missingness may leave too many missing values in the smaller
@@ -475,16 +493,12 @@ def filter_data_completeness(
     if max_missing < 0 or max_missing > 1:
         raise ValueError("Threshold must be between 0 and 1.")
 
-    if not is_numeric_dtype(adata.X):
-        raise ValueError("Data must be numeric.")
-
-    if any(adata.obs.index.duplicated()):
-        raise ValueError("pp.filter_data_completeness(): Duplicated indices in obs")
+    _validate_adata_for_completeness_filter(adata)
 
     # Resolve group indices
     if group_column:
         if group_column not in adata.obs.columns:
-            raise ValueError(f"Group column '{group_column}' not found in obs.")
+            raise ValueError(f"Group column '{group_column}' not found in obs, available: {adata.obs.columns}.")
 
         available_groups = set(adata.obs[group_column].unique())
         selected_groups = set(groups) if groups else available_groups
@@ -504,11 +518,10 @@ def filter_data_completeness(
 
     # Drop columns with too many missing values from data
     if drop.any():
-        n_total = drop.size
         adata = adata[:, ~drop].copy()
         n_dropped = drop.sum()
         logging.info(
-            f"pp.filter_data_completeness(): Dropped {n_dropped} / {n_total} features with >{max_missing:.2f} missing in any group."
+            f"pp.filter_data_completeness(): Dropped {n_dropped} / {drop.size} features with >{max_missing:.2f} missing in any group."
         )
 
     return adata
