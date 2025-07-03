@@ -2,12 +2,7 @@ import pytest
 
 from alphatools.tl.tools import get_id2gene_map, map_genes2pg
 
-
-# Test the get_id2gene_map function
-@pytest.fixture
-def example_fasta():
-    def make_dummy_data():
-        return """>tr|ID0|ID0_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN0 PE=1 SV=1
+DUMMY_FASTA = """>tr|ID0|ID0_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN0 PE=1 SV=1
 PEPTIDEKPEPTIDEK
 >tr|ID1|ID1_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN1 PE=1 SV=1
 PEPTIDEKPEPTIDEK
@@ -18,19 +13,54 @@ PEPTIDEKPEPTIDEK
 >tr|ID4|ID4_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN4 PE=1 SV=1
 PEPTIDEKPEPTIDEK"""
 
+
+@pytest.fixture
+def example_fasta():
+    def make_dummy_data():
+        return DUMMY_FASTA
+
     return make_dummy_data()
 
 
-# TODO: Implement with actual fasta file reading from path as well
+@pytest.fixture
+def example_fasta_file_path(tmp_path):
+    data = DUMMY_FASTA
+    fasta_file = tmp_path / "test.fasta"
+    fasta_file.write_text(data)
+    return fasta_file
+
+
+@pytest.fixture
+def example_fasta_file_string(tmp_path):
+    data = DUMMY_FASTA
+    fasta_file = tmp_path / "test.fasta"
+    fasta_file.write_text(data)
+    return str(fasta_file)
+
+
+# Test the get_id2gene_map function
 @pytest.mark.parametrize(
-    ("expected_dict"),
+    ("expected_dict", "source_type", "fasta_input"),
     [
-        {"ID0": "GN0", "ID1": "GN1", "ID2": "GN1", "ID3": "GN3", "ID4": "GN4"},
+        (
+            {"ID0": "GN0", "ID1": "GN1", "ID2": "GN1", "ID3": "GN3", "ID4": "GN4"},
+            "string",
+            "example_fasta",
+        ),
+        (
+            {"ID0": "GN0", "ID1": "GN1", "ID2": "GN1", "ID3": "GN3", "ID4": "GN4"},
+            "file",
+            "example_fasta_file_path",
+        ),
+        (
+            {"ID0": "GN0", "ID1": "GN1", "ID2": "GN1", "ID3": "GN3", "ID4": "GN4"},
+            "file",
+            "example_fasta_file_string",
+        ),
     ],
 )
-def test_get_id2gene_map(example_fasta, expected_dict):
-    id2gene = get_id2gene_map(example_fasta, source_type="string")
-
+def test_get_id2gene_map(request, expected_dict, source_type, fasta_input):
+    id2gene = get_id2gene_map(request.getfixturevalue(fasta_input), source_type=source_type)
     assert id2gene == expected_dict
 
 
