@@ -21,6 +21,7 @@ PEPTIDEKPEPTIDEK"""
     return make_dummy_data()
 
 
+# TODO: Implement with actual fasta file reading from path as well
 @pytest.mark.parametrize(
     ("expected_dict"),
     [
@@ -28,7 +29,7 @@ PEPTIDEKPEPTIDEK"""
     ],
 )
 def test_get_id2gene_map(example_fasta, expected_dict):
-    id2gene = get_id2gene_map(example_fasta)
+    id2gene = get_id2gene_map(example_fasta, source_type="string")
 
     assert id2gene == expected_dict
 

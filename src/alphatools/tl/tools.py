@@ -19,14 +19,24 @@ def umap() -> None:
 
 def get_id2gene_map(
     fasta_input: str | Path,
-) -> dict:
+    source_type: str = "file",
+) -> dict[str, str]:
     """Reannotate protein groups with gene names from a FASTA input.
 
     Parameters
     ----------
     fasta_input : str | Path
-        - If a Path or file path string, it's interpreted as a file path.
-        - If a plain FASTA string (multi-line with headers and sequences), it is parsed directly.
+        If source_type is 'file' (default), this is interpreted as a filepath to a FASTA file.
+        If source_type is 'string', this is parsed directly as a string-format fasta (multi-line with headers and sequences)
+    source_type : str, optional
+        Specifies the source type of the FASTA input, either 'file' or 'string'.
+        Defaults to 'file'.
+
+    Example for string FASTA input:
+    ">tr|ID0|ID0_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN0 PE=1 SV=1
+    PEPTIDEKPEPTIDEK
+    >tr|ID1|ID1_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN1 PE=1 SV=1
+    PEPTIDEKPEPTIDEK"
 
     Returns
     -------
@@ -36,32 +46,43 @@ def get_id2gene_map(
     """
     id2gene = {}
 
-    if isinstance(fasta_input, Path):
-        logging.info(f"Reading FASTA from file path: {fasta_input}")
-        handle = Path.open(fasta_input)
-    elif isinstance(fasta_input, str):
-        logging.info("Parsing FASTA from string content")
-        handle = StringIO(fasta_input)
+    if source_type not in ["file", "string"]:
+        raise ValueError("source_type must be either 'file' or 'string'.")
+
+    if not isinstance(fasta_input, str | Path):
+        raise TypeError("fasta_input must be a Path or string.")
+
+    if source_type == "file":
+        logging.info(f"Reading FASTA from file path: {fasta_input!s}")
+        # Context manager for path and string input
+        if isinstance(fasta_input, Path):
+            with fasta_input.open() as handle:
+                # Iterator to list while file is open
+                fasta_data = list(SeqIO.parse(handle, "fasta"))
+        else:
+            with Path(fasta_input).open() as handle:
+                fasta_data = list(SeqIO.parse(handle, "fasta"))
     else:
-        raise TypeError("fasta_input must be a valid file path or FASTA string.")
+        logging.info("Parsing FASTA from string content")
+        with StringIO(fasta_input) as handle:
+            fasta_data = list(SeqIO.parse(handle, "fasta"))
 
-    with handle:
-        fasta_data = SeqIO.parse(handle, "fasta")
-        for record in fasta_data:
-            uniprot_id = record.id.split("|")[1]
+    pattern = re.compile(r"GN=([^\s]+)")
+    for record in fasta_data:
+        uniprot_id = record.id.split("|")[1]
 
-            match = re.search(r"GN=([^\s]+)", record.description)
-            gene_name = match.group(1) if match else uniprot_id
-            id2gene[uniprot_id] = gene_name
+        match = re.search(pattern, record.description)
+        gene_name = match.group(1) if match else uniprot_id
+        id2gene[uniprot_id] = gene_name
 
     return id2gene
 
 
 def map_genes2pg(
     id2gene: dict,
-    protein_groups: list,
+    protein_groups: list[str],
     delimiter: str = ";",
-) -> list:
+) -> list[str]:
     """Map gene names to protein groups based
 
     Protein groups may consist of multiple UniProt IDs, separated by a delimiter.
