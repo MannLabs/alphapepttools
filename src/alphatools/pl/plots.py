@@ -788,7 +788,7 @@ class Plots:
         data : ad.AnnData
             AnnData to plot.
         ax : plt.Axes
-            Matplotlib axes object to plot on, add labels and logscale the y-axis.
+            Matplotlib axes object to plot on.
         pc_x : int
             The PC principal component index to plot on the x axis, by default 1. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
         pc_y : int
@@ -877,7 +877,7 @@ class Plots:
         data : ad.AnnData
             AnnData to plot.
         ax : plt.Axes
-            Matplotlib axes object to plot on, add labels and logscale the y-axis.
+            Matplotlib axes object to plot on.
         n_pcs : int,
             number of PCs to plot, by default 20
         pca_variance_layer_name : str,
@@ -934,7 +934,7 @@ class Plots:
         data : ad.AnnData
             AnnData to plot.
         ax : plt.Axes
-            Matplotlib axes object to plot on, add labels and logscale the y-axis.
+            Matplotlib axes object to plot on.
         loadings_name : str
             The name of the PCA loadings layer in the AnnData object (data.varm.keys), by default "PCs". Different name should be used in case `key_added` was specifically set in `pca()` function under `**pca_kwargs`.
         dim : int
@@ -999,7 +999,7 @@ class Plots:
         data : ad.AnnData
             AnnData to plot.
         ax : plt.Axes
-            Matplotlib axes object to plot on, add labels and logscale the y-axis.
+            Matplotlib axes object to plot on.
         loadings_name : str
             The name of the PCA loadings layer in the AnnData object (data.varm.keys), by default "PCs". Different name should be used in case `key_added` was specifically set in `pca()` function under `**pca_kwargs`.
         pc_x : int
@@ -1011,7 +1011,7 @@ class Plots:
         add_labels : bool
             Whether to add feature labels of the top `nfeatures` loadings. by default `True`.
         add_lines : bool
-        If True, draw lines connecting the origin (0,0) to the points representing the top `nfeatures` loadings. Default is `False`.
+            If True, draw lines connecting the origin (0,0) to the points representing the top `nfeatures` loadings. Default is `False`.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
 
