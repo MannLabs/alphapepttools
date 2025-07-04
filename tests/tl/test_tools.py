@@ -1,6 +1,6 @@
 import pytest
 
-from alphatools.tl.tools import get_id2gene_map, map_genes2pg
+from alphatools.tl.tools import get_id2gene_map, map_genes_to_protein_groups
 
 DUMMY_FASTA = """>tr|ID0|ID0_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN0 PE=1 SV=1
 PEPTIDEKPEPTIDEK
@@ -77,7 +77,9 @@ def example_protein_groups():
     ("id2gene", "expected_genes"),
     [({"ID0": "GN0", "ID1": "GN1", "ID2": "GN1", "ID3": "GN3", "ID4": "GN4"}, ["GN0", "GN1", "GN3;GN4"])],
 )
-def test_map_genes2pg(example_protein_groups, id2gene, expected_genes):
-    mapped_genes = map_genes2pg(id2gene=id2gene, protein_groups=example_protein_groups, delimiter=";")
+def test_map_genes_to_protein_groups(example_protein_groups, id2gene, expected_genes):
+    mapped_genes = map_genes_to_protein_groups(
+        id2gene_map=id2gene, protein_groups=example_protein_groups, delimiter=";"
+    )
 
     assert mapped_genes == expected_genes
