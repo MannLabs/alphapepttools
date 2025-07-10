@@ -91,10 +91,25 @@ def add_lines(
         )
 
 
-def _make_legend_patches(
+def make_legend_patches(
     color_dict: dict[str, str | tuple],
 ) -> list[mpl.patches.Patch]:
-    """Create legend patches for a matplotlib legend from a value-to-color mapping"""
+    """Create legend patches for a matplotlib legend from a value-to-color mapping
+
+    This is a helper function for the add_legend function.
+    Matplotlib legends display labelled patches with a defined color. This function
+    takes a dictionary of values and colors and returns a list of named patches.
+
+    Parameters
+    ----------
+    color_dict : dict[str, str | tuple]
+        Dictionary of values and colors.
+
+    Returns
+    -------
+    list[mpl.patches.Patch]
+        List of named patches.
+    """
     patches = []
     for value, color in color_dict.items():
         patches.append(
@@ -109,12 +124,14 @@ def _make_legend_patches(
     return patches
 
 
-def make_legend(
+def add_legend_to_axes_from_patches(
     ax: plt.Axes,
     patches: list[mpl.patches.Patch],
     **kwargs,
 ) -> None:
-    """Add a legend to a matplotlib axes object
+    """Make a legend and directly add it to a matplotlib axes object.
+
+    Expects a list of named patches.
 
     Parameters
     ----------
@@ -134,11 +151,11 @@ def make_legend(
 
     _legend = ax.legend(handles=patches, **kwargs)
 
-    # handle the title separately
+    # Resize legend title based on config legend title_size
     _legend.set_title(_legend.get_title().get_text(), prop={"size": config["legend"]["title_size"]})
 
 
-def add_legend(
+def add_legend_to_axes(
     ax: plt.Axes,
     levels: list[str] | dict[str, str | tuple] | None = None,
     legend: str | mpl.legend.Legend | None = "auto",
@@ -147,8 +164,12 @@ def add_legend(
 ) -> None:
     """Add a legend to an axis object.
 
-    If levels and palette are provided and legend is None, a legend is created automatically.
-    if legend is set to "auto", a legend is created from the levels and a default palette.
+    Handle legend creation in three ways:
+    1.: 'levels' is a dictionary of levels and colors, in which case these levels and colors are used directly.
+    2.: 'levels' is a list of levels, in which case a color palette is used to assign colors to levels. A custom
+    palette can be provided, otherwise a default palette is used.
+    3.: 'legend' is a matplotlib legend object, which overrides all other options and is added directly to the axes.
+    This defaults to 'auto', which directs to the first two cases.
 
     Parameters
     ----------
@@ -167,14 +188,13 @@ def add_legend(
         is passed as the `legend` parameter.
 
     """
-    # If legend is already a Legend object, just add it to the axes
     if isinstance(legend, mpl.legend.Legend):
         ax.add_artist(legend)
         return
     if legend == "auto":
         if isinstance(levels, dict):
-            patches = _make_legend_patches(levels)
-            make_legend(ax, patches, **legend_kwargs)
+            patches = make_legend_patches(levels)
+            add_legend_to_axes_from_patches(ax, patches, **legend_kwargs)
         elif isinstance(levels, list):
             levels = np.unique(levels)
             if palette is None:
@@ -182,8 +202,8 @@ def add_legend(
                 if len(levels) > len(palette):
                     palette = BasePalettes.get("sequential")
             color_dict = get_color_mapping(levels, palette)
-            patches = _make_legend_patches(color_dict)
-            make_legend(ax, patches, **legend_kwargs)
+            patches = make_legend_patches(color_dict)
+            add_legend_to_axes_from_patches(ax, patches, **legend_kwargs)
         else:
             logging.warning("No valid 'levels' parameter provided. Skipping legend creation.")
     else:
@@ -593,7 +613,7 @@ class Plots:
                 )
 
             if legend is not None:
-                add_legend(
+                add_legend_to_axes(
                     ax=ax,
                     levels=color_dict,
                     legend=legend,
@@ -687,7 +707,7 @@ class Plots:
         )
 
         if legend is not None:
-            add_legend(
+            add_legend_to_axes(
                 ax=ax,
                 levels=color_dict,
                 legend=legend,
