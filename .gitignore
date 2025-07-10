@@ -21,6 +21,6 @@ __pycache__/
 /docs/_build/
 
 # misc
-/notebooks/example_outputs/
+/notebooks/example_outputs/*
 
 .idea/
