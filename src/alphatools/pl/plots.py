@@ -384,7 +384,7 @@ class Plots:
         hist_kwargs = hist_kwargs or {}
         legend_kwargs = legend_kwargs or {}
 
-        if not ax:
+        if ax is None:
             _, ax = create_figure(1, 1)
 
         values = _adata_column_to_array(data, value_column)
@@ -429,6 +429,7 @@ class Plots:
         x_column: str,
         color: str = "blue",
         color_column: str | None = None,
+        color_map_column: str | None = None,
         ax: plt.Axes | None = None,
         palette: list[str | tuple] | None = None,
         color_dict: dict[str, str | tuple] | None = None,
@@ -443,13 +444,17 @@ class Plots:
         Parameters
         ----------
         data : pd.DataFrame | ad.AnnData
-            Data to plot, must contain the x_column and y_column and optionally the color_column.
+            Data to plot, must contain the x_column and y_column and optionally the color_column or color_map_column.
         x_column : str
             Column in data to plot on the x-axis. Must contain numeric data.
         y_column : str
             Column in data to plot on the y-axis. Must contain numeric data.
+        color : str, optional
+            Color to use for the scatterplot. By default "blue".
         color_column : str, optional
-            Column in data to use for color encoding. By default None.
+            Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
+        color_map_column : str, optional
+            Column in data to use for color encoding. Overrides color parameter. By default None.
         ax : plt.Axes, optional
             Matplotlib axes object to plot on, if None a new figure is created. By default None.
         palette : list[str | tuple], optional
@@ -472,25 +477,32 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
         legend_kwargs = legend_kwargs or {}
+        DEFAULT_GROUP = "data"
 
-        if not ax:
+        if ax is None:
             _, axm = create_figure()
             ax = axm.next()
 
-        if color_column is None:
-            color_values = ["data"] * len(data)
-            color_dict = {"data": BaseColors.get(color)}
-        else:
+        # Handle color encoding: If there is an actual color column, simply color the points accordingly
+        if color_column is not None:
+            color_map_column = None
+            color_dict = None
             color_values = _adata_column_to_array(data, color_column)
-            palette = palette or BasePalettes.get("qualitative")
-            color_dict = color_dict or get_color_mapping(color_values, palette)
-            missing = set(pd.unique(color_values)) - set(color_dict)
+        # If there is a color map column, map its levels to a palette
+        elif color_map_column is not None:
+            color_levels = _adata_column_to_array(data, color_map_column)
+            color_dict = color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
+            missing = set(np.unique(color_levels)) - set(color_dict)
             for level in missing:
                 color_dict[level] = BaseColors.get("grey")
+            color_values = np.array([color_dict[level] for level in color_levels], dtype=object)
+        else:
+            color_dict = {DEFAULT_GROUP: BaseColors.get(color)}
+            color_values = np.array([color_dict[DEFAULT_GROUP]] * len(data))
 
-        # Handle ordering of plotting arrays: order by the frequency of the color column
-        counts = Counter(color_values)
-        order = np.argsort([counts[cv] for cv in color_values])[::-1]
+        # Handle ordering of plotting arrays by string: order by the frequency of the color column
+        counts = Counter([str(cv) for cv in color_values])
+        order = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
         x_values = _adata_column_to_array(data, x_column)[order]
         y_values = _adata_column_to_array(data, y_column)[order]
         color_values = np.array(color_values)[order]
@@ -498,11 +510,11 @@ class Plots:
         ax.scatter(
             x=x_values,
             y=y_values,
-            c=[color_dict[color] for color in color_values],
+            c=color_values,
             **scatter_kwargs,
         )
 
-        if legend is not None:
+        if legend is not None and color_dict is not None:
             add_legend(
                 ax=ax,
                 levels=color_dict,
@@ -550,6 +562,10 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
+        if ax is None:
+            _, axm = create_figure()
+            ax = axm.next()
+
         if layer != "X" and layer not in data.layers:
             raise ValueError(f"Layer {layer} not found in AnnData object")
 
@@ -569,7 +585,7 @@ class Plots:
             x_column="rank",
             y_column="median",
             color=color,
-            color_column=color_column,
+            color_map_column=color_column,
             legend=legend,
             palette=palette,
             color_dict=color_dict,

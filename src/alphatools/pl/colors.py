@@ -185,13 +185,8 @@ class BaseColors:
         alpha: float | None = None,
     ) -> tuple:
         """Get a default color by name, optionally lightened and/or with alpha"""
-        # First, avoid trying to map RGBA tuples to colors
-        if isinstance(color_name, tuple):
-            color = color_name
-        # Second, check if the color name is available in the defaults
-        elif color_name in cls.default_colors:
-            color = cls.default_colors[color_name]
-        # Third, try to get the color from matplotlib
+        if isinstance(color_name, str) and hasattr(cls, color_name):
+            color = getattr(cls, color_name, None)
         else:
             try:
                 color = mpl_colors.to_rgba(color_name)
