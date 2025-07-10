@@ -103,6 +103,23 @@ def _base_qualitative_colorscale() -> list:
     return picked_colors
 
 
+def rgba_to_hex(rgba: tuple[float, float, float, float]) -> str:
+    """Convert an RGBA tuple to a hex string with alpha
+
+    Parameters
+    ----------
+    rgba : tuple[float, float, float, float]
+        RGBA tuple to convert to hex, e.g. (0.204231, 0.406065, 0.666711, 1.0)
+
+    Returns
+    -------
+    str
+        Hex string with alpha, e.g. '#3468aaff'
+
+    """
+    return mpl.colors.rgb2hex((rgba[0], rgba[1], rgba[2], rgba[3]), keep_alpha=True)
+
+
 def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.colors.Colormap) -> dict:
     """Map values to colors
 
