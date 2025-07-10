@@ -24,13 +24,14 @@ classifiers = [
 ]
 dependencies = [
   # this is the 'data_downloader_improvements' branch with all the anndata code
-  "alphabase @ git+https://github.com/MannLabs/alphabase@2a2c22ebef6e3b074cc8f4f00db85f8c176b2166",
+  "alphabase @ git+https://github.com/MannLabs/alphabase@95a1cd9beafc13dfde09f813984eb1f77e3a60bc", # TODO point to next release
   "anndata==0.11.1",
   "cmcrameri==1.9",                                                                                 # TODO: remove this to optional dependencies?
   "matplotlib==3.10",
   "numpy<2",
   "pandas",                                                                                         # version to be fixed: 2.2.3
   "pyarrow",                                                                                        # version to be fixed: 19.0.1
+  "scanpy==1.10.4",
   "scikit-learn==1.5.1",
   # for debug logging (referenced from the issue template)
   "session-info==1",
@@ -124,6 +125,7 @@ lint.ignore = [
   "G004",
   "INP001",  # implicit namespace package.
   "ISC001",  #may cause conflicts when used with the formatter
+  "LOG015",  # call on root logger  # TODO remove soon
   "N806",    # Variable X in uppercase is commonplace in AnnData and should be allowed
   "NPY002",  # Replace legacy `np.random.normal` # TODO: remove soon
   "PD901",   # Avoid using the generic variable name `df` for DataFrames

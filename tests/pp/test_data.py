@@ -773,7 +773,7 @@ def data_test_completeness_filter():
 
 # test data completeness filtering
 @pytest.mark.parametrize(
-    ("expected_columns", "expected_rows", "max_missing", "axis"),
+    ("expected_columns", "expected_rows", "max_missing", "group_column", "groups"),
     [
         # 1. Check filtering of columns (features)
         # 1.1. Filter columns with 0.5 threshold
@@ -781,57 +781,131 @@ def data_test_completeness_filter():
             ["A", "B", "C"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
             0.5,
-            1,
+            None,
+            None,
         ),
         # 1.2. Filter columns with 0.6 threshold so that one value lies exactly on the threshold --> this should be kept since ">" is used
         (
             ["A", "B", "C", "D"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
             0.6,
-            1,
+            None,
+            None,
         ),
         # 1.3. Filter columns with 1.0 threshold: keep all columns
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
             1.0,
-            1,
+            None,
+            None,
         ),
         # 1.4. Filter columns with 0.0 threshold: remove columns with any missing values
         (
             ["A"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
             0.0,
-            1,
+            None,
+            None,
         ),
-        # 2. Check filtering of rows (samples)
-        # 2.1. Filter rows with 0.5 threshold
+        # 2. Group-wise filtering
+        # 2.1. Group by 'batch' and filter columns with 0.5 threshold
         (
-            ["A", "B", "C", "D", "E"],
-            ["cell3", "cell4", "cell5"],
+            ["A", "B"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
             0.5,
-            0,
+            "batch",
+            None,
         ),
-        # 2.2. Filter rows with 0.6 threshold so that one value lies exactly on the threshold --> this should be kept since ">" is used
-        (
-            ["A", "B", "C", "D", "E"],
-            ["cell2", "cell3", "cell4", "cell5"],
-            0.6,
-            0,
-        ),
-        # 2.3. Filter rows with 1.0 threshold: keep all rows
+        # 2.2. Group by 'batch' and filter columns with 1.0 threshold: keep all columns
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
             1.0,
-            0,
+            "batch",
+            None,
         ),
-        # 2.4. Filter rows with 0.0 threshold: remove rows with any missing values
+        # 2.3. Group by 'batch' and filter columns with 0.0 threshold: remove columns with any missing values in either batch
+        (
+            ["A"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            0.0,
+            "batch",
+            None,
+        ),
+        # 3. Group-wise filtering with specific groups
+        # 3.1. Group by 'batch' and filter only batch '2' with 0.5 threshold
         (
             ["A", "B", "C", "D", "E"],
-            ["cell5"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            0.5,
+            "batch",
+            ["2"],
+        ),
+        # 3.2. Group by 'batch' and filter only batch '2' with 1.0 threshold: keep all columns
+        (
+            ["A", "B", "C", "D", "E"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            1.0,
+            "batch",
+            ["2"],
+        ),
+        # 3.3. Group by 'batch' and filter only batch '2' with 0.0 threshold: remove columns with any missing values in that group
+        (
+            ["A", "B", "C", "D"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
             0.0,
-            0,
+            "batch",
+            ["2"],
+        ),
+        # 3.4. Group by 'batch' and filter only batch '1' with 0.5 threshold
+        (
+            ["A", "B"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            0.5,
+            "batch",
+            ["1"],
+        ),
+        # 3.5. Group by 'batch' and filter only batch '1' with 1.0 threshold: keep all columns
+        (
+            ["A", "B", "C", "D", "E"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            1.0,
+            "batch",
+            ["1"],
+        ),
+        # 3.6. Group by 'batch' and filter only batch '1' with 0.0 threshold: remove columns with any missing values in that group
+        (
+            ["A"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            0.0,
+            "batch",
+            ["1"],
+        ),
+        # 4. Test with two groups specified (should be the same as when only the 'batch' column is specified)
+        # 4.1. Group by 'batch' and filter batches '1' and '2' with 0.5 threshold
+        (
+            ["A", "B"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            0.5,
+            "batch",
+            ["1", "2"],
+        ),
+        # 4.2. Group by 'batch' and filter batches '1' and '2' with 1.0 threshold: keep all columns
+        (
+            ["A", "B", "C", "D", "E"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            1.0,
+            "batch",
+            ["1", "2"],
+        ),
+        # 4.3. Group by 'batch' and filter batches '1' and '2' with 0.0 threshold: remove columns with any missing values in that group
+        (
+            ["A"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            0.0,
+            "batch",
+            ["1", "2"],
         ),
     ],
 )
@@ -840,7 +914,8 @@ def test_filter_data_completeness(
     expected_columns,
     expected_rows,
     max_missing,
-    axis,
+    group_column,
+    groups,
 ):
     # given
     adata = data_test_completeness_filter.copy()
@@ -849,7 +924,8 @@ def test_filter_data_completeness(
     adata_filtered = at.pp.filter_data_completeness(
         adata=adata,
         max_missing=max_missing,
-        axis=axis,
+        group_column=group_column,
+        groups=groups,
     )
 
     # then
