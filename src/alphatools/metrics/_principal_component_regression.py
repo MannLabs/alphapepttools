@@ -64,15 +64,20 @@ def principal_component_regression(
     pca_key: str = "X_pca",
     pca_key_uns: str = "pca",
 ) -> float:
-    r"""Compute principal component regression
+    r"""Compute principal component regression (PCR) score.
 
-    Computes correlation between covariate of interest C and principal components 1, ..., n_components
-    The total variance explained in the latent space is derived by component-wise computation of the
-    variance explained and multiplying with the total variance explained by this commponent Var(PC_n)
+    Estimates how much of the variation in a given covariate is captured in PCA space,
+    based on the correlation between the covariate and each principal component (PC).
+    The final score is computed as a weighted sum of squared correlations between the covariate
+    and the first `n_components` PCs, with weights given by the variance explained by each PC:
 
     .. math::
 
-        \mathrm{PCR} = \sum_{n=1}^{N}{\left( \mathrm{PCC}(C, PC_n)^2 \cdot \mathrm{Var}(PC_n) \right)}
+        \mathrm{PCR} = \sum_{n=1}^{N} \left( \mathrm{PCC}(C, PC_n)^2 \cdot \mathrm{Var}(PC_n) \right)
+
+    where :math:`\mathrm{PCC}(C, PC_n)` is the Pearson correlation coefficient between the covariate :math:`C`
+    and the :math:`n`-th principal component, and :math:`\mathrm{Var}(PC_n)` is the proportion of variance explained
+    by that component.
 
     Parameters
     ----------
@@ -90,8 +95,9 @@ def principal_component_regression(
 
     Returns
     -------
-    Principal component regression
-        Aggregated explained variance of covariate in Principal Component Space
+    float
+        Principal component regression score: an estimate of how much variance in the covariate
+        is explained by the principal components.
 
     Raises
     ------
@@ -100,8 +106,9 @@ def principal_component_regression(
     TypeError
         If `covariate` dtype is not numeric or categorical
 
-    Usage
-    -----
+
+    Example
+    -------
 
     .. code-block:: python
 
@@ -118,12 +125,13 @@ def principal_component_regression(
 
     Notes
     -----
-    As discussed in the original publication (Büttner et al, 2019), principal component regression assumes a
-    linear relationship between batch effect and each principal component, which might not be valid. As this implementation also
-    considers spurious correlations, it might overestimate the actual batch effect.
+    As originally discussed in Büttner et al. (2019), principal component regression assumes
+    a linear relationship between the covariate and the principal components. This assumption may not hold in all cases.
+    Furthermore, because this method captures both true and spurious correlations, it can potentially overestimate
+    the contribution of the covariate to variation in PCA space.
 
-    See Also
-    --------
+    References
+    ----------
     - Luecken, M.D., Büttner, M., Chaichoompu, K. et al. Benchmarking atlas-level data integration in single-cell genomics. Nat Methods 19, 41-50 (2022). https://doi.org/10.1038/s41592-021-01336-8
     - Büttner, M., Miao, Z., Wolf, F.A. et al. A test metric for assessing single-cell RNA-seq batch correction. Nat Methods 16, 43-49 (2019). https://doi.org/10.1038/s41592-018-0254-1
     """
