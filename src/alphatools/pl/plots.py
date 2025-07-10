@@ -419,7 +419,7 @@ def _validate_pca_loadings_plot_inputs(
         )
 
 
-def _prepare_loding_df_to_plot(
+def _prepare_loading_df_to_plot(
     data: ad.AnnData,
     loadings_name: str,
     pc_x: int,
@@ -1026,7 +1026,7 @@ class Plots:
             data=data, loadings_name=loadings_name, dim=pc_x, dim2=pc_y, nfeatures=nfeatures
         )
 
-        loadings = _prepare_loding_df_to_plot(
+        loadings = _prepare_loading_df_to_plot(
             data=data, loadings_name=loadings_name, pc_x=pc_x, pc_y=pc_y, nfeatures=nfeatures
         )
 
