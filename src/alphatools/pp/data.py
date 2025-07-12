@@ -79,6 +79,7 @@ def add_metadata(  # noqa: C901, PLR0912
                 of both adata.obs and adata.var is always the index.
 
     """
+    # Basic checks
     if axis not in [0, 1]:
         raise ValueError("Axis must be 0 or 1.")
 
@@ -93,32 +94,33 @@ def add_metadata(  # noqa: C901, PLR0912
     # set join type
     join = "left" if keep_data_shape else "inner"
 
-    # if existing metadata should be kept and new metadata contains synonymous fields to existing metadata, drop incoming fields
+    ### Handle alignment of incoming and existing metadata
     if keep_existing_metadata:
-        if axis == 0:
-            inplace_metadata = adata.obs
-        elif axis == 1:
-            inplace_metadata = adata.var
+        inplace_metadata = adata.obs if axis == 0 else adata.var
 
-        # handle overlapping metadata columns
+        # if existing metadata should be kept and new metadata contains synonymous fields to existing metadata, drop incoming fields
         incoming_metadata = _handle_overlapping_columns(incoming_metadata, inplace_metadata, verbose=verbose)
 
         # join new to existing metadata; same join logic as for data
         if verbose:
             logging.info(f"pp.add_metadata(): Join incoming to existing metadata via {join} join on axis  {axis}.")
+
         incoming_metadata = inplace_metadata.join(incoming_metadata, how=join)
 
-        # Align the existing data to the new metadata
-        adata = adata[incoming_metadata.index, :] if axis == 0 else adata[:, incoming_metadata.index]
+    ### Emulate join on AnnData level without copying
+    # 1. Reindex the AnnData object for inner join
+    if join == "inner":
+        existing_fields = adata.obs.index if axis == 0 else adata.var.index
+        shared_fields = existing_fields.intersection(incoming_metadata.index)
+        adata = adata[shared_fields, :] if axis == 0 else adata[:, shared_fields]
 
-    # TODO: streamline logic below
-    # 1. align the new metadata to obs or var under the proper join
+    # 2. Align the new metadata to obs or var of the AnnData object
     if axis == 0:
         incoming_metadata = incoming_metadata.reindex(adata.obs.index)
     elif axis == 1:
         incoming_metadata = incoming_metadata.reindex(adata.var.index)
 
-    # 2. use the [] method to subset the adata object inplace based on the obs and incoming indices
+    # 3. use the [] method to subset the adata object inplace based on the obs and incoming indices
     if axis == 0:
         bool_mask = adata.obs.index.isin(incoming_metadata.index)
         adata = adata[bool_mask, :]
@@ -126,13 +128,13 @@ def add_metadata(  # noqa: C901, PLR0912
         bool_mask = adata.var.index.isin(incoming_metadata.index)
         adata = adata[:, bool_mask]
 
-    # 3. reindex the incoming metadata to match the adata object's obs or var index
+    # 4. reindex the incoming metadata to match the adata object's obs or var index
     if axis == 0:
         incoming_metadata = incoming_metadata.reindex(adata.obs.index)
     elif axis == 1:
         incoming_metadata = incoming_metadata.reindex(adata.var.index)
 
-    # 4. assign the new metadata to the adata object's obs or var attribute
+    # 5. assign the new metadata to the adata object's obs or var attribute
     if axis == 0:
         if not adata.obs.index.equals(incoming_metadata.index):
             raise ValueError("Index mismatch between data and metadata.")

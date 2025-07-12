@@ -78,11 +78,12 @@ def example_anndata():
         "expected_data",
         "expected_sample_metadata",
         "expected_feature_metadata",
-        "keep_data_shape",
-        "keep_existing_metadata",
+        "metadata_size",  # 1 = incoming metadata has more keys than existing metadata; 0 = existing metadata has more keys than incoming metadata.
+        "keep_data_shape",  # 1 = keep data shape, i.e. pad incoming metadata if it is missing keys; 0 = subset entire adata object to incoming keys.
+        "keep_existing_metadata",  # 1 = append incoming metadata to existing metadata; 0 = overwrite existing metadata with incoming metadata.
     ),
     [
-        # add sample and feature metadata to data and keep only data shape
+        # 1.: 100
         (
             pd.DataFrame(
                 {"G1": [1, 2, 3], "G2": [4, 5, 6], "G3": [7, 8, 9]},
@@ -99,30 +100,32 @@ def example_anndata():
                 },
                 index=["G1", "G2", "G3"],
             ),
-            False,
-            False,
+            1,
+            0,
+            0,
         ),
-        # Add metadata with left join to data, which forces metadata to be padded with NAs
+        # 2.: 110
         (
             pd.DataFrame(
                 {"G1": [1, 2, 3], "G2": [4, 5, 6], "G3": [7, 8, 9]},
                 index=["cell1", "cell2", "cell3"],
             ),
             pd.DataFrame(
-                {"cell_type": ["A", np.nan, "C"], "batch": ["1", np.nan, "3"]},
+                {"cell_type": ["A", "B", "C"], "batch": ["1", "2", "3"]},
                 index=["cell1", "cell2", "cell3"],
             ),
             pd.DataFrame(
                 {
-                    "gene_name": ["gene1", np.nan, "gene3"],
-                    "UniProtID": ["P12345", np.nan, "P34567"],
+                    "gene_name": ["gene1", "gene2", "gene3"],
+                    "UniProtID": ["P12345", "P23456", "P34567"],
                 },
                 index=["G1", "G2", "G3"],
             ),
-            True,
-            False,
+            1,
+            1,
+            0,
         ),
-        # add metadata with inner join to already existing metadata
+        # 3.: 101
         (
             pd.DataFrame(
                 {"G1": [1, 2, 3], "G2": [4, 5, 6], "G3": [7, 8, 9]},
@@ -140,10 +143,97 @@ def example_anndata():
                 },
                 index=["G1", "G2", "G3"],
             ),
-            False,
-            True,
+            1,
+            0,
+            1,
         ),
-        # add metadata with left join to already existing metadata
+        # 4.: 111
+        (
+            pd.DataFrame(
+                {"G1": [1, 2, 3], "G2": [4, 5, 6], "G3": [7, 8, 9]},
+                index=["cell1", "cell2", "cell3"],
+            ),
+            pd.DataFrame(
+                {"batch_new": ["11", "22", "33"], "cell_type": ["A", "B", "C"], "batch": ["1", "2", "3"]},
+                index=["cell1", "cell2", "cell3"],
+            ),
+            pd.DataFrame(
+                {
+                    "UniProtID_new": ["P23456", "P34567", "P45678"],
+                    "gene_name": ["gene1", "gene2", "gene3"],
+                    "UniProtID": ["P12345", "P23456", "P34567"],
+                },
+                index=["G1", "G2", "G3"],
+            ),
+            1,
+            1,
+            1,
+        ),
+        # 5.: 000
+        (
+            pd.DataFrame(
+                {"G1": [1, 3], "G3": [7, 9]},
+                index=["cell1", "cell3"],
+            ),
+            pd.DataFrame(
+                {"cell_type": ["A", "C"], "batch": ["1", "3"]},
+                index=["cell1", "cell3"],
+            ),
+            pd.DataFrame(
+                {
+                    "gene_name": ["gene1", "gene3"],
+                    "UniProtID": ["P12345", "P34567"],
+                },
+                index=["G1", "G3"],
+            ),
+            0,
+            0,
+            0,
+        ),
+        # 6.: 010
+        (
+            pd.DataFrame(
+                {"G1": [1, 2, 3], "G2": [4, 5, 6], "G3": [7, 8, 9]},
+                index=["cell1", "cell2", "cell3"],
+            ),
+            pd.DataFrame(
+                {"cell_type": ["A", np.nan, "C"], "batch": ["1", np.nan, "3"]},
+                index=["cell1", "cell2", "cell3"],
+            ),
+            pd.DataFrame(
+                {
+                    "gene_name": ["gene1", np.nan, "gene3"],
+                    "UniProtID": ["P12345", np.nan, "P34567"],
+                },
+                index=["G1", "G2", "G3"],
+            ),
+            0,
+            1,
+            0,
+        ),
+        # 7.: 001
+        (
+            pd.DataFrame(
+                {"G1": [1, 3], "G3": [7, 9]},
+                index=["cell1", "cell3"],
+            ),
+            pd.DataFrame(
+                {"batch_new": ["11", "33"], "cell_type": ["A", "C"], "batch": ["1", "3"]},
+                index=["cell1", "cell3"],
+            ),
+            pd.DataFrame(
+                {
+                    "UniProtID_new": ["P23456", "P45678"],
+                    "gene_name": ["gene1", "gene3"],
+                    "UniProtID": ["P12345", "P34567"],
+                },
+                index=["G1", "G3"],
+            ),
+            0,
+            0,
+            1,
+        ),
+        # 8.: 011
         (
             pd.DataFrame(
                 {"G1": [1, 2, 3], "G2": [4, 5, 6], "G3": [7, 8, 9]},
@@ -161,8 +251,9 @@ def example_anndata():
                 },
                 index=["G1", "G2", "G3"],
             ),
-            True,
-            True,
+            0,
+            1,
+            1,
         ),
     ],
 )
@@ -173,19 +264,26 @@ def test_add_metadata(
     expected_data,
     expected_sample_metadata,
     expected_feature_metadata,
+    metadata_size,
     keep_data_shape,
     keep_existing_metadata,
 ):
     """"""
-    # get input datasets
-    if not keep_data_shape:
+
+    # Restrict example metadata to the required size
+    if metadata_size == 1:
         df = example_data.copy()
         sample_metadata = example_sample_metadata.copy()
         feature_metadata = example_feature_metadata.copy()
-    else:
+    elif metadata_size == 0:
         df = example_data.copy()
-        sample_metadata = example_sample_metadata.copy().iloc[:2, :]  # keep samples cell1 and cell3
-        feature_metadata = example_feature_metadata.copy().iloc[:2, :]  # keep features G1 and G3
+        sample_metadata = example_sample_metadata.loc[["cell1", "cell3"], :].copy()
+        feature_metadata = example_feature_metadata.loc[["G1", "G3"], :].copy()
+
+    # create original copies of the data and metadata to assert that the following operations do not change them
+    df_original = df.copy()
+    sample_metadata_original = sample_metadata.copy()
+    feature_metadata_original = feature_metadata.copy()
 
     # create AnnData object (this would already be done during data loading; here substituted with a private method)
     adata = _to_anndata(df)
@@ -195,7 +293,6 @@ def test_add_metadata(
     adata.var = pd.DataFrame({"UniProtID_new": ["P23456", "P34567", "P45678"]}, index=["G1", "G2", "G3"])
 
     # Add metadata to data
-    # when
     adata = at.pp.add_metadata(
         adata, sample_metadata, axis=0, keep_data_shape=keep_data_shape, keep_existing_metadata=keep_existing_metadata
     )
@@ -203,24 +300,19 @@ def test_add_metadata(
         adata, feature_metadata, axis=1, keep_data_shape=keep_data_shape, keep_existing_metadata=keep_existing_metadata
     )
 
-    # check whether data was correctly added and aligned
-    df_aligned = adata.to_df()
-    sample_metadata_aligned = adata.obs
-    feature_metadata_aligned = adata.var
-
     # main tests for data, sample-, and feature metadata
-    assert df_aligned.equals(expected_data), "Data should be aligned with sample and feature metadata"
-    assert sample_metadata_aligned.equals(expected_sample_metadata), "Sample metadata should be aligned with data"
-    assert feature_metadata_aligned.equals(expected_feature_metadata), "Feature metadata should be aligned with data"
+    assert adata.to_df().equals(expected_data), "Data should be aligned with sample and feature metadata"
+    assert adata.obs.equals(expected_sample_metadata), "Sample metadata should be aligned with data"
+    assert adata.var.equals(expected_feature_metadata), "Feature metadata should be aligned with data"
 
     # assert whether input data was changed
-    assert df.equals(example_data), "Data should not be changed by adding it to Data object"
-    assert sample_metadata.equals(
-        example_sample_metadata if not keep_data_shape else example_sample_metadata.iloc[:2, :]
-    ), "Sample metadata should not be changed by adding it to Data object"
-    assert feature_metadata.equals(
-        example_feature_metadata if not keep_data_shape else example_feature_metadata.iloc[:2, :]
-    ), "Feature metadata should not be changed by adding it to Data object"
+    assert df_original.equals(example_data), "Data should not be changed by adding it to Data object"
+    assert sample_metadata.equals(sample_metadata_original), (
+        "Sample metadata should not be changed by adding it to Data object"
+    )
+    assert feature_metadata.equals(feature_metadata_original), (
+        "Feature metadata should not be changed by adding it to Data object"
+    )
 
 
 # Test proper failing behavior if resulting anndata object would be empty
