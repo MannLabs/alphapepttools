@@ -26,6 +26,8 @@ def impute_gaussian(
     feature mean and has a standard deviation of std_factor * feature standard deviation.
     The function returns a copy of the AnnData object with imputed values in place of NaNs.
 
+    If a column is entirely missing, replace nans with 0.
+
     Parameters
     ----------
     adata : anndata.AnnData
@@ -58,9 +60,15 @@ def impute_gaussian(
     rng = np.random.default_rng(random_state)
     na_col_idxs = np.where(np.isnan(X).sum(axis=0) > 0)[0]
 
-    # generate corresponding downshifted features
+    # Mean and std of data columns
     stds = np.nanstd(X, axis=0)
     means = np.nanmean(X, axis=0)
+
+    # replace nans with 0. This means that entirely missing columns will be replaced with 0.
+    stds[np.isnan(stds)] = 0
+    means[np.isnan(means)] = 0
+
+    # generate corresponding downshifted features
     shifted_means = means - std_offset * stds
     shifted_stds = stds * std_factor
 
