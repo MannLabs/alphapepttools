@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alphatools.pp.transform import nanlog
+from alphatools.pp.transform import check_data_integrity, nanlog
 
 # Suppress warnings about conversion to numpy arrays: inputs are ints and get
 # converted to floats by AnnData upon storing the dataframe.
@@ -166,3 +166,52 @@ def test_nanlog(log_dummy_data, base, input_type, expected):
         result = [nanlog(log_dummy_data.to_df()[col].to_numpy(), base) for col in log_dummy_data.to_df().columns]
         for res, exp in zip(result, expected, strict=False):
             np.testing.assert_array_equal(res, exp)
+
+
+@pytest.mark.parametrize(
+    ("base", "input", "expected_error"),
+    [
+        (0, np.array([0, 1]), ValueError),
+        (1, np.array([0, 1]), ValueError),
+        (-1, np.array([0, 1]), ValueError),
+        (2, "invalid_input", TypeError),
+    ],
+)
+def test_nanlog_errors(base, input_data, expected_error):
+    """Test nanlog function for invalid base values."""
+    with pytest.raises(expected_error):
+        nanlog(input_data, base)
+
+
+@pytest.mark.parametrize(
+    ("input", "expected_mask", "verbosity", "expect_warnings"),
+    [
+        (
+            np.array([np.nan, 0, -1, np.inf, -np.inf, 1, 2.1]),
+            np.array([True, True, True, True, True, False, False]),
+            0,
+            False,
+        ),
+        (
+            np.array([np.nan, 0, -1, np.inf, -np.inf, 1, 2.1]),
+            np.array([True, True, True, True, True, False, False]),
+            1,
+            True,
+        ),
+    ],
+)
+def test_check_data_integrity(input_data, expected_mask, verbosity, expect_warnings, caplog):
+    """Test check_data_integrity function."""
+
+    if not expect_warnings:
+        result_mask = check_data_integrity(input_data, verbosity=verbosity)
+        np.testing.assert_array_equal(result_mask, expected_mask)
+    else:
+        with caplog.at_level("WARNING"):
+            result_mask = check_data_integrity(input_data, verbosity=verbosity)
+
+        assert "1 nan values in the data." in caplog.text
+        assert "1 zero values in the data." in caplog.text
+        assert "2 negative values in the data." in caplog.text
+        assert "1 inf values in the data." in caplog.text
+        assert "1 negative_inf values in the data." in caplog.text

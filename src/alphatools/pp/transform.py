@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def check_data_integrity(
-    data: np.ndarray | pd.DataFrame | pd.Series,
+    data: np.ndarray,
     verbosity: int = 0,
 ) -> np.ndarray:
     """Detect nonstandard data inputs.
@@ -28,7 +28,7 @@ def check_data_integrity(
 
     Parameters
     ----------
-    data : np.ndarray | pd.DataFrame | pd.Series
+    data : np.ndarray
         Input data to check for nonstandard values.
     verbosity : int, default 0
         If 1, log warnings for nonstandard values found in the data.
@@ -39,6 +39,9 @@ def check_data_integrity(
         A boolean mask indicating the positions of nonstandard values in the data.
         True indicates a nonstandard value.
     """
+    if not isinstance(data, np.ndarray):
+        raise TypeError("Input data must be a numpy.ndarray.")
+
     data_status = {}
 
     data_status["nan"] = np.isnan(data)
@@ -93,6 +96,9 @@ def nanlog(
     if not isinstance(data, np.ndarray | pd.DataFrame | pd.Series | ad.AnnData):
         raise TypeError("Input must be a anndata.AnnData, numpy.ndarray, pandas.DataFrame or pandas.Series.")
 
+    if base in {0, 1} or base < 0:
+        raise ValueError("Base cannot be 0 (divide by -Inf) or 1 (divide by 0) or negative (invalid log).")
+
     data = data.copy()
 
     def _log_func(
@@ -100,9 +106,6 @@ def nanlog(
         base: float,
     ) -> np.ndarray | pd.DataFrame | pd.Series:
         """Apply logarithm transformation; for base 2 and 10 use dedicated numpy functions"""
-        if base in {0, 1} or base < 0:
-            raise ValueError("Base cannot be 0 (divide by -Inf) or 1 (divide by 0) or negative (invalid log).")
-
         if base == 2:  # NOQA: PLR2004, log2 is standard jargon
             return np.log2(x)
         if base == 10:  # NOQA: PLR2004, log10 is standard jargon
@@ -114,7 +117,7 @@ def nanlog(
         nanmask = check_data_integrity(data.X, verbosity)
         data.X = _log_func(np.where(~nanmask, data.X, np.nan), base)
     elif isinstance(data, pd.DataFrame | pd.Series):
-        nanmask = check_data_integrity(data, verbosity)
+        nanmask = check_data_integrity(data.to_numpy(), verbosity)
         data = _log_func(data.where(~nanmask, np.nan), base)
     else:
         nanmask = check_data_integrity(data, verbosity)
