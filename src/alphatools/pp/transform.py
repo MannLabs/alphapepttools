@@ -1,63 +1,123 @@
 # Data transformations
 
 
+import logging
+
 import anndata as ad
 import numpy as np
 import pandas as pd
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def nanlog(
-    data: ad.AnnData | np.ndarray | pd.DataFrame | pd.Series,
-    log: int = 2,
-) -> np.array:
-    """Wrapper for nplog() functions.
 
-    Replace zeros and negatives with nan and return either log2 or log10 transformed values.
+def check_data_integrity(
+    data: np.ndarray | pd.DataFrame | pd.Series,
+    verbosity: int = 0,
+) -> np.ndarray:
+    """Detect nonstandard data inputs.
+
+    Current nonstandard values include:
+    - NaN values
+    - Zero values
+    - Negative values
+    - Positive infinity
+    - Negative infinity
+
+    If `warn` is True, log warnings for found nonstandard values.
 
     Parameters
     ----------
-    x : np.array | pd.DataFrame | pd.Series
-        Input data; negatives and/or zeros are converted to np.nan
-    log : int
-        Log-level, currently allowed values are 2 and 10.
+    data : np.ndarray | pd.DataFrame | pd.Series
+        Input data to check for nonstandard values.
+    verbosity : int, default 0
+        If 1, log warnings for nonstandard values found in the data.
 
     Returns
     -------
-    np.array:
-        array with log-transformed original values. Zeros
-        and negative values are replaced by np.nan.
+    np.ndarray
+        A boolean mask indicating the positions of nonstandard values in the data.
+        True indicates a nonstandard value.
+    """
+    data_status = {}
+
+    data_status["nan"] = np.isnan(data)
+    data_status["zero"] = data == 0
+    data_status["negative"] = data < 0
+    data_status["inf"] = data == np.inf
+    data_status["negative_inf"] = data == -np.inf
+
+    data_mask = np.zeros_like(data, dtype=bool)
+    for parameter, status in data_status.items():
+        if np.any(status):
+            if verbosity > 0:
+                logger.warning(f"Found {sum(status)} {parameter} values in the data.")
+            data_mask |= status
+
+    return data_mask
+
+
+def nanlog(
+    data: ad.AnnData | np.ndarray | pd.DataFrame | pd.Series,
+    base: int = 2,
+    verbosity: int = 0,
+) -> np.ndarray | pd.DataFrame | pd.Series | ad.AnnData:
+    """Logarithmize a data matrix.
+
+    Return log-transformed data, replacing zeros and other invalid values with np.nan.
+    Original data is not modified.
+
+    Current invalid values include:
+    - NaN values
+    - Zero values
+    - Negative values
+    - Positive infinity
+    - Negative infinity
+
+    Parameters
+    ----------
+    x : np.array | pd.DataFrame | pd.Series | anndata.AnnData
+        Input data; negatives and/or zeros are converted to np.nan
+    base : int
+        Base of the logarithm. Defaults to 2 (log2).
+    verbosity : int, default 0
+        If 1, log warnings for invalid values found in the data.
+
+    Returns
+    -------
+    np.array | pd.DataFrame | pd.Series | anndata.AnnData
+        Log-transformed data with invalid values replaced by np.nan.
+        The type of the returned data matches the input type.
 
     """
-    LOG_FUNCTIONS = {2: np.log2, 10: np.log10}
-
-    if not isinstance(data, ad.AnnData | pd.DataFrame | pd.Series | np.ndarray):
+    if not isinstance(data, np.ndarray | pd.DataFrame | pd.Series | ad.AnnData):
         raise TypeError("Input must be a anndata.AnnData, numpy.ndarray, pandas.DataFrame or pandas.Series.")
 
-    if log not in LOG_FUNCTIONS:
-        raise TypeError(f"'log' must be any of {LOG_FUNCTIONS.keys()}, but got {log}.")
-
-    # Copy for now to avoid inplace modifications TODO: add inplace option?
     data = data.copy()
 
-    # Prevent edgecases that cause downstream processing issues
-    def _sanitized_log_inputs(
-        data: np.ndarray | pd.DataFrame | pd.Series,
+    def _log_func(
+        x: np.ndarray | pd.DataFrame | pd.Series,
+        base: float,
     ) -> np.ndarray | pd.DataFrame | pd.Series:
-        """Sanitize inputs for log transformation."""
-        nanmask = np.isnan(data)
-        nanmask |= data == 0
-        nanmask |= data < 0
-        nanmask |= data == np.inf
-        nanmask |= data == -np.inf
+        """Apply logarithm transformation; for base 2 and 10 use dedicated numpy functions"""
+        if base in {0, 1} or base < 0:
+            raise ValueError("Base cannot be 0 (divide by -Inf) or 1 (divide by 0) or negative (invalid log).")
 
-        # Avoid inplace modification and copy warnings
-        if isinstance(data, pd.DataFrame | pd.Series):
-            return data.where(~nanmask, np.nan)
-        if isinstance(data, np.ndarray):
-            return np.where(~nanmask, data, np.nan)
-        raise TypeError("Unsupported data type for sanitization.")
+        if base == 2:  # NOQA: PLR2004, log2 is standard jargon
+            return np.log2(x)
+        if base == 10:  # NOQA: PLR2004, log10 is standard jargon
+            return np.log10(x)
+        return np.log(x) / np.log(base)
 
+    # Handle subtleties with filtering and assignment of different datatypes
     if isinstance(data, ad.AnnData):
-        data.X = LOG_FUNCTIONS[log](_sanitized_log_inputs(data.X))
-        return data
-    return LOG_FUNCTIONS[log](_sanitized_log_inputs(data))
+        nanmask = check_data_integrity(data.X, verbosity)
+        data.X = _log_func(np.where(~nanmask, data.X, np.nan), base)
+    elif isinstance(data, pd.DataFrame | pd.Series):
+        nanmask = check_data_integrity(data, verbosity)
+        data = _log_func(data.where(~nanmask, np.nan), base)
+    else:
+        nanmask = check_data_integrity(data, verbosity)
+        data = _log_func(np.where(~nanmask, data, np.nan), base)
+
+    return data
