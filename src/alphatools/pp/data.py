@@ -65,18 +65,29 @@ def add_metadata(  # noqa: C901, PLR0912
 ) -> ad.AnnData:
     """Add metadata to an AnnData object while checking for matching indices or shape
 
-        If axis is 0, assume metadata.index <-> data.index and add metadata as '.obs' attribute of the AnnData object.
-    If axis is 1, assume metadata.index <-> data.columns and add metadata as '.var' attribute of the AnnData object.
+    If axis is 0, assume metadata.index <-> data.index and add metadata as '.obs' of the AnnData object.
+    If axis is 1, assume metadata.index <-> data.columns and add metadata as '.var' of the AnnData object.
 
     Parameters
     ----------
         adata : ad.AnnData
                 Anndata object to add metadata to.
-
-        metadata : pd.DataFrame
+        incoming metadata : pd.DataFrame
                 Metadata dataframe to add. The matching entity is always the INDEX, depending on axis it is
-                matched against obs (axis = 0) or var (axis = 1). Correspondingly, the data-aligned dimension
-                of both adata.obs and adata.var is always the index.
+                matched against obs (axis = 0) or var (axis = 1).
+        axis : int
+                Axis to add metadata to. 0 for obs and 1 for var.
+        keep_data_shape : bool = False
+                If True, the incoming data is left-joined to the existing data, which may result in nan-padded
+                rows in the incoming data. If False, incoming data is added via inner join, which may change the
+                shape of the adata object.
+        keep_existing_metadata : bool = False
+                If True, incoming metadata is added to the existing metadata. If False, incoming metadata replaces
+                existing metadata. If columns between existing and incoming metadata are synonymous, the corresponding
+                incoming metadata columns are ignored.
+        verbose : bool = False
+                If True, print additional information about the operation.
+
 
     """
     # Basic checks
@@ -96,16 +107,16 @@ def add_metadata(  # noqa: C901, PLR0912
 
     ### Handle alignment of incoming and existing metadata
     if keep_existing_metadata:
-        inplace_metadata = adata.obs if axis == 0 else adata.var
+        existing_metadata = adata.obs if axis == 0 else adata.var
 
         # if existing metadata should be kept and new metadata contains synonymous fields to existing metadata, drop incoming fields
-        incoming_metadata = _handle_overlapping_columns(incoming_metadata, inplace_metadata, verbose=verbose)
+        incoming_metadata = _handle_overlapping_columns(incoming_metadata, existing_metadata, verbose=verbose)
 
         # join new to existing metadata; same join logic as for data
         if verbose:
             logging.info(f"pp.add_metadata(): Join incoming to existing metadata via {join} join on axis  {axis}.")
 
-        incoming_metadata = inplace_metadata.join(incoming_metadata, how=join)
+        incoming_metadata = existing_metadata.join(incoming_metadata, how=join)
 
     ### Emulate join on AnnData level without copying
     # 1. Reindex the AnnData object for inner join
