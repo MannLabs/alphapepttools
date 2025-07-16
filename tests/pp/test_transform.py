@@ -169,7 +169,7 @@ def test_nanlog(log_dummy_data, base, input_type, expected):
 
 
 @pytest.mark.parametrize(
-    ("base", "input", "expected_error"),
+    ("base", "input_data", "expected_error"),
     [
         (0, np.array([0, 1]), ValueError),
         (1, np.array([0, 1]), ValueError),
@@ -184,7 +184,7 @@ def test_nanlog_errors(base, input_data, expected_error):
 
 
 @pytest.mark.parametrize(
-    ("input", "expected_mask", "verbosity", "expect_warnings"),
+    ("input_data", "expected_mask", "verbosity", "expect_warnings"),
     [
         (
             np.array([np.nan, 0, -1, np.inf, -np.inf, 1, 2.1]),
