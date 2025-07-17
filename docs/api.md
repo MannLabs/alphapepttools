@@ -14,6 +14,8 @@
     pp.filter_data_completeness
     pp.load_diann_pg_matrix
     pp.scale_and_center
+    pp.nanlog
+    pp.check_data_integrity
     pp.normalize
     pp.pca
     pp.impute
