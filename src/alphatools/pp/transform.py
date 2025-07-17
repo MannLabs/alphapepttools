@@ -47,22 +47,22 @@ def detect_special_values(
     if not isinstance(data, np.ndarray):
         raise TypeError("Input data must be a numpy.ndarray.")
 
-    data_status = {}
+    special_values = {}
 
-    data_status["nan"] = np.isnan(data)
-    data_status["zero"] = data == 0
-    data_status["negative"] = data < 0
-    data_status["inf"] = data == np.inf
-    data_status["negative_inf"] = data == -np.inf
+    special_values["nan"] = np.isnan(data)
+    special_values["zero"] = data == 0
+    special_values["negative"] = data < 0
+    special_values["inf"] = data == np.inf
+    special_values["negative_inf"] = data == -np.inf
 
-    data_mask = np.zeros_like(data, dtype=bool)
-    for parameter, status in data_status.items():
+    special_values_mask = np.zeros_like(data, dtype=bool)
+    for parameter, status in special_values.items():
         if np.any(status):
             if verbosity > 0:
                 logger.warning(f"Found {sum(status.flatten())} {parameter} values in the data.")
-            data_mask |= status
+            special_values_mask |= status
 
-    return data_mask
+    return special_values_mask
 
 
 def nanlog(
@@ -118,7 +118,7 @@ def nanlog(
         return np.log(x) / np.log(base)
 
     # Handle subtleties with filtering and assignment of different datatypes
-    nanmask = detect_special_values(data.X, verbosity)
-    data.X = _log_func(np.where(~nanmask, data.X, np.nan), base)
+    special_values_mask = detect_special_values(data.X, verbosity)
+    data.X = _log_func(np.where(~special_values_mask, data.X, np.nan), base)
 
     return data
