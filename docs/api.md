@@ -15,7 +15,7 @@
     pp.load_diann_pg_matrix
     pp.scale_and_center
     pp.nanlog
-    pp.check_data_integrity
+    pp.detect_special_values
     pp.normalize
     pp.pca
     pp.impute

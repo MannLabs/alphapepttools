@@ -11,11 +11,16 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def check_data_integrity(
+def detect_special_values(
     data: np.ndarray,
     verbosity: int = 0,
 ) -> np.ndarray:
-    """Detect nonstandard data inputs.
+    """Detect special values such as NaN, zero, negative, and infinite values in the data.
+
+    This function checks for nonstandard values in the input data and returns a boolean mask indicating
+    their position. Additionally, it provides a log summary for the number and kind of nonstandard values found.
+    This function is useful for upfront checks of data integrity, e.g. prior to transformations or analyses like
+    PCA or clustering.
 
     Current nonstandard values include:
     - NaN values
@@ -54,21 +59,22 @@ def check_data_integrity(
     for parameter, status in data_status.items():
         if np.any(status):
             if verbosity > 0:
-                logger.warning(f"Found {sum(status)} {parameter} values in the data.")
+                logger.warning(f"Found {sum(status.flatten())} {parameter} values in the data.")
             data_mask |= status
 
     return data_mask
 
 
 def nanlog(
-    data: ad.AnnData | np.ndarray | pd.DataFrame | pd.Series,
+    data: ad.AnnData,
     base: int = 2,
-    verbosity: int = 0,
-) -> np.ndarray | pd.DataFrame | pd.Series | ad.AnnData:
+    verbosity: int = 1,
+) -> ad.AnnData:
     """Logarithmize a data matrix.
 
-    Return log-transformed data, replacing zeros and other invalid values with np.nan.
-    Original data is not modified.
+    Apply arbitrary base logarithm transformation to AnnData.X, replacing invalid values with np.nan.
+    Similar to the underlying numpy log functions, invalid values are replaced with np.nan, but a more
+    detailed summary of which values were replaced is provided.
 
     Current invalid values include:
     - NaN values
@@ -79,22 +85,21 @@ def nanlog(
 
     Parameters
     ----------
-    x : np.array | pd.DataFrame | pd.Series | anndata.AnnData
+    x : anndata.AnnData
         Input data; negatives and/or zeros are converted to np.nan
     base : int
         Base of the logarithm. Defaults to 2 (log2).
-    verbosity : int, default 0
+    verbosity : int, default 1
         If 1, log warnings for invalid values found in the data.
 
     Returns
     -------
-    np.array | pd.DataFrame | pd.Series | anndata.AnnData
+    anndata.AnnData
         Log-transformed data with invalid values replaced by np.nan.
-        The type of the returned data matches the input type.
 
     """
-    if not isinstance(data, np.ndarray | pd.DataFrame | pd.Series | ad.AnnData):
-        raise TypeError("Input must be a anndata.AnnData, numpy.ndarray, pandas.DataFrame or pandas.Series.")
+    if not isinstance(data, ad.AnnData):
+        raise TypeError("Input must be a anndata.AnnData.")
 
     if base in {0, 1} or base < 0:
         raise ValueError("Base cannot be 0 (divide by -Inf) or 1 (divide by 0) or negative (invalid log).")
@@ -113,14 +118,7 @@ def nanlog(
         return np.log(x) / np.log(base)
 
     # Handle subtleties with filtering and assignment of different datatypes
-    if isinstance(data, ad.AnnData):
-        nanmask = check_data_integrity(data.X, verbosity)
-        data.X = _log_func(np.where(~nanmask, data.X, np.nan), base)
-    elif isinstance(data, pd.DataFrame | pd.Series):
-        nanmask = check_data_integrity(data.to_numpy(), verbosity)
-        data = _log_func(data.where(~nanmask, np.nan), base)
-    else:
-        nanmask = check_data_integrity(data, verbosity)
-        data = _log_func(np.where(~nanmask, data, np.nan), base)
+    nanmask = detect_special_values(data.X, verbosity)
+    data.X = _log_func(np.where(~nanmask, data.X, np.nan), base)
 
     return data
