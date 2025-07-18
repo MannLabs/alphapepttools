@@ -537,7 +537,7 @@ class Plots:
         cls,
         data: pd.DataFrame | ad.AnnData,
         value_column: str,
-        color_column: str | None = None,
+        color_map_column: str | None = None,
         bins: int = 10,
         ax: plt.Axes | None = None,
         color: str = "blue",
@@ -593,11 +593,11 @@ class Plots:
 
         values = _adata_column_to_array(data, value_column)
 
-        if color_column is None:
+        if color_map_column is None:
             color = BaseColors.get(color)
             ax.hist(values, bins=bins, color=color, **hist_kwargs)
         else:
-            color_values = _adata_column_to_array(data, color_column)
+            color_values = _adata_column_to_array(data, color_map_column)
             palette = palette or BasePalettes.get("qualitative")
             color_dict = color_dict or get_color_mapping(color_values, palette)
             missing = set(np.unique(color_values)) - set(color_dict)
