@@ -224,7 +224,7 @@ def _drop_nans_from_plot_arrays(
 def _assign_nearest_anchor_position_to_values(
     values: np.ndarray,
     anchors: list[int | float] | np.ndarray | None,
-) -> list:
+) -> np.ndarray:
     if anchors is None:
         return values
 
@@ -235,7 +235,7 @@ def _assign_nearest_anchor_position_to_values(
         anchor_diffs = [abs(anchor - val) for anchor in anchors]
         anchored_values.append(anchors[np.argmin(anchor_diffs)])
 
-    return anchored_values
+    return np.array(anchored_values)
 
 
 def label_plot(
@@ -298,7 +298,7 @@ def label_plot(
     # determine label positions based on optional x_anchors
     if x_anchors is not None:
         # x-values are binned to the anchor positions
-        label_x_values = _assign_nearest_anchor_position_to_values(x_values, x_anchors)
+        anchored_x_values = _assign_nearest_anchor_position_to_values(x_values, x_anchors)
 
         # y-values should be distributed evenly between the min and max y-values at that anchor
         label_spacing_display = config["font_sizes"]["medium"] * y_padding_factor
@@ -311,19 +311,40 @@ def label_plot(
         _, upper_bound_in_data_coords = transform.transform((0, ax.get_window_extent().height * y_display_start))
 
         # Iterate over all unique x_anchors and assign y-values in data coordinates to the respective labels
-        label_y_values = []
-        for anchor in np.unique(label_x_values):
-            current_label_y_values = np.sort(y_values[np.array(label_x_values) == anchor])
-            label_y_values.extend(
-                [upper_bound_in_data_coords - y_spacing_in_data_coords * i for i in range(len(current_label_y_values))]
+        sorted_labels = []
+        sorted_data_x_values = []
+        sorted_data_y_values = []
+        sorted_label_x_values = []
+        sorted_label_y_values = []
+
+        for anchor_value in np.unique(anchored_x_values):
+            anchor_mask = anchored_x_values == anchor_value
+
+            sorted_labels.extend(list(labels[anchor_mask]))
+            sorted_data_x_values.extend(list(x_values[anchor_mask]))
+            sorted_data_y_values.extend(list(y_values[anchor_mask]))
+            sorted_label_x_values.extend(list([anchor_value] * np.sum(anchor_mask)))
+            sorted_label_y_values.extend(
+                [upper_bound_in_data_coords - y_spacing_in_data_coords * i for i in range(np.sum(anchor_mask))]
             )
+
     else:
-        label_x_values = x_values
-        label_y_values = y_values
+        sorted_labels = labels
+        sorted_data_x_values = x_values
+        sorted_data_y_values = y_values
+        sorted_label_x_values = x_values
+        sorted_label_y_values = y_values
 
     # generate lines from data values to label positions
     lines = []
-    for label, x, y, label_x, label_y in zip(labels, x_values, y_values, label_x_values, label_y_values, strict=False):
+    for label, x, y, label_x, label_y in zip(
+        sorted_labels,
+        sorted_data_x_values,
+        sorted_data_y_values,
+        sorted_label_x_values,
+        sorted_label_y_values,
+        strict=True,
+    ):
         lines.append(((x, label_x), (y, label_y), label))
 
     for line in lines:
@@ -537,7 +558,7 @@ class Plots:
         cls,
         data: pd.DataFrame | ad.AnnData,
         value_column: str,
-        color_column: str | None = None,
+        color_map_column: str | None = None,
         bins: int = 10,
         ax: plt.Axes | None = None,
         color: str = "blue",
@@ -557,7 +578,7 @@ class Plots:
             Data to plot, must contain the value_column and optionally the color_column.
         value_column : str
             Column in data to plot as histogram. Must contain numeric data.
-        color_column : str, optional
+        color_map_column : str, optional
             Column in data to use for color encoding. Overrides color parameter. By default None.
         bins : int, optional
             Number of bins to use for the histogram. By default 10.
@@ -593,11 +614,11 @@ class Plots:
 
         values = _adata_column_to_array(data, value_column)
 
-        if color_column is None:
+        if color_map_column is None:
             color = BaseColors.get(color)
             ax.hist(values, bins=bins, color=color, **hist_kwargs)
         else:
-            color_values = _adata_column_to_array(data, color_column)
+            color_values = _adata_column_to_array(data, color_map_column)
             palette = palette or BasePalettes.get("qualitative")
             color_dict = color_dict or get_color_mapping(color_values, palette)
             missing = set(np.unique(color_values)) - set(color_dict)
