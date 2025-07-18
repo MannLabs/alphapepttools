@@ -9,7 +9,17 @@
 .. autosummary::
     :toctree: generated
 
-    pp.basic_preproc
+    pp.add_metadata
+    pp.filter_by_metadata
+    pp.filter_data_completeness
+    pp.load_diann_pg_matrix
+    pp.scale_and_center
+    pp.nanlog
+    pp.detect_special_values
+    pp.normalize
+    pp.pca
+    pp.impute
+    pp.add_core_proteome_mask
 ```
 
 ## Tools
@@ -21,7 +31,22 @@
 .. autosummary::
     :toctree: generated
 
-    tl.basic_tool
+    tl.pca
+    tl.ttest
+    tl.umap
+```
+
+## Metrics
+
+```{eval-rst}
+.. module:: alphatools.metrics
+.. currentmodule:: alphatools
+
+.. autosummary::
+    :toctree: generated
+
+    metrics.principal_component_regression
+    metrics.pooled_median_absolute_deviation
 ```
 
 ## Plotting
@@ -33,6 +58,21 @@
 .. autosummary::
     :toctree: generated
 
-    pl.basic_plot
-    pl.BasicClass
+    pl.Plots
+    pl.add_lines
+    pl.label_plot
+```
+
+## IO
+
+### alphatools.io.anndata_factory
+
+```{eval-rst}
+.. module:: alphatools.io.anndata_factory
+.. currentmodule:: alphatools.io.anndata_factory
+
+.. autosummary::
+    :toctree: generated
+
+    AnnDataFactory
 ```
