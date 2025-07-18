@@ -10,11 +10,13 @@
 
 import colorsys
 import logging
+from typing import ClassVar
 
 import cmcrameri.cm as cmc
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from matplotlib import colors as mpl_colors
 from matplotlib.colors import Colormap
 
@@ -118,7 +120,7 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
         Dictionary mapping values to colors
 
     """
-    values = np.unique(values)
+    values = pd.unique(values)
 
     if isinstance(palette, list):
         _palette = _cycle_palette(palette, n=len(values))
@@ -127,7 +129,7 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
     else:
         raise TypeError("palette must be a list of colors or a matplotlib colormap")
 
-    return dict(zip(values, _palette, strict=False))
+    return dict(zip(values, _palette, strict=True))
 
 
 def _base_binary_colorscale() -> list:
@@ -143,34 +145,41 @@ class BaseColors:
     """Base colors for AlphaTools plots"""
 
     _colorscale = _base_qualitative_colorscale()
-    red = _colorscale[0]
-    green = _colorscale[1]
-    blue = _colorscale[2]
-    orange = _colorscale[3]
-    yellow = _colorscale[4]
-    lightred = _colorscale[5]
-    lightgreen = _colorscale[6]
-    lightblue = _colorscale[7]
-    lightorange = _colorscale[8]
-    grey = mpl_colors.to_rgba("lightgrey")
-    black = mpl_colors.to_rgba("black")
-    white = mpl_colors.to_rgba("white")
+    default_colors: ClassVar[dict] = {
+        "red": _colorscale[0],
+        "green": _colorscale[1],
+        "blue": _colorscale[2],
+        "orange": _colorscale[3],
+        "yellow": _colorscale[4],
+        "lightred": _colorscale[5],
+        "lightgreen": _colorscale[6],
+        "lightblue": _colorscale[7],
+        "lightorange": _colorscale[8],
+        "grey": mpl_colors.to_rgba("lightgrey"),
+        "black": mpl_colors.to_rgba("black"),
+        "white": mpl_colors.to_rgba("white"),
+    }
 
     @classmethod
     def get(
         cls,
-        color_name: str,
+        color_name: str | tuple,
         lighten: float | None = None,
         alpha: float | None = None,
     ) -> tuple:
         """Get a default color by name, optionally lightened and/or with alpha"""
-        if isinstance(color_name, str) and hasattr(cls, color_name):
-            color = getattr(cls, color_name, None)
+        # First, avoid trying to map RGBA tuples to colors
+        if isinstance(color_name, tuple):
+            color = color_name
+        # Second, check if the color name is available in the defaults
+        elif color_name in cls.default_colors:
+            color = cls.default_colors[color_name]
+        # Third, try to get the color from matplotlib
         else:
             try:
                 color = mpl_colors.to_rgba(color_name)
             except ValueError:
-                logging.warning(f"Unknown color name: {color_name}, cannot apply lighten or alpha")
+                logging.warning(f"Unknown color name: {color_name}, cannot parse to RGBA or change lightness/alpha")
                 return color_name
 
         if lighten is not None:
@@ -185,8 +194,10 @@ class BaseColors:
 class BasePalettes:
     """Base color palettes for AlphaTools plots"""
 
-    qualitative = _base_qualitative_colorscale()
-    binary = _base_binary_colorscale()
+    default_palettes: ClassVar[dict] = {
+        "qualitative": _base_qualitative_colorscale(),
+        "binary": _base_binary_colorscale(),
+    }
 
     @classmethod
     def get(
@@ -195,7 +206,8 @@ class BasePalettes:
         n: int = 10,
     ) -> list:
         """Get a default color palette by name"""
-        palette = getattr(cls, palette_name, None)
+        if palette_name in cls.default_palettes:
+            palette = cls.default_palettes[palette_name]
         if palette is None:
             try:
                 palette = _get_colors_from_cmap(palette_name, num_colors=n)
@@ -210,8 +222,10 @@ class BaseColormaps:
     """Base colormaps for AlphaTools plots"""
 
     # Use perceptually uniform color palettes to avoid visual distortion (Crameri, F. (2018a), Scientific colour maps. Zenodo. http://doi.org/10.5281/zenodo.1243862)
-    sequential = cmc.devon
-    diverging = cmc.managua_r
+    default_colormaps: ClassVar[dict] = {
+        "sequential": cmc.devon,
+        "diverging": cmc.managua_r,
+    }
 
     @classmethod
     def get(
@@ -238,7 +252,8 @@ class BaseColormaps:
             Matplotlib Colormap object or list of colors
 
         """
-        colormap = getattr(cls, colormap_name, None)
+        if colormap_name in cls.default_colormaps:
+            colormap = cls.default_colormaps[colormap_name]
 
         if colormap is None:
             try:
