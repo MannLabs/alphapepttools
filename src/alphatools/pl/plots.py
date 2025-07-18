@@ -340,7 +340,7 @@ def _validate_pca_plot_input(
     pca_variance_layer_name: str,
     pc_x: int,
     pc_y: int,
-    dim_space: str = "obs",
+    dim_space: str,
 ) -> None:
     """
     Validates the AnnData object for PCA-related data and dimensions.
@@ -425,7 +425,7 @@ def _validate_scree_plot_input(
 
 
 def _validate_pca_loadings_plot_inputs(
-    data: ad.AnnData, loadings_name: str, dim: int, dim2: int | None, nfeatures: int, dim_space: str = "obs"
+    data: ad.AnnData, loadings_name: str, dim: int, dim2: int | None, nfeatures: int, dim_space: str
 ) -> None:
     """
     Validate inputs for accessing PCA feature loadings from an AnnData object.
@@ -453,6 +453,7 @@ def _validate_pca_loadings_plot_inputs(
 
     # Determine which attribute to check based on dim_space
     loadings_attr = "varm" if dim_space == "obs" else "obsm"
+    print(loadings_attr)
 
     # Check if the loadings layer exists in the correct attribute
     if loadings_name not in getattr(data, loadings_attr):
@@ -478,7 +479,7 @@ def _validate_pca_loadings_plot_inputs(
 
 
 def _prepare_loading_df_to_plot(
-    data: ad.AnnData, loadings_name: str, pc_x: int, pc_y: int, nfeatures: int, dim_space: str = "obs"
+    data: ad.AnnData, loadings_name: str, pc_x: int, pc_y: int, nfeatures: int, dim_space: str
 ) -> pd.DataFrame:
     """
     Prepare a DataFrame with PCA feature loadings for plotting.
@@ -508,7 +509,9 @@ def _prepare_loading_df_to_plot(
         DataFrame containing loadings for the selected PCs, feature names, boolean columns
         indicating if a feature was used in PCA and whether it is among the top features in either dimension.
     """
-    _validate_pca_loadings_plot_inputs(data=data, loadings_name=loadings_name, dim=pc_x, dim2=pc_y, nfeatures=nfeatures)
+    _validate_pca_loadings_plot_inputs(
+        data=data, loadings_name=loadings_name, dim=pc_x, dim2=pc_y, nfeatures=nfeatures, dim_space=dim_space
+    )
 
     dim1_z = pc_x - 1  # convert to 0-based index
     dim2_z = pc_y - 1  # convert to 0-based index
@@ -1038,7 +1041,7 @@ class Plots:
         loadings_attr = "varm" if dim_space == "obs" else "obsm"
 
         _validate_pca_loadings_plot_inputs(
-            data=data, loadings_name=loadings_key, dim=dim, dim2=None, nfeatures=nfeatures
+            data=data, loadings_name=loadings_key, dim=dim, dim2=None, nfeatures=nfeatures, dim_space=dim_space
         )
 
         # create the dataframe for plotting
@@ -1123,7 +1126,7 @@ class Plots:
         loadings_key = f"PCs_{dim_space}" if embbedings_name is None else embbedings_name
 
         loadings = _prepare_loading_df_to_plot(
-            data=data, loadings_name=loadings_key, pc_x=pc_x, pc_y=pc_y, nfeatures=nfeatures
+            data=data, loadings_name=loadings_key, pc_x=pc_x, pc_y=pc_y, nfeatures=nfeatures, dim_space=dim_space
         )
 
         # plot the loadings of all features (used in PCA) first

@@ -406,6 +406,10 @@ def _adata_column_to_array(
         if column in data.obs.columns:
             return data.obs[column].to_numpy()
 
+        # if the column is not found in var_names, check the columns of var (metadata)
+        if column in data.var.columns:
+            return data.var[column].to_numpy()
+
         raise ValueError(f"Column {column} not found in AnnData object (checked var_names or obs.columns).")
     raise TypeError("Data must be a pd.DataFrame or ad.AnnData.")
 
