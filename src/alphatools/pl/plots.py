@@ -240,9 +240,9 @@ def _assign_nearest_anchor_position_to_values(
 
 def label_plot(
     ax: plt.Axes,
-    x_values: list | np.ndarray,
-    y_values: list | np.ndarray,
-    labels: list[str] | np.ndarray,
+    x_values: list | np.ndarray | pd.Series,
+    y_values: list | np.ndarray | pd.Series,
+    labels: list[str] | np.ndarray | pd.Series,
     x_anchors: list[int | float] | np.ndarray | None = None,
     label_kwargs: dict | None = None,
     line_kwargs: dict | None = None,
@@ -295,6 +295,12 @@ def label_plot(
     if not len(x_values) == len(y_values) == len(labels):
         raise ValueError("x_values, y_values, and labels must have the same length")
 
+    # Force the order of labels from highest to lowest
+    y_value_order = np.argsort(np.array(y_values))[::-1]
+    y_values = np.array(y_values)[y_value_order]
+    x_values = np.array(x_values)[y_value_order]
+    labels = np.array(labels)[y_value_order]
+
     # convert to numpy arrays for consistency & remove any nans
     x_values, y_values, labels = _drop_nans_from_plot_arrays(np.array(x_values), np.array(y_values), np.array(labels))
 
@@ -321,6 +327,7 @@ def label_plot(
         sorted_label_y_values = []
 
         for anchor_value in np.unique(anchored_x_values):
+            # Get the sequence of sorted values for the current anchor
             anchor_mask = anchored_x_values == anchor_value
 
             sorted_labels.extend(list(labels[anchor_mask]))
