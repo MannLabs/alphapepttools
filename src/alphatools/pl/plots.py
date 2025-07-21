@@ -821,7 +821,7 @@ class Plots:
         palette: list[str | tuple] | None = None,
         color_dict: dict[str, str | tuple] | None = None,
         legend: str | mpl.legend.Legend | None = None,
-        color_column: str | None = None,
+        color_map_column: str | None = None,
         scatter_kwargs: dict | None = None,
     ) -> None:
         """Plot the PCs of a PCA analysis using the scatter method
@@ -879,16 +879,16 @@ class Plots:
         var_dim2 = round(var_dim2 * 100, 2)
 
         # add color column
-        if color_column is not None:
-            color_values = _adata_column_to_array(data, color_column)
-            values[color_column] = color_values
+        if color_map_column is not None:
+            color_values = _adata_column_to_array(data, color_map_column)
+            values[color_map_column] = color_values
 
         cls.scatter(
             data=values,
             x_column="dim1",
             y_column="dim2",
             color=color,
-            color_column=color_column,
+            color_column=color_map_column,
             legend=legend,
             palette=palette,
             color_dict=color_dict,
