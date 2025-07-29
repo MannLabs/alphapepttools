@@ -297,6 +297,8 @@ class MappedColormaps:
     def fit_transform(
         self,
         data: np.ndarray,
+        *,
+        as_hex: bool = False,
     ) -> np.ndarray:
         """Normalize data and transform it to colors
 
@@ -305,7 +307,7 @@ class MappedColormaps:
         data : np.ndarray
             Data to be transformed into colors. Based on this data, the colormap will be normalized.
         """
-        data = np.array(data.copy())
+        data = np.asarray(data).copy()
 
         if self.percentile is not None:
             self.vmin = np.percentile(data, self.percentile[0])
@@ -319,4 +321,31 @@ class MappedColormaps:
         self.color_normalizer = mpl_colors.Normalize(vmin=self.vmin, vmax=self.vmax)
         normalized_data = self.color_normalizer(data)
 
-        return np.vectorize(self.cmap)(normalized_data)
+        rgba = self.cmap(normalized_data)
+
+        if as_hex:
+            return np.apply_along_axis(mpl_colors.to_hex, -1, rgba, keep_alpha=True)
+        return rgba
+
+
+def invert_color(
+    color: tuple | str,
+) -> tuple | str:
+    """Invert a color
+
+    Parameters
+    ----------
+    color : tuple | str
+        Color to be inverted. Can be an RGBA tuple or a color name.
+
+    Returns
+    -------
+    Tuple | str
+        Inverted color as RGBA tuple or hex string.
+    """
+    if isinstance(color, str):
+        color = mpl_colors.to_rgba(color)
+
+    inverted_color = (*tuple(1 - np.array(color[:3])), color[3])  # Preserve alpha channel if present
+
+    return mpl_colors.to_hex(inverted_color, keep_alpha=True) if isinstance(color, str) else inverted_color
