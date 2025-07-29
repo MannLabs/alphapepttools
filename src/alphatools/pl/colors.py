@@ -319,4 +319,4 @@ class MappedColormaps:
         self.color_normalizer = mpl_colors.Normalize(vmin=self.vmin, vmax=self.vmax)
         normalized_data = self.color_normalizer(data)
 
-        return [self.cmap(d) for d in normalized_data]
+        return np.vectorize(self.cmap)(normalized_data)
