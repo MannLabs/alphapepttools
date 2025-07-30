@@ -597,7 +597,8 @@ class Plots:
             color = BaseColors.get(color)
             ax.hist(values, bins=bins, color=color, **hist_kwargs)
         else:
-            color_values = _adata_column_to_array(data, color_map_column)
+            # If there is a color map column, map its string levels to a palette
+            color_values = _adata_column_to_array(data, color_map_column).astype(str)
             palette = palette or BasePalettes.get("qualitative")
             color_dict = color_dict or get_color_mapping(color_values, palette)
             missing = set(np.unique(color_values)) - set(color_dict)
@@ -692,9 +693,9 @@ class Plots:
             color_map_column = None
             color_dict = None
             color_values = _adata_column_to_array(data, color_column)
-        # If there is a color map column, map its levels to a palette
+        # If there is a color map column, map its string levels to a palette
         elif color_map_column is not None:
-            color_levels = _adata_column_to_array(data, color_map_column)
+            color_levels = _adata_column_to_array(data, color_map_column).astype(str)
             color_dict = color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
             missing = set(np.unique(color_levels)) - set(color_dict)
             for level in missing:
