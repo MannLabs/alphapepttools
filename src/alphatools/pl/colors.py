@@ -224,6 +224,8 @@ class BaseColormaps:
     default_colormaps: ClassVar[dict] = {
         "sequential": cmc.devon,
         "diverging": cmc.managua_r,
+        "sequential_r": cmc.devon_r,
+        "diverging_r": cmc.managua,
     }
 
     @classmethod
@@ -326,6 +328,22 @@ class MappedColormaps:
         if as_hex:
             return np.apply_along_axis(mpl_colors.to_hex, -1, rgba, keep_alpha=True)
         return rgba
+
+    @property
+    def scalar_mappable(self) -> mpl.cm.ScalarMappable:
+        """Return a ScalarMappable for use in colorbars
+
+        In order to generate colorbars, the MappedColormaps instance can return a ScalarMappable, which maps normalized data to colors.
+
+        Returns
+        -------
+        mpl.cm.ScalarMappable
+            ScalarMappable instance of the current colormap and normalized data values which can be used in colorbars.
+
+        """
+        sm = plt.cm.ScalarMappable(norm=self.color_normalizer, cmap=self.cmap)
+        sm.set_array([])
+        return sm
 
 
 def invert_color(
