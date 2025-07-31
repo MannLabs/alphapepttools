@@ -889,7 +889,7 @@ class Plots:
             x_column="dim1",
             y_column="dim2",
             color=color,
-            color_column=color_map_column,
+            color_map_column=color_map_column,
             legend=legend,
             palette=palette,
             color_dict=color_dict,
