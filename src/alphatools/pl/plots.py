@@ -11,6 +11,7 @@
 import logging
 from collections import Counter
 from collections.abc import Callable
+from typing import Any
 
 import anndata as ad
 import matplotlib as mpl
@@ -518,6 +519,22 @@ def _prepare_loading_df_to_plot(
     return loadings
 
 
+def _array_to_str(
+    array: np.ndarray | pd.Series,
+) -> np.ndarray:
+    """Map a numpy array to string values, while replacing NaNs with 'NA'."""
+    string_array = np.array(array, dtype=object)
+    string_array[pd.isna(string_array)] = "NA"  # replace NaNs with "NA"
+    return string_array.astype(str)  # ensure all values are strings
+
+
+def _dict_keys_to_str(
+    dictionary: dict,
+) -> dict[str, Any]:
+    """Convert the keys of a dictionary to strings."""
+    return {str(k): v for k, v in dictionary.items()}
+
+
 class Plots:
     """Class for creating figures with matplotlib
 
@@ -557,8 +574,8 @@ class Plots:
             Data to plot, must contain the value_column and optionally the color_column.
         value_column : str
             Column in data to plot as histogram. Must contain numeric data.
-        color_column : str, optional
-            Column in data to use for color encoding. Overrides color parameter. By default None.
+        color_map_column : str, optional
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
         bins : int, optional
             Number of bins to use for the histogram. By default 10.
         color : str, optional
@@ -597,16 +614,19 @@ class Plots:
             color = BaseColors.get(color)
             ax.hist(values, bins=bins, color=color, **hist_kwargs)
         else:
-            color_values = _adata_column_to_array(data, color_map_column).astype(str)
-            palette = palette or BasePalettes.get("qualitative")
-            color_dict = color_dict or get_color_mapping(color_values, palette)
-            missing = set(np.unique(color_values)) - set(color_dict)
-            for level in missing:
+            color_levels = _array_to_str(
+                _adata_column_to_array(data, color_map_column)
+            )  # Safe types: convert the color_map_column values to strings
+            color_dict = _dict_keys_to_str(
+                color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
+            )  # Safe types: convert the color_dict keys to strings
+
+            for level in set(color_levels) - set(color_dict):
                 color_dict[level] = BaseColors.get("grey")
 
             for level, level_color in color_dict.items():
                 ax.hist(
-                    values[color_values == level],
+                    values[color_levels == level],
                     bins=bins,
                     color=level_color,
                     **hist_kwargs,
@@ -629,8 +649,8 @@ class Plots:
     def scatter(
         cls,
         data: pd.DataFrame | ad.AnnData,
-        y_column: str,
         x_column: str,
+        y_column: str,
         color: str = "blue",
         color_map_column: str | None = None,
         color_column: str | None = None,
@@ -669,6 +689,8 @@ class Plots:
             Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
+        legend_kwargs : dict, optional
+            Additional keyword arguments for the matplotlib legend function. By default None.
         xlim : tuple[float, float], optional
             Limits for the x-axis. By default None.
         ylim : tuple[float, float], optional
@@ -692,11 +714,16 @@ class Plots:
             color_values = _adata_column_to_array(data, color_column)
         # If there is a color map column, map its string levels to a palette
         elif color_map_column is not None:
-            color_levels = _adata_column_to_array(data, color_map_column).astype(str)
-            color_dict = color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
-            missing = set(np.unique(color_levels)) - set(color_dict)
-            for level in missing:
+            color_levels = _array_to_str(
+                _adata_column_to_array(data, color_map_column)
+            )  # Safe types: convert the color_map_column values to strings
+            color_dict = _dict_keys_to_str(
+                color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
+            )  # Safe types: convert the color_dict keys to strings
+
+            for level in set(color_levels) - set(color_dict):
                 color_dict[level] = BaseColors.get("grey")
+
             color_values = np.array([color_dict[level] for level in color_levels], dtype=object)
         else:
             color_dict = {DEFAULT_GROUP: BaseColors.get(color)}
