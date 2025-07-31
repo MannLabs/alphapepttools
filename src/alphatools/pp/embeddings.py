@@ -43,31 +43,6 @@ def _check_inputs_for_dim_reduction(
             )
 
 
-def _get_pca_key_names(adata: ad.AnnData, dim_space: str, embbedings_name: str | None) -> tuple[str, str, str]:
-    """Get the key names for PCA results based on embeddings name and dim space.
-
-    Parameters
-    ----------
-    adata: ad.AnnData
-        The AnnData object to store PCA results in.
-    dim_space: str
-        The dimension to project PCA on. Can be either "obs" for sample projection or "var" for feature projection.
-    embbedings_name: str, optional
-        The key under which to store the PCA results in adata.
-
-    Returns
-    -------
-    tuple[str, str, str]
-        A tuple containing the key names for PCA coordinates, loadings, and variance.
-    """
-    # define key names for storing PCA results
-    pca_coords_key = f"X_pca_{dim_space}" if embbedings_name is None else embbedings_name
-    loadings_key = f"PCs_{dim_space}" if embbedings_name is None else embbedings_name
-    variance_key = f"variance_pca_{dim_space}" if embbedings_name is None else embbedings_name
-
-    return pca_coords_key, loadings_key, variance_key
-
-
 def _store_pca_results(  # noqa: PLR0912
     adata: ad.AnnData,
     pca_res: tuple,
