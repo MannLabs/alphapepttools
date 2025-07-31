@@ -32,9 +32,16 @@ class AnnDataFactory:
 
         self._psm_df = psm_df
 
-        duplicated_proteins = self._psm_df[PsmDfCols.PROTEINS].duplicated()
-        if duplicated_proteins.sum() > 0:
-            warnings.warn(f"Found {duplicated_proteins.sum()} duplicated protein groups. Using only first.")
+        # Warn if duplicated features exist which get dropped
+        duplicated_features: pd.Series = self._psm_df.groupby(PsmDfCols.RAW_NAME).apply(
+            lambda df: df[PsmDfCols.PROTEINS].duplicated().sum(), include_groups=False
+        )
+
+        if any(duplicated_features > 0):
+            warnings.warn(
+                f"Found {duplicated_features.sum()} duplicated features. Using only first.",
+                stacklevel=1,
+            )
 
     def create_anndata(self) -> ad.AnnData:
         """Create AnnData object from PSM DataFrame.
