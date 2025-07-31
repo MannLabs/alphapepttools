@@ -739,10 +739,11 @@ class Plots:
         ax: plt.Axes,
         layer: str = "X",
         color: str = "blue",
+        color_column: str | None = None,
+        color_map_column: str | None = None,
         palette: list[str | tuple] | None = None,
         color_dict: dict[str, str | tuple] | None = None,
         legend: str | mpl.legend.Legend | None = None,
-        color_column: str | None = None,
         scatter_kwargs: dict | None = None,
     ) -> None:
         """Plot the ranked protein median intensities across all samples using the scatter method
@@ -755,8 +756,18 @@ class Plots:
             Matplotlib axes object to plot on, add labels and logscale the y-axis.
         layer : str
             The AnnData layer to calculate the median value (intensities) across sample. Default is "X"
+        color : str, optional
+            Color to use for the scatterplot. By default "blue".
         color_column : str, optional
-            Column in data.var to use for color coding. By default None.
+            Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
+        color_map_column : str, optional
+            Column in data to use for color encoding. Overrides color parameter. By default None.
+        palette : list[str | tuple], optional
+            List of colors to use for color encoding, if None a default palette is used. By default None.
+        color_dict: dict[str, str | tuple], optional
+            A dictionary mapping levels to colors. By default None. If provided, palette is ignored.
+        legend : str | mpl.legend.Legend, optional
+            Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
 
@@ -790,7 +801,8 @@ class Plots:
             x_column="rank",
             y_column="median",
             color=color,
-            color_map_column=color_column,
+            color_column=color_column,
+            color_map_column=color_map_column,
             legend=legend,
             palette=palette,
             color_dict=color_dict,
@@ -847,15 +859,17 @@ class Plots:
         label_column: str | None = None,
             Column in data.obs to use for labeling the points. If None, and label is True, data.obs.index labels are added. By default None.
         color : str, optional
-            Color to use for the scatter plot. By default "blue".
+            Color to use for the scatterplot. By default "blue".
+        color_column : str, optional
+            Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
+        color_map_column : str, optional
+            Column in data to use for color encoding. Overrides color parameter. By default None.
         palette : list[str | tuple], optional
             List of colors to use for color encoding, if None a default palette is used. By default None.
         color_dict: dict[str, str | tuple], optional
             Supercedes palette, a dictionary mapping levels to colors. By default None. If provided, palette is ignored.
         legend : str | mpl.legend.Legend, optional
             Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
-        color_column : str, optional
-            Column in data.var to use for color coding. By default None.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
 
