@@ -43,10 +43,8 @@ def _check_inputs_for_dim_reduction(
             )
 
 
-def _get_pca_attr_key_names(
-    adata: ad.AnnData, dim_space: str, embbedings_name: str | None
-) -> tuple[str, str, str, str, str, str]:
-    """Get the attribute names for PCA results based on the dimension space and embeddings name.
+def _get_pca_key_names(adata: ad.AnnData, dim_space: str, embbedings_name: str | None) -> tuple[str, str, str]:
+    """Get the key names for PCA results based on embeddings name and dim space.
 
     Parameters
     ----------
@@ -59,20 +57,104 @@ def _get_pca_attr_key_names(
 
     Returns
     -------
-    tuple[str, str, str, str, str, str]
-        A tuple containing the attribute and the key names for PCA coordinates, loadings, and variance.
+    tuple[str, str, str]
+        A tuple containing the key names for PCA coordinates, loadings, and variance.
     """
     # define key names for storing PCA results
     pca_coords_key = f"X_pca_{dim_space}" if embbedings_name is None else embbedings_name
     loadings_key = f"PCs_{dim_space}" if embbedings_name is None else embbedings_name
     variance_key = f"variance_pca_{dim_space}" if embbedings_name is None else embbedings_name
 
-    # set attr names names for storing PCA results
-    pca_coords_attr = "obsm" if dim_space == "obs" else "varm"
-    loadings_attr = "varm" if dim_space == "obs" else "obsm"
-    variance_attr = "uns"
+    return pca_coords_key, loadings_key, variance_key
 
-    return pca_coords_attr, pca_coords_key, loadings_attr, loadings_key, variance_attr, variance_key
+
+def _store_pca_results(  # noqa: PLR0912
+    adata: ad.AnnData,
+    pca_res: tuple,
+    dim_space: str,
+    embbedings_name: str | None,
+    meta_data_mask_column_name: str | None,
+    logger: logging.Logger,
+) -> ad.AnnData:
+    """
+    Store PCA results (coordinates, loadings, and variance) in the appropriate AnnData attributes.
+
+    Parameters
+    ----------
+    adata : ad.AnnData
+        The AnnData object to update.
+    pca_res : tuple
+        The result from scanpy.pp.pca (coordinates, loadings, variance_ratio, variance).
+    dim_space : str
+        Either "obs" or "var", indicating the PCA projection space.
+    embbedings_name : str or None
+        Custom key name for storing PCA results. If None, defaults are used.
+    meta_data_mask_column_name : str or None
+        Column name in adata.var used as a boolean mask for features. If None, all features are used.
+    logger : logging.Logger
+        Logger for warning messages.
+
+    Returns
+    -------
+    ad.AnnData
+        The updated AnnData object with PCA results stored.
+    """
+    # get key names for storing PCA results
+    if embbedings_name is None:
+        pca_coords_key = f"X_pca_{dim_space}"
+        loadings_key = f"PCs_{dim_space}"
+        variance_key = f"variance_pca_{dim_space}"
+    else:
+        pca_coords_key = embbedings_name
+        loadings_key = embbedings_name
+        variance_key = embbedings_name
+
+    # Store PCA results
+
+    # check if PCA was run for all features or only for a subset
+    if meta_data_mask_column_name is None:
+        pc_mat = pca_res[0].copy()
+        loadings_mat = pca_res[1].T.copy()
+    else:
+        n_pcs = pca_res[0].shape[1]
+        mask = np.where(adata.var[meta_data_mask_column_name].values)[0]
+
+        if dim_space == "var":
+            # PC coordinates of the features used in PCA (NA to all features not used in PCA)
+            pc_mat = np.full((adata.n_vars, n_pcs), np.nan)
+            pc_mat[mask, :] = pca_res[0].copy()
+            # sample loading of the samples used in PCA
+            loadings_mat = pca_res[1].T.copy()
+        else:  # dim_space == "obs":
+            # PC coordinates of the samples used in PCA
+            pc_mat = pca_res[0].copy()
+            # feature loading of the features used in PCA (nan values for all features NOT used in PCA)
+            loadings_mat = np.full((adata.n_vars, n_pcs), np.nan)
+            loadings_mat[mask, :] = pca_res[1].T.copy()
+
+    if variance_key in adata.uns:
+        logger.warning(f"Overwriting existing PCA variance in uns.['{variance_key}']")
+    adata.uns[variance_key] = {
+        "variance_ratio": pca_res[2].copy(),  # Ratio of explained variance (n_comp)
+        "variance": pca_res[3].copy(),  # Explained variance (n_comp)
+    }
+
+    if dim_space == "obs":
+        if pca_coords_key in adata.obsm:
+            logger.warning(f"Overwriting existing PCA coordinates in obsm.['{pca_coords_key}']")
+        if loadings_key in adata.varm:
+            logger.warning(f"Overwriting existing PCA loadings in varm.['{loadings_key}']")
+        adata.obsm[pca_coords_key] = pc_mat
+        adata.varm[loadings_key] = loadings_mat
+    else:  # dim_space == "var"
+        if pca_coords_key in adata.varm:
+            logger.warning(f"Overwriting existing PCA coordinates in varm.['{pca_coords_key}']")
+        if loadings_key in adata.obsm:
+            logger.warning(f"Overwriting existing PCA loadings in obsm.['{loadings_key}']")
+        adata.varm[pca_coords_key] = pc_mat
+        adata.obsm[loadings_key] = loadings_mat
+
+    return adata
 
 
 def pca(
@@ -109,9 +191,9 @@ def pca(
         If provided, this will be used as the key under which to store the PCA results in
         `adata.obsm`, `adata.varm`, and `adata.uns` (see Returns).
         If None, the default keys will be used:
-        - For `dim_space='obs'`: `X_pca_obs`, `PCs_obs`, `variance_pca_obs`
-        - For `dim_space='var'`: `X_pca_var`, `PCs_var`, `variance_pca_var`
-        If provided, the keys will be: `embbedings_name`, `embbedings_name`, `embbedings_name`
+        - For `dim_space='obs'`: `X_pca_obs` for PC coordinates, `PCs_obs` for the feature loadings, `variance_pca_obs` for the variance.
+        - For `dim_space='var'`: `X_pca_var` for PC corrdinates, `PCs_var` for the sample loadings, `variance_pca_var` for the variance.
+        If provided, the keys will be `embbedings_name` for all three data frames.
     n_comps: int, optional (default: 50)
         Number of principal components to compute. Defaults to 50, or 1 - minimum
         dimension size of selected representation.
@@ -167,46 +249,4 @@ def pca(
     # run PCA
     pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, **pca_kwargs)
 
-    # get the attribute and key names for storing PCA results
-    pca_coords_attr, pca_coords_key, loadings_attr, loadings_key, variance_attr, variance_key = _get_pca_attr_key_names(
-        adata=adata, dim_space=dim_space, embbedings_name=embbedings_name
-    )
-
-    if meta_data_mask_column_name is None:
-        pc_mat = pca_res[0].copy()
-        loadings_mat = pca_res[1].T.copy()
-    else:
-        n_pcs = pca_res[0].shape[1]
-        mask = np.where(adata.var[meta_data_mask_column_name].values)[0]
-
-        if dim_space == "var":
-            # PC coordinates of the features used in PCA (NA to all features not used in PCA)
-            pc_mat = np.full((adata.n_vars, n_pcs), np.nan)
-            pc_mat[mask, :] = pca_res[0].copy()
-
-            # sample loading of the samples used in PCA
-            loadings_mat = pca_res[1].T.copy()
-
-        else:  # dim_space == "obs":
-            # PC coordinates of the samples used in PCA
-            pc_mat = pca_res[0].copy()
-
-            # feature loading of the features used in PCA (nan values for all features NOT used in PCA)
-            loadings_mat = np.full((adata.n_vars, n_pcs), np.nan)
-            loadings_mat[mask, :] = pca_res[1].T.copy()
-
-    if pca_coords_key in getattr(adata, pca_coords_attr):
-        logger.warning(f"Overwriting existing PCA coordinates in {pca_coords_attr}['{pca_coords_key}']")
-    if loadings_key in getattr(adata, loadings_attr):
-        logger.warning(f"Overwriting existing PCA loadings in {loadings_attr}['{loadings_key}']")
-    if variance_key in getattr(adata, variance_attr):
-        logger.warning(f"Overwriting existing PCA variance in {variance_attr}['{variance_key}']")
-
-    getattr(adata, pca_coords_attr)[pca_coords_key] = pc_mat
-    getattr(adata, loadings_attr)[loadings_key] = loadings_mat
-    getattr(adata, variance_attr)[variance_key] = {
-        "variance_ratio": pca_res[2].copy(),  # Ratio of explained variance (n_comp)
-        "variance": pca_res[3].copy(),  # Explained variance (n_comp)
-    }
-
-    return adata
+    return _store_pca_results(adata, pca_res, dim_space, embbedings_name, meta_data_mask_column_name, logger)
