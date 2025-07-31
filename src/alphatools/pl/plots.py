@@ -597,7 +597,6 @@ class Plots:
             color = BaseColors.get(color)
             ax.hist(values, bins=bins, color=color, **hist_kwargs)
         else:
-            # If there is a color map column, map its string levels to a palette
             color_values = _adata_column_to_array(data, color_map_column).astype(str)
             palette = palette or BasePalettes.get("qualitative")
             color_dict = color_dict or get_color_mapping(color_values, palette)
@@ -633,8 +632,8 @@ class Plots:
         y_column: str,
         x_column: str,
         color: str = "blue",
-        color_column: str | None = None,
         color_map_column: str | None = None,
+        color_column: str | None = None,
         ax: plt.Axes | None = None,
         palette: list[str | tuple] | None = None,
         color_dict: dict[str, str | tuple] | None = None,
@@ -656,10 +655,10 @@ class Plots:
             Column in data to plot on the y-axis. Must contain numeric data.
         color : str, optional
             Color to use for the scatterplot. By default "blue".
+        color_map_column : str, optional
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
         color_column : str, optional
             Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
-        color_map_column : str, optional
-            Column in data to use for color encoding. Overrides color parameter. By default None.
         ax : plt.Axes, optional
             Matplotlib axes object to plot on, if None a new figure is created. By default None.
         palette : list[str | tuple], optional
@@ -690,8 +689,6 @@ class Plots:
 
         # Handle color encoding: If there is an actual color column, simply color the points accordingly
         if color_column is not None:
-            color_map_column = None
-            color_dict = None
             color_values = _adata_column_to_array(data, color_column)
         # If there is a color map column, map its string levels to a palette
         elif color_map_column is not None:
@@ -739,8 +736,8 @@ class Plots:
         ax: plt.Axes,
         layer: str = "X",
         color: str = "blue",
-        color_column: str | None = None,
         color_map_column: str | None = None,
+        color_column: str | None = None,
         palette: list[str | tuple] | None = None,
         color_dict: dict[str, str | tuple] | None = None,
         legend: str | mpl.legend.Legend | None = None,
@@ -758,10 +755,10 @@ class Plots:
             The AnnData layer to calculate the median value (intensities) across sample. Default is "X"
         color : str, optional
             Color to use for the scatterplot. By default "blue".
+        color_map_column : str, optional
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
         color_column : str, optional
             Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
-        color_map_column : str, optional
-            Column in data to use for color encoding. Overrides color parameter. By default None.
         palette : list[str | tuple], optional
             List of colors to use for color encoding, if None a default palette is used. By default None.
         color_dict: dict[str, str | tuple], optional
@@ -831,8 +828,8 @@ class Plots:
         label: bool = False,  # noqa: FBT001, FBT002
         label_column: str | None = None,
         color: str = "blue",
-        color_column: str | None = None,
         color_map_column: str | None = None,
+        color_column: str | None = None,
         palette: list[str | tuple] | None = None,
         color_dict: dict[str, str | tuple] | None = None,
         legend: str | mpl.legend.Legend | None = None,
@@ -860,10 +857,10 @@ class Plots:
             Column in data.obs to use for labeling the points. If None, and label is True, data.obs.index labels are added. By default None.
         color : str, optional
             Color to use for the scatterplot. By default "blue".
+        color_map_column : str, optional
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
         color_column : str, optional
             Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
-        color_map_column : str, optional
-            Column in data to use for color encoding. Overrides color parameter. By default None.
         palette : list[str | tuple], optional
             List of colors to use for color encoding, if None a default palette is used. By default None.
         color_dict: dict[str, str | tuple], optional
