@@ -810,7 +810,7 @@ class Plots:
     @classmethod
     def plot_pca(
         cls,
-        data: ad.AnnData | pd.DataFrame,
+        data: ad.AnnData,
         ax: plt.Axes,
         pc_x: int = 1,
         pc_y: int = 2,
@@ -819,10 +819,11 @@ class Plots:
         label: bool = False,  # noqa: FBT001, FBT002
         label_column: str | None = None,
         color: str = "blue",
+        color_column: str | None = None,
+        color_map_column: str | None = None,
         palette: list[str | tuple] | None = None,
         color_dict: dict[str, str | tuple] | None = None,
         legend: str | mpl.legend.Legend | None = None,
-        color_map_column: str | None = None,
         scatter_kwargs: dict | None = None,
     ) -> None:
         """Plot the PCs of a PCA analysis using the scatter method
@@ -871,7 +872,12 @@ class Plots:
         # create the dataframe for plotting
         dim1_z = pc_x - 1  # to account for 0 indexing
         dim2_z = pc_y - 1  # to account for 0 indexing
-        values = pd.DataFrame(data.obsm[pca_embeddings_layer_name][:, [dim1_z, dim2_z]], columns=["dim1", "dim2"])
+        values = pd.DataFrame(
+            data.obsm[pca_embeddings_layer_name][:, [dim1_z, dim2_z]], columns=["dim1", "dim2"], index=data.obs_names
+        )
+
+        # Add metadata columns to plotting dataframe
+        values = values.join(data.obs)
 
         # get the explained variance ratio for the dimensions
         var_dim1 = data.uns[pca_variance_layer_name]["variance_ratio"][dim1_z]
@@ -879,16 +885,12 @@ class Plots:
         var_dim2 = data.uns[pca_variance_layer_name]["variance_ratio"][dim2_z]
         var_dim2 = round(var_dim2 * 100, 2)
 
-        # add color column
-        if color_map_column is not None:
-            color_values = _adata_column_to_array(data, color_map_column)
-            values[color_map_column] = color_values
-
         cls.scatter(
             data=values,
             x_column="dim1",
             y_column="dim2",
             color=color,
+            color_column=color_column,
             color_map_column=color_map_column,
             legend=legend,
             palette=palette,
