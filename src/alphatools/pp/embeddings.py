@@ -43,7 +43,7 @@ def _check_inputs_for_dim_reduction(
             )
 
 
-def _store_pca_results(  # noqa: PLR0912
+def _store_pca_results(
     adata: ad.AnnData,
     pca_res: tuple,
     dim_space: str,
@@ -84,8 +84,6 @@ def _store_pca_results(  # noqa: PLR0912
         loadings_key = embbedings_name
         variance_key = embbedings_name
 
-    # Store PCA results
-
     # check if PCA was run for all features or only for a subset
     if meta_data_mask_column_name is None:
         pc_mat = pca_res[0].copy()
@@ -107,27 +105,29 @@ def _store_pca_results(  # noqa: PLR0912
             loadings_mat = np.full((adata.n_vars, n_pcs), np.nan)
             loadings_mat[mask, :] = pca_res[1].T.copy()
 
+    if dim_space == "obs":
+        coords_dict, loadings_dict = adata.obsm, adata.varm
+        coords_location, loadings_location = "obsm", "varm"
+
+    else:  # dim_space == "var"
+        coords_dict, loadings_dict = adata.varm, adata.obsm
+        coords_location, loadings_location = "varm", "obsm"
+
+    # overwrite existing keys if they exist
     if variance_key in adata.uns:
         logger.warning(f"Overwriting existing PCA variance in uns.['{variance_key}']")
+    if pca_coords_key in coords_dict:
+        logger.warning(f"Overwriting existing PCA coordinates {coords_location}.['{pca_coords_key}']")
+    if loadings_key in loadings_dict:
+        logger.warning(f"Overwriting existing PCA loadings {loadings_location}.['{loadings_key}']")
+
+    # store PCA results in locations
+    coords_dict[pca_coords_key] = pc_mat
+    loadings_dict[loadings_key] = loadings_mat
     adata.uns[variance_key] = {
         "variance_ratio": pca_res[2].copy(),  # Ratio of explained variance (n_comp)
         "variance": pca_res[3].copy(),  # Explained variance (n_comp)
     }
-
-    if dim_space == "obs":
-        if pca_coords_key in adata.obsm:
-            logger.warning(f"Overwriting existing PCA coordinates in obsm.['{pca_coords_key}']")
-        if loadings_key in adata.varm:
-            logger.warning(f"Overwriting existing PCA loadings in varm.['{loadings_key}']")
-        adata.obsm[pca_coords_key] = pc_mat
-        adata.varm[loadings_key] = loadings_mat
-    else:  # dim_space == "var"
-        if pca_coords_key in adata.varm:
-            logger.warning(f"Overwriting existing PCA coordinates in varm.['{pca_coords_key}']")
-        if loadings_key in adata.obsm:
-            logger.warning(f"Overwriting existing PCA loadings in obsm.['{loadings_key}']")
-        adata.varm[pca_coords_key] = pc_mat
-        adata.obsm[loadings_key] = loadings_mat
 
     return adata
 
