@@ -951,6 +951,7 @@ class Plots:
         data: ad.AnnData | pd.DataFrame,
         ax: plt.Axes,
         n_pcs: int = 20,
+        color: str = "blue",
         pca_variance_layer_name: str = "pca",
         scatter_kwargs: dict | None = None,
     ) -> None:
@@ -964,6 +965,8 @@ class Plots:
             Matplotlib axes object to plot on.
         n_pcs : int,
             number of PCs to plot, by default 20
+        color : str, optional
+            Color to use for the scatterplot. By default "blue".
         pca_variance_layer_name : str,
             The name of the PCA layer in the AnnData object (in `data.uns`) that contains the explained variance, by default "pca". Different name should be used in case `key_added` was specifically set in `pca()` function under `**pca_kwargs`.
         scatter_kwargs : dict, optional
@@ -996,6 +999,7 @@ class Plots:
             y_column="explained_variance",
             ax=ax,
             scatter_kwargs=scatter_kwargs,
+            color=color,
         )
 
         # set labels
