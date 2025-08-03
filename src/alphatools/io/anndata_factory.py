@@ -32,7 +32,12 @@ class AnnDataFactory:
 
         self._psm_df = psm_df
 
-        # Warn if duplicated features exist which get dropped
+        # Warn if duplicated features exist which get dropped;
+        # TODO: This is not relevant for protein-level analysis, since there it is expected to have duplicated features
+        # (i.e. the same protein id will almost inevitably have more than one precursor per file). However, if the analysis
+        # level is precursors, we would not expect to see duplicated precursor IDs in the same file. In the future, there should
+        # be an explicit flag to indicate whether we are analysing proteins or precursors, and whether the warning
+        # below should be shown
         duplicated_features: pd.Series = self._psm_df.groupby(PsmDfCols.RAW_NAME).apply(
             lambda df: df[PsmDfCols.PROTEINS].duplicated().sum(), include_groups=False
         )
