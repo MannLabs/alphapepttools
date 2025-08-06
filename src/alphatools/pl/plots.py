@@ -453,7 +453,6 @@ def _validate_pca_loadings_plot_inputs(
 
     # Determine which attribute to check based on dim_space
     loadings_attr = "varm" if dim_space == "obs" else "obsm"
-    print(loadings_attr)
 
     # Check if the loadings layer exists in the correct attribute
     if loadings_name not in getattr(data, loadings_attr):
