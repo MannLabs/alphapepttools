@@ -942,35 +942,26 @@ class Plots:
         pca_coors_attr = "obsm" if dim_space == "obs" else "varm"
 
         # Input checks
-        _validate_pca_plot_input(adata, pca_coors_key, variance_key, pc_x, pc_y, dim_space)
+        _validate_pca_plot_input(data, pca_coors_key, variance_key, pc_x, pc_y, dim_space)
 
         # create the dataframe for plotting
         dim1_z = pc_x - 1  # to account for 0 indexing
         dim2_z = pc_y - 1  # to account for 0 indexing
 
-
         # Get PCA coordinates from the correct attribute
-        pca_coordinates = getattr(adata, pca_coors_attr)[pca_coors_key]
+        pca_coordinates = getattr(data, pca_coors_attr)[pca_coors_key]
         values = pd.DataFrame(pca_coordinates[:, [dim1_z, dim2_z]], columns=["dim1", "dim2"])
 
-        values = pd.DataFrame(
-            data.obsm[pca_embeddings_layer_name][:, [dim1_z, dim2_z]], columns=["dim1", "dim2"], index=data.obs_names
-        )
-
-        # Add metadata columns to plotting dataframe
-        values = values.join(data.obs)
-
-
         # get the explained variance ratio for the dimensions
-        var_dim1 = adata.uns[variance_key]["variance_ratio"][dim1_z]
+        var_dim1 = data.uns[variance_key]["variance_ratio"][dim1_z]
         var_dim1 = round(var_dim1 * 100, 2)
-        var_dim2 = adata.uns[variance_key]["variance_ratio"][dim2_z]
+        var_dim2 = data.uns[variance_key]["variance_ratio"][dim2_z]
         var_dim2 = round(var_dim2 * 100, 2)
 
         # add color column
-        if color_column is not None:
-            color_values = _adata_column_to_array(adata, color_column)
-            values[color_column] = color_values
+        if color_map_column is not None:
+            color_values = _adata_column_to_array(data, color_map_column)
+            values[color_map_column] = color_values
 
         cls.scatter(
             data=values,
@@ -990,9 +981,9 @@ class Plots:
         if label:
             # For labeling, we need to consider the appropriate observation space
             if dim_space == "obs":
-                labels = adata.obs.index if label_column is None else _adata_column_to_array(adata, label_column)
+                labels = data.obs.index if label_column is None else _adata_column_to_array(data, label_column)
             else:  # dim_space == "var"
-                labels = adata.var.index if label_column is None else _adata_column_to_array(adata, label_column)
+                labels = data.var.index if label_column is None else _adata_column_to_array(data, label_column)
 
             label_plot(ax=ax, x_values=values["dim1"], y_values=values["dim2"], labels=labels, x_anchors=None)
 
