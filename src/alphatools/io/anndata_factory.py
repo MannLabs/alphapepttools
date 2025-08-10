@@ -32,9 +32,21 @@ class AnnDataFactory:
 
         self._psm_df = psm_df
 
-        duplicated_proteins = self._psm_df[PsmDfCols.PROTEINS].duplicated()
-        if duplicated_proteins.sum() > 0:
-            warnings.warn(f"Found {duplicated_proteins.sum()} duplicated protein groups. Using only first.")
+        # Warn if duplicated features exist which get dropped;
+        # TODO: This is not relevant for protein-level analysis, since there it is expected to have duplicated features
+        # (i.e. the same protein id will almost inevitably have more than one precursor per file). However, if the analysis
+        # level is precursors, we would not expect to see duplicated precursor IDs in the same file. In the future, there should
+        # be an explicit flag to indicate whether we are analysing proteins or precursors, and whether the warning
+        # below should be shown
+        duplicated_features: pd.Series = self._psm_df.groupby(PsmDfCols.RAW_NAME).apply(
+            lambda df: df[PsmDfCols.PROTEINS].duplicated().sum(), include_groups=False
+        )
+
+        if any(duplicated_features > 0):
+            warnings.warn(
+                f"Found {duplicated_features.sum()} duplicated features. Using only first.",
+                stacklevel=1,
+            )
 
     def create_anndata(self) -> ad.AnnData:
         """Create AnnData object from PSM DataFrame.

@@ -11,6 +11,7 @@
 import logging
 from collections import Counter
 from collections.abc import Callable
+from typing import Any
 
 import anndata as ad
 import matplotlib as mpl
@@ -518,6 +519,22 @@ def _prepare_loading_df_to_plot(
     return loadings
 
 
+def _array_to_str(
+    array: np.ndarray | pd.Series,
+) -> np.ndarray:
+    """Map a numpy array to string values, while replacing NaNs with 'NA'."""
+    string_array = np.array(array, dtype=object)
+    string_array[pd.isna(string_array)] = "NA"  # replace NaNs with "NA"
+    return string_array.astype(str)  # ensure all values are strings
+
+
+def _dict_keys_to_str(
+    dictionary: dict,
+) -> dict[str, Any]:
+    """Convert the keys of a dictionary to strings."""
+    return {str(k): v for k, v in dictionary.items()}
+
+
 class Plots:
     """Class for creating figures with matplotlib
 
@@ -537,7 +554,7 @@ class Plots:
         cls,
         data: pd.DataFrame | ad.AnnData,
         value_column: str,
-        color_column: str | None = None,
+        color_map_column: str | None = None,
         bins: int = 10,
         ax: plt.Axes | None = None,
         color: str = "blue",
@@ -557,8 +574,8 @@ class Plots:
             Data to plot, must contain the value_column and optionally the color_column.
         value_column : str
             Column in data to plot as histogram. Must contain numeric data.
-        color_column : str, optional
-            Column in data to use for color encoding. Overrides color parameter. By default None.
+        color_map_column : str, optional
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
         bins : int, optional
             Number of bins to use for the histogram. By default 10.
         color : str, optional
@@ -588,25 +605,28 @@ class Plots:
         hist_kwargs = hist_kwargs or {}
         legend_kwargs = legend_kwargs or {}
 
-        if not ax:
+        if ax is None:
             _, ax = create_figure(1, 1)
 
         values = _adata_column_to_array(data, value_column)
 
-        if color_column is None:
+        if color_map_column is None:
             color = BaseColors.get(color)
             ax.hist(values, bins=bins, color=color, **hist_kwargs)
         else:
-            color_values = _adata_column_to_array(data, color_column)
-            palette = palette or BasePalettes.get("qualitative")
-            color_dict = color_dict or get_color_mapping(color_values, palette)
-            missing = set(np.unique(color_values)) - set(color_dict)
-            for level in missing:
+            color_levels = _array_to_str(
+                _adata_column_to_array(data, color_map_column)
+            )  # Safe types: convert the color_map_column values to strings
+            color_dict = _dict_keys_to_str(
+                color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
+            )  # Safe types: convert the color_dict keys to strings
+
+            for level in set(color_levels) - set(color_dict):
                 color_dict[level] = BaseColors.get("grey")
 
             for level, level_color in color_dict.items():
                 ax.hist(
-                    values[color_values == level],
+                    values[color_levels == level],
                     bins=bins,
                     color=level_color,
                     **hist_kwargs,
@@ -629,9 +649,10 @@ class Plots:
     def scatter(
         cls,
         data: pd.DataFrame | ad.AnnData,
-        y_column: str,
         x_column: str,
+        y_column: str,
         color: str = "blue",
+        color_map_column: str | None = None,
         color_column: str | None = None,
         ax: plt.Axes | None = None,
         palette: list[str | tuple] | None = None,
@@ -647,13 +668,17 @@ class Plots:
         Parameters
         ----------
         data : pd.DataFrame | ad.AnnData
-            Data to plot, must contain the x_column and y_column and optionally the color_column.
+            Data to plot, must contain the x_column and y_column and optionally the color_column or color_map_column.
         x_column : str
             Column in data to plot on the x-axis. Must contain numeric data.
         y_column : str
             Column in data to plot on the y-axis. Must contain numeric data.
+        color : str, optional
+            Color to use for the scatterplot. By default "blue".
+        color_map_column : str, optional
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
         color_column : str, optional
-            Column in data to use for color encoding. By default None.
+            Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
         ax : plt.Axes, optional
             Matplotlib axes object to plot on, if None a new figure is created. By default None.
         palette : list[str | tuple], optional
@@ -664,6 +689,8 @@ class Plots:
             Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
+        legend_kwargs : dict, optional
+            Additional keyword arguments for the matplotlib legend function. By default None.
         xlim : tuple[float, float], optional
             Limits for the x-axis. By default None.
         ylim : tuple[float, float], optional
@@ -676,25 +703,35 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
         legend_kwargs = legend_kwargs or {}
+        DEFAULT_GROUP = "data"
 
-        if not ax:
+        if ax is None:
             _, axm = create_figure()
             ax = axm.next()
 
-        if color_column is None:
-            color_values = ["data"] * len(data)
-            color_dict = {"data": BaseColors.get(color)}
-        else:
+        # Handle color encoding: If there is an actual color column, simply color the points accordingly
+        if color_column is not None:
             color_values = _adata_column_to_array(data, color_column)
-            palette = palette or BasePalettes.get("qualitative")
-            color_dict = color_dict or get_color_mapping(color_values, palette)
-            missing = set(np.unique(color_values)) - set(color_dict)
-            for level in missing:
+        # If there is a color map column, map its string levels to a palette
+        elif color_map_column is not None:
+            color_levels = _array_to_str(
+                _adata_column_to_array(data, color_map_column)
+            )  # Safe types: convert the color_map_column values to strings
+            color_dict = _dict_keys_to_str(
+                color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
+            )  # Safe types: convert the color_dict keys to strings
+
+            for level in set(color_levels) - set(color_dict):
                 color_dict[level] = BaseColors.get("grey")
 
-        # Handle ordering of plotting arrays: order by the frequency of the color column
-        counts = Counter(color_values)
-        order = np.argsort([counts[cv] for cv in color_values])[::-1]
+            color_values = np.array([color_dict[level] for level in color_levels], dtype=object)
+        else:
+            color_dict = {DEFAULT_GROUP: BaseColors.get(color)}
+            color_values = np.array([color_dict[DEFAULT_GROUP]] * len(data))
+
+        # Handle ordering of plotting arrays by string: order by the frequency of the color column
+        counts = Counter([str(cv) for cv in color_values])
+        order = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
         x_values = _adata_column_to_array(data, x_column)[order]
         y_values = _adata_column_to_array(data, y_column)[order]
         color_values = np.array(color_values)[order]
@@ -702,11 +739,11 @@ class Plots:
         ax.scatter(
             x=x_values,
             y=y_values,
-            c=[color_dict[color] for color in color_values],
+            c=color_values,
             **scatter_kwargs,
         )
 
-        if legend is not None:
+        if legend is not None and color_dict is not None:
             add_legend_to_axes(
                 ax=ax,
                 levels=color_dict,
@@ -726,10 +763,11 @@ class Plots:
         ax: plt.Axes,
         layer: str = "X",
         color: str = "blue",
+        color_map_column: str | None = None,
+        color_column: str | None = None,
         palette: list[str | tuple] | None = None,
         color_dict: dict[str, str | tuple] | None = None,
         legend: str | mpl.legend.Legend | None = None,
-        color_column: str | None = None,
         scatter_kwargs: dict | None = None,
     ) -> None:
         """Plot the ranked protein median intensities across all samples using the scatter method
@@ -742,8 +780,18 @@ class Plots:
             Matplotlib axes object to plot on, add labels and logscale the y-axis.
         layer : str
             The AnnData layer to calculate the median value (intensities) across sample. Default is "X"
+        color : str, optional
+            Color to use for the scatterplot. By default "blue".
+        color_map_column : str, optional
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
         color_column : str, optional
-            Column in data.var to use for color coding. By default None.
+            Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
+        palette : list[str | tuple], optional
+            List of colors to use for color encoding, if None a default palette is used. By default None.
+        color_dict: dict[str, str | tuple], optional
+            A dictionary mapping levels to colors. By default None. If provided, palette is ignored.
+        legend : str | mpl.legend.Legend, optional
+            Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
 
@@ -753,6 +801,10 @@ class Plots:
 
         """
         scatter_kwargs = scatter_kwargs or {}
+
+        if ax is None:
+            _, axm = create_figure()
+            ax = axm.next()
 
         if layer != "X" and layer not in data.layers:
             raise ValueError(f"Layer {layer} not found in AnnData object")
@@ -774,6 +826,7 @@ class Plots:
             y_column="median",
             color=color,
             color_column=color_column,
+            color_map_column=color_map_column,
             legend=legend,
             palette=palette,
             color_dict=color_dict,
@@ -793,7 +846,7 @@ class Plots:
     @classmethod
     def plot_pca(
         cls,
-        data: ad.AnnData | pd.DataFrame,
+        data: ad.AnnData,
         ax: plt.Axes,
         pc_x: int = 1,
         pc_y: int = 2,
@@ -802,10 +855,11 @@ class Plots:
         label: bool = False,  # noqa: FBT001, FBT002
         label_column: str | None = None,
         color: str = "blue",
+        color_map_column: str | None = None,
+        color_column: str | None = None,
         palette: list[str | tuple] | None = None,
         color_dict: dict[str, str | tuple] | None = None,
         legend: str | mpl.legend.Legend | None = None,
-        color_column: str | None = None,
         scatter_kwargs: dict | None = None,
     ) -> None:
         """Plot the PCs of a PCA analysis using the scatter method
@@ -829,15 +883,17 @@ class Plots:
         label_column: str | None = None,
             Column in data.obs to use for labeling the points. If None, and label is True, data.obs.index labels are added. By default None.
         color : str, optional
-            Color to use for the scatter plot. By default "blue".
+            Color to use for the scatterplot. By default "blue".
+        color_map_column : str, optional
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
+        color_column : str, optional
+            Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
         palette : list[str | tuple], optional
             List of colors to use for color encoding, if None a default palette is used. By default None.
         color_dict: dict[str, str | tuple], optional
             Supercedes palette, a dictionary mapping levels to colors. By default None. If provided, palette is ignored.
         legend : str | mpl.legend.Legend, optional
             Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
-        color_column : str, optional
-            Column in data.var to use for color coding. By default None.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
 
@@ -854,7 +910,12 @@ class Plots:
         # create the dataframe for plotting
         dim1_z = pc_x - 1  # to account for 0 indexing
         dim2_z = pc_y - 1  # to account for 0 indexing
-        values = pd.DataFrame(data.obsm[pca_embeddings_layer_name][:, [dim1_z, dim2_z]], columns=["dim1", "dim2"])
+        values = pd.DataFrame(
+            data.obsm[pca_embeddings_layer_name][:, [dim1_z, dim2_z]], columns=["dim1", "dim2"], index=data.obs_names
+        )
+
+        # Add metadata columns to plotting dataframe
+        values = values.join(data.obs)
 
         # get the explained variance ratio for the dimensions
         var_dim1 = data.uns[pca_variance_layer_name]["variance_ratio"][dim1_z]
@@ -862,17 +923,13 @@ class Plots:
         var_dim2 = data.uns[pca_variance_layer_name]["variance_ratio"][dim2_z]
         var_dim2 = round(var_dim2 * 100, 2)
 
-        # add color column
-        if color_column is not None:
-            color_values = _adata_column_to_array(data, color_column)
-            values[color_column] = color_values
-
         cls.scatter(
             data=values,
             x_column="dim1",
             y_column="dim2",
             color=color,
             color_column=color_column,
+            color_map_column=color_map_column,
             legend=legend,
             palette=palette,
             color_dict=color_dict,
