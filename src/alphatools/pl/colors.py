@@ -67,12 +67,20 @@ def _cycle_palette(
 
 
 def _get_colors_from_cmap(
-    cmap_name: str,
-    num_colors: int,
+    cmap_name: str | mpl.colors.Colormap,
+    values: np.ndarray | int,
 ) -> list:
     """Use a matplotlib colormap to get a list of colors"""
     cmap = plt.get_cmap(cmap_name)
-    return [cmap(i) for i in np.linspace(0, 1, num_colors)]
+
+    if isinstance(values, int):
+        values = np.linspace(0, 1, values)
+    else:
+        values = np.array(values, dtype=float)
+        vmin, vmax = np.nanmin(values), np.nanmax(values)
+        values = mpl_colors.Normalize(vmin=vmin, vmax=vmax)(values)
+
+    return [cmap(value) for value in values]
 
 
 def _base_qualitative_colorscale() -> list:
@@ -125,7 +133,7 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
     if isinstance(palette, list):
         _palette = _cycle_palette(palette, n=len(values))
     elif isinstance(palette, mpl.colors.Colormap):
-        _palette = _get_colors_from_cmap(palette, num_colors=len(values))
+        _palette = _get_colors_from_cmap(palette, values=values)
     else:
         raise TypeError("palette must be a list of colors or a matplotlib colormap")
 
@@ -206,11 +214,12 @@ class BasePalettes:
         n: int = 10,
     ) -> list:
         """Get a default color palette by name"""
+        palette = None
         if palette_name in cls.default_palettes:
             palette = cls.default_palettes[palette_name]
         if palette is None:
             try:
-                palette = _get_colors_from_cmap(palette_name, num_colors=n)
+                palette = _get_colors_from_cmap(palette_name, values=n)
             except ValueError as exc:
                 raise ValueError(f"Unknown palette name: {palette_name}") from exc
 
@@ -319,7 +328,4 @@ class MappedColormaps:
 
         data = np.clip(data, self.vmin, self.vmax)
 
-        self.color_normalizer = mpl_colors.Normalize(vmin=self.vmin, vmax=self.vmax)
-        normalized_data = self.color_normalizer(data)
-
-        return [self.cmap(d) for d in normalized_data]
+        return _get_colors_from_cmap(self.cmap, values=data)
