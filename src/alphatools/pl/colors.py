@@ -225,6 +225,8 @@ class BaseColormaps:
     default_colormaps: ClassVar[dict] = {
         "sequential": cmc.devon,
         "diverging": cmc.managua_r,
+        "sequential_r": cmc.devon_r,
+        "diverging_r": cmc.managua,
     }
 
     @classmethod
@@ -287,6 +289,20 @@ class MappedColormaps:
         Percentile range to be used for normalization. If None, the full range of data is used.
         For example, (5, 95) will map colors between the 5th and 95th percentile.
 
+    Attributes
+    ----------
+    cmap : Colormap
+        Matplotlib Colormap object to be used for mapping data to colors
+    vmin : float
+        Minimum value of the data used for normalization
+    vmax : float
+        Maximum value of the data used for normalization
+    color_normalizer : mpl.colors.Normalize
+        Normalization instance used to map data to colors based on vmin and vmax
+    scalar_mappable : mpl.cm.ScalarMappable
+        MappedColormaps(color_map, percentile).scalar_mappable is a mpl.cm.ScalarMappable instance of the current
+        colormap and normalized data values which can be used in colorbars.
+
     """
 
     def __init__(
@@ -300,6 +316,8 @@ class MappedColormaps:
     def fit_transform(
         self,
         data: np.ndarray,
+        *,
+        as_hex: bool = False,
     ) -> np.ndarray:
         """Normalize data and transform it to colors
 
@@ -308,7 +326,7 @@ class MappedColormaps:
         data : np.ndarray
             Data to be transformed into colors. Based on this data, the colormap will be normalized.
         """
-        data = np.array(data.copy())
+        data = np.asarray(data).copy()
 
         if self.percentile is not None:
             self.vmin = np.percentile(data, self.percentile[0])
@@ -322,4 +340,38 @@ class MappedColormaps:
         self.color_normalizer = mpl_colors.Normalize(vmin=self.vmin, vmax=self.vmax)
         normalized_data = self.color_normalizer(data)
 
-        return [self.cmap(d) for d in normalized_data]
+        rgba = self.cmap(normalized_data)
+
+        if as_hex:
+            return np.apply_along_axis(mpl_colors.to_hex, -1, rgba, keep_alpha=True)
+        return rgba
+
+    @property
+    def scalar_mappable(self) -> mpl.cm.ScalarMappable:
+        """Return a ScalarMappable for use in colorbars"""
+        sm = plt.cm.ScalarMappable(norm=self.color_normalizer, cmap=self.cmap)
+        sm.set_array([])
+        return sm
+
+
+def invert_color(
+    color: tuple | str,
+) -> tuple | str:
+    """Invert a color
+
+    Parameters
+    ----------
+    color : tuple | str
+        Color to be inverted. Can be an RGBA tuple or a color name.
+
+    Returns
+    -------
+    Tuple | str
+        Inverted color as RGBA tuple or hex string.
+    """
+    if isinstance(color, str):
+        color = mpl_colors.to_rgba(color)
+
+    inverted_color = (*tuple(1 - np.array(color[:3])), color[3])  # Preserve alpha channel if present
+
+    return mpl_colors.to_hex(inverted_color, keep_alpha=True) if isinstance(color, str) else inverted_color
