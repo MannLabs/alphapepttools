@@ -336,7 +336,12 @@ def label_plot(
 
 
 def _validate_pca_plot_input(
-    data: ad.AnnData, pca_embeddings_layer_name: str, pca_variance_layer_name: str, pc_x: int, pc_y: int
+    data: ad.AnnData,
+    pca_embeddings_layer_name: str,
+    pca_variance_layer_name: str,
+    pc_x: int,
+    pc_y: int,
+    dim_space: str,
 ) -> None:
     """
     Validates the AnnData object for PCA-related data and dimensions.
@@ -353,23 +358,35 @@ def _validate_pca_plot_input(
         First PCA dimension to be validated (1-indexed, i.e. the first PC is 1, not 0).
     pc_y:
         Second PCA dimension to be validated (1-indexed, i.e. the first PC is 1, not 0).
+    dim_space:
+        The dimension space used in PCA. Can be either "obs" or "var".
     """
     if not isinstance(data, ad.AnnData):
         raise TypeError("data must be an AnnData object")
 
-    if pca_embeddings_layer_name not in data.obsm:
+    if dim_space not in ["obs", "var"]:
+        raise ValueError(f"dim_space must be either 'obs' or 'var', got {dim_space}")
+
+    # Determine which attribute to check based on dim_space
+    pca_coors_attr = "obsm" if dim_space == "obs" else "varm"
+
+    # Check if the PCA embeddings layer exists in the correct attribute
+    if pca_embeddings_layer_name not in getattr(data, pca_coors_attr):
+        available_layers = list(getattr(data, pca_coors_attr).keys())
         raise ValueError(
-            f"PCA embeddings layer '{pca_embeddings_layer_name}' not found in AnnData object. "
-            f"Found layers: {list(data.obsm.keys())}"
+            f"PCA embeddings layer '{pca_embeddings_layer_name}' not found in data.{pca_coors_attr}. "
+            f"Found layers: {available_layers}"
         )
 
+    # Check if the variance layer exists in uns
     if pca_variance_layer_name not in data.uns:
         raise ValueError(
             f"PCA metadata layer '{pca_variance_layer_name}' not found in AnnData object. "
             f"Found layers: {list(data.uns.keys())}"
         )
 
-    n_pcs = data.obsm[pca_embeddings_layer_name].shape[1]
+    # Check PC dimensions
+    n_pcs = getattr(data, pca_coors_attr)[pca_embeddings_layer_name].shape[1]
     if not (1 <= pc_x <= n_pcs) or not (1 <= pc_y <= n_pcs):
         raise ValueError(f"pc_x and pc_y must be between 1 and {n_pcs} (inclusive). Got pc_x={pc_x}, pc_y={pc_y}.")
 
@@ -409,7 +426,7 @@ def _validate_scree_plot_input(
 
 
 def _validate_pca_loadings_plot_inputs(
-    data: ad.AnnData, loadings_name: str, dim: int, dim2: int | None, nfeatures: int
+    data: ad.AnnData, loadings_name: str, dim: int, dim2: int | None, nfeatures: int, dim_space: str
 ) -> None:
     """
     Validate inputs for accessing PCA feature loadings from an AnnData object.
@@ -419,30 +436,42 @@ def _validate_pca_loadings_plot_inputs(
     data : anndata.AnnData
         The AnnData object containing PCA loadings data.
     loadings_name : str
-        The key in `data.varm` that stores PCA feature loadings (e.g., "PCs").
-    dim : int
+        The key that stores PCA feature loadings (e.g., "PCs").
+    dim: int
         The principal component index (1-based) to extract loadings for.
     dim2 : int | None
         The second principal component index (1-based) to extract loadings for, if applicable.
     nfeatures : int
         The number of top features to consider for the given component.
+    dim_space : str
+        The dimension space used in PCA. Can be either "obs" or "var".
     """
     if not isinstance(data, ad.AnnData):
         raise TypeError("data must be an AnnData object")
 
-    if loadings_name not in data.varm:
+    if dim_space not in ["obs", "var"]:
+        raise ValueError(f"dim_space must be either 'obs' or 'var', got {dim_space}")
+
+    # Determine which attribute to check based on dim_space
+    loadings_attr = "varm" if dim_space == "obs" else "obsm"
+
+    # Check if the loadings layer exists in the correct attribute
+    if loadings_name not in getattr(data, loadings_attr):
+        available_layers = list(getattr(data, loadings_attr).keys())
         raise ValueError(
-            f"PCA feature loadings layer '{loadings_name}' not found in AnnData object. "
-            f"Found layers: {list(data.varm.keys())}"
+            f"PCA feature loadings layer '{loadings_name}' not found in data.{loadings_attr}. "
+            f"Found layers: {available_layers}"
         )
 
-    n_pcs = data.varm[loadings_name].shape[1]
+    # Check PC dimensions
+    n_pcs = getattr(data, loadings_attr)[loadings_name].shape[1]
     if not (1 <= dim <= n_pcs):
         raise ValueError(f"PC must be between 1 and {n_pcs} (inclusive). Got dim={dim}.")
     if dim2 is not None and not (1 <= dim2 <= n_pcs):
         raise ValueError(f"second PC must be between 1 and {n_pcs} (inclusive). Got pc_y={dim2}.")
 
-    n_features = data.varm[loadings_name].shape[0]
+    # Check number of features
+    n_features = getattr(data, loadings_attr)[loadings_name].shape[0]
     if not (1 <= nfeatures <= n_features):
         raise ValueError(
             f"Number of features must be between 1 and {n_features} (inclusive). Got nfeatures={nfeatures}."
@@ -450,11 +479,7 @@ def _validate_pca_loadings_plot_inputs(
 
 
 def _prepare_loading_df_to_plot(
-    data: ad.AnnData,
-    loadings_name: str,
-    pc_x: int,
-    pc_y: int,
-    nfeatures: int,
+    data: ad.AnnData, loadings_name: str, pc_x: int, pc_y: int, nfeatures: int, dim_space: str
 ) -> pd.DataFrame:
     """
     Prepare a DataFrame with PCA feature loadings for plotting.
@@ -468,13 +493,15 @@ def _prepare_loading_df_to_plot(
     data : anndata.AnnData
         The AnnData object containing PCA results.
     loadings_name : str
-        The key in `data.varm` where PCA loadings are stored.
+        The key where PCA loadings are stored.
     pc_x : int
         The first principal component index (1-based) to extract loadings for.
     pc_y : int
         The second principal component index (1-based) to extract loadings for.
     nfeatures : int
         Number of top features per PC to highlight based on absolute loadings.
+    dim_space : str
+        The dimension space used in PCA. Can be either "obs" or "var".
 
     Returns
     -------
@@ -482,10 +509,16 @@ def _prepare_loading_df_to_plot(
         DataFrame containing loadings for the selected PCs, feature names, boolean columns
         indicating if a feature was used in PCA and whether it is among the top features in either dimension.
     """
+    _validate_pca_loadings_plot_inputs(
+        data=data, loadings_name=loadings_name, dim=pc_x, dim2=pc_y, nfeatures=nfeatures, dim_space=dim_space
+    )
+
     dim1_z = pc_x - 1  # convert to 0-based index
     dim2_z = pc_y - 1  # convert to 0-based index
 
-    orig_loadings = data.varm[loadings_name]
+    # Determine which attribute to use based on dim_space
+    loadings_attr = "varm" if dim_space == "obs" else "obsm"
+    orig_loadings = getattr(data, loadings_attr)[loadings_name]
 
     loadings = pd.DataFrame(
         {
@@ -494,19 +527,16 @@ def _prepare_loading_df_to_plot(
         }
     )
 
-    # Add feature names and absolute loadings
-    loadings["feature"] = data.var_names
+    # Add feature names based on dim_space
+    if dim_space == "obs":
+        loadings["feature"] = data.var_names
+    else:  # dim_space == "var"
+        loadings["feature"] = data.obs_names
 
     # get only features that were used in the PCA (e.g., those that are part of the core proteome)
-    # these would be features with 0 loadings in all PC dimensions
-    loading_sums = np.nansum(orig_loadings, axis=1)
-    non_sum_zero = np.where(loading_sums != 0)[0]
-    is_in_pca = np.zeros(data.n_vars, dtype=bool)
-    is_in_pca[non_sum_zero] = True
-    loadings["is_in_pca"] = is_in_pca
-
-    # filter the loadings to only include features that were used in the PCA
-    loadings = loadings[loadings["is_in_pca"]]
+    # these would be features with all-NaN loadings in all PC dimensions
+    non_nan_mask = ~np.isnan(orig_loadings).all(axis=1)
+    loadings = loadings[non_nan_mask]
 
     # add the top N features for each dimension
     loadings["abs_dim1"] = loadings["dim1_loadings"].abs()
@@ -850,8 +880,8 @@ class Plots:
         ax: plt.Axes,
         pc_x: int = 1,
         pc_y: int = 2,
-        pca_embeddings_layer_name: str = "X_pca",
-        pca_variance_layer_name: str = "pca",
+        dim_space: str = "obs",
+        embbedings_name: str | None = None,
         label: bool = False,  # noqa: FBT001, FBT002
         label_column: str | None = None,
         color: str = "blue",
@@ -866,7 +896,7 @@ class Plots:
 
         Parameters
         ----------
-        data : ad.AnnData
+        adata : ad.AnnData
             AnnData to plot.
         ax : plt.Axes
             Matplotlib axes object to plot on.
@@ -874,10 +904,10 @@ class Plots:
             The PC principal component index to plot on the x axis, by default 1. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
         pc_y : int
             The principal component index to plot on the y axis, by default 2. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
-        pca_embeddings_layer_name : str,
-            The name of the PCA layer in the AnnData object (in `data.obsm`), by default "X_pca". Different name should be used in case `key_added` was specifically set in `pca()` function under `**pca_kwargs`.
-        label: bool,
-            The name of the PCA layer in the AnnData object (in `data.uns`) that contains the explained variance, by default "pca". Different name should be used in case `key_added` was specifically set in `pca()` function under `**pca_kwargs`.
+        dim_space : str, optional
+            The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
+        embbedings_name : str | None, optional
+            The custom embeddings name used in PCA (given as input for `pca` function in `embbedings_name` ). If None, uses default naming convention. By default None.
         label: bool,
             Whether to add labels to the points in the scatter plot. by default False.
         label_column: str | None = None,
@@ -904,24 +934,34 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
+        # Generate the correct key names based on dim_space and embbedings_name
+        pca_coors_key = f"X_pca_{dim_space}" if embbedings_name is None else embbedings_name
+        variance_key = f"variance_pca_{dim_space}" if embbedings_name is None else embbedings_name
+
+        # Determine which attribute to use for coordinates based on dim_space
+        pca_coors_attr = "obsm" if dim_space == "obs" else "varm"
+
         # Input checks
-        _validate_pca_plot_input(data, pca_embeddings_layer_name, pca_variance_layer_name, pc_x, pc_y)
+        _validate_pca_plot_input(data, pca_coors_key, variance_key, pc_x, pc_y, dim_space)
 
         # create the dataframe for plotting
         dim1_z = pc_x - 1  # to account for 0 indexing
         dim2_z = pc_y - 1  # to account for 0 indexing
-        values = pd.DataFrame(
-            data.obsm[pca_embeddings_layer_name][:, [dim1_z, dim2_z]], columns=["dim1", "dim2"], index=data.obs_names
-        )
 
-        # Add metadata columns to plotting dataframe
-        values = values.join(data.obs)
+        # Get PCA coordinates from the correct attribute
+        pca_coordinates = getattr(data, pca_coors_attr)[pca_coors_key]
+        values = pd.DataFrame(pca_coordinates[:, [dim1_z, dim2_z]], columns=["dim1", "dim2"])
 
         # get the explained variance ratio for the dimensions
-        var_dim1 = data.uns[pca_variance_layer_name]["variance_ratio"][dim1_z]
+        var_dim1 = data.uns[variance_key]["variance_ratio"][dim1_z]
         var_dim1 = round(var_dim1 * 100, 2)
-        var_dim2 = data.uns[pca_variance_layer_name]["variance_ratio"][dim2_z]
+        var_dim2 = data.uns[variance_key]["variance_ratio"][dim2_z]
         var_dim2 = round(var_dim2 * 100, 2)
+
+        # add color column
+        if color_map_column is not None:
+            color_values = _adata_column_to_array(data, color_map_column)
+            values[color_map_column] = color_values
 
         cls.scatter(
             data=values,
@@ -939,7 +979,12 @@ class Plots:
 
         # add labels if requested
         if label:
-            labels = data.obs.index if label_column is None else _adata_column_to_array(data, label_column)
+            # For labeling, we need to consider the appropriate observation space
+            if dim_space == "obs":
+                labels = data.obs.index if label_column is None else _adata_column_to_array(data, label_column)
+            else:  # dim_space == "var"
+                labels = data.var.index if label_column is None else _adata_column_to_array(data, label_column)
+
             label_plot(ax=ax, x_values=values["dim1"], y_values=values["dim2"], labels=labels, x_anchors=None)
 
         # set axislabels
@@ -948,10 +993,11 @@ class Plots:
     @classmethod
     def scree_plot(
         cls,
-        data: ad.AnnData | pd.DataFrame,
+        adata: ad.AnnData | pd.DataFrame,
         ax: plt.Axes,
         n_pcs: int = 20,
-        pca_variance_layer_name: str = "pca",
+        dim_space: str = "obs",
+        embbedings_name: str | None = None,
         scatter_kwargs: dict | None = None,
     ) -> None:
         """Plot the eigenvalues of each of the PCs using the scatter method
@@ -964,8 +1010,10 @@ class Plots:
             Matplotlib axes object to plot on.
         n_pcs : int,
             number of PCs to plot, by default 20
-        pca_variance_layer_name : str,
-            The name of the PCA layer in the AnnData object (in `data.uns`) that contains the explained variance, by default "pca". Different name should be used in case `key_added` was specifically set in `pca()` function under `**pca_kwargs`.
+        dim_space : str, optional
+            The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
+        embbedings_name : str | None, optional
+            The custom embeddings name used in PCA. If None, uses default naming convention. By default None.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
 
@@ -976,17 +1024,20 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        # Input checks
-        _validate_scree_plot_input(data, pca_variance_layer_name, n_pcs)
+        # Generate the correct variance key name
+        variance_key = f"variance_pca_{dim_space}" if embbedings_name is None else embbedings_name
 
-        n_pcs_avail = len(data.uns[pca_variance_layer_name]["variance_ratio"])
+        # Input checks
+        _validate_scree_plot_input(adata, variance_key, n_pcs)
+
+        n_pcs_avail = len(adata.uns[variance_key]["variance_ratio"])
         n_pcs = min(n_pcs, n_pcs_avail)
 
         # create the dataframe for plotting, X = pcs, y = explained variance
         values = pd.DataFrame(
             {
                 "PC": np.arange(n_pcs) + 1,
-                "explained_variance": data.uns[pca_variance_layer_name]["variance_ratio"][:n_pcs],
+                "explained_variance": adata.uns[variance_key]["variance_ratio"][:n_pcs],
             }
         )
 
@@ -999,14 +1050,16 @@ class Plots:
         )
 
         # set labels
-        label_axes(ax, xlabel="PC number", ylabel="Explained variance (%)")
+        space_suffix = " (samples)" if dim_space == "obs" else " (features)"
+        label_axes(ax, xlabel="PC number", ylabel=f"Explained variance (%){space_suffix}")
 
     @classmethod
     def plot_pca_loadings(
         cls,
         data: ad.AnnData | pd.DataFrame,
         ax: plt.Axes,
-        loadings_name: str = "PCs",
+        dim_space: str = "obs",
+        embbedings_name: str | None = None,
         dim: int = 1,
         nfeatures: int = 20,
         scatter_kwargs: dict | None = None,
@@ -1019,8 +1072,10 @@ class Plots:
             AnnData to plot.
         ax : plt.Axes
             Matplotlib axes object to plot on.
-        loadings_name : str
-            The name of the PCA loadings layer in the AnnData object (data.varm.keys), by default "PCs". Different name should be used in case `key_added` was specifically set in `pca()` function under `**pca_kwargs`.
+        dim_space : str, optional
+            The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
+        embbedings_name : str | None, optional
+            The custom embeddings name used in PCA. If None, uses default naming convention. By default None.
         dim : int
             The PC number from which to get loadings, by default 1 (1-indexed, i.e. the first PC is 1, not 0).
         nfeatures : int
@@ -1035,14 +1090,27 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
+        # Generate the correct loadings key name
+        loadings_key = f"PCs_{dim_space}" if embbedings_name is None else embbedings_name
+
+        # Determine which attribute to use for loadings based on dim_space
+        loadings_attr = "varm" if dim_space == "obs" else "obsm"
+
         _validate_pca_loadings_plot_inputs(
-            data=data, loadings_name=loadings_name, dim=dim, dim2=None, nfeatures=nfeatures
+            data=data, loadings_name=loadings_key, dim=dim, dim2=None, nfeatures=nfeatures, dim_space=dim_space
         )
 
         # create the dataframe for plotting
         dim_z = dim - 1  # to account from 0 indexing
-        loadings = pd.DataFrame({"dim_loadings": data.varm[loadings_name][:, dim_z]})
-        loadings["feature"] = data.var.index.astype("string")
+        loadings_matrix = getattr(data, loadings_attr)[loadings_key]
+        loadings = pd.DataFrame({"dim_loadings": loadings_matrix[:, dim_z]})
+
+        # Use appropriate index for features based on dim_space
+        if dim_space == "obs":
+            loadings["feature"] = data.var.index.astype("string")
+        else:  # dim_space == "var"
+            loadings["feature"] = data.obs.index.astype("string")
+
         loadings["abs_loadings"] = loadings["dim_loadings"].abs()
         # Sort the DataFrame by absolute loadings and select the top features
         top_loadings = loadings.sort_values(by="abs_loadings", ascending=False).copy().head(nfeatures)
@@ -1058,7 +1126,8 @@ class Plots:
         )
 
         # set axis labels
-        label_axes(ax, xlabel=f"PC{dim} loadings", ylabel="Top features")
+        space_suffix = " features" if dim_space == "obs" else " samples"
+        label_axes(ax, xlabel=f"PC{dim} loadings", ylabel=f"Top{space_suffix}")
         ax.set_yticks(top_loadings["index_int"])
         ax.set_yticklabels(top_loadings["feature"], rotation=0, ha="right")
 
@@ -1067,7 +1136,8 @@ class Plots:
         cls,
         data: ad.AnnData | pd.DataFrame,
         ax: plt.Axes,
-        loadings_name: str = "PCs",
+        dim_space: str = "obs",
+        embbedings_name: str | None = None,
         pc_x: int = 1,
         pc_y: int = 2,
         nfeatures: int = 20,
@@ -1084,8 +1154,10 @@ class Plots:
             AnnData to plot.
         ax : plt.Axes
             Matplotlib axes object to plot on.
-        loadings_name : str
-            The name of the PCA loadings layer in the AnnData object (data.varm.keys), by default "PCs". Different name should be used in case `key_added` was specifically set in `pca()` function under `**pca_kwargs`.
+        dim_space : str, optional
+            The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
+        embbedings_name : str | None, optional
+            The custom embeddings name used in PCA. If None, uses default naming convention. By default None.
         pc_x : int
             The PC principal component index to plot on the x axis, by default 1. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
         pc_y : int
@@ -1106,12 +1178,11 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        _validate_pca_loadings_plot_inputs(
-            data=data, loadings_name=loadings_name, dim=pc_x, dim2=pc_y, nfeatures=nfeatures
-        )
+        # Generate the correct loadings key name
+        loadings_key = f"PCs_{dim_space}" if embbedings_name is None else embbedings_name
 
         loadings = _prepare_loading_df_to_plot(
-            data=data, loadings_name=loadings_name, pc_x=pc_x, pc_y=pc_y, nfeatures=nfeatures
+            data=data, loadings_name=loadings_key, pc_x=pc_x, pc_y=pc_y, nfeatures=nfeatures, dim_space=dim_space
         )
 
         # plot the loadings of all features (used in PCA) first
@@ -1157,4 +1228,5 @@ class Plots:
                 ax.plot([0, xi], [0, yi], color="gray", linestyle="-", linewidth=0.2)
 
         # set axis labels
-        label_axes(ax, xlabel=f"PC{pc_x}", ylabel=f"PC{pc_y}")
+        space_suffix = " (samples)" if dim_space == "obs" else " (features)"
+        label_axes(ax, xlabel=f"PC{pc_x}{space_suffix}", ylabel=f"PC{pc_y}{space_suffix}")
