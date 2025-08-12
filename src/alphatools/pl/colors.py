@@ -288,6 +288,20 @@ class MappedColormaps:
         Percentile range to be used for normalization. If None, the full range of data is used.
         For example, (5, 95) will map colors between the 5th and 95th percentile.
 
+    Attributes
+    ----------
+    cmap : Colormap
+        Matplotlib Colormap object to be used for mapping data to colors
+    vmin : float
+        Minimum value of the data used for normalization
+    vmax : float
+        Maximum value of the data used for normalization
+    color_normalizer : mpl.colors.Normalize
+        Normalization instance used to map data to colors based on vmin and vmax
+    scalar_mappable : mpl.cm.ScalarMappable
+        MappedColormaps(color_map, percentile).scalar_mappable is a mpl.cm.ScalarMappable instance of the current
+        colormap and normalized data values which can be used in colorbars.
+
     """
 
     def __init__(
@@ -333,16 +347,7 @@ class MappedColormaps:
 
     @property
     def scalar_mappable(self) -> mpl.cm.ScalarMappable:
-        """Return a ScalarMappable for use in colorbars
-
-        In order to generate colorbars, the MappedColormaps instance can return a ScalarMappable, which maps normalized data to colors.
-
-        Returns
-        -------
-        mpl.cm.ScalarMappable
-            ScalarMappable instance of the current colormap and normalized data values which can be used in colorbars.
-
-        """
+        """Return a ScalarMappable for use in colorbars"""
         sm = plt.cm.ScalarMappable(norm=self.color_normalizer, cmap=self.cmap)
         sm.set_array([])
         return sm
