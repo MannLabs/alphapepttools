@@ -217,7 +217,7 @@ def _drop_nans_from_plot_arrays(
     labels: np.ndarray | list[str],
 ) -> tuple:
     # Missing x or y values are breaking and should be dropped
-    keep_mask = ~np.logical_or(np.isnan(x_values), np.isnan(y_values))
+    keep_mask = ~np.logical_or(pd.isna(x_values), pd.isna(y_values))
 
     return x_values[keep_mask], y_values[keep_mask], labels[keep_mask]
 
