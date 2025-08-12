@@ -252,6 +252,7 @@ class BaseColormaps:
             Matplotlib Colormap object or list of colors
 
         """
+        colormap = None
         if colormap_name in cls.default_colormaps:
             colormap = cls.default_colormaps[colormap_name]
 
