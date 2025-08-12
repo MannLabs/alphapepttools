@@ -69,7 +69,7 @@ def _cycle_palette(
 def _get_colors_from_cmap(
     cmap_name: str | mpl.colors.Colormap,
     values: np.ndarray | int,
-) -> list:
+) -> np.ndarray:
     """Use a matplotlib colormap to get a list of colors"""
     cmap = plt.get_cmap(cmap_name)
 
@@ -338,15 +338,15 @@ class MappedColormaps:
         data = np.asarray(data).copy()
 
         if self.percentile is not None:
-            self.vmin = np.percentile(data, self.percentile[0])
-            self.vmax = np.percentile(data, self.percentile[1])
+            self.vmin = np.nanpercentile(data, self.percentile[0])
+            self.vmax = np.nanpercentile(data, self.percentile[1])
         else:
             self.vmin = np.nanmin(data)
             self.vmax = np.nanmax(data)
 
         data = np.clip(data, self.vmin, self.vmax)
 
-        rgba = _get_colors_from_cmap(self.cmap, values=data)
+        rgba = _get_colors_from_cmap(self.cmap, data)
 
         if as_hex:
             return np.apply_along_axis(mpl_colors.to_hex, -1, rgba, keep_alpha=True)
@@ -355,7 +355,9 @@ class MappedColormaps:
     @property
     def scalar_mappable(self) -> mpl.cm.ScalarMappable:
         """Return a ScalarMappable for use in colorbars"""
-        sm = plt.cm.ScalarMappable(norm=self.color_normalizer, cmap=self.cmap)
+        if not hasattr(self, "vmin") or not hasattr(self, "vmax"):
+            raise ValueError("fit_transform must be called before accessing scalar_mappable")
+        sm = plt.cm.ScalarMappable(norm=mpl_colors.Normalize(vmin=self.vmin, vmax=self.vmax), cmap=self.cmap)
         sm.set_array([])
         return sm
 
