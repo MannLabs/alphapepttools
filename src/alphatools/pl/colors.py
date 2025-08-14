@@ -14,6 +14,7 @@ from typing import ClassVar
 
 import cmcrameri.cm as cmc
 import matplotlib as mpl
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -54,6 +55,17 @@ def _lighten_color(
         color += [alpha]
 
     return tuple(color)
+
+
+def clip_colormap(
+    cmap: mpl.colors.Colormap,
+    lowpoint: float = 0.0,
+    highpoint: float = 1.0,
+    n: int = 256,
+) -> mcolors.LinearSegmentedColormap:
+    """Return a truncated version of a colormap."""
+    new_colors = cmap(np.linspace(lowpoint, highpoint, n))
+    return mcolors.LinearSegmentedColormap.from_list(f"{cmap.name}_trunc", new_colors)
 
 
 def _cycle_palette(
@@ -236,6 +248,9 @@ class BaseColormaps:
         "diverging": cmc.managua_r,
         "sequential_r": cmc.devon_r,
         "diverging_r": cmc.managua,
+        "sequential_clipped": clip_colormap(cmc.devon, lowpoint=0, highpoint=0.8),
+        "sequential_r_clipped": clip_colormap(cmc.devon_r, lowpoint=0.2, highpoint=1),
+        "magma_clipped": clip_colormap(plt.get_cmap("magma"), lowpoint=0, highpoint=0.8),
     }
 
     @classmethod
