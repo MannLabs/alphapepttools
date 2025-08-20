@@ -43,7 +43,7 @@ pip install -e ".[test, dev]"
 
 ## Release notes
 
-See the [GitHub Release page][https://github.com/MannLabs/alphatools/releases].
+See the [GitHub Release page](https://github.com/MannLabs/alphatools/releases).
 
 ## Developer Guide
 
