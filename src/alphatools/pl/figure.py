@@ -35,7 +35,9 @@ def label_axes(
     ylabel: str | None = None,
     title: str | None = None,
     label_parser: Callable | None = None,
-) -> plt.Axes:
+    enumeration: str | None = None,
+    enumeration_xytext: tuple[float, float] = (-10, 10),
+) -> None:
     """Apply labels to a matplotlib axes object
 
     Parameters
@@ -52,6 +54,12 @@ def label_axes(
         A function to parse labels, by default None. This is useful to convert
         labels from a computation-context to presentation context, e.g. a column
         like upregulated_proteins could be shown as "Upregulated Proteins" in the plot.
+    enumeration : str, optional
+        A string to enumerate the plot in the top left, e.g. "A", "B", "C", etc.
+    enumeration_xytext : Tuple[float, float], optional, by default (-10, 10)
+        This parameter describes the offset of the enumeration text in typographic points
+        relative to the top left of the axis. This does not scale with resolution or plot
+        size, but can be adapted to fit the plot.
 
     Returns
     -------
@@ -63,6 +71,18 @@ def label_axes(
     ax.set_xlabel(label_parser(xlabel), fontsize=config["axes"]["label_size"]) if xlabel is not None else None
     ax.set_ylabel(label_parser(ylabel), fontsize=config["axes"]["label_size"]) if ylabel is not None else None
     ax.set_title(label_parser(title), fontsize=config["axes"]["title_size"]) if title is not None else None
+
+    # Optionally, add the numeration to the plot
+    if enumeration is not None:
+        ax.annotate(
+            str(enumeration),
+            xy=(0, 1),  # This is the anchor: top left of the plot
+            xytext=enumeration_xytext,  # This is the text position relative to the offset
+            xycoords="axes fraction",  # This tells mpl that the coordinates are relative to the axes
+            textcoords="offset points",  # This tells mpl that the text position is in points relative to the anchor
+            fontsize=config["font_sizes"]["large"],
+            ha="right",
+        )
 
 
 def _indexable_axes(

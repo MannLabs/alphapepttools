@@ -400,13 +400,20 @@ def _adata_column_to_array(
         # prioritize var_names, i.e. numeric data from X
         if column in data.var_names:
             col_idx = data.var_names.get_loc(column)
+            logging.info(f"Column '{column}' found in: data.var_names. Using that")
             return data.X[:, col_idx].flatten()
 
-        # if the column is not found in var_names, check the columns of obs (metadata)
         if column in data.obs.columns:
+            logging.info(f"Column '{column}' found in: data.obs.columns. Using that")
             return data.obs[column].to_numpy()
 
-        raise ValueError(f"Column {column} not found in AnnData object (checked var_names or obs.columns).")
+        if column in data.var.columns:
+            logging.info(f"Column '{column}' found in: data.var.columns. Using that")
+            return data.var[column].to_numpy()
+
+        raise ValueError(
+            f"Column {column} not found in AnnData object (checked var_names and obs.columns and var.columns)."
+        )
     raise TypeError("Data must be a pd.DataFrame or ad.AnnData.")
 
 

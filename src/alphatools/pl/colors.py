@@ -14,6 +14,7 @@ from typing import ClassVar
 
 import cmcrameri.cm as cmc
 import matplotlib as mpl
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -56,6 +57,17 @@ def _lighten_color(
     return tuple(color)
 
 
+def clip_colormap(
+    cmap: mpl.colors.Colormap,
+    lowpoint: float = 0.0,
+    highpoint: float = 1.0,
+    n: int = 256,
+) -> mcolors.LinearSegmentedColormap:
+    """Return a truncated version of a colormap."""
+    new_colors = cmap(np.linspace(lowpoint, highpoint, n))
+    return mcolors.LinearSegmentedColormap.from_list(f"{cmap.name}_trunc", new_colors)
+
+
 def _cycle_palette(
     palette: list,
     n: int,
@@ -67,12 +79,20 @@ def _cycle_palette(
 
 
 def _get_colors_from_cmap(
-    cmap_name: str,
-    num_colors: int,
-) -> list:
+    cmap_name: str | mpl.colors.Colormap,
+    values: np.ndarray | int,
+) -> np.ndarray:
     """Use a matplotlib colormap to get a list of colors"""
     cmap = plt.get_cmap(cmap_name)
-    return [cmap(i) for i in np.linspace(0, 1, num_colors)]
+
+    if isinstance(values, int):
+        values = np.linspace(0, 1, values)
+    else:
+        values = np.array(values, dtype=float)
+        vmin, vmax = np.nanmin(values), np.nanmax(values)
+        values = mpl_colors.Normalize(vmin=vmin, vmax=vmax)(values)
+
+    return cmap(values)
 
 
 def _base_qualitative_colorscale() -> list:
@@ -125,7 +145,7 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
     if isinstance(palette, list):
         _palette = _cycle_palette(palette, n=len(values))
     elif isinstance(palette, mpl.colors.Colormap):
-        _palette = _get_colors_from_cmap(palette, num_colors=len(values))
+        _palette = _get_colors_from_cmap(palette, values=values)
     else:
         raise TypeError("palette must be a list of colors or a matplotlib colormap")
 
@@ -206,11 +226,12 @@ class BasePalettes:
         n: int = 10,
     ) -> list:
         """Get a default color palette by name"""
+        palette = None
         if palette_name in cls.default_palettes:
             palette = cls.default_palettes[palette_name]
         if palette is None:
             try:
-                palette = _get_colors_from_cmap(palette_name, num_colors=n)
+                palette = _get_colors_from_cmap(palette_name, values=n)
             except ValueError as exc:
                 raise ValueError(f"Unknown palette name: {palette_name}") from exc
 
@@ -225,6 +246,11 @@ class BaseColormaps:
     default_colormaps: ClassVar[dict] = {
         "sequential": cmc.devon,
         "diverging": cmc.managua_r,
+        "sequential_r": cmc.devon_r,
+        "diverging_r": cmc.managua,
+        "sequential_clipped": clip_colormap(cmc.devon, lowpoint=0, highpoint=0.8),
+        "sequential_r_clipped": clip_colormap(cmc.devon_r, lowpoint=0.2, highpoint=1),
+        "magma_clipped": clip_colormap(plt.get_cmap("magma"), lowpoint=0, highpoint=0.8),
     }
 
     @classmethod
@@ -252,6 +278,7 @@ class BaseColormaps:
             Matplotlib Colormap object or list of colors
 
         """
+        colormap = None
         if colormap_name in cls.default_colormaps:
             colormap = cls.default_colormaps[colormap_name]
 
@@ -286,6 +313,20 @@ class MappedColormaps:
         Percentile range to be used for normalization. If None, the full range of data is used.
         For example, (5, 95) will map colors between the 5th and 95th percentile.
 
+    Attributes
+    ----------
+    cmap : Colormap
+        Matplotlib Colormap object to be used for mapping data to colors
+    vmin : float
+        Minimum value of the data used for normalization
+    vmax : float
+        Maximum value of the data used for normalization
+    color_normalizer : mpl.colors.Normalize
+        Normalization instance used to map data to colors based on vmin and vmax
+    scalar_mappable : mpl.cm.ScalarMappable
+        MappedColormaps(color_map, percentile).scalar_mappable is a mpl.cm.ScalarMappable instance of the current
+        colormap and normalized data values which can be used in colorbars.
+
     """
 
     def __init__(
@@ -295,10 +336,14 @@ class MappedColormaps:
     ):
         self.cmap = BaseColormaps.get(cmap)
         self.percentile = percentile
+        self.vmin = None
+        self.vmax = None
 
     def fit_transform(
         self,
         data: np.ndarray,
+        *,
+        as_hex: bool = False,
     ) -> np.ndarray:
         """Normalize data and transform it to colors
 
@@ -307,18 +352,51 @@ class MappedColormaps:
         data : np.ndarray
             Data to be transformed into colors. Based on this data, the colormap will be normalized.
         """
-        data = np.array(data.copy())
+        data = np.asarray(data).copy()
 
         if self.percentile is not None:
-            self.vmin = np.percentile(data, self.percentile[0])
-            self.vmax = np.percentile(data, self.percentile[1])
+            self.vmin = np.nanpercentile(data, self.percentile[0])
+            self.vmax = np.nanpercentile(data, self.percentile[1])
         else:
-            self.vmin = np.min(data)
-            self.vmax = np.max(data)
+            self.vmin = np.nanmin(data)
+            self.vmax = np.nanmax(data)
 
         data = np.clip(data, self.vmin, self.vmax)
 
-        self.color_normalizer = mpl_colors.Normalize(vmin=self.vmin, vmax=self.vmax)
-        normalized_data = self.color_normalizer(data)
+        rgba = _get_colors_from_cmap(self.cmap, data)
 
-        return [self.cmap(d) for d in normalized_data]
+        if as_hex:
+            return np.apply_along_axis(mpl_colors.to_hex, -1, rgba, keep_alpha=True)
+        return rgba
+
+    @property
+    def scalar_mappable(self) -> mpl.cm.ScalarMappable:
+        """Return a ScalarMappable for use in colorbars"""
+        if self.vmin is None or self.vmax is None:
+            raise ValueError("fit_transform must be called before accessing scalar_mappable")
+        sm = plt.cm.ScalarMappable(norm=mpl_colors.Normalize(vmin=self.vmin, vmax=self.vmax), cmap=self.cmap)
+        sm.set_array([])
+        return sm
+
+
+def invert_color(
+    color: tuple | str,
+) -> tuple | str:
+    """Invert a color
+
+    Parameters
+    ----------
+    color : tuple | str
+        Color to be inverted. Can be an RGBA tuple or a color name.
+
+    Returns
+    -------
+    Tuple | str
+        Inverted color as RGBA tuple or hex string.
+    """
+    if isinstance(color, str):
+        color = mpl_colors.to_rgba(color)
+
+    inverted_color = (*tuple(1 - np.array(color[:3])), color[3])  # Preserve alpha channel if present
+
+    return mpl_colors.to_hex(inverted_color, keep_alpha=True) if isinstance(color, str) else inverted_color
