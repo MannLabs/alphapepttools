@@ -336,6 +336,8 @@ class MappedColormaps:
     ):
         self.cmap = BaseColormaps.get(cmap)
         self.percentile = percentile
+        self.vmin = None
+        self.vmax = None
 
     def fit_transform(
         self,
@@ -370,7 +372,7 @@ class MappedColormaps:
     @property
     def scalar_mappable(self) -> mpl.cm.ScalarMappable:
         """Return a ScalarMappable for use in colorbars"""
-        if not hasattr(self, "vmin") or not hasattr(self, "vmax"):
+        if self.vmin is None or self.vmax is None:
             raise ValueError("fit_transform must be called before accessing scalar_mappable")
         sm = plt.cm.ScalarMappable(norm=mpl_colors.Normalize(vmin=self.vmin, vmax=self.vmax), cmap=self.cmap)
         sm.set_array([])
