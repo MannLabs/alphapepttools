@@ -9,15 +9,14 @@ from alphatools.pl.plots import label_plot
 def example_ax():
     def make_dummy_data():
         fig, axm = create_figure(1, 2, figsize=(6, 3))
-        return fig, axm.next()
+        ax = axm.next()
+        return fig, ax
 
     return make_dummy_data()
 
 
-# 3 --> 3.057
-# 2 --> 2.711
-# 1 --> 2.365
-# The important thing to assess is whether labels and values stay matched throughout the repositioning
+# The important thing to assess is whether labels and values stay matched throughout the repositioning,
+# Hence the providing of labels and values out of order.
 @pytest.mark.parametrize(
     (
         "x",
@@ -46,13 +45,15 @@ def example_ax():
             [2, 2, 3, 3, 1, 1],
             ["middle_right", "middle_left", "top_right", "top_left", "bottom_right", "bottom_left"],
             (0.5, 2.5),
+            # These values were manually read out from a plot in a test notebook; the important thing
+            # here is the order of label y values: top > middle > bottom for left and right
             [
-                ((1, 0.5), (3, 3.057), "top_left"),
-                ((1, 0.5), (2, 2.711), "middle_left"),
-                ((1, 0.5), (1, 2.365), "bottom_left"),
-                ((2, 2.5), (3, 3.057), "top_right"),
-                ((2, 2.5), (2, 2.711), "middle_right"),
-                ((2, 2.5), (1, 2.365), "bottom_right"),
+                ((1, 0.5), (3, 3.094), "top_left"),
+                ((1, 0.5), (2, 2.788), "middle_left"),
+                ((1, 0.5), (1, 2.484), "bottom_left"),
+                ((2, 2.5), (3, 3.094), "top_right"),
+                ((2, 2.5), (2, 2.788), "middle_right"),
+                ((2, 2.5), (1, 2.484), "bottom_right"),
             ],
         ),
     ],
