@@ -722,7 +722,7 @@ class Plots:
         scatter_kwargs = scatter_kwargs or {}
 
         pca_coor_df = pdh.prepare_pca_data_to_plot(
-            data, pc_x, pc_y, dim_space, embbedings_name, color_map_column, label_column, *label
+            data, pc_x, pc_y, dim_space, embbedings_name, color_map_column, label_column, label=label
         )
 
         # Check if the variance layer exists in uns
