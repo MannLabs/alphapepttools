@@ -4,7 +4,6 @@ requires = [ "hatchling" ]
 
 [project]
 name = "alphatools"
-version = "0.0.1"
 description = "Search- and quantification-engine agnostic biological interpretation of proteomics data"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -22,6 +21,8 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
 ]
+dynamic = [ "version" ]
+
 dependencies = [
   # this is the 'data_downloader_improvements' branch with all the anndata code
   "alphabase @ git+https://github.com/MannLabs/alphabase@95a1cd9beafc13dfde09f813984eb1f77e3a60bc", # TODO point to next release
@@ -65,6 +66,9 @@ optional-dependencies.test = [
 urls.Documentation = "https://alphatools.readthedocs.io/"
 urls.Homepage = "https://github.com/MannLabs/alphatools"
 urls.Source = "https://github.com/MannLabs/alphatools"
+
+[tool.hatch.version]
+path = "src/alphatools/__init__.py"
 
 [tool.hatch.envs.default]
 installer = "uv"
