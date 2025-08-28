@@ -81,8 +81,8 @@ def _cycle_palette(
 def _get_colors_from_cmap(
     cmap_name: str | mpl.colors.Colormap,
     values: np.ndarray | int,
-) -> list[tuple[float, float, float, float]]:
-    """Use a matplotlib colormap to get a list of colors"""
+) -> np.ndarray:
+    """Map values to colors from a colormap"""
     cmap = plt.get_cmap(cmap_name)
 
     if isinstance(values, int):
@@ -92,7 +92,7 @@ def _get_colors_from_cmap(
         vmin, vmax = np.nanmin(values), np.nanmax(values)
         values = mpl_colors.Normalize(vmin=vmin, vmax=vmax)(values)
 
-    return [tuple(rgba) for rgba in cmap(values)]
+    return cmap(values)
 
 
 def _base_qualitative_colorscale() -> list:
