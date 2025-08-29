@@ -33,7 +33,7 @@ def read_pg_table(
     ----------
     path
         Path to protein group matrix
-    reader_type
+    search_engine
         Name of engine output, pass the method name of the corresponding reader. You can
         list all available readers with the :func:`dvpio.read.omics.available_reader` helper function
     column_mapping
@@ -72,14 +72,14 @@ def read_pg_table(
 
     .. code-block:: python
 
-        from alphatools.io import read_pg
+        from alphatools.io import read_pg_table
 
         alphadia_path = ...
-        adata = read_pg_table(alphadia_path, reader_type="alphadia")
+        adata = read_pg_table(alphadia_path, search_engine="alphadia")
 
         maxquant_path = ...
         # Read LFQ values from MaxQuant report
-        adata = read_pg_table(maxquant_path, reader_type="maxquant", measurement_regex="lfq")
+        adata = read_pg_table(maxquant_path, search_engine="maxquant", measurement_regex="lfq")
 
     Get available regular expressions
 

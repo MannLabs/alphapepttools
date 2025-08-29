@@ -50,10 +50,10 @@ def test_alphapept_pg_reader(example_alphapept_csv: tuple[Path, Path]):
     """Test alphadia reader (basic reader)"""
     file_path, reference_file_path, var_data_path = example_alphapept_csv
 
-    # Validate that measurement_regex works as exepcted
+    # Validate that measurement_regex works as expected
     adata = read_pg_table(file_path, search_engine="alphapept", measurement_regex="lfq")
     reference_df = pd.read_parquet(reference_file_path)
-    # Reference .var attribute, validat parsing of metadata
+    # Reference .var attribute, validate parsing of metadata
     reference_var = pd.read_parquet(var_data_path)
 
     pd.testing.assert_frame_equal(adata.to_df(), reference_df)
