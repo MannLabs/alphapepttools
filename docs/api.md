@@ -75,4 +75,5 @@
     :toctree: generated
 
     AnnDataFactory
+    read_pg_table
 ```
