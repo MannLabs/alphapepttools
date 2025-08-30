@@ -115,6 +115,8 @@ def _get_colors_from_cmap(
 
     if isinstance(values, int):
         return [tuple(color) for color in cmap(np.linspace(0, 1, values))]
+    if not pd.api.types.is_numeric_dtype(values):
+        raise TypeError("values must be an integer or a numeric numpy array")
 
     vmin, vmax = np.nanmin(values), np.nanmax(values)
     values = mpl_colors.Normalize(vmin=vmin, vmax=vmax)(values)
