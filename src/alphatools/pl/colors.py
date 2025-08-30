@@ -115,6 +115,7 @@ def _get_colors_from_cmap(
 
     if isinstance(values, int):
         return [tuple(color) for color in cmap(np.linspace(0, 1, values))]
+
     vmin, vmax = np.nanmin(values), np.nanmax(values)
     values = mpl_colors.Normalize(vmin=vmin, vmax=vmax)(values)
     return cmap(values)
@@ -188,10 +189,11 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
     # Ensure predictable color mapping
     values = np.sort(values)
 
+    # Map color levels to a palette or a colormap
     if isinstance(palette, list):
         _palette = _cycle_palette(palette, n=len(values))
     elif isinstance(palette, mpl.colors.Colormap):
-        _palette = _get_colors_from_cmap(palette, values=values)
+        _palette = _get_colors_from_cmap(palette, values=len(values))
     else:
         raise TypeError("palette must be a list of colors or a matplotlib colormap")
 

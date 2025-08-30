@@ -772,22 +772,25 @@ class Plots:
             color_values = data_column_to_array(data, color_column)
         # Map values from the color_map_column to colors
         elif color_map_column is not None:
-            # if the color_map_column is numeric, map it to colors directly
-            color_levels = data_column_to_array(data, color_map_column)
-            if pd.api.types.is_numeric_dtype(color_levels) and isinstance(palette, plt.Colormap):
+            color_map_column_array = data_column_to_array(data, color_map_column)
+
+            if pd.api.types.is_numeric_dtype(color_map_column_array) and isinstance(palette, plt.Colormap):
                 color_values = _get_colors_from_cmap(
                     cmap_name=palette,
-                    values=color_levels,
+                    values=color_map_column_array,
                 )
+            # if color_map_column is not numeric
             else:
-                color_levels = _array_to_str(data_column_to_array(data, color_map_column))
+                color_map_column_array = _array_to_str(data_column_to_array(data, color_map_column))
                 color_dict = _dict_keys_to_str(
                     color_dict
-                    or get_color_mapping(values=color_levels, palette=palette or BasePalettes.get("qualitative"))
+                    or get_color_mapping(
+                        values=color_map_column_array, palette=palette or BasePalettes.get("qualitative")
+                    )
                 )
-                for level in set(color_levels) - set(color_dict):
+                for level in set(color_map_column_array) - set(color_dict):
                     color_dict[level] = BaseColors.get("grey")
-                color_values = np.array([color_dict[level] for level in color_levels], dtype=object)
+                color_values = np.array([color_dict[level] for level in color_map_column_array], dtype=object)
         else:
             color_dict = {DEFAULT_GROUP: color or DEFAULT_COLOR}
             color_values = np.array([color_dict[DEFAULT_GROUP]] * len(data))
