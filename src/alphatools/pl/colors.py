@@ -166,20 +166,26 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
 
     """
     NA_STRING = config["na_default"]
+    has_na = False
 
     values = values.astype(str)
     values = pd.unique(values)
 
-    if config["na_default"] in values:
-        logger.warning(
-            f"The default NaN replacement string '{config['na_default']}' is present in the data. Consider choosing a different value to avoid overwriting."
-        )
-
-    has_na = False
-    if NA_STRING in values:
-        values = values[values != NA_STRING]
+    # Handle missing values
+    na_values = {NA_STRING, "nan"}
+    found_na_values = na_values.intersection(values)
+    if found_na_values:
         has_na = True
+        if NA_STRING in found_na_values:
+            logger.warning(
+                f"The default NaN filler string '{NA_STRING}' is present in the data. "
+                "Consider using a different value to avoid overwriting."
+            )
 
+    # Remove all NA-like values
+    values = np.array([v for v in values if v not in na_values])
+
+    # Ensure predictable color mapping
     values = np.sort(values)
 
     if isinstance(palette, list):
