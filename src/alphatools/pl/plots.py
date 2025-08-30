@@ -27,6 +27,7 @@ from alphatools.pp.data import data_column_to_array
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 config = defaults.plot_settings.to_dict()
 
@@ -552,9 +553,15 @@ def _prepare_loading_df_to_plot(
 def _array_to_str(
     array: np.ndarray | pd.Series,
 ) -> np.ndarray:
-    """Map a numpy array to string values, while replacing NaNs with 'NA'."""
+    """Map a numpy array to string values, while replacing NaNs with default nan-filler string."""
     string_array = np.array(array, dtype=object)
-    string_array[pd.isna(string_array)] = "NA"  # replace NaNs with "NA"
+
+    if config["na_default"] in string_array:
+        logger.warning(
+            f"The default NaN replacement string '{config['na_default']}' is present in the data. Consider choosing a different value to avoid overwriting."
+        )
+
+    string_array[pd.isna(string_array)] = config["na_default"]  # replace NaNs with default string
     return string_array.astype(str)  # ensure all values are strings
 
 
@@ -605,7 +612,7 @@ class Plots:
         value_column : str
             Column in data to plot as histogram. Must contain numeric data.
         color_map_column : str, optional
-            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by a default filler string. Overrides color parameter. By default None.
         bins : int, optional
             Number of bins to use for the histogram. By default 10.
         color : str, optional
@@ -645,7 +652,9 @@ class Plots:
             ax.hist(values, bins=bins, color=color, **hist_kwargs)
         else:
             color_levels = _array_to_str(data_column_to_array(data, color_map_column))
-            color_dict = color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
+            color_dict = _dict_keys_to_str(
+                color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
+            )
 
             for level in set(color_levels) - set(color_dict):
                 color_dict[level] = BaseColors.get("grey")
@@ -724,7 +733,7 @@ class Plots:
         color : str, optional
             Color to use for the scatterplot. By default "blue".
         color_map_column : str, optional
-            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by a default filler string. Overrides color parameter. By default None.
         color_column : str, optional
             Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
         ax : plt.Axes, optional
@@ -772,14 +781,15 @@ class Plots:
                 )
             else:
                 color_levels = _array_to_str(data_column_to_array(data, color_map_column))
-                color_dict = color_dict or get_color_mapping(
-                    values=color_levels, palette=palette or BasePalettes.get("qualitative")
+                color_dict = _dict_keys_to_str(
+                    color_dict
+                    or get_color_mapping(values=color_levels, palette=palette or BasePalettes.get("qualitative"))
                 )
                 for level in set(color_levels) - set(color_dict):
                     color_dict[level] = BaseColors.get("grey")
                 color_values = np.array([color_dict[level] for level in color_levels], dtype=object)
         else:
-            color_dict = {DEFAULT_GROUP: DEFAULT_COLOR or color}
+            color_dict = {DEFAULT_GROUP: color or DEFAULT_COLOR}
             color_values = np.array([color_dict[DEFAULT_GROUP]] * len(data))
 
         # Handle ordering of plotting arrays by string: order by the frequency of the color column
@@ -836,7 +846,7 @@ class Plots:
         color : str, optional
             Color to use for the scatterplot. By default "blue".
         color_map_column : str, optional
-            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by a default filler string. Overrides color parameter. By default None.
         color_column : str, optional
             Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
         palette : list[str | tuple], optional
@@ -938,7 +948,7 @@ class Plots:
         color : str, optional
             Color to use for the scatterplot. By default "blue".
         color_map_column : str, optional
-            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by a default filler string. Overrides color parameter. By default None.
         color_column : str, optional
             Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
         palette : list[str | tuple], optional

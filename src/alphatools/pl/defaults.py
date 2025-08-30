@@ -50,6 +50,8 @@ class PlotSettings:
             "0.25": 22.5,
         }
 
+        self.na_default = "n/a"
+
     def to_dict(self) -> dict:
         """Convert PlotSettings to a dictionary."""
         return {key: value for key, value in self.__dict__.items() if not key.startswith("__")}

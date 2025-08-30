@@ -21,6 +21,11 @@ import pandas as pd
 from matplotlib import colors as mpl_colors
 from matplotlib.colors import Colormap
 
+from alphatools.pl import defaults
+
+config = defaults.plot_settings.to_dict()
+logger = logging.getLogger(__name__)
+
 
 def show_rgba_color_list(colors: list) -> None:
     """Show a list of RGBA colors for quick inspection"""
@@ -160,11 +165,17 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
         Dictionary mapping values to colors
 
     """
-    NA_STRING = "NA"
+    NA_STRING = config["na_default"]
 
     values = values.astype(str)
     values = pd.unique(values)
 
+    if config["na_default"] in values:
+        logger.warning(
+            f"The default NaN replacement string '{config['na_default']}' is present in the data. Consider choosing a different value to avoid overwriting."
+        )
+
+    has_na = False
     if NA_STRING in values:
         values = values[values != NA_STRING]
         has_na = True
