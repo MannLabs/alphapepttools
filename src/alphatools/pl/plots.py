@@ -21,9 +21,9 @@ import pandas as pd
 from matplotlib.patches import Patch
 
 from alphatools.pl import defaults
-from alphatools.pl.colors import BaseColors, BasePalettes, get_color_mapping
+from alphatools.pl.colors import BaseColors, BasePalettes, _get_colors_from_cmap, get_color_mapping
 from alphatools.pl.figure import create_figure, label_axes
-from alphatools.pp.data import _adata_column_to_array
+from alphatools.pp.data import data_column_to_array
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -638,18 +638,14 @@ class Plots:
         if ax is None:
             _, ax = create_figure(1, 1)
 
-        values = _adata_column_to_array(data, value_column)
+        values = data_column_to_array(data, value_column)
 
         if color_map_column is None:
             color = BaseColors.get(color)
             ax.hist(values, bins=bins, color=color, **hist_kwargs)
         else:
-            color_levels = _array_to_str(
-                _adata_column_to_array(data, color_map_column)
-            )  # Safe types: convert the color_map_column values to strings
-            color_dict = _dict_keys_to_str(
-                color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
-            )  # Safe types: convert the color_dict keys to strings
+            color_levels = _array_to_str(data_column_to_array(data, color_map_column))
+            color_dict = color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
 
             for level in set(color_levels) - set(color_dict):
                 color_dict[level] = BaseColors.get("grey")
@@ -681,7 +677,7 @@ class Plots:
         data: pd.DataFrame | ad.AnnData,
         x_column: str,
         y_column: str,
-        color: str = "blue",
+        color: str | None = None,
         color_map_column: str | None = None,
         color_column: str | None = None,
         ax: plt.Axes | None = None,
@@ -694,6 +690,28 @@ class Plots:
         ylim: tuple[float, float] | None = None,
     ) -> None:
         """Plot a scatterplot from a DataFrame or AnnData object
+
+        Coloring works in three ways, with the following order of precedence: 1. color_column, 2. color_map_column, 3. color.
+        If a color_column is provided, its values are interpreted directly as colors, i.e. they have to be something matplotlib
+        can understand (e.g. RGBA, hex, etc.). If a color_map_column is provided, its values are mapped to colors in combination
+        with palette or color_dict (see color mapping logic below). If neither color_column nor color_map_column is provided, the
+        color parameter is used to color all points the same (defaults to blue).
+
+        Color mapping logic
+        -------------------
+        - color_map_column is non-numeric:
+            - If color_dict is not None: Use color_dict to assign levels of color_map_column to colors (unmapped levels default to grey).
+            - If color_dict is None, and palette is not None: Use palette to automatically assign colors to each level.
+            - If color_dict is None and palette is None: Use a repeating default palette to assign colors to each level.
+        - color_map_column is numeric:
+            - If palette is a matplotlib colormap: Numerically map values to colors using the colormap. This means that e.g. 1 and 3 will be closer in color than 1 and 10.
+            - If palette is not a matplotlib colormap: Treat numeric values as categorical and color as described above.
+
+        - Examples:
+            - color_column="my_colors": Points colored by values in "my_colors" column (must contain valid colors)
+            - color_map_column="cell_type": Categorical mapping of cell types to colors
+            - color_map_column="expression", palette=plt.cm.viridis: Continuous gradient based on expression values
+
 
         Parameters
         ----------
@@ -711,7 +729,7 @@ class Plots:
             Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
         ax : plt.Axes, optional
             Matplotlib axes object to plot on, if None a new figure is created. By default None.
-        palette : list[str | tuple], optional
+        palette : list[str | tuple] | matplotlib.colors.Colormap, optional
             List of colors to use for color encoding, if None a default palette is used. By default None.
         color_dict: dict[str, str | tuple], optional
             Supercedes palette, a dictionary mapping levels to colors. By default None. If provided, palette is ignored.
@@ -734,36 +752,41 @@ class Plots:
         scatter_kwargs = scatter_kwargs or {}
         legend_kwargs = legend_kwargs or {}
         DEFAULT_GROUP = "data"
+        DEFAULT_COLOR = BaseColors.get("blue")
 
         if ax is None:
             _, axm = create_figure()
             ax = axm.next()
 
-        # Handle color encoding: If there is an actual color column, simply color the points accordingly
+        # Directly use colors from the color_column
         if color_column is not None:
-            color_values = _adata_column_to_array(data, color_column)
-        # If there is a color map column, map its string levels to a palette
+            color_values = data_column_to_array(data, color_column)
+        # Map values from the color_map_column to colors
         elif color_map_column is not None:
-            color_levels = _array_to_str(
-                _adata_column_to_array(data, color_map_column)
-            )  # Safe types: convert the color_map_column values to strings
-            color_dict = _dict_keys_to_str(
-                color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
-            )  # Safe types: convert the color_dict keys to strings
-
-            for level in set(color_levels) - set(color_dict):
-                color_dict[level] = BaseColors.get("grey")
-
-            color_values = np.array([color_dict[level] for level in color_levels], dtype=object)
+            # if the color_map_column is numeric, map it to colors directly
+            color_levels = data_column_to_array(data, color_map_column)
+            if pd.api.types.is_numeric_dtype(color_levels) and isinstance(palette, plt.Colormap):
+                color_values = _get_colors_from_cmap(
+                    cmap_name=palette,
+                    values=color_levels,
+                )
+            else:
+                color_levels = _array_to_str(data_column_to_array(data, color_map_column))
+                color_dict = color_dict or get_color_mapping(
+                    values=color_levels, palette=palette or BasePalettes.get("qualitative")
+                )
+                for level in set(color_levels) - set(color_dict):
+                    color_dict[level] = BaseColors.get("grey")
+                color_values = np.array([color_dict[level] for level in color_levels], dtype=object)
         else:
-            color_dict = {DEFAULT_GROUP: BaseColors.get(color)}
+            color_dict = {DEFAULT_GROUP: DEFAULT_COLOR or color}
             color_values = np.array([color_dict[DEFAULT_GROUP]] * len(data))
 
         # Handle ordering of plotting arrays by string: order by the frequency of the color column
         counts = Counter([str(cv) for cv in color_values])
         order = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
-        x_values = _adata_column_to_array(data, x_column)[order]
-        y_values = _adata_column_to_array(data, y_column)[order]
+        x_values = data_column_to_array(data, x_column)[order]
+        y_values = data_column_to_array(data, y_column)[order]
         color_values = np.array(color_values)[order]
 
         ax.scatter(
@@ -960,7 +983,7 @@ class Plots:
 
         # add color column
         if color_map_column is not None:
-            color_values = _adata_column_to_array(data, color_map_column)
+            color_values = data_column_to_array(data, color_map_column)
             values[color_map_column] = color_values
 
         cls.scatter(
@@ -981,9 +1004,9 @@ class Plots:
         if label:
             # For labeling, we need to consider the appropriate observation space
             if dim_space == "obs":
-                labels = data.obs.index if label_column is None else _adata_column_to_array(data, label_column)
+                labels = data.obs.index if label_column is None else data_column_to_array(data, label_column)
             else:  # dim_space == "var"
-                labels = data.var.index if label_column is None else _adata_column_to_array(data, label_column)
+                labels = data.var.index if label_column is None else data_column_to_array(data, label_column)
 
             label_plot(ax=ax, x_values=values["dim1"], y_values=values["dim2"], labels=labels, x_anchors=None)
 

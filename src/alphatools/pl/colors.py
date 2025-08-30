@@ -110,7 +110,6 @@ def _get_colors_from_cmap(
 
     if isinstance(values, int):
         return [tuple(color) for color in cmap(np.linspace(0, 1, values))]
-    values = np.array(values, dtype=float)
     vmin, vmax = np.nanmin(values), np.nanmax(values)
     values = mpl_colors.Normalize(vmin=vmin, vmax=vmax)(values)
     return cmap(values)
@@ -161,7 +160,16 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
         Dictionary mapping values to colors
 
     """
+    NA_STRING = "NA"
+
+    values = values.astype(str)
     values = pd.unique(values)
+
+    if NA_STRING in values:
+        values = values[values != NA_STRING]
+        has_na = True
+
+    values = np.sort(values)
 
     if isinstance(palette, list):
         _palette = _cycle_palette(palette, n=len(values))
@@ -170,7 +178,12 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
     else:
         raise TypeError("palette must be a list of colors or a matplotlib colormap")
 
-    return dict(zip(values, _palette, strict=True))
+    result_dict = dict(zip(values, _palette, strict=True))
+
+    if has_na:
+        result_dict[NA_STRING] = mpl_colors.to_rgba("lightgrey")
+
+    return result_dict
 
 
 def _base_binary_colorscale() -> list:

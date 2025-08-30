@@ -7,7 +7,7 @@ import pytest
 import alphatools as at
 
 # import private method to obtain anndata object
-from alphatools.pp.data import _adata_column_to_array, _handle_overlapping_columns, _to_anndata
+from alphatools.pp.data import _handle_overlapping_columns, _to_anndata, data_column_to_array
 
 ### Fixtures ###
 
@@ -1030,7 +1030,7 @@ def test_filter_data_completeness(
     assert np.array_equal(adata.X, data_test_completeness_filter.X, equal_nan=True)
 
 
-# test adata_column_to_array
+# test data_column_to_array
 @pytest.mark.parametrize(
     ("expected_array", "column", "transpose"),
     [
@@ -1062,7 +1062,7 @@ def test_filter_data_completeness(
         ),
     ],
 )
-def test_adata_column_to_array(
+def test_data_column_to_array(
     example_data,
     example_sample_metadata,
     example_feature_metadata,
@@ -1076,10 +1076,7 @@ def test_adata_column_to_array(
     adata = at.pp.add_metadata(adata, example_feature_metadata, axis=1)
 
     # when
-    if not transpose:
-        array = _adata_column_to_array(adata, column)
-    else:
-        array = _adata_column_to_array(adata.transpose(), column)
+    array = data_column_to_array(adata, column) if not transpose else data_column_to_array(adata.transpose(), column)
 
     # then
     assert np.all(array == expected_array)
