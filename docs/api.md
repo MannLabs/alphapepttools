@@ -65,6 +65,19 @@
 
 ## IO
 
+### Reader functions
+
+```{eval-rst}
+.. module:: alphatools.io
+.. currentmodule:: alphatools.io
+.. autosummary::
+    :toctree: generated
+
+    read_psm_table
+
+
+```
+
 ### alphatools.io.anndata_factory
 
 ```{eval-rst}
