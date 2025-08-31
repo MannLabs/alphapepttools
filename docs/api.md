@@ -69,23 +69,12 @@
 
 ```{eval-rst}
 .. module:: alphatools.io
-.. currentmodule:: alphatools.io
-.. autosummary::
-    :toctree: generated
-
-    read_psm_table
-
-
-```
-
-### alphatools.io.anndata_factory
-
-```{eval-rst}
-.. module:: alphatools.io.anndata_factory
-.. currentmodule:: alphatools.io.anndata_factory
+.. currentmodule:: alphatools
 
 .. autosummary::
     :toctree: generated
 
-    AnnDataFactory
+    io.read_psm_table
+    io.AnnDataFactory
+
 ```
