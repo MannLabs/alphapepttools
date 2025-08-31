@@ -33,10 +33,10 @@ def read_psm_table(
     search_engine
         Name of search engine that generated the output, pass the method name of the corresponding reader.
     intensity_column
-        Column that holds the quantified intensities in the PSM table. Defaults to the pre-configured value
+        Column that holds the quantified intensities in the PSM table. Defaults to the pre-configured protein intensities value
         in `alphabase`.
     feature_id_column
-        Column that holds the feature identifier in the PSM table. Defaults to the pre-configured value
+        Column that holds the feature identifier in the PSM table. Defaults to proteins and the pre-configured value
         in `alphabase`.
     sample_id_column
         Column that holds the sample identifier in the PSM table. Defaults to the pre-configured value
