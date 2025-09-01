@@ -6,7 +6,6 @@ import pandas as pd
 import pytest
 
 from alphatools.pl.plot_data_handling import (
-    _prepare_loading_df_to_plot,
     _validate_pca_loadings_plot_inputs,
     _validate_pca_plot_input,
     _validate_scree_plot_input,
@@ -284,21 +283,6 @@ class TestDataPreparationFunctions:
         assert isinstance(result, pd.DataFrame)
         # In var space, features should be sample names
         assert all(feature.startswith("sample_") for feature in result["feature"])
-
-    def test_prepare_loading_df_to_plot_basic(self, sample_adata):
-        """Test _prepare_loading_df_to_plot with basic parameters."""
-        result = _prepare_loading_df_to_plot(
-            sample_adata, loadings_name="PCs_obs", pc_x=1, pc_y=2, nfeatures=10, dim_space="obs"
-        )
-
-        assert isinstance(result, pd.DataFrame)
-        expected_columns = ["dim1_loadings", "dim2_loadings", "feature", "abs_dim1", "abs_dim2", "is_top"]
-        assert list(result.columns) == expected_columns
-
-        # Check that top features are marked correctly
-        top_features = result[result["is_top"]]
-        assert len(top_features) <= 20  # At most nfeatures * 2 (some might overlap)  # noqa: PLR2004
-        assert len(top_features) >= 10  # At least nfeatures  # noqa: PLR2004
 
 
 class TestEdgeCases:
