@@ -20,8 +20,7 @@ import numpy as np
 import pandas as pd
 from matplotlib.patches import Patch
 
-import alphatools.pl.plot_data_handling as pdh
-from alphatools.pl import defaults
+from alphatools.pl import defaults, plot_data_handling
 from alphatools.pl.colors import BaseColors, BasePalettes, get_color_mapping
 from alphatools.pl.figure import create_figure, label_axes
 from alphatools.pp.data import _adata_column_to_array
@@ -721,7 +720,7 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        pca_coor_df = pdh.prepare_pca_data_to_plot(
+        pca_coor_df = plot_data_handling.prepare_pca_data_to_plot(
             data, pc_x, pc_y, dim_space, embbedings_name, color_map_column, label_column, label=label
         )
 
@@ -802,7 +801,7 @@ class Plots:
         scatter_kwargs = scatter_kwargs or {}
 
         # create the dataframe for plotting, X = pcs, y = explained variance
-        values = pdh.prepare_scree_data_to_plot(adata, n_pcs, dim_space, embbedings_name)
+        values = plot_data_handling.prepare_scree_data_to_plot(adata, n_pcs, dim_space, embbedings_name)
 
         cls.scatter(
             data=values,
@@ -853,7 +852,7 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        top_loadings = pdh.prepare_pca_1d_loadings_data_to_plot(
+        top_loadings = plot_data_handling.prepare_pca_1d_loadings_data_to_plot(
             data=data,
             dim_space=dim_space,
             embbedings_name=embbedings_name,
@@ -925,7 +924,7 @@ class Plots:
         # Generate the correct loadings key name
         loadings_key = f"PCs_{dim_space}" if embbedings_name is None else embbedings_name
 
-        loadings = pdh.prepare_pca_2d_loadings_data_to_plot(
+        loadings_df = plot_data_handling.prepare_pca_2d_loadings_data_to_plot(
             data=data, loadings_name=loadings_key, pc_x=pc_x, pc_y=pc_y, nfeatures=nfeatures, dim_space=dim_space
         )
 
@@ -933,7 +932,7 @@ class Plots:
         scatter_kwargs.update({"alpha": 0.3, "s": 10, "edgecolors": "none"})
 
         cls.scatter(
-            data=loadings,
+            data=loadings_df,
             x_column="dim1_loadings",
             y_column="dim2_loadings",
             ax=ax,
@@ -941,7 +940,7 @@ class Plots:
             scatter_kwargs=scatter_kwargs,
         )
 
-        loadings_top = loadings[loadings["is_top"]]
+        loadings_top = loadings_df[loadings_df["is_top"]]
 
         # plot the top features on top
         scatter_kwargs.update({"alpha": 1, "s": 20, "edgecolors": "none"})
