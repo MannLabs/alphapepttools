@@ -12,9 +12,9 @@ def read_psm_table(
     sample_id_column: str | None = None,
     **kwargs,
 ) -> ad.AnnData:
-    """Read peptide spectrum tables to the :class:`anndata.AnnData` format
+    """Read peptide spectrum match tables to the :class:`anndata.AnnData` format
 
-    Read PSM tables from proteomics search engines into
+    Read peptide spectrum match (PSM) tables from proteomics search engines into
     the :class:`anndata.AnnData` format (observations x features). Per default,
     raw protein intensities are returned.
 
