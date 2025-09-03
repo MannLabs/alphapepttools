@@ -41,9 +41,7 @@ class TestReadPGTable:
         result = read_pg_table("/path/to/file", search_engine)
 
         # Verify provider was called with correct engine
-        mock_pg_reader_provider.get_reader.assert_called_once_with(
-            search_engine, column_mapping=None, measurement_regex=None
-        )
+        mock_pg_reader_provider.get_reader.assert_called_once_with(search_engine)
 
         # Check result is AnnData object
         assert isinstance(result, ad.AnnData)
@@ -70,24 +68,20 @@ class TestReadPGTable:
         result = read_pg_table("/path/to/file", "maxquant", column_mapping=column_mapping)
 
         # Verify column mapping was passed to get_reader
-        mock_pg_reader_provider.get_reader.assert_called_once_with(
-            "maxquant", column_mapping=column_mapping, measurement_regex=None
-        )
+        mock_pg_reader_provider.get_reader.assert_called_once_with("maxquant", column_mapping=column_mapping)
 
         assert isinstance(result, ad.AnnData)
 
     @pytest.mark.parametrize(
         ("measurement_regex", "expected_regex"),
-        [(None, None), ("lfq", "lfq"), ("^.*(?<!_LFQ)$", "^.*(?<!_LFQ)$"), ("_intensity$", "_intensity$")],
+        [("lfq", "lfq"), ("^.*(?<!_LFQ)$", "^.*(?<!_LFQ)$"), ("_intensity$", "_intensity$")],
     )
     def test_read_pg_table_with_measurement_regex(self, mock_pg_reader_provider, measurement_regex, expected_regex):
         """Test read_pg_table with different measurement regex patterns."""
         result = read_pg_table("/path/to/file", "diann", measurement_regex=measurement_regex)
 
         # Verify measurement_regex was passed correctly
-        mock_pg_reader_provider.get_reader.assert_called_once_with(
-            "diann", column_mapping=None, measurement_regex=expected_regex
-        )
+        mock_pg_reader_provider.get_reader.assert_called_once_with("diann", measurement_regex=expected_regex)
 
         assert isinstance(result, ad.AnnData)
 
