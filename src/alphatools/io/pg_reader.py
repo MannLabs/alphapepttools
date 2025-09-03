@@ -12,6 +12,7 @@ def read_pg_table(
     *,
     column_mapping: dict[str, Any] | None = None,
     measurement_regex: str | None = None,
+    **reader_provider_kwargs,
 ) -> ad.AnnData:
     """Read protein group table to the :class:`anndata.AnnData` format
 
@@ -34,8 +35,7 @@ def read_pg_table(
     path
         Path to protein group matrix
     search_engine
-        Name of engine output, pass the method name of the corresponding reader. You can
-        list all available readers with the :func:`dvpio.read.omics.available_reader` helper function
+        Name of engine output, pass the method name of the corresponding reader.
     column_mapping
         Mapping of additional columns in protein group table to a unified name, defaults to standard colum mapping in alphabase.
         Passed to :meth:`alphabase.pg_reader.pg_reader_provider.get_reader`.
@@ -54,6 +54,8 @@ def read_pg_table(
             - A valid regular expression
 
         Use classmethod `get_preconfigured_regex` for the respective reader in `alphabase`
+    reader_provider_kwargs
+        Passed to :meth:`alphabase.pg_reader.pg_reader_provider.get_reader`
 
     Returns
     -------
@@ -95,9 +97,15 @@ def read_pg_table(
     --------
     :mod:`alphabase.pg_reader`
     """
-    reader = pg_reader_provider.get_reader(
-        search_engine, column_mapping=column_mapping, measurement_regex=measurement_regex
-    )
+    # Build reader_provider_kwargs
+    # This assures that the default values of the readers are considered (e.g. if `column_mapping="raw"`)
+    if column_mapping is not None:
+        reader_provider_kwargs["column_mapping"] = column_mapping
+    if measurement_regex is not None:
+        reader_provider_kwargs["measurement_regex"] = measurement_regex
+
+    reader = pg_reader_provider.get_reader(search_engine, **reader_provider_kwargs)
+
     # Features x Observations
     df = reader.import_file(path)
 
