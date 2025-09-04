@@ -33,6 +33,18 @@ def different_count_data() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     )
 
 
+@pytest.fixture
+def nan_count_data() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Generate count data (samples, features) where samples have different intensities and contain nan values,
+    the expected result and the expected normalization factors"""
+    # Add nan intensites
+    return (
+        np.array([[0, 1.0], [2.0, 0.0], [0.8, np.nan], [np.nan, 2.0]]),
+        np.array([[0, 1.45], [1.45, 0.0], [1.45, np.nan], [np.nan, 1.45]]),
+        np.array([1.45, 0.725, 1.8124999, 0.725]),
+    )
+
+
 def test__validate_strategies() -> None:
     # Valid strategy
     _validate_strategies("total_mean")
@@ -56,6 +68,14 @@ def test__mean_normalization_different(different_count_data) -> None:
 
     assert np.isclose(norm_array, norm_array_ref, atol=1e-6).all()
     assert np.isclose(norm_factors, norm_factors_ref, atol=1e-6).all()
+
+
+def test__mean_normalization_nan_values(nan_count_data) -> None:
+    array, norm_array_ref, norm_factors_ref = nan_count_data
+    norm_array, norm_factors = _total_mean_normalization(array)
+
+    assert np.isclose(norm_array, norm_array_ref, atol=1e-6, equal_nan=True).all()
+    assert np.isclose(norm_factors, norm_factors_ref, atol=1e-6, equal_nan=True).all()
 
 
 def test_normalize_default_parameters(different_count_data) -> None:
