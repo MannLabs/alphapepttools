@@ -39,8 +39,9 @@ def _total_mean_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]
         > array([1.93333333, 1.93333333, 1.93333333])
     """
     # Compute sample-wise means
+    # NaNs are interpreted as zero-values
     total_counts = np.nansum(data, axis=1)
-    norm_factor = np.nanmean(total_counts) / total_counts
+    norm_factor = np.mean(total_counts) / total_counts
 
     return data * norm_factor.reshape(-1, 1), norm_factor
 
