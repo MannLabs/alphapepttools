@@ -4,7 +4,7 @@ from typing import Literal
 import anndata as ad
 import numpy as np
 
-STRATEGIES = ["total_mean"]
+STRATEGIES = ["total_mean", "total_median"]
 
 
 def _validate_strategies(strategy: str) -> None:
@@ -46,6 +46,27 @@ def _total_mean_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     return data * norm_factor.reshape(-1, 1), norm_factor
 
 
+def _total_median_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Total normalization
+
+    Normalizes total intensity in each sample (row) to median of the total intensities
+
+    Parameters
+    ----------
+    data
+        Count data of shape (samples, features)
+
+    See Also
+    --------
+    alphatools.pp.norm._total_mean_normalization
+    """
+    # Compute sample-wise means
+    total_counts = np.nansum(data, axis=1)
+    norm_factor = np.nanmedian(total_counts) / total_counts
+
+    return data * norm_factor.reshape(-1, 1), norm_factor
+
+
 def normalize(
     adata: ad.AnnData,
     from_layer: str | None = None,
@@ -68,6 +89,9 @@ def normalize(
 
             - *total_mean* The intensity of each feature is adjusted by a normalizing factor so that the
             total sample intensity is equal to the mean of the total sample intensities across all samples
+            - *total_median* The intensity of each feature is adjusted by a normalizing factor so that the
+            total sample intensity is equal to the median of the total sample intensities across all samples
+
     key_added
         If not None, adds normalization factors to column in `adata.obs`
 
@@ -127,6 +151,8 @@ def normalize(
 
     if strategy == "total_mean":
         normalized_data, norm_factors = _total_mean_normalization(data)
+    if strategy == "total_median":
+        normalized_data, norm_factors = _total_median_normalization(data)
 
     # Reassign to anndata
     if to_layer is None:
