@@ -37,23 +37,15 @@ def read_pg_table(
     search_engine
         Name of engine output, pass the method name of the corresponding reader.
     column_mapping
-        Mapping of additional columns in protein group table to a unified name, defaults to standard colum mapping in alphabase.
         Passed to :meth:`alphabase.pg_reader.pg_reader_provider.get_reader`.
-        Expected format is
-
-        .. code-block:: python
-
-            {"new_column_name": "column_name_pg_matrix", ...}
-
+        A dictionary of mapping alphabase columns (keys) to the corresponding columns in the other
+        search engine (values). If `None` will be loaded from the `column_mapping` key of the respective
+        search engine in `pg_reader.yaml`.
     measurement_regex
-        Regular expression that subsets feature columns to the correct quantification type. Only relevant if PG matrix contains multiple
-        quantification methods per sample. Defaults to raw intensities. Options depend on the reader
-
-            - None (default): Raw intensities
-            - Reader-specific pre-configured names (e.g. `lfq`): Available intensities in the report (e.g. LFQ)
-            - A valid regular expression
-
-        Use classmethod `get_preconfigured_regex` for the respective reader in `alphabase`
+        Passed to :meth:`alphabase.pg_reader.pg_reader_provider.get_reader`.
+        Regular expression that identifies correct measurement type. Only relevant if PG matrix contains multiple
+        measurement types. For example, alphapept returns the raw protein intensity per sample in column `A` and the
+        LFQ corrected value in `A_LFQ`. If `None` loads raw intensities.
     reader_provider_kwargs
         Passed to :meth:`alphabase.pg_reader.pg_reader_provider.get_reader`
 
