@@ -56,13 +56,19 @@ def _total_median_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarra
     data
         Count data of shape (samples, features)
 
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        Tuple of normalized data and scaling factors
+
     See Also
     --------
     alphatools.pp.norm._total_mean_normalization
     """
     # Compute sample-wise means
+    # NaNs are counted as zeros
     total_counts = np.nansum(data, axis=1)
-    norm_factor = np.nanmedian(total_counts) / total_counts
+    norm_factor = np.median(total_counts) / total_counts
 
     return data * norm_factor.reshape(-1, 1), norm_factor
 
