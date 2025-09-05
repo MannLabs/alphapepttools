@@ -137,6 +137,7 @@ class TestNormalizeFunction:
     def test_normalize_function_layer_operations(
         self, strategy: str, from_layer: str, to_layer: str, test_data_factory
     ) -> None:
+        """Test that results are stored in the correct layers"""
         X, expected_arrays, expected_norm_factors = test_data_factory.get_test_data("different")
 
         # Construct multi-layered anndata
@@ -153,11 +154,12 @@ class TestNormalizeFunction:
 
     @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
     def test_normalize_function_to_layer_exists(self, strategy: str, test_data_factory) -> None:
+        """Test that `to_layer` gets overwritten"""
         X, expected_arrays, _ = test_data_factory.get_test_data("different")
-        to_layer = "to_layer_exists"
+
         # Construct multi-layered anndata
-        adata = ad.AnnData(X=X.copy(), layers={to_layer: X.copy()})
+        adata = ad.AnnData(X=X.copy(), layers={"layer_exists": X.copy()})
 
-        normalize(adata, strategy=strategy, key_added="norm_factors", to_layer=to_layer)
+        normalize(adata, strategy=strategy, key_added="norm_factors", to_layer="layer_exists")
 
-        assert np.isclose(adata.layers[to_layer], expected_arrays[strategy], atol=1e-6, equal_nan=True).all()
+        assert np.isclose(adata.layers["layer_exists"], expected_arrays[strategy], atol=1e-6, equal_nan=True).all()
