@@ -157,7 +157,7 @@ def normalize(
 
     if strategy == "total_mean":
         normalized_data, norm_factors = _total_mean_normalization(data)
-    if strategy == "total_median":
+    elif strategy == "total_median":
         normalized_data, norm_factors = _total_median_normalization(data)
 
     # Reassign to anndata
