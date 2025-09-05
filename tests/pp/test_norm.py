@@ -127,3 +127,37 @@ class TestNormalizeFunction:
         assert np.isclose(adata.X, expected_arrays[strategy], atol=1e-6, equal_nan=True).all()
         assert len(adata.obs.columns) == 1
         assert "norm_factors" in adata.obs.columns
+
+    @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
+    @pytest.mark.parametrize(
+        "from_layer",
+        [None, "different_layer"],
+    )
+    @pytest.mark.parametrize("to_layer", [None, "new_layer", "different_layer"])
+    def test_normalize_function_layer_operations(
+        self, strategy: str, from_layer: str, to_layer: str, test_data_factory
+    ) -> None:
+        X, expected_arrays, expected_norm_factors = test_data_factory.get_test_data("different")
+
+        # Construct multi-layered anndata
+        layers = {from_layer: X.copy()} if from_layer is not None else None
+        adata = ad.AnnData(X=X.copy(), layers=layers)
+
+        normalize(adata, strategy=strategy, key_added="norm_factors", from_layer=from_layer, to_layer=to_layer)
+
+        result = adata.X if to_layer is None else adata.layers[to_layer]
+
+        assert np.isclose(result, expected_arrays[strategy], atol=1e-6, equal_nan=True).all()
+        assert "norm_factors" in adata.obs.columns
+        assert np.isclose(adata.obs["norm_factors"], expected_norm_factors[strategy], atol=1e-6, equal_nan=True).all()
+
+    @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
+    def test_normalize_function_to_layer_exists(self, strategy: str, test_data_factory) -> None:
+        X, expected_arrays, _ = test_data_factory.get_test_data("different")
+        to_layer = "to_layer_exists"
+        # Construct multi-layered anndata
+        adata = ad.AnnData(X=X.copy(), layers={to_layer: X.copy()})
+
+        normalize(adata, strategy=strategy, key_added="norm_factors", to_layer=to_layer)
+
+        assert np.isclose(adata.layers[to_layer], expected_arrays[strategy], atol=1e-6, equal_nan=True).all()
