@@ -77,7 +77,7 @@ def normalize(
     adata: ad.AnnData,
     from_layer: str | None = None,
     to_layer: str | None = None,
-    strategy: Literal["total_mean"] = "total_mean",
+    strategy: Literal["total_mean", "total_median"] = "total_mean",
     key_added: str | None = None,
 ) -> ad.AnnData:
     """Normalize measured counts per sample
