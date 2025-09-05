@@ -250,7 +250,6 @@ def label_plot(
     label_parser: Callable | None = None,
     y_display_start: float = 1,
     y_padding_factor: float = 3,
-    line_operation: str = "add",  # "add" or "add_return"
 ) -> None:
     """Add labels to a 2D axes object
 
@@ -285,8 +284,6 @@ def label_plot(
         This is useful for avoiding label overlap.
     y_padding_factor: float, optional
         Factor to increase or decrease how far apart labels are spread in the y-direction when stacked into a column over x-anchors
-    line_operation: str
-        Whether to add return labelling lines or just add them to the Axes instance
 
     """
     label_kwargs = {"fontsize": config["font_sizes"]["medium"], **(label_kwargs or {})}
@@ -321,6 +318,7 @@ def label_plot(
         _, upper_bound_in_data_coords = transform.transform((0, ax.get_window_extent().height * y_display_start))
 
         # Iterate over all unique x_anchors and assign y-values in data coordinates to the respective labels
+        # TODO: Optimize this loop to not have so many data structures
         sorted_labels = []
         sorted_data_x_values = []
         sorted_data_y_values = []
@@ -364,12 +362,6 @@ def label_plot(
             alignment = "right" if line[0][0] > line[0][1] else "left"
             label_kwargs["ha"] = alignment
         ax.text(line[0][1], line[1][1], label_parser(line[2]), **label_kwargs)
-
-    if line_operation == "add_return":
-        return lines
-    if line_operation == "add":
-        return None
-    raise ValueError(f"Invalid line_operation argument {line_operation}, choose 'add' or 'add_return'.")
 
 
 def _validate_pca_plot_input(

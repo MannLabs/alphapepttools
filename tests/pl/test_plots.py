@@ -15,6 +15,21 @@ def example_ax():
     return make_dummy_data()
 
 
+# Helper function to read out lines from a matplotlib Axes object
+def extract_label_plot_data(ax):
+    """Extract line and label data from an axes after label_plot has been called."""
+    lines = ax.get_lines()
+    texts = ax.texts
+
+    result = []
+    for line, text in zip(lines, texts, strict=False):
+        x_data = tuple(line.get_xdata())
+        y_data = tuple(line.get_ydata())
+        label = text.get_text()
+        result.append((x_data, y_data, label))
+    return result
+
+
 # The important thing to assess is whether labels and values stay matched throughout the repositioning,
 # Hence the providing of labels and values out of order.
 @pytest.mark.parametrize(
@@ -59,14 +74,14 @@ def example_ax():
     ],
 )
 def test_label_plot(example_ax, x, y, labels, anchors, expected_lines):
-    fig, ax = example_ax
+    _, ax = example_ax
 
     # Empirical parameters to handle default alphatools font size
     A_DISPLAY_START = 3.20
     Y_PADDING_FACTOR = 10
 
-    # Generate the lines
-    label_lines = label_plot(
+    # Add the lines to the axes
+    label_plot(
         ax=ax,
         x_values=x,
         y_values=y,
@@ -74,8 +89,10 @@ def test_label_plot(example_ax, x, y, labels, anchors, expected_lines):
         x_anchors=anchors,
         y_display_start=A_DISPLAY_START,
         y_padding_factor=Y_PADDING_FACTOR,
-        line_operation="add_return",
     )
+
+    # Extract the actual lines
+    label_lines = extract_label_plot_data(ax)
 
     # Assert that the labels are approximately correct
     for generated_line, expected_line in zip(label_lines, expected_lines, strict=False):
