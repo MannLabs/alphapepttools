@@ -43,7 +43,25 @@ pip install -e ".[test, dev]"
 
 ## Release notes
 
-See the [changelog][].
+See the [GitHub Release page](https://github.com/MannLabs/alphatools/releases).
+
+## Developer Guide
+
+This document gathers information on how to develop and contribute to the alphaDIA project.
+
+### Release process
+
+#### Tagging of changes
+
+In order to have release notes automatically generated, changes need to be tagged with labels.
+The following labels are used (should be safe-explanatory):
+`breaking-change`, `bug`, `enhancement`.
+
+#### Release a new version
+
+This package uses a shared release process defined in the
+[alphashared](https://github.com/MannLabs/alphashared) repository. Please see the instructions
+[there](https://github.com/MannLabs/alphashared/blob/reusable-release-workflow/.github/workflows/README.md#release-a-new-version)
 
 ## Contact
 

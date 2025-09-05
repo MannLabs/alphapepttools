@@ -80,18 +80,39 @@ def _cycle_palette(
 
 def _get_colors_from_cmap(
     cmap_name: str | mpl.colors.Colormap,
-    values: np.ndarray | int,
-) -> np.ndarray:
-    """Use a matplotlib colormap to get a list of colors"""
+    values: int | np.ndarray,
+) -> list | np.ndarray:
+    """Retrieve colors from a colormap
+
+    Parameters
+    ----------
+    cmap_name : str | mpl.colors.Colormap
+        Name of the colormap or a Colormap instance. If a string, tries to retrieve the corresponding colormap from matplotlib.
+    values : int | np.ndarray
+        If int, retrieve that many evenly spaced colors from the colormap as a list of RGBA tuples.
+        If np.ndarray, normalize the values to the range of the colormap and retrieve the corresponding colors in whatever shape the input array was. In
+        the case of 2D input arrays, the output will be a mxnx4 array of RGBA tuples.
+
+    Returns
+    -------
+    list[tuple[float, float, float, float]] | np.ndarray
+        List of RGBA tuples if values is int, or an array of RGBA tuples with the same shape as values if values is np.ndarray.
+
+    Examples
+    --------
+    >>> _get_colors_from_cmap("Spectral", np.ones((2, 2))).shape
+    (2, 2, 4)
+    >>> _get_colors_from_cmap("Spectral", 1)
+    [(0.6196078431372549, 0.00392156862745098, 0.25882352941176473, 1.0)]
+
+    """
     cmap = plt.get_cmap(cmap_name)
 
     if isinstance(values, int):
-        values = np.linspace(0, 1, values)
-    else:
-        values = np.array(values, dtype=float)
-        vmin, vmax = np.nanmin(values), np.nanmax(values)
-        values = mpl_colors.Normalize(vmin=vmin, vmax=vmax)(values)
-
+        return [tuple(color) for color in cmap(np.linspace(0, 1, values))]
+    values = np.array(values, dtype=float)
+    vmin, vmax = np.nanmin(values), np.nanmax(values)
+    values = mpl_colors.Normalize(vmin=vmin, vmax=vmax)(values)
     return cmap(values)
 
 
