@@ -41,9 +41,9 @@ def _total_mean_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     # Compute sample-wise means
     # NaNs are interpreted as zero-values
     total_counts = np.nansum(data, axis=1)
-    norm_factor = np.mean(total_counts) / total_counts
+    norm_factors = np.mean(total_counts) / total_counts
 
-    return data * norm_factor.reshape(-1, 1), norm_factor
+    return data * norm_factors.reshape(-1, 1), norm_factors
 
 
 def _total_median_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
@@ -68,9 +68,9 @@ def _total_median_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarra
     # Compute sample-wise means
     # NaNs are counted as zeros
     total_counts = np.nansum(data, axis=1)
-    norm_factor = np.median(total_counts) / total_counts
+    norm_factors = np.median(total_counts) / total_counts
 
-    return data * norm_factor.reshape(-1, 1), norm_factor
+    return data * norm_factors.reshape(-1, 1), norm_factors
 
 
 def normalize(
