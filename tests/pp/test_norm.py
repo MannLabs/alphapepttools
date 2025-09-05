@@ -6,37 +6,55 @@ from alphatools.pp import normalize
 from alphatools.pp.norm import _total_mean_normalization, _total_median_normalization, _validate_strategies
 
 
+class TestDataFactory:
+    """Factory for generating test data for normalization tests"""
+
+    @staticmethod
+    def get_test_data(data_type: str) -> tuple[np.ndarray, dict, dict]:
+        """Get test data based on type"""
+        data_configs = {
+            "all_equal": {
+                "X": np.array([[1.0, 1.0], [2.0, 0.0], [0.0, 2.0]]),
+                "expected_arrays": {
+                    "total_mean": np.array([[1.0, 1.0], [2.0, 0.0], [0.0, 2.0]]),
+                    "total_median": np.array([[1.0, 1.0], [2.0, 0.0], [0.0, 2.0]]),
+                },
+                "expected_factors": {
+                    "total_mean": np.array([1.0, 1.0, 1.0]),
+                    "total_median": np.array([1.0, 1.0, 1.0]),
+                },
+            },
+            "different": {
+                "X": np.array([[0.8, 1.0], [2.0, 0.0], [0.0, 2.0]]),
+                "expected_arrays": {
+                    "total_mean": np.array([[0.85925926, 1.07407407], [1.93333333, 0.0], [0.0, 1.93333333]]),
+                    "total_median": np.array([[0.88888889, 1.11111111], [2.0, 0.0], [0.0, 2.0]]),
+                },
+                "expected_factors": {
+                    "total_mean": np.array([1.07407407, 0.96666667, 0.96666667]),
+                    "total_median": np.array([1.111111, 1.0, 1.0]),
+                },
+            },
+            "nan": {
+                "X": np.array([[0, 1.0], [2.0, 0.0], [0.8, np.nan], [np.nan, 2.0]]),
+                "expected_arrays": {
+                    "total_mean": np.array([[0, 1.45], [1.45, 0.0], [1.45, np.nan], [np.nan, 1.45]]),
+                    "total_median": np.array([[0.0, 1.5], [1.5, 0.0], [1.5, np.nan], [np.nan, 1.5]]),
+                },
+                "expected_factors": {
+                    "total_mean": np.array([1.45, 0.725, 1.8124999, 0.725]),
+                    "total_median": np.array([1.5, 0.75, 1.875, 0.75]),
+                },
+            },
+        }
+
+        config = data_configs[data_type]
+        return config["X"], config["expected_arrays"], config["expected_factors"]
+
+
 @pytest.fixture
-def all_equal_count_data() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Generate count data (samples, features) where all samples have the same intensity,
-    the expected result and the expected normalization factors"""
-    X = np.array([[1.0, 1.0], [2.0, 0.0], [0.0, 2.0]])
-
-    assert X.sum(axis=1).all()
-
-    return (
-        X,
-        X,
-        np.array([1.0, 1.0, 1.0]),
-    )
-
-
-@pytest.fixture
-def different_count_data() -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Generate count data (samples, features) where samples have different intensities,
-    the expected result and the expected normalization factors"""
-    # Reduce total intensity of sample 0
-    return (
-        np.array([[0.8, 1.0], [2.0, 0.0], [0.0, 2.0]]),
-        {
-            "total_mean": np.array([[0.85925926, 1.07407407], [1.93333333, 0.0], [0.0, 1.93333333]]),
-            "total_median": np.array([[0.88888889, 1.11111111], [2.0, 0.0], [0.0, 2.0]]),
-        },
-        {
-            "total_mean": np.array([1.07407407, 0.96666667, 0.96666667]),
-            "total_median": np.array([1.111111, 1.0, 1.0]),
-        },
-    )
+def test_data_factory():
+    return TestDataFactory()
 
 
 @pytest.fixture
@@ -69,92 +87,43 @@ class TestValidation:
 
 
 class TestNormalizationFunctions:
-    """Test low-level normalization fucntions"""
+    """Test low-level normalization functions"""
 
-    def test__total_mean_normalization_all_equal(self, all_equal_count_data) -> None:
-        """Test that equal sample intensities lead to no change in data values for total mean normalization"""
-        array, norm_array_ref, norm_factors_ref = all_equal_count_data
-        norm_array, norm_factors = _total_mean_normalization(array)
+    @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
+    @pytest.mark.parametrize("data_type", ["all_equal", "different", "nan"])
+    def test_normalization_function(self, strategy, data_type, test_data_factory) -> None:
+        """Test correctness of normalization function"""
+        X, expected_arrays, expected_factors = test_data_factory.get_test_data(data_type)
 
-        assert np.isclose(norm_array, norm_array_ref, atol=1e-6).all()
-        assert np.isclose(norm_factors, norm_factors_ref, atol=1e-6).all()
+        norm_func = {"total_mean": _total_mean_normalization, "total_median": _total_median_normalization}[strategy]
 
-    def test__total_median_normalization_all_equal(self, all_equal_count_data) -> None:
-        """Test that equal sample intensities lead to identity transform for total median normalization"""
+        norm_array, norm_factors = norm_func(X)
 
-        array, norm_array_ref, norm_factors_ref = all_equal_count_data
-        norm_array, norm_factors = _total_median_normalization(array)
-
-        assert np.isclose(norm_array, norm_array_ref, atol=1e-6).all()
-        assert np.isclose(norm_factors, norm_factors_ref, atol=1e-6).all()
-
-    def test__mean_normalization_different(self, different_count_data) -> None:
-        """Test total mean normalization"""
-        STRATEGY = "total_mean"
-
-        array, norm_array_ref, norm_factors_ref = different_count_data
-        norm_array, norm_factors = _total_mean_normalization(array)
-
-        assert np.isclose(norm_array, norm_array_ref[STRATEGY], atol=1e-6).all()
-        assert np.isclose(norm_factors, norm_factors_ref[STRATEGY], atol=1e-6).all()
-
-    def test__median_normalization_different(self, different_count_data) -> None:
-        """Test total median normalization"""
-        STRATEGY = "total_median"
-
-        array, norm_array_ref, norm_factors_ref = different_count_data
-        norm_array, norm_factors = _total_median_normalization(array)
-
-        assert np.isclose(norm_array, norm_array_ref[STRATEGY], atol=1e-6).all()
-        assert np.isclose(norm_factors, norm_factors_ref[STRATEGY], atol=1e-6).all()
-
-    def test__mean_normalization_nan_values(self, nan_count_data) -> None:
-        STRATEGY = "total_mean"
-        array, norm_array_ref, norm_factors_ref = nan_count_data
-        norm_array, norm_factors = _total_mean_normalization(array)
-
-        assert np.isclose(norm_array, norm_array_ref[STRATEGY], atol=1e-6, equal_nan=True).all()
-        assert np.isclose(norm_factors, norm_factors_ref[STRATEGY], atol=1e-6, equal_nan=True).all()
-
-    def test__median_normalization_nan_values(self, nan_count_data) -> None:
-        STRATEGY = "total_median"
-        array, norm_array_ref, norm_factors_ref = nan_count_data
-        norm_array, norm_factors = _total_median_normalization(array)
-
-        assert np.isclose(norm_array, norm_array_ref[STRATEGY], atol=1e-6, equal_nan=True).all()
-        assert np.isclose(norm_factors, norm_factors_ref[STRATEGY], atol=1e-6, equal_nan=True).all()
+        assert np.isclose(norm_array, expected_arrays[strategy], atol=1e-6, equal_nan=True).all()
+        assert np.isclose(norm_factors, expected_factors[strategy], atol=1e-6, equal_nan=True).all()
 
 
 class TestNormalizeFunction:
     """Test the high-level normalize function"""
 
     @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
-    def test_normalize_default_parameters(self, different_count_data, strategy: str) -> None:
-        """Test normalize with default parameters (normalizes adata.X in place)"""
-        # Create test data
-        array, norm_array_ref, _ = different_count_data
-        adata = ad.AnnData(X=array.copy())
-
-        # Normalize
+    @pytest.mark.parametrize("data_type", ["all_equal", "different", "nan"])
+    def test_normalize_function_default(self, strategy, data_type, test_data_factory) -> None:
+        X, expected_arrays, _ = test_data_factory.get_test_data(data_type)
+        adata = ad.AnnData(X=X.copy())
         normalize(adata, strategy=strategy)
 
-        # Check that X was normalized
-        assert np.isclose(adata.X, norm_array_ref[strategy], atol=1e-6).all()
+        assert np.isclose(adata.X, expected_arrays[strategy], atol=1e-6, equal_nan=True).all()
         assert len(adata.obs.columns) == 0
         assert len(adata.layers) == 0
 
     @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
-    def test_normalize_key_added(self, different_count_data, strategy: str) -> None:
-        """Test normalize with key_added parameter"""
-        # Create test data
-        array, norm_array_ref, norm_factors_ref = different_count_data
-        adata = ad.AnnData(X=array.copy())
-
-        # Normalize
+    @pytest.mark.parametrize("data_type", ["all_equal", "different", "nan"])
+    def test_normalize_function_key_added(self, strategy, data_type, test_data_factory) -> None:
+        X, expected_arrays, _ = test_data_factory.get_test_data(data_type)
+        adata = ad.AnnData(X=X.copy())
         normalize(adata, strategy=strategy, key_added="norm_factors")
 
-        # Check that X was normalized
-        assert np.isclose(adata.X, norm_array_ref[strategy], atol=1e-6).all()
+        assert np.isclose(adata.X, expected_arrays[strategy], atol=1e-6, equal_nan=True).all()
+        assert len(adata.obs.columns) == 1
         assert "norm_factors" in adata.obs.columns
-        assert np.isclose(adata.obs["norm_factors"].to_numpy(), norm_factors_ref[strategy], atol=1e-6).all()
-        assert len(adata.layers) == 0
