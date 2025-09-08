@@ -75,6 +75,6 @@
     :toctree: generated
 
     io.read_psm_table
+    read_pg_table
     io.AnnDataFactory
-
 ```
