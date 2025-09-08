@@ -16,7 +16,8 @@ def _validate_strategies(strategy: str) -> None:
 def _total_mean_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Total normalization
 
-    Normalizes total intensity in each sample (row) to mean of the total intensities
+    Normalizes total intensity in each sample (row) to mean of the total intensities.
+    NaN-values are interpreted as zero-values.
 
     Parameters
     ----------
@@ -50,6 +51,7 @@ def _total_median_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarra
     """Total normalization
 
     Normalizes total intensity in each sample (row) to median of the total intensities
+    NaN-values are interpreted as zero-values.
 
     Parameters
     ----------
