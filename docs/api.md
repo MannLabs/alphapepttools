@@ -65,15 +65,16 @@
 
 ## IO
 
-### alphatools.io.anndata_factory
+### Reader functions
 
 ```{eval-rst}
-.. module:: alphatools.io.anndata_factory
-.. currentmodule:: alphatools.io.anndata_factory
+.. module:: alphatools.io
+.. currentmodule:: alphatools
 
 .. autosummary::
     :toctree: generated
 
-    AnnDataFactory
+    io.read_psm_table
     read_pg_table
+    io.AnnDataFactory
 ```
