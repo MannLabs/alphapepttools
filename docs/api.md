@@ -17,9 +17,7 @@
     pp.nanlog
     pp.detect_special_values
     pp.normalize
-    pp.pca
     pp.impute
-    pp.add_core_proteome_mask
 ```
 
 ## Tools
