@@ -1,2 +1,3 @@
-from .stats import pca, ttest
+from .embeddings import pca
+from .stats import ttest
 from .tools import umap
