@@ -225,7 +225,7 @@ def _drop_nans_from_plot_arrays(
 def _assign_nearest_anchor_position_to_values(
     values: np.ndarray,
     anchors: list[int | float] | np.ndarray | None,
-) -> list:
+) -> np.ndarray:
     if anchors is None:
         return values
 
@@ -236,14 +236,14 @@ def _assign_nearest_anchor_position_to_values(
         anchor_diffs = [abs(anchor - val) for anchor in anchors]
         anchored_values.append(anchors[np.argmin(anchor_diffs)])
 
-    return anchored_values
+    return np.array(anchored_values)
 
 
 def label_plot(
     ax: plt.Axes,
-    x_values: list | np.ndarray,
-    y_values: list | np.ndarray,
-    labels: list[str] | np.ndarray,
+    x_values: list | np.ndarray | pd.Series,
+    y_values: list | np.ndarray | pd.Series,
+    labels: list[str] | np.ndarray | pd.Series,
     x_anchors: list[int | float] | np.ndarray | None = None,
     label_kwargs: dict | None = None,
     line_kwargs: dict | None = None,
@@ -293,13 +293,19 @@ def label_plot(
     if not len(x_values) == len(y_values) == len(labels):
         raise ValueError("x_values, y_values, and labels must have the same length")
 
+    # Force the order of labels from highest to lowest
+    y_value_order = np.argsort(np.array(y_values))[::-1]
+    y_values = np.array(y_values)[y_value_order]
+    x_values = np.array(x_values)[y_value_order]
+    labels = np.array(labels)[y_value_order]
+
     # convert to numpy arrays for consistency & remove any nans
     x_values, y_values, labels = _drop_nans_from_plot_arrays(np.array(x_values), np.array(y_values), np.array(labels))
 
     # determine label positions based on optional x_anchors
     if x_anchors is not None:
         # x-values are binned to the anchor positions
-        label_x_values = _assign_nearest_anchor_position_to_values(x_values, x_anchors)
+        anchored_x_values = _assign_nearest_anchor_position_to_values(x_values, x_anchors)
 
         # y-values should be distributed evenly between the min and max y-values at that anchor
         label_spacing_display = config["font_sizes"]["medium"] * y_padding_factor
@@ -312,19 +318,42 @@ def label_plot(
         _, upper_bound_in_data_coords = transform.transform((0, ax.get_window_extent().height * y_display_start))
 
         # Iterate over all unique x_anchors and assign y-values in data coordinates to the respective labels
-        label_y_values = []
-        for anchor in np.unique(label_x_values):
-            current_label_y_values = np.sort(y_values[np.array(label_x_values) == anchor])
-            label_y_values.extend(
-                [upper_bound_in_data_coords - y_spacing_in_data_coords * i for i in range(len(current_label_y_values))]
+        # TODO: Optimize this loop to not have so many data structures
+        sorted_labels = []
+        sorted_data_x_values = []
+        sorted_data_y_values = []
+        sorted_label_x_values = []
+        sorted_label_y_values = []
+
+        for anchor_value in np.unique(anchored_x_values):
+            # Get the sequence of sorted values for the current anchor
+            anchor_mask = anchored_x_values == anchor_value
+
+            sorted_labels.extend(list(labels[anchor_mask]))
+            sorted_data_x_values.extend(list(x_values[anchor_mask]))
+            sorted_data_y_values.extend(list(y_values[anchor_mask]))
+            sorted_label_x_values.extend(list([anchor_value] * np.sum(anchor_mask)))
+            sorted_label_y_values.extend(
+                [upper_bound_in_data_coords - y_spacing_in_data_coords * i for i in range(np.sum(anchor_mask))]
             )
+
     else:
-        label_x_values = x_values
-        label_y_values = y_values
+        sorted_labels = labels
+        sorted_data_x_values = x_values
+        sorted_data_y_values = y_values
+        sorted_label_x_values = x_values
+        sorted_label_y_values = y_values
 
     # generate lines from data values to label positions
     lines = []
-    for label, x, y, label_x, label_y in zip(labels, x_values, y_values, label_x_values, label_y_values, strict=False):
+    for label, x, y, label_x, label_y in zip(
+        sorted_labels,
+        sorted_data_x_values,
+        sorted_data_y_values,
+        sorted_label_x_values,
+        sorted_label_y_values,
+        strict=True,
+    ):
         lines.append(((x, label_x), (y, label_y), label))
 
     for line in lines:
