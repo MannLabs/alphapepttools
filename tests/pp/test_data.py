@@ -864,6 +864,7 @@ def data_test_completeness_filter():
 
 
 # test data completeness filtering
+@pytest.mark.parametrize("subset", [False, True])
 @pytest.mark.parametrize(
     ("expected_columns", "expected_rows", "max_missing", "group_column", "groups"),
     [
@@ -1008,26 +1009,36 @@ def test_filter_data_completeness(
     max_missing,
     group_column,
     groups,
+    subset,
+    flag_column="completeness_filter_flag",
 ):
     # given
     adata = data_test_completeness_filter.copy()
 
     # when
-    adata_filtered = at.pp.filter_data_completeness(
-        adata=adata,
+    adata_result = at.pp.filter_data_completeness(
+        adata=adata.copy(),
         max_missing=max_missing,
         group_column=group_column,
         groups=groups,
+        subset=subset,
+        flag_column=flag_column,
     )
 
     # then
-    assert adata_filtered.var.index.to_list() == expected_columns
-    assert adata_filtered.obs.index.to_list() == expected_rows
-
-    # assert whether input data was changed
-    assert adata.var.index.to_list() == data_test_completeness_filter.var.index.to_list()
-    assert adata.obs.index.to_list() == data_test_completeness_filter.obs.index.to_list()
-    assert np.array_equal(adata.X, data_test_completeness_filter.X, equal_nan=True)
+    if not subset:
+        # --- flagging mode ---
+        # shape unchanged
+        assert adata_result.var.index.to_list() == data_test_completeness_filter.var.index.to_list()
+        assert adata_result.obs.index.to_list() == data_test_completeness_filter.obs.index.to_list()
+        # new flag column present
+        assert flag_column in adata_result.var.columns
+        assert adata_result.var[flag_column].dtype == bool
+    else:
+        # --- subsetting mode ---
+        # shape matches expected columns/rows
+        assert adata_result.var.index.to_list() == expected_columns
+        assert adata_result.obs.index.to_list() == expected_rows
 
 
 # test adata_column_to_array

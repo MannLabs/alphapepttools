@@ -486,33 +486,11 @@ def filter_data_completeness(
     max_missing: float,
     group_column: str | None = None,
     groups: list[str] | None = None,
+    *,
+    subset: bool = False,
+    flag_column: str = "completeness_flag",
 ) -> ad.AnnData:
-    """Filter features based on missing values
-
-    Filters AnnData features (columns) based on the fraction of missing values.
-    If group_column and groups are provided, only missingness of certain metadata
-    levels is considered. This is especially useful for imbalanced classes, where
-    filtering by global missingness may leave too many missing values in the smaller
-    class.
-
-    (In case rows should be filtered, it is recommended to transpose the adata
-    object prior to calling this function and reverting the transpose afterwards.)
-
-    Parameters
-    ----------
-    max_missing : float
-        Maximum fraction of missing values allowed. Compared with the fraction of missing values
-        in a "greater than" fashion, i.e. if max_missing is 0.6 and the fraction of missing values
-        is 0.6, the sample or feature is kept. Greater than comparison is used here since the
-        missing fraction may be 0.0, in which case the sample or feature should be kept.
-    group_column : str, optional
-        Column in obs to determine groups for filtering.
-    groups : list[str], optional
-        List of levels of the group_column to consider in filtering. E.g. if the column has the levels
-        ['A', 'B', 'C'], and groups = ['A', 'B'], only missingness of features in these
-        groups is considered. If None, all groups are considered.
-
-    """
+    """Flag or filter features based on missing values."""
     if max_missing < 0 or max_missing > 1:
         raise ValueError("Threshold must be between 0 and 1.")
 
@@ -539,8 +517,18 @@ def filter_data_completeness(
         missing_fraction = np.isnan(adata[indices, :].X).mean(axis=0)
         drop |= missing_fraction > max_missing
 
-    # Drop columns with too many missing values from data
-    if drop.any():
+    if not subset:
+        keep_mask = ~drop
+
+        # Log warning if column already exists
+        if flag_column in adata.var.columns:
+            logging.warning(f"Column '{flag_column}' already exists in adata.var and will be overwritten.")
+
+        adata.var[flag_column] = keep_mask
+        logging.info(
+            f"pp.filter_data_completeness(): Annotated {flag_column} column with feature completeness flags (True=kept)."
+        )
+    elif drop.any():
         adata = adata[:, ~drop].copy()
         n_dropped = drop.sum()
         logging.info(
