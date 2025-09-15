@@ -168,20 +168,20 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
         Dictionary mapping values to colors
 
     """
-    NA_STRING = config["na_default"]
+    na_string = config["na_default"]
     has_na = False
 
     values = values.astype(str)
     values = pd.unique(values)
 
     # Handle missing values
-    na_values = {NA_STRING, "nan"}
+    na_values = {na_string, "nan"}
     found_na_values = na_values.intersection(values)
     if found_na_values:
         has_na = True
-        if NA_STRING in found_na_values:
+        if na_string in found_na_values:
             logger.warning(
-                f"The default NaN filler string '{NA_STRING}' is present in the data. "
+                f"The default NaN filler string '{na_string}' is present in the data. "
                 "Consider using a different value to avoid overwriting."
             )
 
@@ -202,7 +202,7 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
     result_dict = dict(zip(values, _palette, strict=True))
 
     if has_na:
-        result_dict[NA_STRING] = mpl_colors.to_rgba("lightgrey")
+        result_dict[na_string] = mpl_colors.to_rgba("lightgrey")
 
     return result_dict
 
