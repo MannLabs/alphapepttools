@@ -23,6 +23,12 @@ from matplotlib.patches import Patch
 from alphatools.pl import defaults
 from alphatools.pl.colors import BaseColors, BasePalettes, _get_colors_from_cmap, get_color_mapping
 from alphatools.pl.figure import create_figure, label_axes
+from alphatools.pl.plot_data_handling import (
+    prepare_pca_1d_loadings_data_to_plot,
+    prepare_pca_2d_loadings_data_to_plot,
+    prepare_pca_data_to_plot,
+    prepare_scree_data_to_plot,
+)
 from alphatools.pp.data import data_column_to_array
 
 # logging configuration
@@ -779,7 +785,7 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        pca_coor_df = plot_data_handling.prepare_pca_data_to_plot(
+        pca_coor_df = prepare_pca_data_to_plot(
             data, pc_x, pc_y, dim_space, embbedings_name, color_map_column, label_column, label=label
         )
 
@@ -801,7 +807,7 @@ class Plots:
         # add color column
         if color_map_column is not None:
             color_values = data_column_to_array(data, color_map_column)
-            values[color_map_column] = color_values
+            pca_coor_df[color_map_column] = color_values
 
         cls.scatter(
             data=pca_coor_df,
@@ -825,7 +831,7 @@ class Plots:
             else:  # dim_space == "var"
                 labels = data.var.index if label_column is None else data_column_to_array(data, label_column)
 
-            label_plot(ax=ax, x_values=values["dim1"], y_values=values["dim2"], labels=labels, x_anchors=None)
+            label_plot(ax=ax, x_values=pca_coor_df["dim1"], y_values=pca_coor_df["dim2"], labels=labels, x_anchors=None)
 
         # set axislabels
         label_axes(ax, xlabel=f"PC{pc_x} ({var_dim1}%)", ylabel=f"PC{pc_y} ({var_dim2}%)")
@@ -865,7 +871,7 @@ class Plots:
         scatter_kwargs = scatter_kwargs or {}
 
         # create the dataframe for plotting, X = pcs, y = explained variance
-        values = plot_data_handling.prepare_scree_data_to_plot(adata, n_pcs, dim_space, embbedings_name)
+        values = prepare_scree_data_to_plot(adata, n_pcs, dim_space, embbedings_name)
 
         cls.scatter(
             data=values,
@@ -916,7 +922,7 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        top_loadings = plot_data_handling.prepare_pca_1d_loadings_data_to_plot(
+        top_loadings = prepare_pca_1d_loadings_data_to_plot(
             data=data,
             dim_space=dim_space,
             embbedings_name=embbedings_name,
@@ -988,7 +994,7 @@ class Plots:
         # Generate the correct loadings key name
         loadings_key = f"PCs_{dim_space}" if embbedings_name is None else embbedings_name
 
-        loadings_df = plot_data_handling.prepare_pca_2d_loadings_data_to_plot(
+        loadings_df = prepare_pca_2d_loadings_data_to_plot(
             data=data, loadings_name=loadings_key, pc_x=pc_x, pc_y=pc_y, nfeatures=nfeatures, dim_space=dim_space
         )
 
