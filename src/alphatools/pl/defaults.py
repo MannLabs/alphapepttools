@@ -1,3 +1,6 @@
+import matplotlib.colors as mpl_colors
+
+
 class PlotSettings:
     """Default settings for AlphaTools plots."""
 
@@ -52,7 +55,7 @@ class PlotSettings:
 
         # Lookup for NA values for automatic coloring
         self.na_identifiers = ["nan"]
-        self.na_color = "#d3d3d3"
+        self.na_color = mpl_colors.to_rgba("lightgrey")
 
     def to_dict(self) -> dict:
         """Convert PlotSettings to a dictionary."""

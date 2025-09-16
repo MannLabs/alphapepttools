@@ -49,7 +49,7 @@ def test_get_color_mapping(input_values, palette, expected_dict):
     """Test get_color_mapping with various input types and edge cases."""
     expected_dict = dict(expected_dict.items())
 
-    expected_dict[config["na_default"]] = BaseColors.get("lightgrey")
+    expected_dict["nan"] = BaseColors.get("lightgrey")
 
     result = get_color_mapping(input_values, palette)
 
