@@ -50,7 +50,9 @@ class PlotSettings:
             "0.25": 22.5,
         }
 
-        self.na_default = "_at_NA"
+        # Lookup for NA values for automatic coloring
+        self.na_identifiers = ["nan"]
+        self.na_color = "#d3d3d3"
 
     def to_dict(self) -> dict:
         """Convert PlotSettings to a dictionary."""

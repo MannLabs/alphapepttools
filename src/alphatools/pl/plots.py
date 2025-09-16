@@ -582,16 +582,8 @@ def _prepare_loading_df_to_plot(
 def _array_to_str(
     array: np.ndarray | pd.Series,
 ) -> np.ndarray:
-    """Map a numpy array to string values, while replacing NaNs with default nan-filler string."""
-    string_array = np.array(array, dtype=object)
-
-    if config["na_default"] in string_array:
-        logger.warning(
-            f"The default NaN replacement string '{config['na_default']}' is present in the data. Consider choosing a different value to avoid overwriting."
-        )
-
-    string_array[pd.isna(string_array)] = config["na_default"]  # replace NaNs with default string
-    return string_array.astype(str)  # ensure all values are strings
+    """Map a numpy array to string values."""
+    return np.array(array, dtype=object).astype(str)
 
 
 def _dict_keys_to_str(
@@ -817,8 +809,10 @@ class Plots:
                         values=color_map_column_array, palette=palette or BasePalettes.get("qualitative")
                     )
                 )
+
                 for level in set(color_map_column_array) - set(color_dict):
                     color_dict[level] = BaseColors.get("grey")
+
                 color_values = np.array([color_dict[level] for level in color_map_column_array], dtype=object)
         else:
             color_dict = {DEFAULT_GROUP: color or DEFAULT_COLOR}
@@ -847,7 +841,7 @@ class Plots:
             )
 
         if xlim:
-            ax.set_xlim(xlim)
+            ax = ax.set_xlim(xlim)
         if ylim:
             ax.set_ylim(ylim)
 

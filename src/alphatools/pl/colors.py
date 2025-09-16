@@ -115,6 +115,7 @@ def _get_colors_from_cmap(
 
     if isinstance(values, int):
         return [tuple(color) for color in cmap(np.linspace(0, 1, values))]
+
     if not pd.api.types.is_numeric_dtype(values):
         raise TypeError("values must be an integer or a numeric numpy array")
 
@@ -152,7 +153,13 @@ def _base_qualitative_colorscale() -> list:
 
 
 def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.colors.Colormap) -> dict:
-    """Map values to colors
+    """Map categorical values to colors.
+
+    Maps unique values in `values` to colors from `palette`. If `palette` is a list of colors,
+    colors are assigned in a cycling manner, which can lead to non-unique assignments if there
+    are more unique values than colors in the palette. If `palette` is a colormap, colors are
+    assigned uniquely based on the number of unique values. Missing values (as defined in
+    `config["na_identifiers"]`) are assigned the default NA color (`config["na_color"]`).
 
     Parameters
     ----------
@@ -168,25 +175,14 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
         Dictionary mapping values to colors
 
     """
-    na_string = config["na_default"]
-    has_na = False
+    values = pd.unique(values.astype(str))
 
-    values = values.astype(str)
-    values = pd.unique(values)
+    # Set missing values aside for later addition with default NA-color
+    na_values = np.array([v for v in values if v in config["na_identifiers"]])
+    na_dict = dict(zip(na_values, [config["na_color"]] * len(na_values), strict=True))
 
-    # Handle missing values
-    na_values = {na_string, "nan"}
-    found_na_values = na_values.intersection(values)
-    if found_na_values:
-        has_na = True
-        if na_string in found_na_values:
-            logger.warning(
-                f"The default NaN filler string '{na_string}' is present in the data. "
-                "Consider using a different value to avoid overwriting."
-            )
-
-    # Remove all NA-like values
-    values = np.array([v for v in values if v not in na_values])
+    # Continue with non-missing values only
+    values = np.array([v for v in values if v not in config["na_identifiers"]])
 
     # Ensure predictable color mapping
     values = np.sort(values)
@@ -195,14 +191,16 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
     if isinstance(palette, list):
         _palette = _cycle_palette(palette, n=len(values))
     elif isinstance(palette, mpl.colors.Colormap):
+        # Use the color mapping with an integer number of values, i.e. get equally spaced colors from the colormap
         _palette = _get_colors_from_cmap(palette, values=len(values))
     else:
         raise TypeError("palette must be a list of colors or a matplotlib colormap")
 
     result_dict = dict(zip(values, _palette, strict=True))
 
-    if has_na:
-        result_dict[na_string] = mpl_colors.to_rgba("lightgrey")
+    # Add missing values to the mapping with the default na color
+    if na_values:
+        result_dict.update(na_dict)
 
     return result_dict
 
