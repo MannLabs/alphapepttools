@@ -21,6 +21,12 @@ import pandas as pd
 from matplotlib import colors as mpl_colors
 from matplotlib.colors import Colormap
 
+from alphatools.pl import defaults
+
+logger = logging.getLogger(__name__)
+
+config = defaults.plot_settings.to_dict()
+
 
 def show_rgba_color_list(colors: list) -> None:
     """Show a list of RGBA colors for quick inspection"""
@@ -110,7 +116,10 @@ def _get_colors_from_cmap(
 
     if isinstance(values, int):
         return [tuple(color) for color in cmap(np.linspace(0, 1, values))]
-    values = np.array(values, dtype=float)
+
+    if not pd.api.types.is_numeric_dtype(values):
+        raise TypeError("values must be an integer or a numeric numpy array")
+
     vmin, vmax = np.nanmin(values), np.nanmax(values)
     values = mpl_colors.Normalize(vmin=vmin, vmax=vmax)(values)
     return cmap(values)
@@ -145,7 +154,13 @@ def _base_qualitative_colorscale() -> list:
 
 
 def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.colors.Colormap) -> dict:
-    """Map values to colors
+    """Map categorical values to colors.
+
+    Maps unique values in `values` to colors from `palette`. If `palette` is a list of colors,
+    colors are assigned in a cycling manner, which can lead to non-unique assignments if there
+    are more unique values than colors in the palette. If `palette` is a colormap, colors are
+    assigned uniquely based on the number of unique values. Missing values (as defined in
+    `config["na_identifiers"]`) are assigned the default NA color (`config["na_color"]`).
 
     Parameters
     ----------
@@ -161,16 +176,34 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
         Dictionary mapping values to colors
 
     """
-    values = pd.unique(values)
+    values = pd.unique(values.astype(str))
 
+    # Set missing values aside for later addition with default NA-color
+    na_values = np.array([v for v in values if v in config["na_identifiers"]])
+    na_dict = dict(zip(na_values, [config["na_color"]] * len(na_values), strict=True))
+
+    # Continue with non-missing values only
+    values = np.array([v for v in values if v not in config["na_identifiers"]])
+
+    # Ensure predictable color mapping
+    values = np.sort(values)
+
+    # Map color levels to a palette or a colormap
     if isinstance(palette, list):
         _palette = _cycle_palette(palette, n=len(values))
     elif isinstance(palette, mpl.colors.Colormap):
-        _palette = _get_colors_from_cmap(palette, values=values)
+        # Use the color mapping with an integer number of values, i.e. get equally spaced colors from the colormap
+        _palette = _get_colors_from_cmap(palette, values=len(values))
     else:
         raise TypeError("palette must be a list of colors or a matplotlib colormap")
 
-    return dict(zip(values, _palette, strict=True))
+    result_dict = dict(zip(values, _palette, strict=True))
+
+    # Add missing values to the mapping with the default na color
+    if na_values:
+        result_dict.update(na_dict)
+
+    return result_dict
 
 
 def _base_binary_colorscale() -> list:
