@@ -843,6 +843,7 @@ class Plots:
         ax: plt.Axes,
         n_pcs: int = 20,
         dim_space: str = "obs",
+        color: str = "blue",
         embbedings_name: str | None = None,
         scatter_kwargs: dict | None = None,
     ) -> None:
@@ -858,6 +859,8 @@ class Plots:
             number of PCs to plot, by default 20
         dim_space : str, optional
             The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
+        color : str, optional
+            Color to use for the scatterplot. By default "blue".
         embbedings_name : str | None, optional
             The custom embeddings name used in PCA. If None, uses default naming convention. By default None.
         scatter_kwargs : dict, optional
@@ -879,6 +882,7 @@ class Plots:
             y_column="explained_variance",
             ax=ax,
             scatter_kwargs=scatter_kwargs,
+            color=color,
         )
 
         # set labels
