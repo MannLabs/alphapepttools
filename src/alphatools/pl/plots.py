@@ -21,12 +21,19 @@ import pandas as pd
 from matplotlib.patches import Patch
 
 from alphatools.pl import defaults
-from alphatools.pl.colors import BaseColors, BasePalettes, get_color_mapping
+from alphatools.pl.colors import BaseColors, BasePalettes, _get_colors_from_cmap, get_color_mapping
 from alphatools.pl.figure import create_figure, label_axes
-from alphatools.pp.data import _adata_column_to_array
+from alphatools.pl.plot_data_handling import (
+    prepare_pca_1d_loadings_data_to_plot,
+    prepare_pca_2d_loadings_data_to_plot,
+    prepare_pca_data_to_plot,
+    prepare_scree_data_to_plot,
+)
+from alphatools.pp.data import data_column_to_array
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 config = defaults.plot_settings.to_dict()
 
@@ -364,227 +371,11 @@ def label_plot(
         ax.text(line[0][1], line[1][1], label_parser(line[2]), **label_kwargs)
 
 
-def _validate_pca_plot_input(
-    data: ad.AnnData,
-    pca_embeddings_layer_name: str,
-    pca_variance_layer_name: str,
-    pc_x: int,
-    pc_y: int,
-    dim_space: str,
-) -> None:
-    """
-    Validates the AnnData object for PCA-related data and dimensions.
-
-    Parameters
-    ----------
-    data:
-        AnnData object to be validated.
-    pca_embeddings_layer_name:
-        Name of the PCA layer to be checked.
-    pca_variance_layer_name:
-        Name of the column for explained variance to be checked.
-    pc_x:
-        First PCA dimension to be validated (1-indexed, i.e. the first PC is 1, not 0).
-    pc_y:
-        Second PCA dimension to be validated (1-indexed, i.e. the first PC is 1, not 0).
-    dim_space:
-        The dimension space used in PCA. Can be either "obs" or "var".
-    """
-    if not isinstance(data, ad.AnnData):
-        raise TypeError("data must be an AnnData object")
-
-    if dim_space not in ["obs", "var"]:
-        raise ValueError(f"dim_space must be either 'obs' or 'var', got {dim_space}")
-
-    # Determine which attribute to check based on dim_space
-    pca_coors_attr = "obsm" if dim_space == "obs" else "varm"
-
-    # Check if the PCA embeddings layer exists in the correct attribute
-    if pca_embeddings_layer_name not in getattr(data, pca_coors_attr):
-        available_layers = list(getattr(data, pca_coors_attr).keys())
-        raise ValueError(
-            f"PCA embeddings layer '{pca_embeddings_layer_name}' not found in data.{pca_coors_attr}. "
-            f"Found layers: {available_layers}"
-        )
-
-    # Check if the variance layer exists in uns
-    if pca_variance_layer_name not in data.uns:
-        raise ValueError(
-            f"PCA metadata layer '{pca_variance_layer_name}' not found in AnnData object. "
-            f"Found layers: {list(data.uns.keys())}"
-        )
-
-    # Check PC dimensions
-    n_pcs = getattr(data, pca_coors_attr)[pca_embeddings_layer_name].shape[1]
-    if not (1 <= pc_x <= n_pcs) or not (1 <= pc_y <= n_pcs):
-        raise ValueError(f"pc_x and pc_y must be between 1 and {n_pcs} (inclusive). Got pc_x={pc_x}, pc_y={pc_y}.")
-
-
-def _validate_scree_plot_input(
-    data: ad.AnnData,
-    pca_variance_layer_name: str,
-    n_pcs: int,
-) -> None:
-    """
-    Validate inputs for scree plot of the PCA dimension.
-
-    Parameters
-    ----------
-    data : anndata.AnnData
-        The AnnData object containing PCA results.
-    pca_variance_layer_name : str
-        The name of the PCA layer (used to construct the embedding key as `data.uns[pca_name]`).
-    n_pcs : int
-        The number of principal components requested for plotting.
-
-    """
-    if not isinstance(data, ad.AnnData):
-        raise TypeError("data must be an AnnData object")
-
-    if pca_variance_layer_name not in data.uns:
-        raise ValueError(
-            f"PCA metadata layer '{pca_variance_layer_name}' not found in AnnData object. "
-            f"Found layers: {list(data.uns.keys())}"
-        )
-
-    n_pcs_avail = len(data.uns[pca_variance_layer_name]["variance_ratio"])
-    if n_pcs > n_pcs_avail:
-        logging.warning(
-            f"Requested {n_pcs} PCs, but only {n_pcs_avail} PCs are available. Plotting only the available PCs."
-        )
-
-
-def _validate_pca_loadings_plot_inputs(
-    data: ad.AnnData, loadings_name: str, dim: int, dim2: int | None, nfeatures: int, dim_space: str
-) -> None:
-    """
-    Validate inputs for accessing PCA feature loadings from an AnnData object.
-
-    Parameters
-    ----------
-    data : anndata.AnnData
-        The AnnData object containing PCA loadings data.
-    loadings_name : str
-        The key that stores PCA feature loadings (e.g., "PCs").
-    dim: int
-        The principal component index (1-based) to extract loadings for.
-    dim2 : int | None
-        The second principal component index (1-based) to extract loadings for, if applicable.
-    nfeatures : int
-        The number of top features to consider for the given component.
-    dim_space : str
-        The dimension space used in PCA. Can be either "obs" or "var".
-    """
-    if not isinstance(data, ad.AnnData):
-        raise TypeError("data must be an AnnData object")
-
-    if dim_space not in ["obs", "var"]:
-        raise ValueError(f"dim_space must be either 'obs' or 'var', got {dim_space}")
-
-    # Determine which attribute to check based on dim_space
-    loadings_attr = "varm" if dim_space == "obs" else "obsm"
-
-    # Check if the loadings layer exists in the correct attribute
-    if loadings_name not in getattr(data, loadings_attr):
-        available_layers = list(getattr(data, loadings_attr).keys())
-        raise ValueError(
-            f"PCA feature loadings layer '{loadings_name}' not found in data.{loadings_attr}. "
-            f"Found layers: {available_layers}"
-        )
-
-    # Check PC dimensions
-    n_pcs = getattr(data, loadings_attr)[loadings_name].shape[1]
-    if not (1 <= dim <= n_pcs):
-        raise ValueError(f"PC must be between 1 and {n_pcs} (inclusive). Got dim={dim}.")
-    if dim2 is not None and not (1 <= dim2 <= n_pcs):
-        raise ValueError(f"second PC must be between 1 and {n_pcs} (inclusive). Got pc_y={dim2}.")
-
-    # Check number of features
-    n_features = getattr(data, loadings_attr)[loadings_name].shape[0]
-    if not (1 <= nfeatures <= n_features):
-        raise ValueError(
-            f"Number of features must be between 1 and {n_features} (inclusive). Got nfeatures={nfeatures}."
-        )
-
-
-def _prepare_loading_df_to_plot(
-    data: ad.AnnData, loadings_name: str, pc_x: int, pc_y: int, nfeatures: int, dim_space: str
-) -> pd.DataFrame:
-    """
-    Prepare a DataFrame with PCA feature loadings for plotting.
-
-    This function extracts the loadings of two specified principal components (PCs) from
-    an AnnData object, filters features that contributed to the PCA (non-zero loadings),
-    and flags the top nfeatures for each selected PC dimension.
-
-    Parameters
-    ----------
-    data : anndata.AnnData
-        The AnnData object containing PCA results.
-    loadings_name : str
-        The key where PCA loadings are stored.
-    pc_x : int
-        The first principal component index (1-based) to extract loadings for.
-    pc_y : int
-        The second principal component index (1-based) to extract loadings for.
-    nfeatures : int
-        Number of top features per PC to highlight based on absolute loadings.
-    dim_space : str
-        The dimension space used in PCA. Can be either "obs" or "var".
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame containing loadings for the selected PCs, feature names, boolean columns
-        indicating if a feature was used in PCA and whether it is among the top features in either dimension.
-    """
-    _validate_pca_loadings_plot_inputs(
-        data=data, loadings_name=loadings_name, dim=pc_x, dim2=pc_y, nfeatures=nfeatures, dim_space=dim_space
-    )
-
-    dim1_z = pc_x - 1  # convert to 0-based index
-    dim2_z = pc_y - 1  # convert to 0-based index
-
-    # Determine which attribute to use based on dim_space
-    loadings_attr = "varm" if dim_space == "obs" else "obsm"
-    orig_loadings = getattr(data, loadings_attr)[loadings_name]
-
-    loadings = pd.DataFrame(
-        {
-            "dim1_loadings": orig_loadings[:, dim1_z],
-            "dim2_loadings": orig_loadings[:, dim2_z],
-        }
-    )
-
-    # Add feature names based on dim_space
-    if dim_space == "obs":
-        loadings["feature"] = data.var_names
-    else:  # dim_space == "var"
-        loadings["feature"] = data.obs_names
-
-    # get only features that were used in the PCA (e.g., those that are part of the core proteome)
-    # these would be features with all-NaN loadings in all PC dimensions
-    non_nan_mask = ~np.isnan(orig_loadings).all(axis=1)
-    loadings = loadings[non_nan_mask]
-
-    # add the top N features for each dimension
-    loadings["abs_dim1"] = loadings["dim1_loadings"].abs()
-    loadings["abs_dim2"] = loadings["dim2_loadings"].abs()
-
-    loadings["is_top"] = False
-    loadings.loc[loadings.nlargest(nfeatures, "abs_dim1").index, "is_top"] = True
-    loadings.loc[loadings.nlargest(nfeatures, "abs_dim2").index, "is_top"] = True
-
-    return loadings
-
-
 def _array_to_str(
     array: np.ndarray | pd.Series,
 ) -> np.ndarray:
-    """Map a numpy array to string values, while replacing NaNs with 'NA'."""
-    string_array = np.array(array, dtype=object)
-    string_array[pd.isna(string_array)] = "NA"  # replace NaNs with "NA"
-    return string_array.astype(str)  # ensure all values are strings
+    """Map a numpy array to string values."""
+    return np.array(array, dtype=object).astype(str)
 
 
 def _dict_keys_to_str(
@@ -634,7 +425,7 @@ class Plots:
         value_column : str
             Column in data to plot as histogram. Must contain numeric data.
         color_map_column : str, optional
-            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by a default filler string. Overrides color parameter. By default None.
         bins : int, optional
             Number of bins to use for the histogram. By default 10.
         color : str, optional
@@ -667,18 +458,16 @@ class Plots:
         if ax is None:
             _, ax = create_figure(1, 1)
 
-        values = _adata_column_to_array(data, value_column)
+        values = data_column_to_array(data, value_column)
 
         if color_map_column is None:
             color = BaseColors.get(color)
             ax.hist(values, bins=bins, color=color, **hist_kwargs)
         else:
-            color_levels = _array_to_str(
-                _adata_column_to_array(data, color_map_column)
-            )  # Safe types: convert the color_map_column values to strings
+            color_levels = _array_to_str(data_column_to_array(data, color_map_column))
             color_dict = _dict_keys_to_str(
                 color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
-            )  # Safe types: convert the color_dict keys to strings
+            )
 
             for level in set(color_levels) - set(color_dict):
                 color_dict[level] = BaseColors.get("grey")
@@ -710,7 +499,7 @@ class Plots:
         data: pd.DataFrame | ad.AnnData,
         x_column: str,
         y_column: str,
-        color: str = "blue",
+        color: str | None = None,
         color_map_column: str | None = None,
         color_column: str | None = None,
         ax: plt.Axes | None = None,
@@ -724,6 +513,28 @@ class Plots:
     ) -> None:
         """Plot a scatterplot from a DataFrame or AnnData object
 
+        Coloring works in three ways, with the following order of precedence: 1. color_column, 2. color_map_column, 3. color.
+        If a color_column is provided, its values are interpreted directly as colors, i.e. they have to be something matplotlib
+        can understand (e.g. RGBA, hex, etc.). If a color_map_column is provided, its values are mapped to colors in combination
+        with palette or color_dict (see color mapping logic below). If neither color_column nor color_map_column is provided, the
+        color parameter is used to color all points the same (defaults to blue).
+
+        Color mapping logic
+        -------------------
+        - color_map_column is non-numeric:
+            - If color_dict is not None: Use color_dict to assign levels of color_map_column to colors (unmapped levels default to grey).
+            - If color_dict is None, and palette is not None: Use palette to automatically assign colors to each level.
+            - If color_dict is None and palette is None: Use a repeating default palette to assign colors to each level.
+        - color_map_column is numeric:
+            - If palette is a matplotlib colormap: Numerically map values to colors using the colormap. This means that e.g. 1 and 3 will be closer in color than 1 and 10.
+            - If palette is not a matplotlib colormap: Treat numeric values as categorical and color as described above.
+
+        - Examples:
+            - color_column="my_colors": Points colored by values in "my_colors" column (must contain valid colors)
+            - color_map_column="cell_type": Categorical mapping of cell types to colors
+            - color_map_column="expression", palette=plt.cm.viridis: Continuous gradient based on expression values
+
+
         Parameters
         ----------
         data : pd.DataFrame | ad.AnnData
@@ -735,12 +546,12 @@ class Plots:
         color : str, optional
             Color to use for the scatterplot. By default "blue".
         color_map_column : str, optional
-            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by a default filler string. Overrides color parameter. By default None.
         color_column : str, optional
             Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
         ax : plt.Axes, optional
             Matplotlib axes object to plot on, if None a new figure is created. By default None.
-        palette : list[str | tuple], optional
+        palette : list[str | tuple] | matplotlib.colors.Colormap, optional
             List of colors to use for color encoding, if None a default palette is used. By default None.
         color_dict: dict[str, str | tuple], optional
             Supercedes palette, a dictionary mapping levels to colors. By default None. If provided, palette is ignored.
@@ -763,36 +574,47 @@ class Plots:
         scatter_kwargs = scatter_kwargs or {}
         legend_kwargs = legend_kwargs or {}
         DEFAULT_GROUP = "data"
+        DEFAULT_COLOR = BaseColors.get("blue")
 
         if ax is None:
             _, axm = create_figure()
             ax = axm.next()
 
-        # Handle color encoding: If there is an actual color column, simply color the points accordingly
+        # Directly use colors from the color_column
         if color_column is not None:
-            color_values = _adata_column_to_array(data, color_column)
-        # If there is a color map column, map its string levels to a palette
+            color_values = data_column_to_array(data, color_column)
+        # Map values from the color_map_column to colors
         elif color_map_column is not None:
-            color_levels = _array_to_str(
-                _adata_column_to_array(data, color_map_column)
-            )  # Safe types: convert the color_map_column values to strings
-            color_dict = _dict_keys_to_str(
-                color_dict or get_color_mapping(color_levels, palette or BasePalettes.get("qualitative"))
-            )  # Safe types: convert the color_dict keys to strings
+            color_map_column_array = data_column_to_array(data, color_map_column)
 
-            for level in set(color_levels) - set(color_dict):
-                color_dict[level] = BaseColors.get("grey")
+            if pd.api.types.is_numeric_dtype(color_map_column_array) and isinstance(palette, plt.Colormap):
+                color_values = _get_colors_from_cmap(
+                    cmap_name=palette,
+                    values=color_map_column_array,
+                )
+            # if color_map_column is not numeric
+            else:
+                color_map_column_array = _array_to_str(data_column_to_array(data, color_map_column))
+                color_dict = _dict_keys_to_str(
+                    color_dict
+                    or get_color_mapping(
+                        values=color_map_column_array, palette=palette or BasePalettes.get("qualitative")
+                    )
+                )
 
-            color_values = np.array([color_dict[level] for level in color_levels], dtype=object)
+                for level in set(color_map_column_array) - set(color_dict):
+                    color_dict[level] = BaseColors.get("grey")
+
+                color_values = np.array([color_dict[level] for level in color_map_column_array], dtype=object)
         else:
-            color_dict = {DEFAULT_GROUP: BaseColors.get(color)}
+            color_dict = {DEFAULT_GROUP: color or DEFAULT_COLOR}
             color_values = np.array([color_dict[DEFAULT_GROUP]] * len(data))
 
         # Handle ordering of plotting arrays by string: order by the frequency of the color column
         counts = Counter([str(cv) for cv in color_values])
         order = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
-        x_values = _adata_column_to_array(data, x_column)[order]
-        y_values = _adata_column_to_array(data, y_column)[order]
+        x_values = data_column_to_array(data, x_column)[order]
+        y_values = data_column_to_array(data, y_column)[order]
         color_values = np.array(color_values)[order]
 
         ax.scatter(
@@ -842,7 +664,7 @@ class Plots:
         color : str, optional
             Color to use for the scatterplot. By default "blue".
         color_map_column : str, optional
-            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by a default filler string. Overrides color parameter. By default None.
         color_column : str, optional
             Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
         palette : list[str | tuple], optional
@@ -944,7 +766,7 @@ class Plots:
         color : str, optional
             Color to use for the scatterplot. By default "blue".
         color_map_column : str, optional
-            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by "NA". Overrides color parameter. By default None.
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by a default filler string. Overrides color parameter. By default None.
         color_column : str, optional
             Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
         palette : list[str | tuple], optional
@@ -963,37 +785,32 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        # Generate the correct key names based on dim_space and embbedings_name
-        pca_coors_key = f"X_pca_{dim_space}" if embbedings_name is None else embbedings_name
+        pca_coor_df = prepare_pca_data_to_plot(
+            data, pc_x, pc_y, dim_space, embbedings_name, color_map_column, label_column, label=label
+        )
+
+        # Check if the variance layer exists in uns
         variance_key = f"variance_pca_{dim_space}" if embbedings_name is None else embbedings_name
 
-        # Determine which attribute to use for coordinates based on dim_space
-        pca_coors_attr = "obsm" if dim_space == "obs" else "varm"
+        if variance_key not in data.uns:
+            raise ValueError(
+                f"PCA metadata layer '{variance_key}' not found in AnnData object. "
+                f"Found layers: {list(data.uns.keys())}"
+            )
 
-        # Input checks
-        _validate_pca_plot_input(data, pca_coors_key, variance_key, pc_x, pc_y, dim_space)
-
-        # create the dataframe for plotting
-        dim1_z = pc_x - 1  # to account for 0 indexing
-        dim2_z = pc_y - 1  # to account for 0 indexing
-
-        # Get PCA coordinates from the correct attribute
-        pca_coordinates = getattr(data, pca_coors_attr)[pca_coors_key]
-        values = pd.DataFrame(pca_coordinates[:, [dim1_z, dim2_z]], columns=["dim1", "dim2"])
-
-        # get the explained variance ratio for the dimensions
-        var_dim1 = data.uns[variance_key]["variance_ratio"][dim1_z]
+        # get the explained variance ratio for the dimensions (for axis labels)
+        var_dim1 = data.uns[variance_key]["variance_ratio"][pc_x - 1]
         var_dim1 = round(var_dim1 * 100, 2)
-        var_dim2 = data.uns[variance_key]["variance_ratio"][dim2_z]
+        var_dim2 = data.uns[variance_key]["variance_ratio"][pc_y - 1]
         var_dim2 = round(var_dim2 * 100, 2)
 
         # add color column
         if color_map_column is not None:
-            color_values = _adata_column_to_array(data, color_map_column)
-            values[color_map_column] = color_values
+            color_values = data_column_to_array(data, color_map_column)
+            pca_coor_df[color_map_column] = color_values
 
         cls.scatter(
-            data=values,
+            data=pca_coor_df,
             x_column="dim1",
             y_column="dim2",
             color=color,
@@ -1010,11 +827,11 @@ class Plots:
         if label:
             # For labeling, we need to consider the appropriate observation space
             if dim_space == "obs":
-                labels = data.obs.index if label_column is None else _adata_column_to_array(data, label_column)
+                labels = data.obs.index if label_column is None else data_column_to_array(data, label_column)
             else:  # dim_space == "var"
-                labels = data.var.index if label_column is None else _adata_column_to_array(data, label_column)
+                labels = data.var.index if label_column is None else data_column_to_array(data, label_column)
 
-            label_plot(ax=ax, x_values=values["dim1"], y_values=values["dim2"], labels=labels, x_anchors=None)
+            label_plot(ax=ax, x_values=pca_coor_df["dim1"], y_values=pca_coor_df["dim2"], labels=labels, x_anchors=None)
 
         # set axislabels
         label_axes(ax, xlabel=f"PC{pc_x} ({var_dim1}%)", ylabel=f"PC{pc_y} ({var_dim2}%)")
@@ -1026,6 +843,7 @@ class Plots:
         ax: plt.Axes,
         n_pcs: int = 20,
         dim_space: str = "obs",
+        color: str = "blue",
         embbedings_name: str | None = None,
         scatter_kwargs: dict | None = None,
     ) -> None:
@@ -1033,7 +851,7 @@ class Plots:
 
         Parameters
         ----------
-        data : ad.AnnData
+        adata : ad.AnnData
             AnnData to plot.
         ax : plt.Axes
             Matplotlib axes object to plot on.
@@ -1041,6 +859,8 @@ class Plots:
             number of PCs to plot, by default 20
         dim_space : str, optional
             The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
+        color : str, optional
+            Color to use for the scatterplot. By default "blue".
         embbedings_name : str | None, optional
             The custom embeddings name used in PCA. If None, uses default naming convention. By default None.
         scatter_kwargs : dict, optional
@@ -1053,22 +873,8 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        # Generate the correct variance key name
-        variance_key = f"variance_pca_{dim_space}" if embbedings_name is None else embbedings_name
-
-        # Input checks
-        _validate_scree_plot_input(adata, variance_key, n_pcs)
-
-        n_pcs_avail = len(adata.uns[variance_key]["variance_ratio"])
-        n_pcs = min(n_pcs, n_pcs_avail)
-
         # create the dataframe for plotting, X = pcs, y = explained variance
-        values = pd.DataFrame(
-            {
-                "PC": np.arange(n_pcs) + 1,
-                "explained_variance": adata.uns[variance_key]["variance_ratio"][:n_pcs],
-            }
-        )
+        values = prepare_scree_data_to_plot(adata, n_pcs, dim_space, embbedings_name)
 
         cls.scatter(
             data=values,
@@ -1076,6 +882,7 @@ class Plots:
             y_column="explained_variance",
             ax=ax,
             scatter_kwargs=scatter_kwargs,
+            color=color,
         )
 
         # set labels
@@ -1119,32 +926,13 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        # Generate the correct loadings key name
-        loadings_key = f"PCs_{dim_space}" if embbedings_name is None else embbedings_name
-
-        # Determine which attribute to use for loadings based on dim_space
-        loadings_attr = "varm" if dim_space == "obs" else "obsm"
-
-        _validate_pca_loadings_plot_inputs(
-            data=data, loadings_name=loadings_key, dim=dim, dim2=None, nfeatures=nfeatures, dim_space=dim_space
+        top_loadings = prepare_pca_1d_loadings_data_to_plot(
+            data=data,
+            dim_space=dim_space,
+            embbedings_name=embbedings_name,
+            dim=dim,
+            nfeatures=nfeatures,
         )
-
-        # create the dataframe for plotting
-        dim_z = dim - 1  # to account from 0 indexing
-        loadings_matrix = getattr(data, loadings_attr)[loadings_key]
-        loadings = pd.DataFrame({"dim_loadings": loadings_matrix[:, dim_z]})
-
-        # Use appropriate index for features based on dim_space
-        if dim_space == "obs":
-            loadings["feature"] = data.var.index.astype("string")
-        else:  # dim_space == "var"
-            loadings["feature"] = data.obs.index.astype("string")
-
-        loadings["abs_loadings"] = loadings["dim_loadings"].abs()
-        # Sort the DataFrame by absolute loadings and select the top features
-        top_loadings = loadings.sort_values(by="abs_loadings", ascending=False).copy().head(nfeatures)
-        top_loadings = top_loadings.reset_index(drop=True)
-        top_loadings["index_int"] = range(nfeatures, 0, -1)
 
         cls.scatter(
             data=top_loadings,
@@ -1210,7 +998,7 @@ class Plots:
         # Generate the correct loadings key name
         loadings_key = f"PCs_{dim_space}" if embbedings_name is None else embbedings_name
 
-        loadings = _prepare_loading_df_to_plot(
+        loadings_df = prepare_pca_2d_loadings_data_to_plot(
             data=data, loadings_name=loadings_key, pc_x=pc_x, pc_y=pc_y, nfeatures=nfeatures, dim_space=dim_space
         )
 
@@ -1218,7 +1006,7 @@ class Plots:
         scatter_kwargs.update({"alpha": 0.3, "s": 10, "edgecolors": "none"})
 
         cls.scatter(
-            data=loadings,
+            data=loadings_df,
             x_column="dim1_loadings",
             y_column="dim2_loadings",
             ax=ax,
@@ -1226,7 +1014,7 @@ class Plots:
             scatter_kwargs=scatter_kwargs,
         )
 
-        loadings_top = loadings[loadings["is_top"]]
+        loadings_top = loadings_df[loadings_df["is_top"]]
 
         # plot the top features on top
         scatter_kwargs.update({"alpha": 1, "s": 20, "edgecolors": "none"})

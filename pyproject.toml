@@ -25,13 +25,14 @@ dynamic = [ "version" ]
 
 dependencies = [
   # this is the 'data_downloader_improvements' branch with all the anndata code
-  "alphabase @ git+https://github.com/MannLabs/alphabase@95a1cd9beafc13dfde09f813984eb1f77e3a60bc", # TODO point to next release
+  "alphabase==1.7.1",    # TODO point to next release
   "anndata==0.11.1",
-  "cmcrameri==1.9",                                                                                 # TODO: remove this to optional dependencies?
+  "cmcrameri==1.9",      # TODO: remove this to optional dependencies?
   "matplotlib==3.10",
   "numpy<2",
-  "pandas",                                                                                         # version to be fixed: 2.2.3
-  "pyarrow",                                                                                        # version to be fixed: 19.0.1
+  "openpyxl>=3.1.3",
+  "pandas",              # version to be fixed: 2.2.3
+  "pyarrow",             # version to be fixed: 19.0.1
   "scanpy==1.10.4",
   "scikit-learn==1.5.1",
   # for debug logging (referenced from the issue template)
