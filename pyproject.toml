@@ -30,6 +30,7 @@ dependencies = [
   "cmcrameri==1.9",      # TODO: remove this to optional dependencies?
   "matplotlib==3.10",
   "numpy<2",
+  "openpyxl>=3.1.3",
   "pandas",              # version to be fixed: 2.2.3
   "pyarrow",             # version to be fixed: 19.0.1
   "scanpy==1.10.4",
@@ -48,7 +49,6 @@ optional-dependencies.doc = [
   "ipykernel",
   "ipython",
   "myst-nb>=1.1",
-  "openpyxl>=3.1.3",
   "setuptools",
   "sphinx>=4",
   "sphinx-autodoc-typehints",
