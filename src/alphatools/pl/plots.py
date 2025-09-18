@@ -633,7 +633,7 @@ class Plots:
             )
 
         if xlim:
-            ax = ax.set_xlim(xlim)
+            ax.set_xlim(xlim)
         if ylim:
             ax.set_ylim(ylim)
 

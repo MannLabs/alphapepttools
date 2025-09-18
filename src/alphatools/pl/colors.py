@@ -23,8 +23,9 @@ from matplotlib.colors import Colormap
 
 from alphatools.pl import defaults
 
-config = defaults.plot_settings.to_dict()
 logger = logging.getLogger(__name__)
+
+config = defaults.plot_settings.to_dict()
 
 
 def show_rgba_color_list(colors: list) -> None:
