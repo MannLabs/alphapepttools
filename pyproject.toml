@@ -25,7 +25,7 @@ dynamic = [ "version" ]
 
 dependencies = [
   # this is the 'data_downloader_improvements' branch with all the anndata code
-  "alphabase==1.7",      # TODO point to next release
+  "alphabase==1.7.1",    # TODO point to next release
   "anndata==0.11.1",
   "cmcrameri==1.9",      # TODO: remove this to optional dependencies?
   "matplotlib==3.10",
