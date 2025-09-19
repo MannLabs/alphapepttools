@@ -728,16 +728,17 @@ class Plots:
     def plot_pca(
         cls,
         data: ad.AnnData,
-        ax: plt.Axes,
-        pc_x: int = 1,
-        pc_y: int = 2,
-        dim_space: str = "obs",
-        embbedings_name: str | None = None,
-        label: bool = False,  # noqa: FBT001, FBT002
-        label_column: str | None = None,
+        x_column: int = 1,
+        y_column: int = 2,
         color: str = "blue",
         color_map_column: str | None = None,
         color_column: str | None = None,
+        dim_space: str = "obs",
+        embbedings_name: str | None = None,
+        # TODO: the below argument is an antipattern resulting from this function doing multiple things. In the future, this should be replaced by a pca-plotting adapter so that pca_plot is no longer needed and scatter can be used instead, followed by label_plot, etc.
+        label: bool = False,  # noqa: FBT001, FBT002
+        label_column: str | None = None,
+        ax: plt.Axes | None = None,
         palette: list[str | tuple] | None = None,
         color_dict: dict[str, str | tuple] | None = None,
         legend: str | mpl.legend.Legend | None = None,
@@ -786,7 +787,7 @@ class Plots:
         scatter_kwargs = scatter_kwargs or {}
 
         pca_coor_df = prepare_pca_data_to_plot(
-            data, pc_x, pc_y, dim_space, embbedings_name, color_map_column, label_column, label=label
+            data, x_column, y_column, dim_space, embbedings_name, color_map_column, label_column, label=label
         )
 
         # Check if the variance layer exists in uns
@@ -799,9 +800,9 @@ class Plots:
             )
 
         # get the explained variance ratio for the dimensions (for axis labels)
-        var_dim1 = data.uns[variance_key]["variance_ratio"][pc_x - 1]
+        var_dim1 = data.uns[variance_key]["variance_ratio"][x_column - 1]
         var_dim1 = round(var_dim1 * 100, 2)
-        var_dim2 = data.uns[variance_key]["variance_ratio"][pc_y - 1]
+        var_dim2 = data.uns[variance_key]["variance_ratio"][y_column - 1]
         var_dim2 = round(var_dim2 * 100, 2)
 
         # add color column
@@ -834,7 +835,7 @@ class Plots:
             label_plot(ax=ax, x_values=pca_coor_df["dim1"], y_values=pca_coor_df["dim2"], labels=labels, x_anchors=None)
 
         # set axislabels
-        label_axes(ax, xlabel=f"PC{pc_x} ({var_dim1}%)", ylabel=f"PC{pc_y} ({var_dim2}%)")
+        label_axes(ax, xlabel=f"PC{x_column} ({var_dim1}%)", ylabel=f"PC{y_column} ({var_dim2}%)")
 
     @classmethod
     def scree_plot(
