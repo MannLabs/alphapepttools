@@ -14,16 +14,18 @@ def scanpy_pycombat(
     """Apply batch correction using scanpy's implementation of pyComBat
 
     Correct for the batch effect of a categorical covariate using an empirical
-    Bayes framework as implemented in the pyComBat function of scanpy. the
+    Bayes framework as implemented in the pyComBat function of scanpy. The
     underlying function requires a complete data matrix without NaN values, which
     may require imputation prior to running batch correction.
 
     Parameters
     ----------
     adata : anndata.AnnData
-        Annotated data matrix, where rows are cells and columns are features.
+        Annotated data matrix, where rows are cells and columns are features. The data matrix
+        cannot contain NaN values.
     batch : str
-        Name of the batch feature in obs, the variation associated with this feature will be corrected
+        Name of the batch feature in obs, the variation associated with this feature will be corrected.
+        Missing values in this column will be replaced by one single "NA" batch.
 
     Returns
     -------
@@ -40,13 +42,6 @@ def scanpy_pycombat(
     if adata.obs[batch].isna().sum() > 0:
         logging.warning(f"Found NaNs in {batch}, adding 'NA' batch...")
         adata.obs[batch] = adata.obs[batch].fillna("NA")
-
-    # If any level of the to-correct data has only one level, drop it
-    batch_level_count = adata.obs.groupby(batch)[batch].transform("count")
-
-    if any(batch_level_count == 1):
-        logging.warning(f"There are single-sample batches for {batch}. Dropping these samples.")
-        adata = adata[batch_level_count > 1, :].copy()
 
     # batch correct; apparently pyCombat from scanpy sets everything to nan if there is a batch that contains only one cell
     # i.e. if a sample only occurs once per plate, everything fails and we get all nans
