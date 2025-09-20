@@ -100,6 +100,6 @@ def test_label_plot(example_ax, x, y, labels, anchors, expected_lines):
             if i == 0:  # x-coordinates
                 assert gen_i == exp_i
             elif i == 1:  # y-coodrinates
-                assert gen_i == pytest.approx(exp_i, rel=1e-1)  # Fails on second, unexplained?
+                assert gen_i == pytest.approx(exp_i, rel=1e-1)
             else:  # labels
                 assert gen_i == exp_i
