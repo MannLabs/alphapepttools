@@ -146,7 +146,7 @@ def scanpy_pycombat(
     adata = adata.copy()
 
     # Ensure that X is numeric
-    # adata.X = adata.X.astype(float)
+    adata.X = adata.X.astype(float)
 
     # Harmonize NA values in the batch column into a single "NA" batch
     if any(adata.obs[batch].isna()):
