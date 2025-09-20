@@ -1,3 +1,4 @@
+import pandas as pd
 import pytest
 
 from alphatools.pl.figure import create_figure
@@ -15,23 +16,33 @@ def example_ax():
     return make_dummy_data()
 
 
-# Helper function to read out lines from a matplotlib Axes object
 def extract_label_plot_data(ax):
     """Extract line and label data from an axes after label_plot has been called."""
     lines = ax.get_lines()
     texts = ax.texts
 
-    result = []
+    line_dfs = []
     for line, text in zip(lines, texts, strict=False):
-        x_data = tuple(line.get_xdata())
-        y_data = tuple(line.get_ydata())
+        x_left, x_right = line.get_xdata()
+        y_left, y_right = line.get_ydata()
         label = text.get_text()
-        result.append((x_data, y_data, label))
-    return result
+        line_dfs.append(
+            pd.DataFrame(
+                {
+                    "x_start": [x_left],
+                    "x_end": [x_right],
+                    "y_start": [y_left],
+                    "y_end": [y_right],
+                    "label": [label],
+                }
+            )
+        )
+
+    return pd.concat(line_dfs, ignore_index=True)
 
 
-# The important thing to assess is whether labels and values stay matched throughout the repositioning,
-# Hence the providing of labels and values out of order.
+# The important thing to assess is that x, y and labels stay correctly ordered, i.e. top_right
+# ends up at the top right label after anchor assignment.
 @pytest.mark.parametrize(
     (
         "x",
@@ -46,30 +57,32 @@ def extract_label_plot_data(ax):
             [2, 2, 3, 3, 1, 1],
             ["middle_right", "middle_left", "top_right", "top_left", "bottom_right", "bottom_left"],
             None,
-            [
-                ((1, 1), (3, 3), "top_left"),
-                ((2, 2), (3, 3), "top_right"),
-                ((1, 1), (2, 2), "middle_left"),
-                ((2, 2), (2, 2), "middle_right"),
-                ((1, 1), (1, 1), "bottom_left"),
-                ((2, 2), (1, 1), "bottom_right"),
-            ],
+            # Expected lines read from plot visually
+            pd.DataFrame(
+                {
+                    "x_start": [1, 2, 1, 2, 1, 2],
+                    "x_end": [1, 2, 1, 2, 1, 2],
+                    "y_start": [3, 3, 2, 2, 1, 1],
+                    "y_end": [3, 3, 2, 2, 1, 1],
+                    "label": ["top_left", "top_right", "middle_left", "middle_right", "bottom_left", "bottom_right"],
+                }
+            ),
         ),
         (
             [2, 1, 2, 1, 2, 1],
             [2, 2, 3, 3, 1, 1],
             ["middle_right", "middle_left", "top_right", "top_left", "bottom_right", "bottom_left"],
             (0.5, 2.5),
-            # These values were manually read out from a plot in a test notebook; the important thing
-            # here is the order of label y values: top > middle > bottom for left and right
-            [
-                ((1, 0.5), (3, 3.094), "top_left"),
-                ((1, 0.5), (2, 2.788), "middle_left"),
-                ((1, 0.5), (1, 2.484), "bottom_left"),
-                ((2, 2.5), (3, 3.094), "top_right"),
-                ((2, 2.5), (2, 2.788), "middle_right"),
-                ((2, 2.5), (1, 2.484), "bottom_right"),
-            ],
+            # Expected lines read from plot visually
+            pd.DataFrame(
+                {
+                    "x_start": [1, 1, 1, 2, 2, 2],
+                    "x_end": [0.5, 0.5, 0.5, 2.5, 2.5, 2.5],
+                    "y_start": [3, 2, 1, 3, 2, 1],
+                    "y_end": [3.094, 2.788, 2.484, 3.094, 2.788, 2.484],
+                    "label": ["top_left", "middle_left", "bottom_left", "top_right", "middle_right", "bottom_right"],
+                }
+            ),
         ),
     ],
 )
@@ -94,12 +107,20 @@ def test_label_plot(example_ax, x, y, labels, anchors, expected_lines):
     # Extract the actual lines
     label_lines = extract_label_plot_data(ax)
 
+    # For both dataframes, for each x anchor (x_end) convert the y_end points to ranks to avoid issues with absolute positioning
+    label_lines["y_end"] = label_lines.groupby("x_end")["y_end"].rank(ascending=True)
+    expected_lines["y_end"] = expected_lines.groupby("x_end")["y_end"].rank(ascending=True)
+
+    # Set datatypes
+    comparison_datatypes = {
+        "x_start": float,
+        "x_end": float,
+        "y_start": float,
+        "y_end": float,
+        "label": str,
+    }
+    label_lines = label_lines.astype(comparison_datatypes)
+    expected_lines = expected_lines.astype(comparison_datatypes)
+
     # Assert that the labels are approximately correct
-    for generated_line, expected_line in zip(label_lines, expected_lines, strict=False):
-        for i, (gen_i, exp_i) in enumerate(zip(generated_line, expected_line, strict=False)):
-            if i == 0:  # x-coordinates
-                assert gen_i == exp_i
-            elif i == 1:  # y-coodrinates
-                assert gen_i == pytest.approx(exp_i, rel=1e-1)  # Fails on second, unexplained?
-            else:  # labels
-                assert gen_i == exp_i
+    pd.testing.assert_frame_equal(label_lines, expected_lines)

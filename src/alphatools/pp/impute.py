@@ -58,6 +58,10 @@ def impute_gaussian(
     rng = np.random.default_rng(random_state)
     na_col_idxs = np.where(np.isnan(X).sum(axis=0) > 0)[0]
 
+    if len(na_col_idxs) == 0:
+        logging.info(" impute_gaussian: No NaN values found, no imputation performed.")
+        return adata
+
     # generate corresponding downshifted features
     stds = np.nanstd(X, axis=0)
     means = np.nanmean(X, axis=0)
@@ -70,10 +74,10 @@ def impute_gaussian(
         X[na_row_idxs, i] = rng.normal(shifted_means[i], shifted_stds[i], len(na_row_idxs))
 
     if not X.shape == input_X_shape:
-        raise ValueError("Imputed data shape does not match original data shape.")
+        raise ValueError(" impute_gaussian: Imputed data shape does not match original data shape.")
 
     if np.isnan(X).any():
-        raise ValueError("Imputation failed, data retained NaN values.")
+        raise ValueError(" impute_gaussian: Imputation failed, data retained NaN values.")
 
-    logging.info(f"Imputation complete. Imputed {nan_count} NaN values with Gaussian distribution.")
+    logging.info(f" impute_gaussian: Imputation complete. Imputed {nan_count} NaN values with Gaussian distribution.")
     return adata

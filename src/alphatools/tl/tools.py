@@ -8,8 +8,8 @@ import numpy as np
 import regex as re
 from Bio import SeqIO
 
-# logging configuration
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def umap() -> None:
@@ -57,11 +57,11 @@ def get_id2gene_map(
         raise TypeError("fasta_input must be a Path or string.")
 
     if source_type == "file":
-        logging.info(f"Reading FASTA from file path: {fasta_input!s}")
+        logger.info(f"Reading FASTA from file path: {fasta_input!s}")
         with Path(fasta_input).open() as handle:
             fasta_data = list(SeqIO.parse(handle, "fasta"))
     else:
-        logging.info("Parsing FASTA from string content")
+        logger.info("Parsing FASTA from string content")
         with StringIO(fasta_input) as handle:
             fasta_data = list(SeqIO.parse(handle, "fasta"))
 
