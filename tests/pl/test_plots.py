@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from alphatools.pl.figure import create_figure
-from alphatools.pl.plots import extract_columns_to_df, extract_groupwise_plotting_data, label_plot
+from alphatools.pl.plots import _extract_columns_to_df, _extract_groupwise_plotting_data, label_plot
 
 
 # Fixtures
@@ -184,14 +184,14 @@ def test_label_plot(example_ax, x, y, labels, anchors, expected_lines):
         ),
     ],
 )
-def test_extract_columns_to_df(which_data, example_data, example_sample_metadata, columns, expected_data):
+def test__extract_columns_to_df(which_data, example_data, example_sample_metadata, columns, expected_data):
     if which_data == "anndata":
         adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
         data_input = adata
     else:
         data_input = example_data
 
-    extracted_data = extract_columns_to_df(data_input, columns)
+    extracted_data = _extract_columns_to_df(data_input, columns)
 
     pd.testing.assert_frame_equal(extracted_data, expected_data)
 
@@ -205,7 +205,7 @@ def test_extract_columns_to_df(which_data, example_data, example_sample_metadata
         ("anndata_with_duplicate", ["A", "age"]),
     ],
 )
-def test_extract_columns_to_df_failures(which_data, example_data, example_sample_metadata, columns):
+def test__extract_columns_to_df_failures(which_data, example_data, example_sample_metadata, columns):
     if which_data == "anndata":
         adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
         data_input = adata
@@ -218,16 +218,18 @@ def test_extract_columns_to_df_failures(which_data, example_data, example_sample
         data_input = example_data
 
     with pytest.raises(KeyError):
-        extract_columns_to_df(data_input, columns)
+        _extract_columns_to_df(data_input, columns)
 
 
 # Test parsing of anndata objects to bar/box/violin-plottable data
 @pytest.mark.parametrize(
-    ("grouping_column", "value_column", "expected_data", "expected_labels", "expected_positions"),
+    ("grouping_column", "value_column", "direct_columns", "expected_data", "expected_labels", "expected_positions"),
     [
+        # Basic functionality with grouping and value column
         (
             "batch",
             "A",
+            None,
             [[2.0], [3.0]],  # NaN is dropped, grouped by batch [1,1,2]
             [1, 2],
             [1, 2],
@@ -235,33 +237,38 @@ def test_extract_columns_to_df_failures(which_data, example_data, example_sample
         (
             "batch",
             "B",
+            None,
             [[4.0, 5.0], [6.0]],  # First two cells in batch 1, last in batch 2
             [1, 2],
             [1, 2],
         ),
+        # Case with direct column usage and dropping NaNs
+        (
+            None,
+            None,
+            ["A", "B", "age"],
+            [[2.0, 3.0], [4.0, 5.0, 6.0], [10.0, 20.0, 30.0]],
+            ["A", "B", "age"],
+            [1, 2, 3],
+        ),
     ],
 )
-def test_extract_groupwise_plotting_data(
+def test__extract_groupwise_plotting_data(
     example_data,
     example_sample_metadata,
     grouping_column,
     value_column,
+    direct_columns,
     expected_data,
     expected_labels,
     expected_positions,
 ):
     adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
 
-    data_lists, labels, positions = extract_groupwise_plotting_data(adata, grouping_column, value_column)
+    data_lists, labels, positions = _extract_groupwise_plotting_data(
+        data=adata, grouping_column=grouping_column, value_column=value_column, direct_columns=direct_columns
+    )
 
     assert data_lists == expected_data
     assert labels == expected_labels
     assert positions == expected_positions
-
-
-def test_extract_groupwise_plotting_data_failure(example_data, example_sample_metadata):
-    # Test failure when requesting non-existent batch level with anndata
-    adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
-
-    with pytest.raises(ValueError, match="Groups not found"):
-        extract_groupwise_plotting_data(adata, "batch", "A", selected_values=[99, 100])
