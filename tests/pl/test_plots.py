@@ -127,7 +127,7 @@ def test_label_plot(example_ax, x, y, labels, anchors, expected_lines):
     pd.testing.assert_frame_equal(label_lines, expected_lines)
 
 
-# Test the data extraction function extract_columns_to_df to get a dataframe from anndata X and obs
+# Test the data extraction function of alphatools: correctly extract quantitative data for plotting from dataframes and anndata objects
 @pytest.fixture
 def example_data():
     def make_dummy_data():
@@ -156,9 +156,10 @@ def example_sample_metadata():
 
 
 @pytest.mark.parametrize(
-    ("columns", "expected_data"),
+    ("which_data", "columns", "expected_data"),
     [
         (
+            "anndata",
             ["A", "B", "age"],
             pd.DataFrame(
                 {
@@ -169,11 +170,25 @@ def example_sample_metadata():
                 index=["cell1", "cell2", "cell3"],
             ),
         ),
+        (
+            "dataframe",
+            ["A", "B"],
+            pd.DataFrame(
+                {
+                    "A": [1, 2, 3],
+                    "B": [4, 5, 6],
+                },
+                index=["cell1", "cell2", "cell3"],
+            ),
+        ),
     ],
 )
-def test_extract_columns_to_df(example_data, example_sample_metadata, columns, expected_data):
-    adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
-    data_input = adata
+def test_extract_columns_to_df(which_data, example_data, example_sample_metadata, columns, expected_data):
+    if which_data == "anndata":
+        adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
+        data_input = adata
+    else:
+        data_input = example_data
 
     extracted_data = extract_columns_to_df(data_input, columns)
 
@@ -183,21 +198,27 @@ def test_extract_columns_to_df(example_data, example_sample_metadata, columns, e
 
 # Test failure cases for extract_columns_to_df
 @pytest.mark.parametrize(
-    ("test_case", "columns"),
+    ("which_data", "columns"),
     [
+        # Missing column in DataFrame
+        ("dataframe", ["A", "nonexistent"]),
         # Missing column in AnnData
-        ("missing_column", ["A", "nonexistent"]),
+        ("anndata", ["A", "nonexistent"]),
         # Duplicate column in both X and obs for AnnData
-        ("duplicate_column", ["A", "age"]),
+        ("anndata_with_duplicate", ["A", "age"]),
     ],
 )
-def test_extract_columns_to_df_failures(test_case, example_data, example_sample_metadata, columns):
-    if test_case == "missing_column":
+def test_extract_quan_data_failures(which_data, example_data, example_sample_metadata, columns):
+    if which_data == "anndata":
         adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
-    elif test_case == "duplicate_column":
+        data_input = adata
+    elif which_data == "anndata_with_duplicate":
         X_with_age = example_data.copy()
         X_with_age.columns = ["A", "B", "age"]
         adata = anndata.AnnData(X=X_with_age, obs=example_sample_metadata)
+        data_input = adata
+    else:
+        data_input = example_data
 
     with pytest.raises(KeyError):
-        extract_columns_to_df(adata, columns)
+        extract_columns_to_df(data_input, columns)
