@@ -38,6 +38,119 @@ logger = logging.getLogger(__name__)
 config = defaults.plot_settings.to_dict()
 
 
+def extract_quan_data(
+    data: ad.AnnData | pd.DataFrame,
+    columns: list[str] | None = None,
+) -> pd.DataFrame:
+    """Extract selected numeric columns from AnnData or DataFrame.
+
+    This function serves as an adapter upstream of matplotlib plotting functions,
+    which frequently accept an array of numeric values. The DataFrame case is
+    straightforward, while the AnnData case flexibly handles columns from both
+    X matrix and obs metadata.
+
+    Parameters
+    ----------
+    data : ad.AnnData | pd.DataFrame
+        Input data object.
+    columns : list[str] | None, optional
+        List of column names to extract. If None, uses all columns (DataFrame)
+        or all columns in X (AnnData). Default is None.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing only the selected numeric columns.
+
+    Raises
+    ------
+    KeyError
+        If requested columns are not found or exist in both X and obs.
+    ValueError
+        If any selected columns contain non-numeric data.
+    TypeError
+        If data is not a DataFrame or AnnData object.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import anndata as ad
+    >>> # Create test data
+    >>> data = pd.DataFrame(
+    ...     {
+    ...         "A": [1, 2, 3, 4, 5, 6, 7],
+    ...         "B": [17, 3, 4, 5, 6, 7, 8],
+    ...     },
+    ...     index=list("abcdefg"),
+    ... )
+    >>> md = pd.DataFrame(
+    ...     {
+    ...         "batch": ["A", "A", "A", "B", "B", "B", "B"],
+    ...         "group": ["X", "X", "Y", "Y", "Y", "Z", "Z"],
+    ...         "age": [10, 20, 30, 40, 50, 60, 70],
+    ...     },
+    ...     index=list("abcdefg"),
+    ... )
+    >>> annd = ad.AnnData(X=data.values, obs=md, var=pd.DataFrame(index=data.columns))
+    >>> # Extract mixed columns from X and obs
+    >>> result = extract_quan_data(annd, columns=["A", "B", "age"])
+    >>> print(result)
+    A   B  age
+    0  1  17   10
+    1  2   3   20
+    2  3   4   30
+    3  4   5   40
+    4  5   6   50
+    5  6   7   60
+    6  7   8   70
+    """
+    if isinstance(data, pd.DataFrame):
+        columns = columns or data.columns.tolist()
+        try:
+            dataset = data[columns]
+        except KeyError as e:
+            raise KeyError(f"Columns {columns} not found in dataframe.") from e
+
+    elif isinstance(data, ad.AnnData):
+        if columns is None:
+            dataset = data.to_df()
+        else:
+            # Partition columns by source
+            x_cols = [col for col in columns if col in data.var_names]
+            obs_cols = [col for col in columns if col in data.obs.columns]
+
+            # Check for duplicate columns across sources
+            duplicates = set(x_cols) & set(obs_cols)
+            if duplicates:
+                raise KeyError(
+                    f"Columns {duplicates} found in both AnnData X and obs. Please ensure unique column names."
+                )
+
+            # Check for missing columns
+            missing_cols = set(columns) - set(x_cols) - set(obs_cols)
+            if missing_cols:
+                raise KeyError(f"Columns {missing_cols} not found in AnnData X or obs.")
+
+            # Build dataset from available sources
+            parts = []
+            if x_cols:
+                parts.append(data.to_df()[x_cols])
+            if obs_cols:
+                parts.append(data.obs[obs_cols])
+
+            dataset = pd.concat(parts, axis=1) if len(parts) > 1 else parts[0]
+
+    else:
+        raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
+
+    # Validate numeric columns
+    non_numeric = [col for col in dataset.columns if not pd.api.types.is_numeric_dtype(dataset[col])]
+    if non_numeric:
+        raise ValueError(f"Columns {non_numeric} are not numeric.")
+
+    return dataset
+
+
 def add_lines(
     ax: plt.Axes,
     intercepts: float | list[float | int],
