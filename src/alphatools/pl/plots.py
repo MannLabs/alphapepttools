@@ -61,47 +61,6 @@ def extract_columns_to_df(
     pd.DataFrame
         DataFrame containing only the selected columns.
 
-    Raises
-    ------
-    KeyError
-        If requested columns are not found or exist in both X and obs.
-    ValueError
-        If any selected columns contain non-numeric data.
-    TypeError
-        If data is not a DataFrame or AnnData object.
-
-    Examples
-    --------
-    >>> import pandas as pd
-    >>> import anndata as ad
-    >>> # Create test data
-    >>> data = pd.DataFrame(
-    ...     {
-    ...         "A": [1, 2, 3, 4, 5, 6, 7],
-    ...         "B": [17, 3, 4, 5, 6, 7, 8],
-    ...     },
-    ...     index=list("abcdefg"),
-    ... )
-    >>> md = pd.DataFrame(
-    ...     {
-    ...         "batch": ["A", "A", "A", "B", "B", "B", "B"],
-    ...         "group": ["X", "X", "Y", "Y", "Y", "Z", "Z"],
-    ...         "age": [10, 20, 30, 40, 50, 60, 70],
-    ...     },
-    ...     index=list("abcdefg"),
-    ... )
-    >>> annd = ad.AnnData(X=data.values, obs=md, var=pd.DataFrame(index=data.columns))
-    >>> # Extract mixed columns from X and obs
-    >>> result = extract_quan_data(annd, columns=["A", "B", "age"])
-    >>> print(result)
-    A   B  age
-    0  1  17   10
-    1  2   3   20
-    2  3   4   30
-    3  4   5   40
-    4  5   6   50
-    5  6   7   60
-    6  7   8   70
     """
     if isinstance(data, pd.DataFrame):
         columns = columns or data.columns.tolist()
@@ -143,6 +102,61 @@ def extract_columns_to_df(
         raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
 
     return dataset
+
+
+def extract_groupwise_plotting_data(
+    data: ad.AnnData | pd.DataFrame,
+    grouping_column: str,
+    value_column: str,
+    selected_values: list[str] | None = None,
+) -> tuple[list[list], list[str], list[int]]:
+    """Extract data for group-wise plotting (violin, bar, box plots).
+
+    Transforms long-format data into the list-of-lists format required by
+    matplotlib's violin, bar, and box plot functions.
+
+    Parameters
+    ----------
+    data : ad.AnnData | pd.DataFrame
+        Data containing grouping and value columns
+    grouping_column : str
+        Column containing the groups to compare
+    value_column : str
+        Column whose values should be plotted
+    selected_values : list[str] | None, optional
+        Selected levels of the grouping_column to plot, by default None (all levels)
+
+    Returns
+    -------
+    tuple[list[list], list[str], list[int]]
+        Tuple of (data_lists, labels, positions) for plotting
+
+    """
+    # Extract required columns as DataFrame
+    df = extract_columns_to_df(data, columns=[grouping_column, value_column])
+
+    # Determine groups to plot
+    available_groups = df[grouping_column].unique()
+    groups_to_plot = selected_values or available_groups.tolist()
+
+    # Validate selected groups exist
+    invalid_groups = set(groups_to_plot) - set(available_groups)
+    if invalid_groups:
+        raise ValueError(f"Groups not found: {invalid_groups}")
+
+    # Extract data for each group
+    data_lists = []
+    labels = []
+    positions = []
+
+    for i, group in enumerate(groups_to_plot):
+        group_data = df[df[grouping_column] == group][value_column].dropna()
+        if not group_data.empty:
+            data_lists.append(group_data.tolist())
+            labels.append(group)
+            positions.append(i + 1)
+
+    return data_lists, labels, positions
 
 
 def add_lines(

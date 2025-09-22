@@ -1,12 +1,39 @@
 import anndata
+import numpy as np
 import pandas as pd
 import pytest
 
 from alphatools.pl.figure import create_figure
-from alphatools.pl.plots import extract_columns_to_df, label_plot
+from alphatools.pl.plots import extract_columns_to_df, extract_groupwise_plotting_data, label_plot
 
 
-# Test the labelling function of alphatools: correctly spaced and ordered labels
+# Fixtures
+@pytest.fixture
+def example_data():
+    def make_dummy_data():
+        X = pd.DataFrame(
+            {
+                "A": [np.nan, 2.0, 3.0],
+                "B": [4.0, 5.0, 6.0],
+                "C": [7.0, 8.0, 9.0],
+            }
+        )
+        X.index = ["cell1", "cell2", "cell3"]
+        return X
+
+    return make_dummy_data()
+
+
+@pytest.fixture
+def example_sample_metadata():
+    def make_dummy_data():
+        sample_metadata = pd.DataFrame({"cell_type": ["A", "B", "C"], "age": [10.0, 20.0, 30.0], "batch": [1, 1, 2]})
+        sample_metadata.index = ["cell1", "cell2", "cell3"]
+        return sample_metadata
+
+    return make_dummy_data()
+
+
 @pytest.fixture
 def example_ax():
     def make_dummy_data():
@@ -17,6 +44,7 @@ def example_ax():
     return make_dummy_data()
 
 
+# Test the labelling function of alphatools: correctly spaced and ordered labels
 def extract_label_plot_data(ax):
     """Extract line and label data from an axes after label_plot has been called."""
     lines = ax.get_lines()
@@ -127,34 +155,7 @@ def test_label_plot(example_ax, x, y, labels, anchors, expected_lines):
     pd.testing.assert_frame_equal(label_lines, expected_lines)
 
 
-# Test the data extraction function of alphatools: correctly extract quantitative data for plotting from dataframes and anndata objects
-@pytest.fixture
-def example_data():
-    def make_dummy_data():
-        X = pd.DataFrame(
-            {
-                "A": [1, 2, 3],
-                "B": [4, 5, 6],
-                "C": [7, 8, 9],
-            }
-        )
-        X.index = ["cell1", "cell2", "cell3"]
-        return X
-
-    return make_dummy_data()
-
-
-# example sample metadata: one more sample than data
-@pytest.fixture
-def example_sample_metadata():
-    def make_dummy_data():
-        sample_metadata = pd.DataFrame({"cell_type": ["A", "B", "C"], "age": [10, 20, 30]})
-        sample_metadata.index = ["cell1", "cell2", "cell3"]
-        return sample_metadata
-
-    return make_dummy_data()
-
-
+# Test data extraction for plotting from dataframes and anndata objects
 @pytest.mark.parametrize(
     ("which_data", "columns", "expected_data"),
     [
@@ -163,9 +164,9 @@ def example_sample_metadata():
             ["A", "B", "age"],
             pd.DataFrame(
                 {
-                    "A": [1, 2, 3],
-                    "B": [4, 5, 6],
-                    "age": [10, 20, 30],
+                    "A": [np.nan, 2.0, 3.0],
+                    "B": [4.0, 5.0, 6.0],
+                    "age": [10.0, 20.0, 30.0],
                 },
                 index=["cell1", "cell2", "cell3"],
             ),
@@ -175,8 +176,8 @@ def example_sample_metadata():
             ["A", "B"],
             pd.DataFrame(
                 {
-                    "A": [1, 2, 3],
-                    "B": [4, 5, 6],
+                    "A": [np.nan, 2.0, 3.0],
+                    "B": [4.0, 5.0, 6.0],
                 },
                 index=["cell1", "cell2", "cell3"],
             ),
@@ -192,7 +193,6 @@ def test_extract_columns_to_df(which_data, example_data, example_sample_metadata
 
     extracted_data = extract_columns_to_df(data_input, columns)
 
-    # Ensure the extracted data matches the expected data
     pd.testing.assert_frame_equal(extracted_data, expected_data)
 
 
@@ -200,15 +200,12 @@ def test_extract_columns_to_df(which_data, example_data, example_sample_metadata
 @pytest.mark.parametrize(
     ("which_data", "columns"),
     [
-        # Missing column in DataFrame
         ("dataframe", ["A", "nonexistent"]),
-        # Missing column in AnnData
         ("anndata", ["A", "nonexistent"]),
-        # Duplicate column in both X and obs for AnnData
         ("anndata_with_duplicate", ["A", "age"]),
     ],
 )
-def test_extract_quan_data_failures(which_data, example_data, example_sample_metadata, columns):
+def test_extract_columns_to_df_failures(which_data, example_data, example_sample_metadata, columns):
     if which_data == "anndata":
         adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
         data_input = adata
@@ -222,3 +219,49 @@ def test_extract_quan_data_failures(which_data, example_data, example_sample_met
 
     with pytest.raises(KeyError):
         extract_columns_to_df(data_input, columns)
+
+
+# Test parsing of anndata objects to bar/box/violin-plottable data
+@pytest.mark.parametrize(
+    ("grouping_column", "value_column", "expected_data", "expected_labels", "expected_positions"),
+    [
+        (
+            "batch",
+            "A",
+            [[2.0], [3.0]],  # NaN is dropped, grouped by batch [1,1,2]
+            [1, 2],
+            [1, 2],
+        ),
+        (
+            "batch",
+            "B",
+            [[4.0, 5.0], [6.0]],  # First two cells in batch 1, last in batch 2
+            [1, 2],
+            [1, 2],
+        ),
+    ],
+)
+def test_extract_groupwise_plotting_data(
+    example_data,
+    example_sample_metadata,
+    grouping_column,
+    value_column,
+    expected_data,
+    expected_labels,
+    expected_positions,
+):
+    adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
+
+    data_lists, labels, positions = extract_groupwise_plotting_data(adata, grouping_column, value_column)
+
+    assert data_lists == expected_data
+    assert labels == expected_labels
+    assert positions == expected_positions
+
+
+def test_extract_groupwise_plotting_data_failure(example_data, example_sample_metadata):
+    # Test failure when requesting non-existent batch level with anndata
+    adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
+
+    with pytest.raises(ValueError, match="Groups not found"):
+        extract_groupwise_plotting_data(adata, "batch", "A", selected_values=[99, 100])
