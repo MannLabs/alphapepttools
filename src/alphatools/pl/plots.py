@@ -60,7 +60,7 @@ def extract_quan_data(
     Returns
     -------
     pd.DataFrame
-        DataFrame containing only the selected numeric columns.
+        DataFrame containing only the selected columns.
 
     Raises
     ------
