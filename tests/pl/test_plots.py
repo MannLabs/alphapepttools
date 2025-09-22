@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from alphatools.pl.figure import create_figure
-from alphatools.pl.plots import extract_quan_data, label_plot
+from alphatools.pl.plots import extract_columns_to_df, label_plot
 
 
 # Test the labelling function of alphatools: correctly spaced and ordered labels
@@ -127,7 +127,7 @@ def test_label_plot(example_ax, x, y, labels, anchors, expected_lines):
     pd.testing.assert_frame_equal(label_lines, expected_lines)
 
 
-# Test the data extraction function of alphatools: correctly extract quantitative data for plotting from dataframes and anndata objects
+# Test the data extraction function extract_columns_to_df to get a dataframe from anndata X and obs
 @pytest.fixture
 def example_data():
     def make_dummy_data():
@@ -156,10 +156,9 @@ def example_sample_metadata():
 
 
 @pytest.mark.parametrize(
-    ("which_data", "columns", "expected_data"),
+    ("columns", "expected_data"),
     [
         (
-            "anndata",
             ["A", "B", "age"],
             pd.DataFrame(
                 {
@@ -170,55 +169,35 @@ def example_sample_metadata():
                 index=["cell1", "cell2", "cell3"],
             ),
         ),
-        (
-            "dataframe",
-            ["A", "B"],
-            pd.DataFrame(
-                {
-                    "A": [1, 2, 3],
-                    "B": [4, 5, 6],
-                },
-                index=["cell1", "cell2", "cell3"],
-            ),
-        ),
     ],
 )
-def test_extract_quan_data(which_data, example_data, example_sample_metadata, columns, expected_data):
-    if which_data == "anndata":
-        adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
-        data_input = adata
-    else:
-        data_input = example_data
+def test_extract_columns_to_df(example_data, example_sample_metadata, columns, expected_data):
+    adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
+    data_input = adata
 
-    extracted_data = extract_quan_data(data_input, columns)
+    extracted_data = extract_columns_to_df(data_input, columns)
 
     # Ensure the extracted data matches the expected data
     pd.testing.assert_frame_equal(extracted_data, expected_data)
 
 
-# Test failure cases for extract_quan_data
+# Test failure cases for extract_columns_to_df
 @pytest.mark.parametrize(
-    ("which_data", "columns"),
+    ("test_case", "columns"),
     [
-        # Missing column in DataFrame
-        ("dataframe", ["A", "nonexistent"]),
         # Missing column in AnnData
-        ("anndata", ["A", "nonexistent"]),
+        ("missing_column", ["A", "nonexistent"]),
         # Duplicate column in both X and obs for AnnData
-        ("anndata_with_duplicate", ["A", "age"]),
+        ("duplicate_column", ["A", "age"]),
     ],
 )
-def test_extract_quan_data_failures(which_data, example_data, example_sample_metadata, columns):
-    if which_data == "anndata":
+def test_extract_columns_to_df_failures(test_case, example_data, example_sample_metadata, columns):
+    if test_case == "missing_column":
         adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
-        data_input = adata
-    elif which_data == "anndata_with_duplicate":
+    elif test_case == "duplicate_column":
         X_with_age = example_data.copy()
         X_with_age.columns = ["A", "B", "age"]
         adata = anndata.AnnData(X=X_with_age, obs=example_sample_metadata)
-        data_input = adata
-    else:
-        data_input = example_data
 
     with pytest.raises(KeyError):
-        extract_quan_data(data_input, columns)
+        extract_columns_to_df(adata, columns)
