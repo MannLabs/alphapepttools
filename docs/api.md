@@ -31,9 +31,9 @@
 .. autosummary::
     :toctree: generated
 
-    tl.pca
-    tl.ttest
-    tl.umap
+    tl.nan_safe_bh_correction
+    tl.nan_safe_ttest_ind
+    tl.group_ratios_ttest_ind
 ```
 
 ## Metrics
