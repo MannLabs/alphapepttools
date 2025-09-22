@@ -12,11 +12,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def umap() -> None:
-    """Perform UMAP on the data"""
-    raise NotImplementedError
-
-
 def get_id2gene_map(
     fasta_input: str | Path,
     source_type: str = "file",
