@@ -289,7 +289,7 @@ def diff_exp_ttest(
     ).set_index("id", drop=True)
     result_df.index.name = None
 
-    return result_df
+    return _standardize_diff_exp_ttest_results(comparison_name, result_df)
 
 
 def _standardize_alphaquant_results(

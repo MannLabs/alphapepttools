@@ -205,16 +205,18 @@ def test_group_ratios_ttest_ind(
     pvalues = np.array(pvalues)
     fdrs = nan_safe_bh_correction(pvalues)
 
-    # Build expected dataframe for comparison
+    # Build expected dataframe for comparison with standardized columns
+    comparison_key = f"{comparison[0]}_VS_{comparison[1]}"
     expected_df = pd.DataFrame(
         {
-            f"ratio_{comparison[0]}_VS_{comparison[1]}": ratios,
-            f"delta_{comparison[0]}_VS_{comparison[1]}": deltas,
-            f"tvalue_{comparison[0]}_VS_{comparison[1]}": tvalues,
-            f"pvalue_{comparison[0]}_VS_{comparison[1]}": pvalues,
-            f"padj_{comparison[0]}_VS_{comparison[1]}": fdrs,
-            f"n_{comparison[0]}": n_a,
-            f"n_{comparison[1]}": n_b,
+            "condition_pair": [comparison_key] * len(deltas),
+            "protein": example_data.columns.tolist(),
+            "log2fc": deltas,
+            "p_value": pvalues,
+            "-log10(p_value)": [-np.log10(p) if p != 0 and not np.isnan(p) else np.nan for p in pvalues],
+            "fdr": fdrs,
+            "-log10(fdr)": [-np.log10(f) if f != 0 and not np.isnan(f) else np.nan for f in fdrs],
+            "method": ["ttest"] * len(deltas),
         },
         index=example_data.columns,
     )
