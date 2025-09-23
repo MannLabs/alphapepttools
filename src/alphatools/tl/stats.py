@@ -140,6 +140,39 @@ def nan_safe_ttest_ind(
     return ttest_ind(a, b, **kwargs)
 
 
+def _standardize_diff_exp_ttest_results(
+    comparison_key: str,
+    result_df: pd.DataFrame,
+) -> pd.DataFrame:
+    """Standardize ttest results DataFrames"""
+    current_result_df = result_df.copy()
+
+    # Map columns from ttest output format to standard format
+    current_column_map = {
+        f"delta_{comparison_key}": "log2fc",
+        f"pvalue_{comparison_key}": "p_value",
+        f"padj_{comparison_key}": "fdr",
+    }
+
+    # Select and rename columns
+    columns_to_keep = [col for col in current_column_map if col in current_result_df.columns]
+    current_result_df = current_result_df[columns_to_keep].rename(columns=current_column_map)
+
+    # Add standard columns
+    current_result_df["condition_pair"] = comparison_key
+    current_result_df["protein"] = current_result_df.index
+    current_result_df["method"] = "ttest"
+
+    # Calculate -log10 transformations
+    current_result_df["-log10(p_value)"] = -current_result_df["p_value"].apply(
+        lambda x: np.nan if x == 0 else np.log10(x)
+    )
+    current_result_df["-log10(fdr)"] = -current_result_df["fdr"].apply(lambda x: np.nan if x == 0 else np.log10(x))
+
+    # Reorder columns to match DIFF_EXP_COLS
+    return current_result_df[DIFF_EXP_COLS].copy()
+
+
 def diff_exp_ttest(
     adata: ad.AnnData,
     between_column: str,
