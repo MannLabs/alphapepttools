@@ -162,6 +162,8 @@ def _extract_groupwise_plotting_data(
 
     """
     if direct_columns is not None:
+        if grouping_column is not None or value_column is not None:
+            logger.info("'direct_columns' provided, ignoring 'grouping_column' and 'value_column' parameters.")
         df = _extract_columns_to_df(data, columns=direct_columns)[direct_columns]  # ensure order
         df = df.melt(var_name="variable", value_name="value")
         grouping_column, value_column = "variable", "value"
