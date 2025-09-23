@@ -60,14 +60,15 @@ def nan_safe_bh_correction(
 def nan_safe_ttest_ind(
     a: pd.Series,
     b: pd.Series,
-    min_valid_values: int | None = 2,
+    min_valid_values: int | None = None,
     **kwargs,
-) -> tuple:
+) -> tuple[float, float] | tuple[np.nan, np.nan]:
     """NaN-safe wrapper around scipy.stats.ttest_ind.
 
     Performs independent t-test between two samples, but returns (nan, nan) if either
     input has fewer than two non-NaN values. Automatically converts inputs to pandas
-    Series if needed.
+    Series if needed. Defaults are set to omit NaNs and not assume equal variance (Welch's t-test),
+    which can be changed by passing different arguments for "nan_policy" and "equal_var" to **kwargs.
 
     Parameters
     ----------
@@ -124,6 +125,66 @@ def nan_safe_ttest_ind(
     return ttest_ind(a, b, **kwargs)
 
 
+def _validate_ttest_inputs(
+    adata: ad.AnnData,
+    between_column: str,
+    comparison: tuple,
+    min_valid_values: int,
+) -> tuple[str, str]:
+    """Validate inputs for group_ratios_ttest_ind.
+
+    Parameters
+    ----------
+    adata : ad.AnnData
+        AnnData object with features and observations.
+    between_column : str
+        Name of the column in adata.obs that contains the groups to compare.
+    comparison : tuple
+        Tuple of exactly two group names to compare (group1, group2).
+    min_valid_values : int
+        Minimum number of samples required per group.
+
+    Returns
+    -------
+    tuple[str, str]
+        Validated group names (g1, g2).
+
+    Raises
+    ------
+    ValueError
+        If any validation check fails.
+    """
+    # check that between column exists in obs
+    if between_column not in adata.obs.columns:
+        raise ValueError(f"Error in group_ratios_ttest_ind: Column '{between_column}' not found in adata.obs.")
+
+    # validate comparison tuple
+    if not isinstance(comparison, tuple) or len(comparison) != 2:  # noqa: PLR2004 since this is a tuple check
+        raise ValueError("Error in group_ratios_ttest_ind: 'comparison' must be a tuple of exactly two group names.")
+
+    g1, g2 = comparison
+    available_groups = set(adata.obs[between_column].dropna().unique())
+
+    # check that both groups exist in the data
+    if g1 not in available_groups:
+        raise ValueError(f"Error in group_ratios_ttest_ind: Group '{g1}' not found in column '{between_column}'.")
+    if g2 not in available_groups:
+        raise ValueError(f"Error in group_ratios_ttest_ind: Group '{g2}' not found in column '{between_column}'.")
+
+    # check that each group has sufficient samples to even meet min_valid_values
+    group_counts = adata.obs[between_column].value_counts()
+    if group_counts[g1] < min_valid_values:
+        raise ValueError(
+            f"Error in group_ratios_ttest_ind: Group '{g1}' has only {group_counts[g1]} samples, need at least {min_valid_values}."
+        )
+    if group_counts[g2] < min_valid_values:
+        raise ValueError(
+            f"Error in group_ratios_ttest_ind: Group '{g2}' has only {group_counts[g2]} samples, need at least {min_valid_values}."
+        )
+
+    return g1, g2
+
+
 def group_ratios_ttest_ind(
     adata: ad.AnnData,
     between_column: str,
@@ -156,33 +217,8 @@ def group_ratios_ttest_ind(
         DataFrame with ratios, deltas, t-statistics, p-values, and adjusted p-values
         for the comparison between the two specified groups. Returns None if validation fails.
     """
-    # check that between column exists in obs
-    if between_column not in adata.obs.columns:
-        raise ValueError(f"Error in group_ratios_ttest_ind: Column '{between_column}' not found in adata.obs.")
-
-    # validate comparison tuple
-    if not isinstance(comparison, tuple) or len(comparison) != 2:  # noqa: PLR2004 since this is a tuple check
-        raise ValueError("Error in group_ratios_ttest_ind: 'comparison' must be a tuple of exactly two group names.")
-
-    g1, g2 = comparison
-    available_groups = set(adata.obs[between_column].dropna().unique())
-
-    # check that both groups exist in the data
-    if g1 not in available_groups:
-        raise ValueError(f"Error in group_ratios_ttest_ind: Group '{g1}' not found in column '{between_column}'.")
-    if g2 not in available_groups:
-        raise ValueError(f"Error in group_ratios_ttest_ind: Group '{g2}' not found in column '{between_column}'.")
-
-    # check that each group has sufficient samples to even meet min_valid_values
-    group_counts = adata.obs[between_column].value_counts()
-    if group_counts[g1] < min_valid_values:
-        raise ValueError(
-            f"Error in group_ratios_ttest_ind: Group '{g1}' has only {group_counts[g1]} samples, need at least {min_valid_values}."
-        )
-    if group_counts[g2] < min_valid_values:
-        raise ValueError(
-            f"Error in group_ratios_ttest_ind: Group '{g2}' has only {group_counts[g2]} samples, need at least {min_valid_values}."
-        )
+    # Validate inputs
+    g1, g2 = _validate_ttest_inputs(adata, between_column, comparison, min_valid_values)
 
     # perform single comparison between the two specified groups
     g1_frame = filter_by_metadata(adata, {between_column: g1}, axis=0).to_df()
@@ -226,18 +262,21 @@ def group_ratios_ttest_ind(
     p_adj = nan_safe_bh_correction(p)
 
     # store results in dataframe
-    result_df = pd.DataFrame(
-        {
-            "id": features.to_numpy(),
-            f"ratio_{comparison_name}": ratio,
-            f"delta_{comparison_name}": delta,
-            f"tvalue_{comparison_name}": t,
-            f"pvalue_{comparison_name}": p,
-            f"padj_{comparison_name}": p_adj,
-            f"n_{g1}": g1_n_samples,
-            f"n_{g2}": g2_n_samples,
-        }
-    ).set_index("id", drop=True)
-    result_df.index.name = None
+    result_df = (
+        pd.DataFrame(
+            {
+                "id": features.to_numpy(),
+                f"ratio_{comparison_name}": ratio,
+                f"delta_{comparison_name}": delta,
+                f"tvalue_{comparison_name}": t,
+                f"pvalue_{comparison_name}": p,
+                f"padj_{comparison_name}": p_adj,
+                f"n_{g1}": g1_n_samples,
+                f"n_{g2}": g2_n_samples,
+            }
+        )
+        .set_index("id", drop=True)
+        .rename_axis(index=None)
+    )
 
-    return result_df
+    return result_df  # noqa: RET504 output standardization function will go here
