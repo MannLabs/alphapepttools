@@ -38,23 +38,25 @@ def nan_safe_bh_correction(
     >>> corrected = nan_safe_bh_correction(pvals)
     >>> # Returns [0.015, 0.05, nan, 0.015, nan] (approximately)
     """
-    # convert array to dataframe with distinct index
-    pval_df = pd.DataFrame({"pvals": pvals})
+    # Convert to numpy array if not already
+    pvals = np.asarray(pvals)
 
-    initial_index = range(len(pval_df))
-    pval_df.index = initial_index
+    # Create output array filled with NaNs
+    corrected_pvals = np.full_like(pvals, np.nan, dtype=np.float64)
 
-    pval_df_no_nans = pval_df.copy().dropna()
-    pval_df_no_nans["pvals_corrected"] = false_discovery_control(pval_df_no_nans["pvals"], method="bh")
+    # Find indices of non-NaN values
+    valid_mask = ~np.isnan(pvals)
+    valid_indices = np.where(valid_mask)[0]
 
-    # merge back to original index
-    pval_df = pval_df.join(pval_df_no_nans["pvals_corrected"], how="left")
+    # If there are valid p-values, apply BH correction
+    if len(valid_indices) > 0:
+        valid_pvals = pvals[valid_mask]
+        corrected_valid = false_discovery_control(valid_pvals, method="bh")
 
-    # verify that the original index is preserved
-    if not all(pval_df.index == initial_index):
-        raise ValueError("Index mismatch in nan_safe_bh_correction.")
+        # Put corrected values back in their original positions
+        corrected_pvals[valid_indices] = corrected_valid
 
-    return pval_df["pvals_corrected"].to_numpy()
+    return corrected_pvals
 
 
 def nan_safe_ttest_ind(
