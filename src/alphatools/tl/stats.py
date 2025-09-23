@@ -223,21 +223,21 @@ def group_ratios_ttest_ind(
     g1, g2 = _validate_ttest_inputs(adata, between_column, comparison, min_valid_values)
 
     # perform single comparison between the two specified groups
-    g1_frame = filter_by_metadata(adata, {between_column: g1}, axis=0).to_df()
-    g2_frame = filter_by_metadata(adata, {between_column: g2}, axis=0).to_df()
+    g1_df = filter_by_metadata(adata, {between_column: g1}, axis=0).to_df()
+    g2_df = filter_by_metadata(adata, {between_column: g2}, axis=0).to_df()
 
     comparison_name = f"{g1}_VS_{g2}"
     features = pd.Series(adata.var_names)
 
     # record number of non-na samples in each group
-    g1_n_samples = g1_frame.count()
-    g2_n_samples = g2_frame.count()
+    g1_n_samples = g1_df.count()
+    g2_n_samples = g2_df.count()
 
     # calculate ratio and difference, latter for log-transformed inputs
     # Handle the intricacy that there can be a delta even when the ratio would be a division by zero.
     # First calculate means and the delta, then replace zero means with NaN for ratio calculation
-    g1_mean = g1_frame.mean(axis=0)
-    g2_mean = g2_frame.mean(axis=0)
+    g1_mean = g1_df.mean(axis=0)
+    g2_mean = g2_df.mean(axis=0)
     delta = g1_mean - g2_mean
 
     # where mean is zero, insert np.nan to avoid division by zero in the ratios
@@ -247,11 +247,11 @@ def group_ratios_ttest_ind(
 
     # Perform t-test for each feature between the two groups
     # Lambda captures DataFrames at creation time to avoid closure issues
-    t, p = zip(
+    t_values, p_values = zip(
         *features.apply(
-            lambda x, _g1_frame=g1_frame, _g2_frame=g2_frame: nan_safe_ttest_ind(
-                a=_g1_frame[x],
-                b=_g2_frame[x],
+            lambda x, _g1_df=g1_df, _g2_df=g2_df: nan_safe_ttest_ind(
+                a=_g1_df[x],
+                b=_g2_df[x],
                 equal_var=equal_var,
                 nan_policy="omit",
                 min_valid_values=min_valid_values,
@@ -261,7 +261,7 @@ def group_ratios_ttest_ind(
     )
 
     # adjust pvalues using Benjamini-Hochberg method, accounting for nans
-    p_adj = nan_safe_bh_correction(p)
+    p_adj = nan_safe_bh_correction(p_values)
 
     # store results in dataframe
     result_df = (
@@ -270,8 +270,8 @@ def group_ratios_ttest_ind(
                 "id": features.to_numpy(),
                 f"ratio_{comparison_name}": ratio,
                 f"delta_{comparison_name}": delta,
-                f"tvalue_{comparison_name}": t,
-                f"pvalue_{comparison_name}": p,
+                f"tvalue_{comparison_name}": t_values,
+                f"pvalue_{comparison_name}": p_values,
                 f"padj_{comparison_name}": p_adj,
                 f"n_{g1}": g1_n_samples,
                 f"n_{g2}": g2_n_samples,
