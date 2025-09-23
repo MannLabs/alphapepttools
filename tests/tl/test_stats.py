@@ -1,10 +1,12 @@
+from pathlib import Path
+
 import anndata as ad
 import numpy as np
 import pandas as pd
 import pytest
 from scipy.stats import false_discovery_control, ttest_ind
 
-from alphatools.tl.stats import diff_exp_ttest, nan_safe_bh_correction, nan_safe_ttest_ind
+from alphatools.tl.stats import diff_exp_alphaquant, diff_exp_ttest, nan_safe_bh_correction, nan_safe_ttest_ind
 
 
 @pytest.fixture
@@ -227,3 +229,51 @@ def test_group_ratios_ttest_ind(
         check_names=False,
         check_dtype=False,
     )
+
+
+# Test diff_exp_alphaquant by loading small example datasets
+def test_diff_exp_alphaquant():
+    """Testing function to ascertain stable functionality of diff_exp_alphaquant on small example datasets.
+
+    The example datasets were generated in alphatools/tests/tl/tl_test_data.ipynb and saved
+    as .pkl files in alphatools/tests/tl/tl_test_data. This test is meant to freeze the expected output
+    upon generation and to stabilize the wrapper, but it should be noted that the underlying alphaquant
+    functionality is not tested.
+
+    """
+
+    test_data_dir = Path(__file__).parent / "tl_test_data"
+    report = pd.read_csv(test_data_dir / "example_dataset_mouse_sn_top20peptides.tsv", sep="\t")
+    samplemap = pd.read_csv(test_data_dir / "samplemap_200.tsv", sep="\t")
+
+    adata = ad.AnnData(
+        X=pd.DataFrame(np.zeros(samplemap.shape[0]), index=samplemap["sample"], columns=["dummy"]),
+        obs=samplemap.set_index("sample"),
+    )
+
+    comparison_key, results = diff_exp_alphaquant(
+        adata=adata,
+        report=report,
+        between_column="condition",
+        comparison=("brain", "kidney"),
+        min_valid_values=2,
+        valid_values_filter_mode="either",
+        plots="hide",
+    )
+
+    # Load expected results
+    expected_comparison_key = "brain_VS_kidney"
+    expected_results = {
+        "protein": pd.read_pickle(test_data_dir / "alphaquant_protein_diffexp.pkl"),
+        "proteoform": pd.read_pickle(test_data_dir / "alphaquant_proteoform_diffexp.pkl"),
+        "peptide": pd.read_pickle(test_data_dir / "alphaquant_peptide_diffexp.pkl"),
+    }
+
+    assert comparison_key == expected_comparison_key, (
+        f"Expected comparison key {expected_comparison_key}, got {comparison_key}"
+    )
+    for level in ["protein", "proteoform", "peptide"]:
+        pd.testing.assert_frame_equal(
+            results[level],
+            expected_results[level],
+        )
