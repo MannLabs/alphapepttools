@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from scipy.stats import false_discovery_control, ttest_ind
 
-from alphatools.tl.stats import group_ratios_ttest_ind, nan_safe_bh_correction, nan_safe_ttest_ind
+from alphatools.tl.stats import diff_exp_ttest, nan_safe_bh_correction, nan_safe_ttest_ind
 
 
 @pytest.fixture
@@ -153,7 +153,7 @@ def test_group_ratios_ttest_ind(
         obs=example_metadata,
     )
 
-    results = group_ratios_ttest_ind(
+    results = diff_exp_ttest(
         adata=adata,
         between_column=between_column,
         comparison=comparison,

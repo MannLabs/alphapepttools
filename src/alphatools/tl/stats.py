@@ -124,7 +124,7 @@ def nan_safe_ttest_ind(
     return ttest_ind(a, b, **kwargs)
 
 
-def group_ratios_ttest_ind(
+def diff_exp_ttest(
     adata: ad.AnnData,
     between_column: str,
     comparison: tuple,
@@ -241,3 +241,15 @@ def group_ratios_ttest_ind(
     result_df.index.name = None
 
     return result_df
+
+
+def diff_exp_alphaquant(
+    adata: ad.AnnData,
+    report: pd.DataFrame,
+    between_column: str,
+    comparison: tuple,
+    min_valid_values: int = 2,
+    valid_values_filter_mode: str = "either",
+    plots: str = "hide",
+) -> pd.DataFrame | None:
+    """Calculate differential expression using AlphaQuant."""
