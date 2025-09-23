@@ -72,7 +72,6 @@ def test_nan_safe_bh_correction(p_values):
             expected_full.append(np.nan)
         else:
             expected_full.append(expected[0])
-            # Get rid of first element to get the next with [0]
             expected = expected[1:]
 
     expected = np.array(expected_full)

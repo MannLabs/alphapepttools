@@ -15,6 +15,7 @@ from typing import Any
 
 import anndata as ad
 import matplotlib as mpl
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -36,6 +37,155 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 config = defaults.plot_settings.to_dict()
+
+
+def _extract_columns_to_df(
+    data: ad.AnnData | pd.DataFrame,
+    columns: list[str] | None = None,
+) -> pd.DataFrame:
+    """Extract selected columns from AnnData or DataFrame.
+
+    This function serves as an adapter upstream of matplotlib plotting functions,
+    which frequently accept an array of values. Extracts the requested columns
+    from an AnnData object's X and/or obs object & validates there are no duplicates.
+
+    Parameters
+    ----------
+    data : ad.AnnData | pd.DataFrame
+        Input data object.
+    columns : list[str] | None, optional
+        List of column names to extract. If None, uses all columns (DataFrame)
+        or all columns in X (AnnData). Default is None.
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing only the selected columns.
+
+    """
+    if isinstance(data, pd.DataFrame):
+        columns = columns or data.columns.tolist()
+        try:
+            dataset = data[columns]
+        except KeyError as e:
+            raise KeyError(f"Columns {columns} not found in dataframe.") from e
+
+    elif isinstance(data, ad.AnnData):
+        if columns is None:
+            dataset = data.to_df()
+        else:
+            # Partition columns by source
+            x_cols = [col for col in columns if col in data.var_names]
+            obs_cols = [col for col in columns if col in data.obs.columns]
+
+            # Check for duplicate columns across sources
+            duplicates = set(x_cols) & set(obs_cols)
+            if duplicates:
+                raise KeyError(
+                    f"Columns {duplicates} found in both AnnData X and obs. Please ensure unique column names."
+                )
+
+            # Check for missing columns
+            missing_cols = set(columns) - set(x_cols) - set(obs_cols)
+            if missing_cols:
+                raise KeyError(f"Columns {missing_cols} not found in AnnData X or obs.")
+
+            # Build dataset from available sources
+            parts = []
+            if x_cols:
+                parts.append(data.to_df()[x_cols])
+            if obs_cols:
+                parts.append(data.obs[obs_cols])
+
+            dataset = pd.concat(parts, axis=1) if len(parts) > 1 else parts[0]
+
+    else:
+        raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
+
+    return dataset
+
+
+def _extract_groupwise_plotting_data(
+    data: ad.AnnData | pd.DataFrame,
+    grouping_column: str | None = None,
+    value_column: str | None = None,
+    direct_columns: list[str] | None = None,
+) -> tuple[list[list], list[str], list[int]]:
+    """Extract data for group-wise plotting (violin, bar, box plots).
+
+    Transforms long-format data into the list-of-lists format required by
+    matplotlib's violin, bar, and box plot functions. Each sublist contains
+    the values for one group. Using direct_columns makes each of its columns
+    directly correspond to a group.
+
+    Parameters
+    ----------
+    data : ad.AnnData | pd.DataFrame
+        Data containing grouping and value columns
+    grouping_column : str
+        Column containing the groups to compare
+    value_column : str
+        Column whose values should be plotted
+    direct_columns: list[str] | None
+        Overrides grouping_column and value_column: This argument allows for extraction of
+        actual columns directly into data_lists, labels and positions.
+
+    Returns
+    -------
+    tuple[list[list], list[str], list[int]]
+        Tuple of (data_lists, labels, positions) for plotting
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> from alphatools.pl import _extract_groupwise_plotting_data
+    >>> df = pd.DataFrame({
+    ...     'group': ['A', 'A', 'B', 'B', 'C'],
+    ...     'X1': [1, 2, 3, 4, 5]
+    ...     'X2': [5, 4, 3, 2, 1]
+    ...     'X3': [1, 2, 3, 4, 5]
+    ... })
+
+    >>> # Use grouping column
+    >>> data_lists, labels, positions = _extract_groupwise_plotting_data(df, "group", "X1")
+    >>> print(data_lists)  # [[1, 2], [3, 4], [5]]
+    >>> print(labels)  # ['A', 'B', 'C']
+    >>> print(positions)  # [1, 2, 3]
+
+    >>> # Use columns directly
+    >>> data_lists, labels, positions = _extract_groupwise_plotting_data(
+    ...     df, "group", "X1", direct_columns=["X1", "X2", "X3"]
+    ... )
+    >>> print(data_lists)  # [[1, 2, 5], [3, 4, 3], [5, 1, 5]]
+    >>> print(labels)  # ['X1', 'X2', 'X3']
+    >>> print(positions)  # [1, 2, 3]
+
+    """
+    if direct_columns is not None:
+        if grouping_column is not None or value_column is not None:
+            logger.info("'direct_columns' provided, ignoring 'grouping_column' and 'value_column' parameters.")
+        df = _extract_columns_to_df(data, columns=direct_columns)[direct_columns]  # ensure order
+        df = df.melt(var_name="variable", value_name="value")
+        grouping_column, value_column = "variable", "value"
+    else:
+        df = _extract_columns_to_df(data, columns=[grouping_column, value_column])
+
+    # Determine groups
+    groups_to_plot = df[grouping_column].dropna().unique().tolist()
+
+    # Extract data for each group
+    data_lists = []
+    labels = []
+    positions = []
+
+    for i, group in enumerate(groups_to_plot):
+        group_data = df[df[grouping_column] == group][value_column].dropna()
+        if not group_data.empty:
+            data_lists.append(group_data.tolist())
+            labels.append(group)
+            positions.append(i + 1)
+
+    return data_lists, labels, positions
 
 
 def add_lines(
@@ -636,6 +786,235 @@ class Plots:
             ax.set_xlim(xlim)
         if ylim:
             ax.set_ylim(ylim)
+
+    @classmethod
+    def barplot(
+        cls,
+        ax: plt.Axes,
+        data: ad.AnnData | pd.DataFrame,
+        grouping_column: list[str] | None = None,
+        value_column: list[str] | None = None,
+        direct_columns: list[str] | None = None,
+        color: tuple = BaseColors.get("blue"),
+        color_dict: dict | None = None,
+    ) -> None:
+        """Plot a bar chart from a DataFrame or AnnData object
+
+        Creates a bar plot showing means with error bars (standard deviation) for grouped data.
+        Each bar represents the mean of values within a group, with error bars showing the
+        standard deviation. Bars have semi-transparent fill with opaque black outlines.
+
+        Parameters
+        ----------
+        ax : plt.Axes
+            Matplotlib axes object to plot on.
+        data : ad.AnnData | pd.DataFrame
+            Data containing grouping and value columns or direct columns to plot.
+        grouping_column : list[str] | None, optional
+            Column containing the groups to compare. By default None.
+        value_column : list[str] | None, optional
+            Column whose values should be plotted. By default None.
+        direct_columns : list[str] | None, optional
+            Overrides grouping_column and value_column. Each column becomes a separate
+            bar group. By default None.
+        color : tuple, optional
+            Default color for all bars. By default BaseColors.get("blue").
+        color_dict : dict | None, optional
+            Dictionary mapping group labels to specific colors. Overrides the color
+            parameter for specified groups. By default None.
+
+        Returns
+        -------
+        None
+
+        """
+        data, labels, positions = _extract_groupwise_plotting_data(
+            data=data,
+            grouping_column=grouping_column,
+            value_column=value_column,
+            direct_columns=direct_columns,
+        )
+
+        means = [pd.Series(d).mean() for d in data]
+        stds = [pd.Series(d).std() for d in data]
+
+        bars = ax.bar(
+            x=positions,
+            height=means,
+            yerr=stds,
+            capsize=5,
+            align="center",
+            width=0.5,
+        )
+
+        # Styling of bars
+        for label, bar in zip(labels, bars, strict=False):
+            current_color = color_dict.get(label, config["na_color"]) if color_dict else color
+            bar.set_facecolor(mcolors.to_rgba(current_color, alpha=0.5))
+            bar.set_edgecolor(BaseColors.get("black"))
+            bar.set(linewidth=config["linewidths"]["large"])
+
+        ax.set_xticks(positions)
+        ax.set_xticklabels(labels)
+
+    @classmethod
+    def boxplot(
+        cls,
+        ax: plt.Axes,
+        data: ad.AnnData | pd.DataFrame,
+        grouping_column: list[str] | None = None,
+        value_column: list[str] | None = None,
+        direct_columns: list[str] | None = None,
+        color: tuple = BaseColors.get("blue"),
+        color_dict: dict | None = None,
+    ) -> None:
+        """Plot a box plot from a DataFrame or AnnData object
+
+        Creates a box plot showing the distribution of values for grouped data.
+        Each box shows the median, quartiles, and outliers for values within a group.
+        Boxes have semi-transparent fill with opaque black outlines, medians, whiskers, and caps.
+
+        Parameters
+        ----------
+        ax : plt.Axes
+            Matplotlib axes object to plot on.
+        data : ad.AnnData | pd.DataFrame
+            Data containing grouping and value columns or direct columns to plot.
+        grouping_column : list[str] | None, optional
+            Column containing the groups to compare. By default None.
+        value_column : list[str] | None, optional
+            Column whose values should be plotted. By default None.
+        direct_columns : list[str] | None, optional
+            Overrides grouping_column and value_column. Each column becomes a separate
+            box plot. By default None.
+        color : tuple, optional
+            Default color for all boxes. By default BaseColors.get("blue").
+        color_dict : dict | None, optional
+            Dictionary mapping group labels to specific colors. Overrides the color
+            parameter for specified groups. By default None.
+
+        Returns
+        -------
+        None
+
+        """
+        data, labels, positions = _extract_groupwise_plotting_data(
+            data=data,
+            grouping_column=grouping_column,
+            value_column=value_column,
+            direct_columns=direct_columns,
+        )
+
+        boxes = ax.boxplot(
+            x=data,
+            positions=positions,
+            widths=0.5,
+            patch_artist=True,
+        )
+
+        # Styling of boxes
+        for label, box in zip(labels, boxes["boxes"], strict=False):
+            current_color = color_dict.get(label, config["na_color"]) if color_dict else color
+            box.set_facecolor(mcolors.to_rgba(current_color, alpha=0.5))
+            box.set(linewidth=config["linewidths"]["large"])
+            box.set_edgecolor(BaseColors.get("black"))
+
+        # Styping of medians
+        for _, median in zip(labels, boxes["medians"], strict=False):
+            median.set(color=BaseColors.get("black"))
+            median.set(linewidth=config["linewidths"]["large"])
+
+        # Styling of whiskers
+        for _, whisker in zip(labels * 2, boxes["whiskers"], strict=False):
+            whisker.set(color=BaseColors.get("black"))
+            whisker.set(linewidth=config["linewidths"]["large"])
+
+        # Styling of caps
+        for _, cap in zip(labels * 2, boxes["caps"], strict=False):
+            cap.set(color=BaseColors.get("black"))
+            cap.set(linewidth=config["linewidths"]["large"])
+
+        ax.set_xticks(positions)
+        ax.set_xticklabels(labels)
+
+    @classmethod
+    def violinplot(
+        cls,
+        ax: plt.Axes,
+        data: ad.AnnData | pd.DataFrame,
+        grouping_column: list[str] | None = None,
+        value_column: list[str] | None = None,
+        direct_columns: list[str] | None = None,
+        color: tuple = BaseColors.get("blue"),
+        color_dict: dict | None = None,
+    ) -> None:
+        """Plot a violin plot from a DataFrame or AnnData object
+
+        Creates a violin plot showing the distribution density of values for grouped data.
+        Each violin shows the kernel density estimation of the distribution, along with
+        medians, quartiles, and min/max whiskers. Violins have semi-transparent fill with
+        opaque black outlines and internal statistical markers.
+
+        Parameters
+        ----------
+        ax : plt.Axes
+            Matplotlib axes object to plot on.
+        data : ad.AnnData | pd.DataFrame
+            Data containing grouping and value columns or direct columns to plot.
+        grouping_column : list[str] | None, optional
+            Column containing the groups to compare. By default None.
+        value_column : list[str] | None, optional
+            Column whose values should be plotted. By default None.
+        direct_columns : list[str] | None, optional
+            Overrides grouping_column and value_column. Each column becomes a separate
+            violin plot. By default None.
+        color : tuple, optional
+            Default color for all violins. By default BaseColors.get("blue").
+        color_dict : dict | None, optional
+            Dictionary mapping group labels to specific colors. Overrides the color
+            parameter for specified groups. By default None.
+
+        Returns
+        -------
+        None
+
+        """
+        data, labels, positions = _extract_groupwise_plotting_data(
+            data=data,
+            grouping_column=grouping_column,
+            value_column=value_column,
+            direct_columns=direct_columns,
+        )
+
+        violins = ax.violinplot(
+            dataset=data,
+            positions=positions,
+            widths=0.5,
+            showmedians=True,
+        )
+
+        # Styling of violins
+        for label, violin in zip(labels, violins["bodies"], strict=False):
+            current_color = color_dict.get(label, config["na_color"]) if color_dict else color
+            violin.set_facecolor(mcolors.to_rgba(current_color, alpha=0.5))
+            violin.set_edgecolor(BaseColors.get("black"))
+            violin.set_linewidth(config["linewidths"]["large"])
+            violin.set_alpha(None)  # Reset any global alpha
+
+        # Styling of medians
+        violins["cmedians"].set(color=BaseColors.get("black"))
+        violins["cmedians"].set(linewidth=config["linewidths"]["large"])
+
+        # Styling of min and max whiskers and the central bar
+        violins["cmins"].set(color=BaseColors.get("black"))
+        violins["cmins"].set(linewidth=config["linewidths"]["large"])
+        violins["cmaxes"].set(color=BaseColors.get("black"))
+        violins["cmaxes"].set(linewidth=config["linewidths"]["large"])
+        violins["cbars"].set(color=BaseColors.get("black"))
+        violins["cbars"].set(linewidth=config["linewidths"]["large"])
+
+        ax.set_xticks(positions)
+        ax.set_xticklabels(labels)
 
     @classmethod
     def rank_median_plot(
