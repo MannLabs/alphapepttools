@@ -1,6 +1,7 @@
 from typing import Any
 
 import anndata as ad
+import pandas as pd
 from alphabase.pg_reader.pg_reader import pg_reader_provider
 
 SAMPLE_ID_NAME: str = "sample_id"
@@ -101,7 +102,9 @@ def read_pg_table(
     # Features x Observations
     df = reader.import_file(path)
 
+    # Feature index logic: either one unique or auto-generated
+    if df.index.get_level_values(0).is_unique:
+        _ = pd.DataFrame(index=df.index)
+
     # Observations x Features
-    return ad.AnnData(
-        X=df.to_numpy().T, var=df.index.to_frame(index=False), obs=df.columns.to_frame(index=False, name=SAMPLE_ID_NAME)
-    )
+    return ad.AnnData(X=df.to_numpy().T, var=pd.DataFrame(index=df.index), obs=pd.DataFrame(index=df.columns))
