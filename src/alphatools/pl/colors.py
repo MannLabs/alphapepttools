@@ -30,7 +30,7 @@ config = defaults.plot_settings.to_dict()
 
 def show_rgba_color_list(colors: list) -> None:
     """Show a list of RGBA colors for quick inspection"""
-    fig, ax = plt.subplots(figsize=(10, 1))
+    fig, ax = plt.subplots(figsize=(np.min([len(colors), 10]), 1))
     ax.imshow([colors], aspect="auto")
     ax.axis("off")
     plt.show()
@@ -153,6 +153,18 @@ def _base_qualitative_colorscale() -> list:
     return picked_colors
 
 
+def _perceptually_uniform_qualitative_colorscale() -> list:
+    """Base colorscale selected from a perceptually uniform colormap
+
+    Sample along the lipari colorscale from cmcrameri to get 10 distinct colors
+
+    """
+    colors = _get_colors_from_cmap(cmc.batlow, 9)
+
+    # interlace colors 1-5, 2-6, etc. to maximize color distance
+    return [colors[i] for start in range(3) for i in range(start, len(colors), 3)]
+
+
 def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.colors.Colormap) -> dict:
     """Map categorical values to colors.
 
@@ -208,11 +220,11 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
 
 def _base_binary_colorscale() -> list:
     """Base colorscale for binary data"""
-    colors = _get_colors_from_cmap("BrBG", 10)
+    colors_left = _get_colors_from_cmap("cmc.batlow", 10)
+    colors_right = _get_colors_from_cmap("cmc.devon", 10)
 
-    # hand-selected colors
-    color_indices = [2, 7]
-    return [_lighten_color(colors[i], 0.1) for i in color_indices]
+    # hand-selected colors along the respective palettes to obtain good contrast and aesthetics
+    return [colors_left[7], colors_right[3]]
 
 
 class BaseColors:
@@ -269,7 +281,8 @@ class BasePalettes:
     """Base color palettes for AlphaTools plots"""
 
     default_palettes: ClassVar[dict] = {
-        "qualitative": _base_qualitative_colorscale(),
+        "qualitative_spectral": _base_qualitative_colorscale(),
+        "qualitative": _perceptually_uniform_qualitative_colorscale(),
         "binary": _base_binary_colorscale(),
     }
 
@@ -277,7 +290,7 @@ class BasePalettes:
     def get(
         cls,
         palette_name: str,
-        n: int = 10,
+        n: int = 9,
     ) -> list:
         """Get a default color palette by name"""
         palette = None
