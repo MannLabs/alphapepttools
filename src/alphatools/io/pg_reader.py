@@ -1,6 +1,7 @@
 from typing import Any
 
 import anndata as ad
+import pandas as pd
 from alphabase.pg_reader.pg_reader import pg_reader_provider
 
 SAMPLE_ID_NAME: str = "sample_id"
@@ -19,6 +20,8 @@ def read_pg_table(
     Read (features x observations) protein group matrices from proteomics search engines into
     the :class:`anndata.AnnData` format (observations x features). Per default,
     raw intensities are returned, which can be modified dependening on the search engine.
+    If a single unique feature index could be derived from the input, the function
+    will assign it as var index. Otherwise, an ascending integer var index will be used.
 
     Supported formats include
 
@@ -101,7 +104,8 @@ def read_pg_table(
     # Features x Observations
     df = reader.import_file(path)
 
+    # Feature index logic: either one unique index or ascending integer
+    var_df = pd.DataFrame(index=df.index) if df.index.get_level_values(0).is_unique else df.index.to_frame(index=False)
+
     # Observations x Features
-    return ad.AnnData(
-        X=df.to_numpy().T, var=df.index.to_frame(index=False), obs=df.columns.to_frame(index=False, name=SAMPLE_ID_NAME)
-    )
+    return ad.AnnData(X=df.to_numpy().T, var=var_df, obs=pd.DataFrame(index=df.columns))
