@@ -104,8 +104,11 @@ def read_pg_table(
     # Features x Observations
     df = reader.import_file(path)
 
-    # Feature index logic: either one unique index or ascending integer
-    var_df = pd.DataFrame(index=df.index) if df.index.get_level_values(0).is_unique else df.index.to_frame(index=False)
+    # Feature index logic: If first level is unique, use as var.index (with remaining levels as columns if multi-index), otherwise convert all to columns with integer index
+    if df.index.get_level_values(0).is_unique:
+        var_df = df.index.to_frame(index=True).iloc[:, 1:] if df.index.nlevels > 1 else pd.DataFrame(index=df.index)
+    else:
+        var_df = df.index.to_frame(index=False)
 
     # Observations x Features
     return ad.AnnData(X=df.to_numpy().T, var=var_df, obs=pd.DataFrame(index=df.columns))
