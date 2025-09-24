@@ -104,10 +104,17 @@ def read_pg_table(
     # Features x Observations
     df = reader.import_file(path)
 
-    # Feature index logic: If first level is unique, use as var.index (with remaining levels as columns if multi-index), otherwise convert all to columns with integer index
+    # TODO: set "preferred feature column" in alphabase for each reader and use here, for now just check for first level uniqueness
     if df.index.get_level_values(0).is_unique:
-        var_df = df.index.to_frame(index=True).iloc[:, 1:] if df.index.nlevels > 1 else pd.DataFrame(index=df.index)
+        if df.index.nlevels > 1:
+            # Unique index with more index columns to use as var columns
+            var_df = df.index.to_frame(index=False).iloc[:, 1:]
+            var_df.index = df.index.get_level_values(0)
+        else:
+            # Single unique index to use as var index
+            var_df = pd.DataFrame(index=df.index)
     else:
+        # No unique index, convert all index levels to columns and use integer index
         var_df = df.index.to_frame(index=False)
 
     # Observations x Features
