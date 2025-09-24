@@ -20,6 +20,8 @@ def read_pg_table(
     Read (features x observations) protein group matrices from proteomics search engines into
     the :class:`anndata.AnnData` format (observations x features). Per default,
     raw intensities are returned, which can be modified dependening on the search engine.
+    If a single unique feature index could be derived from the input, the function
+    will assign it as var index. Otherwise, an ascending integer var index will be used.
 
     Supported formats include
 
@@ -102,9 +104,8 @@ def read_pg_table(
     # Features x Observations
     df = reader.import_file(path)
 
-    # Feature index logic: either one unique or auto-generated
-    if df.index.get_level_values(0).is_unique:
-        _ = pd.DataFrame(index=df.index)
+    # Feature index logic: either one unique index or ascending integer
+    var_df = pd.DataFrame(index=df.index) if df.index.get_level_values(0).is_unique else df.index.to_frame(index=False)
 
     # Observations x Features
-    return ad.AnnData(X=df.to_numpy().T, var=pd.DataFrame(index=df.index), obs=pd.DataFrame(index=df.columns))
+    return ad.AnnData(X=df.to_numpy().T, var=var_df, obs=pd.DataFrame(index=df.columns))
