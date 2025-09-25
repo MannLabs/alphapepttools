@@ -6,6 +6,7 @@ Learn about how to use alphatools with the following tutorials.
 ---
 maxdepth: 1
 ---
+notebooks/00_data_sources.ipynb
 notebooks/01_data_loading.ipynb
 notebooks/02_plotting.ipynb
 notebooks/03_basic_workflow.ipynb
