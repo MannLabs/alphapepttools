@@ -622,10 +622,25 @@ class Plots:
             for level in set(color_levels) - set(color_dict):
                 color_dict[level] = BaseColors.get("grey")
 
+            # Calculate unified bin edges based on the entire data range
+            values_clean = values[~np.isnan(values)]
+            data_min = np.min(values_clean)
+            data_max = np.max(values_clean)
+
+            # Create unified bin edges for the entire data range
+            unified_bin_edges = np.linspace(data_min, data_max, bins + 1)
+
             for level, level_color in color_dict.items():
+                level_values = values[color_levels == level]
+                level_values = level_values[~np.isnan(level_values)]
+
+                if len(level_values) == 0:
+                    continue
+
+                # Use the unified bin edges for all sub-histograms
                 ax.hist(
-                    values[color_levels == level],
-                    bins=bins,
+                    level_values,
+                    bins=unified_bin_edges,
                     color=level_color,
                     **hist_kwargs,
                 )
