@@ -7,7 +7,7 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 
-from alphatools.tl.defaults import tl_defaults
+from alphatools.tl import tl_defaults
 from alphatools.tl.utils import _suppress_plots
 
 logging.basicConfig(level=logging.INFO)

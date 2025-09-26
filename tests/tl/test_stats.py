@@ -2,9 +2,7 @@ import numpy as np
 import pytest
 from scipy.stats import false_discovery_control
 
-from alphatools.tl.stats import (
-    nan_safe_bh_correction,
-)
+from alphatools import tl
 
 
 @pytest.mark.parametrize(
@@ -26,7 +24,7 @@ from alphatools.tl.stats import (
 )
 def test_nan_safe_bh_correction(p_values):
     """Test that nan_safe_bh_correction preserves order and handles NaNs correctly."""
-    corrected_pvals = nan_safe_bh_correction(p_values)
+    corrected_pvals = tl.nan_safe_bh_correction(p_values)
 
     na_positions = np.isnan(p_values)
     valid_pvalues = p_values[~na_positions]
