@@ -7,6 +7,9 @@ import pytest
 from scipy.stats import ttest_ind
 
 from alphatools import tl
+from alphatools.tl.defaults import tl_defaults
+from alphatools.tl.diff_exp.alphaquant import _standardize_alphaquant_results
+from alphatools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
 
 
 @pytest.fixture
@@ -235,3 +238,136 @@ def test_diff_exp_alphaquant():
             results[level],
             expected_results[level],
         )
+
+
+# Check standardization of the ttest output
+@pytest.mark.parametrize(
+    ("comparison_key", "input_df", "neg_log_pval", "neg_log_fdr"),
+    [
+        (
+            "A_VS_B",
+            pd.DataFrame(
+                {
+                    "delta_A_VS_B": [1],
+                    "pvalue_A_VS_B": [1],
+                    "padj_A_VS_B": [1],
+                }
+            ),
+            -0.0,
+            -0.0,
+        ),
+    ],
+)
+def test__standardize_diff_exp_ttest_results(comparison_key, input_df, neg_log_pval, neg_log_fdr):
+    """Test that _standardize_diff_exp_ttest_results correctly parses all columns."""
+    result = _standardize_diff_exp_ttest_results(comparison_key, input_df)
+
+    # Check that columns match the standard DIFF_EXP_COLS
+    assert list(result.columns) == tl_defaults.DIFF_EXP_COLS, (
+        f"Expected columns {tl_defaults.DIFF_EXP_COLS}, got {list(result.columns)}"
+    )
+
+    # Check that the pvalue log transformation worked
+    assert result["-log10(p_value)"].iloc[0] == neg_log_pval, (
+        f"Expected -log10(p_value) {neg_log_pval}, got {result['-log10(p_value)'].iloc[0]}"
+    )
+
+    # Check that the fdr log transformation worked
+    assert result["-log10(fdr)"].iloc[0] == neg_log_fdr, (
+        f"Expected -log10(fdr) {neg_log_fdr}, got {result['-log10(fdr)'].iloc[0]}"
+    )
+
+
+# Check standardization of the AlphaQuant output
+@pytest.mark.parametrize(
+    ("comparison_key", "level", "input_df", "expected_columns", "neg_log10_pval", "neg_log10_fdr", "peptide"),
+    [
+        (
+            "A_VS_B",
+            "protein",
+            pd.DataFrame(
+                {
+                    "condition_pair": ["A_VS_B"],
+                    "protein": ["PROT_1"],
+                    "log2fc": [1],
+                    "p_value": [1],
+                    "fdr": [1],
+                    "quality_score": [1],
+                }
+            ),
+            [*tl_defaults.DIFF_EXP_COLS, "quality_score"],
+            -0.0,
+            -0.0,
+            None,
+        ),
+        (
+            "A_VS_B",
+            "proteoform",
+            pd.DataFrame(
+                {
+                    "protein": ["PROT_1"],
+                    "log2fc": [1],
+                    "proteoform_pval": [1],
+                    "proteoform_fdr": [1],
+                    "proteoform_id": ["PF_1"],
+                    "peptides": ["PEP1;PEP2"],
+                    "num_peptides": [1],
+                    "quality_score": [1],
+                }
+            ),
+            [*tl_defaults.DIFF_EXP_COLS, "proteoform_id", "peptides", "num_peptides", "quality_score"],
+            -0.0,
+            -0.0,
+            None,
+        ),
+        (
+            "A_VS_B",
+            "peptide",
+            pd.DataFrame(
+                {
+                    "condition_pair": ["A_VS_B"],
+                    "protein": ["PROT_1"],
+                    "log2fc": [1],
+                    "p_value": [1],
+                    "fdr": [1],
+                    "sequence": ["SEQ_PEPTIDE_"],
+                    "quality_score": [1],
+                }
+            ),
+            [*tl_defaults.DIFF_EXP_COLS, "sequence", "quality_score"],
+            -0.0,
+            -0.0,
+            "PEPTIDE",
+        ),
+    ],
+)
+def test__standardize_alphaquant_results(
+    comparison_key, level, input_df, expected_columns, neg_log10_pval, neg_log10_fdr, peptide
+):
+    """Test that _standardize_alphaquant_results correctly parses all columns for each level."""
+
+    result = _standardize_alphaquant_results(comparison_key, level, input_df)
+
+    # Check that columns match the expected columns for the level
+    if level in {"protein", "proteoform"}:
+        assert list(result.columns) == expected_columns, (
+            f"Expected columns {expected_columns}, got {list(result.columns)}"
+        )
+    elif level == "peptide":
+        assert list(result.columns) == expected_columns, (
+            f"Expected columns {expected_columns}, got {list(result.columns)}"
+        )
+        # Check that peptide names were cleaned correctly
+        assert result["sequence"].iloc[0] == peptide, (
+            f"Expected cleaned peptide name {peptide}, got {result['sequence'].iloc[0]}"
+        )
+
+    # Check that the pvalue log transformation worked
+    assert result["-log10(p_value)"].iloc[0] == neg_log10_pval, (
+        f"Expected -log10(p_value) {neg_log10_pval}, got {result['-log10(p_value)'].iloc[0]}"
+    )
+
+    # Check that the fdr log transformation worked
+    assert result["-log10(fdr)"].iloc[0] == neg_log10_fdr, (
+        f"Expected -log10(fdr) {neg_log10_fdr}, got {result['-log10(fdr)'].iloc[0]}"
+    )
