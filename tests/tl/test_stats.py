@@ -236,10 +236,8 @@ def test_group_ratios_ttest_ind(
 def test_diff_exp_alphaquant():
     """Testing function to ascertain stable functionality of diff_exp_alphaquant on small example datasets.
 
-    The example datasets were generated in alphatools/tests/tl/tl_test_data.ipynb and saved
-    as .pkl files in alphatools/tests/tl/tl_test_data. This test is meant to freeze the expected output
-    upon generation and to stabilize the wrapper, but it should be noted that the underlying alphaquant
-    functionality is not tested.
+    The expected data were generated in alphatools/tests/tl/tl_test_data.ipynb and saved
+    as .pkl files in alphatools/tests/tl/tl_test_data.
 
     """
 

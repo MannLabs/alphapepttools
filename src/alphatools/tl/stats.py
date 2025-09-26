@@ -1,16 +1,15 @@
-import contextlib
 import logging
 import tempfile
 from pathlib import Path
 
 import alphaquant.run_pipeline as aq_pipeline
 import anndata as ad
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy.stats import false_discovery_control, ttest_ind
 
 from alphatools.pp.data import filter_by_metadata
+from alphatools.tl.utils import _suppress_plots
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -426,17 +425,6 @@ def diff_exp_alphaquant(
         return pd.DataFrame(
             {"sample": adata.obs.index[mask].astype(str), "condition": adata.obs.loc[mask, between_column]}
         ).reset_index(drop=True)
-
-    # Context manager to suppress plots if needed
-    @contextlib.contextmanager
-    def _suppress_plots():  # noqa: ANN202 # avoid generator return type annotation
-        original_show = plt.show
-        plt.show = lambda *a, **k: None  # NOQA: ARG005
-        try:
-            yield
-            plt.close("all")
-        finally:
-            plt.show = original_show
 
     samplemap = _get_samplemap(adata, between_column, comparison)
 
