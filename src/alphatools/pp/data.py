@@ -370,7 +370,7 @@ def _handle_overlapping_columns(
     )
 
 
-def _adata_column_to_array(
+def data_column_to_array(
     data: pd.DataFrame | ad.AnnData,
     column: str,
 ) -> np.ndarray:
@@ -396,6 +396,7 @@ def _adata_column_to_array(
         if column not in data.columns:
             raise ValueError(f"Column {column} not found in DataFrame.")
         return data[column].to_numpy()
+
     if isinstance(data, ad.AnnData):
         # prioritize var_names, i.e. numeric data from X
         if column in data.var_names:
@@ -414,7 +415,8 @@ def _adata_column_to_array(
         raise ValueError(
             f"Column {column} not found in AnnData object (checked var_names and obs.columns and var.columns)."
         )
-    raise TypeError("Data must be a pd.DataFrame or ad.AnnData.")
+
+    raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
 
 
 def scale_and_center(  # explicitly tested via test_pp_scale_and_center()

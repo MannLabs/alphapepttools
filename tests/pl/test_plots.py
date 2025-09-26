@@ -1,10 +1,39 @@
+import anndata
+import numpy as np
+import pandas as pd
 import pytest
 
 from alphatools.pl.figure import create_figure
-from alphatools.pl.plots import label_plot
+from alphatools.pl.plots import _extract_columns_to_df, _extract_groupwise_plotting_data, label_plot
 
 
-# Test the labelling function of alphatools: correctly spaced and ordered labels
+# Fixtures
+@pytest.fixture
+def example_data():
+    def make_dummy_data():
+        X = pd.DataFrame(
+            {
+                "A": [np.nan, 2.0, 3.0],
+                "B": [4.0, 5.0, 6.0],
+                "C": [7.0, 8.0, 9.0],
+            }
+        )
+        X.index = ["cell1", "cell2", "cell3"]
+        return X
+
+    return make_dummy_data()
+
+
+@pytest.fixture
+def example_sample_metadata():
+    def make_dummy_data():
+        sample_metadata = pd.DataFrame({"cell_type": ["A", "B", "C"], "age": [10.0, 20.0, 30.0], "batch": [1, 1, 2]})
+        sample_metadata.index = ["cell1", "cell2", "cell3"]
+        return sample_metadata
+
+    return make_dummy_data()
+
+
 @pytest.fixture
 def example_ax():
     def make_dummy_data():
@@ -15,23 +44,34 @@ def example_ax():
     return make_dummy_data()
 
 
-# Helper function to read out lines from a matplotlib Axes object
+# Test the labelling function of alphatools: correctly spaced and ordered labels
 def extract_label_plot_data(ax):
     """Extract line and label data from an axes after label_plot has been called."""
     lines = ax.get_lines()
     texts = ax.texts
 
-    result = []
+    line_dfs = []
     for line, text in zip(lines, texts, strict=False):
-        x_data = tuple(line.get_xdata())
-        y_data = tuple(line.get_ydata())
+        x_left, x_right = line.get_xdata()
+        y_left, y_right = line.get_ydata()
         label = text.get_text()
-        result.append((x_data, y_data, label))
-    return result
+        line_dfs.append(
+            pd.DataFrame(
+                {
+                    "x_start": [x_left],
+                    "x_end": [x_right],
+                    "y_start": [y_left],
+                    "y_end": [y_right],
+                    "label": [label],
+                }
+            )
+        )
+
+    return pd.concat(line_dfs, ignore_index=True)
 
 
-# The important thing to assess is whether labels and values stay matched throughout the repositioning,
-# Hence the providing of labels and values out of order.
+# The important thing to assess is that x, y and labels stay correctly ordered, i.e. top_right
+# ends up at the top right label after anchor assignment.
 @pytest.mark.parametrize(
     (
         "x",
@@ -46,30 +86,32 @@ def extract_label_plot_data(ax):
             [2, 2, 3, 3, 1, 1],
             ["middle_right", "middle_left", "top_right", "top_left", "bottom_right", "bottom_left"],
             None,
-            [
-                ((1, 1), (3, 3), "top_left"),
-                ((2, 2), (3, 3), "top_right"),
-                ((1, 1), (2, 2), "middle_left"),
-                ((2, 2), (2, 2), "middle_right"),
-                ((1, 1), (1, 1), "bottom_left"),
-                ((2, 2), (1, 1), "bottom_right"),
-            ],
+            # Expected lines read from plot visually
+            pd.DataFrame(
+                {
+                    "x_start": [1, 2, 1, 2, 1, 2],
+                    "x_end": [1, 2, 1, 2, 1, 2],
+                    "y_start": [3, 3, 2, 2, 1, 1],
+                    "y_end": [3, 3, 2, 2, 1, 1],
+                    "label": ["top_left", "top_right", "middle_left", "middle_right", "bottom_left", "bottom_right"],
+                }
+            ),
         ),
         (
             [2, 1, 2, 1, 2, 1],
             [2, 2, 3, 3, 1, 1],
             ["middle_right", "middle_left", "top_right", "top_left", "bottom_right", "bottom_left"],
             (0.5, 2.5),
-            # These values were manually read out from a plot in a test notebook; the important thing
-            # here is the order of label y values: top > middle > bottom for left and right
-            [
-                ((1, 0.5), (3, 3.094), "top_left"),
-                ((1, 0.5), (2, 2.788), "middle_left"),
-                ((1, 0.5), (1, 2.484), "bottom_left"),
-                ((2, 2.5), (3, 3.094), "top_right"),
-                ((2, 2.5), (2, 2.788), "middle_right"),
-                ((2, 2.5), (1, 2.484), "bottom_right"),
-            ],
+            # Expected lines read from plot visually
+            pd.DataFrame(
+                {
+                    "x_start": [1, 1, 1, 2, 2, 2],
+                    "x_end": [0.5, 0.5, 0.5, 2.5, 2.5, 2.5],
+                    "y_start": [3, 2, 1, 3, 2, 1],
+                    "y_end": [3.094, 2.788, 2.484, 3.094, 2.788, 2.484],
+                    "label": ["top_left", "middle_left", "bottom_left", "top_right", "middle_right", "bottom_right"],
+                }
+            ),
         ),
     ],
 )
@@ -94,12 +136,139 @@ def test_label_plot(example_ax, x, y, labels, anchors, expected_lines):
     # Extract the actual lines
     label_lines = extract_label_plot_data(ax)
 
+    # For both dataframes, for each x anchor (x_end) convert the y_end points to ranks to avoid issues with absolute positioning
+    label_lines["y_end"] = label_lines.groupby("x_end")["y_end"].rank(ascending=True)
+    expected_lines["y_end"] = expected_lines.groupby("x_end")["y_end"].rank(ascending=True)
+
+    # Set datatypes
+    comparison_datatypes = {
+        "x_start": float,
+        "x_end": float,
+        "y_start": float,
+        "y_end": float,
+        "label": str,
+    }
+    label_lines = label_lines.astype(comparison_datatypes)
+    expected_lines = expected_lines.astype(comparison_datatypes)
+
     # Assert that the labels are approximately correct
-    for generated_line, expected_line in zip(label_lines, expected_lines, strict=False):
-        for i, (gen_i, exp_i) in enumerate(zip(generated_line, expected_line, strict=False)):
-            if i == 0:  # x-coordinates
-                assert gen_i == exp_i
-            elif i == 1:  # y-coodrinates
-                assert gen_i == pytest.approx(exp_i, rel=1e-1)  # Fails on second, unexplained?
-            else:  # labels
-                assert gen_i == exp_i
+    pd.testing.assert_frame_equal(label_lines, expected_lines)
+
+
+# Test data extraction for plotting from dataframes and anndata objects
+@pytest.mark.parametrize(
+    ("which_data", "columns", "expected_data"),
+    [
+        (
+            "anndata",
+            ["A", "B", "age"],
+            pd.DataFrame(
+                {
+                    "A": [np.nan, 2.0, 3.0],
+                    "B": [4.0, 5.0, 6.0],
+                    "age": [10.0, 20.0, 30.0],
+                },
+                index=["cell1", "cell2", "cell3"],
+            ),
+        ),
+        (
+            "dataframe",
+            ["A", "B"],
+            pd.DataFrame(
+                {
+                    "A": [np.nan, 2.0, 3.0],
+                    "B": [4.0, 5.0, 6.0],
+                },
+                index=["cell1", "cell2", "cell3"],
+            ),
+        ),
+    ],
+)
+def test__extract_columns_to_df(which_data, example_data, example_sample_metadata, columns, expected_data):
+    if which_data == "anndata":
+        adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
+        data_input = adata
+    else:
+        data_input = example_data
+
+    extracted_data = _extract_columns_to_df(data_input, columns)
+
+    pd.testing.assert_frame_equal(extracted_data, expected_data)
+
+
+# Test failure cases for extract_columns_to_df
+@pytest.mark.parametrize(
+    ("which_data", "columns"),
+    [
+        ("dataframe", ["A", "nonexistent"]),
+        ("anndata", ["A", "nonexistent"]),
+        ("anndata_with_duplicate", ["A", "age"]),
+    ],
+)
+def test__extract_columns_to_df_failures(which_data, example_data, example_sample_metadata, columns):
+    if which_data == "anndata":
+        adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
+        data_input = adata
+    elif which_data == "anndata_with_duplicate":
+        X_with_age = example_data.copy()
+        X_with_age.columns = ["A", "B", "age"]
+        adata = anndata.AnnData(X=X_with_age, obs=example_sample_metadata)
+        data_input = adata
+    else:
+        data_input = example_data
+
+    with pytest.raises(KeyError):
+        _extract_columns_to_df(data_input, columns)
+
+
+# Test parsing of anndata objects to bar/box/violin-plottable data
+@pytest.mark.parametrize(
+    ("grouping_column", "value_column", "direct_columns", "expected_data", "expected_labels", "expected_positions"),
+    [
+        # Basic functionality with grouping and value column
+        (
+            "batch",
+            "A",
+            None,
+            [[2.0], [3.0]],  # NaN is dropped, grouped by batch [1,1,2]
+            [1, 2],
+            [1, 2],
+        ),
+        (
+            "batch",
+            "B",
+            None,
+            [[4.0, 5.0], [6.0]],  # First two cells in batch 1, last in batch 2
+            [1, 2],
+            [1, 2],
+        ),
+        # Case with direct column usage and dropping NaNs
+        (
+            None,
+            None,
+            ["A", "B", "age"],
+            [[2.0, 3.0], [4.0, 5.0, 6.0], [10.0, 20.0, 30.0]],
+            ["A", "B", "age"],
+            [1, 2, 3],
+        ),
+    ],
+)
+def test__extract_groupwise_plotting_data(
+    example_data,
+    example_sample_metadata,
+    grouping_column,
+    value_column,
+    direct_columns,
+    expected_data,
+    expected_labels,
+    expected_positions,
+):
+    adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
+
+    data_lists, labels, positions = _extract_groupwise_plotting_data(
+        data=adata, grouping_column=grouping_column, value_column=value_column, direct_columns=direct_columns
+    )
+
+    assert data_lists == expected_data
+    assert labels == expected_labels
+    assert positions == expected_positions

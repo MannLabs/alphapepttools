@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
-from alphabase.tools.data_downloader import DataShareDownloader
 
 from alphatools.io import read_pg_table
 
@@ -13,10 +12,10 @@ test_data_path = Path(f"{current_file_directory}/reference_data")
 @pytest.fixture
 def example_alphadia_tsv(tmp_path) -> tuple[Path, Path]:
     """Get and parse real alphadia PG report matrix."""
-    URL = "https://datashare.biochem.mpg.de/s/96e8SIbSSEMkfge"
+    INPUT_DATA_NAME = "alphadia_1.10.4___pg_matrix.tsv"
     REF_DATA_NAME = "reference_ad_alphadia_1.10.4__pg.parquet"
 
-    file_path = DataShareDownloader(url=URL, output_dir=tmp_path).download()
+    file_path = test_data_path / INPUT_DATA_NAME
     reference_file_path = test_data_path / REF_DATA_NAME
 
     return file_path, reference_file_path
@@ -25,11 +24,12 @@ def example_alphadia_tsv(tmp_path) -> tuple[Path, Path]:
 @pytest.fixture
 def example_alphapept_csv(tmp_path) -> tuple[Path, Path, Path]:
     """Get and parse real alphadia PG report matrix."""
-    URL = "https://datashare.biochem.mpg.de/s/oy9yvQ7IvubEPoq"
+
+    INPUT_DATA_NAME = "alphapept_0.5.0__pg_matrix.csv"
     REF_DATA_NAME = "reference_ad_alphapept_0.5.0__pg.parquet"
     VAR_DATA_NAME = "reference_ad_var_alphapept_0.5.0__pg.parquet"
 
-    file_path = DataShareDownloader(url=URL, output_dir=tmp_path).download()
+    file_path = test_data_path / INPUT_DATA_NAME
     reference_file_path = test_data_path / REF_DATA_NAME
     var_data_path = test_data_path / VAR_DATA_NAME
 
@@ -52,6 +52,7 @@ def test_alphapept_pg_reader(example_alphapept_csv: tuple[Path, Path]):
 
     # Validate that measurement_regex works as expected
     adata = read_pg_table(file_path, search_engine="alphapept", measurement_regex="lfq")
+
     reference_df = pd.read_parquet(reference_file_path)
     # Reference .var attribute, validate parsing of metadata
     reference_var = pd.read_parquet(var_data_path)

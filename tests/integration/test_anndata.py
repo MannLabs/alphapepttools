@@ -64,7 +64,7 @@ def _assert_reference_df_equal(
 def test_anndata_alphadia_181():
     """Test creating anndata from alphadia files."""
     # Create directly from files
-    url = "https://datashare.biochem.mpg.de/s/Hk41INtwBvBl0kP/download?files=alphadia_1.8.1_report_head.tsv"
+    url = "https://datashare.biochem.mpg.de/public.php/dav/files/Hk41INtwBvBl0kP/alphadia_1.8.1_report_head.tsv"
     with tempfile.TemporaryDirectory() as temp_dir:
         file_path = DataShareDownloader(url=url, output_dir=temp_dir).download()
 
@@ -79,7 +79,7 @@ def test_anndata_alphadia_181():
 def test_anndata_diann_181():
     """Test creating anndata from diann files."""
     # Create directly from files
-    url = "https://datashare.biochem.mpg.de/s/Hk41INtwBvBl0kP/download?files=diann_1.8.1_report_head.tsv"
+    url = "https://datashare.biochem.mpg.de/public.php/dav/files/Hk41INtwBvBl0kP/diann_1.8.1_report_head.tsv"
     with tempfile.TemporaryDirectory() as temp_dir:
         file_path = DataShareDownloader(url=url, output_dir=temp_dir).download()
 
@@ -100,7 +100,7 @@ def test_anndata_diann_181():
 def test_anndata_diann_190():
     """Test creating anndata from diann files."""
     # Create directly from files
-    url = "https://datashare.biochem.mpg.de/s/Hk41INtwBvBl0kP/download?files=diann_1.9.0_report_head.tsv"
+    url = "https://datashare.biochem.mpg.de/public.php/dav/files/Hk41INtwBvBl0kP/diann_1.9.0_report_head.tsv"
     with tempfile.TemporaryDirectory() as temp_dir:
         file_path = DataShareDownloader(url=url, output_dir=temp_dir).download()
 
