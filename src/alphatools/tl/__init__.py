@@ -1,1 +1,2 @@
-from .stats import diff_exp_ttest, nan_safe_bh_correction, nan_safe_ttest_ind
+from . import diff_exp
+from .stats import nan_safe_bh_correction
