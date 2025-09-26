@@ -6,7 +6,12 @@ import pandas as pd
 import pytest
 from scipy.stats import false_discovery_control, ttest_ind
 
-from alphatools.tl.stats import diff_exp_alphaquant, diff_exp_ttest, nan_safe_bh_correction, nan_safe_ttest_ind
+from alphatools.tl.stats import (
+    diff_exp_alphaquant,
+    diff_exp_ttest,
+    nan_safe_bh_correction,
+    nan_safe_ttest_ind,
+)
 
 
 @pytest.fixture
