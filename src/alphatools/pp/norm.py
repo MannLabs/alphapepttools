@@ -88,10 +88,8 @@ def normalize(
     ----------
     adata
         Count data
-    from_layer:
+    layer:
         Layer that will be normalized. If `None` uses `anndata.AnnData.X`
-    to_layer:
-        Layer to which the normalized data will be added. If `None` overwrites `anndata.AnnData.X`
     strategy
         Normalization strategy
 
@@ -99,9 +97,11 @@ def normalize(
             total sample intensity is equal to the mean of the total sample intensities across all samples
             - *total_median* The intensity of each feature is adjusted by a normalizing factor so that the
             total sample intensity is equal to the median of the total sample intensities across all samples
-
     key_added
         If not None, adds normalization factors to column in `adata.obs`
+    copy
+        Whether to return a modified copy (True) of the anndata object. If False (default)
+        modifies the object inplace
 
     Returns
     -------
