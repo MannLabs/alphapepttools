@@ -195,6 +195,7 @@ def test_group_ratios_ttest_ind(
 
 
 # Test diff_exp_alphaquant by loading small example datasets
+# TODO: Mock alphaquant itself to avoid dependency on it for testing diff_exp_alphaquant; this might depend on implementing an AlphaQuant API to avoid the temp-file construct currently required
 def test_diff_exp_alphaquant():
     """Testing function to ascertain stable functionality of diff_exp_alphaquant on small example datasets.
 
