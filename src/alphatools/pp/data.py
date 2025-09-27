@@ -443,7 +443,7 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     Returns
     -------
     None | anndata.AnnData
-        If `copy=False` modifies the anndata object inplace and returns None. If `copy=True`,
+        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
         returns a modified copy.
     """
     adata = adata.copy() if copy else adata
