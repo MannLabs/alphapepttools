@@ -25,6 +25,11 @@ def add_function_parameter_to_signature(
         Name of parameter
     **kwargs
         Passed to `inspect.Parameter`
+
+    Returns
+    -------
+    Callable
+        Updated function with copy parameter in signature
     """
     function_signature = inspect.signature(func)
     params = list(function_signature.parameters.values())
@@ -49,6 +54,17 @@ def copy_decorator(func: AnnDataFunc) -> CopyAnnDataFunc:
     -------
     Callable[[ad.AnnData, Any], None | ad.AnnData]
         Callable with added copy argument and updated function signature.
+
+    Usage
+    -----
+    .. code-block:: python
+        @copy_decorator
+        def set_to_zero(adata: ad.AnnData) -> ad.AnnData | None:
+            adata.X = np.zeros_like(adata.X)
+            return adata
+
+        help(set_to_zero)
+        > set_to_zero(adata: anndata._core.anndata.AnnData, *, copy: bool = False) -> anndata._core.anndata.AnnData | None
     """
     COPY_DEFAULT = False
 
