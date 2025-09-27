@@ -430,18 +430,21 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
 
     Parameters
     ----------
-    adata : ad.AnnData
+    adata
         Anndata object with data to scale.
-    scaler : str
+    scaler
         Sklearn scaler to use. Available scalers are 'standard' and 'robust'.
-    from_layer : str, optional
-        Name of the layer to scale. If None, the data matrix X is used.
-    to_layer : str, optional
-        Name of the layer to scale. If None, the data matrix X is modified
+    layer
+        Name of the layer to scale. If None (default), the data matrix X is used.
+    copy
+        Whether to return a modified copy (True) of the anndata object. If False (default)
+        modifies the object inplace
 
     Returns
     -------
-    None
+    None | anndata.AnnData
+        If `copy=False` modifies the anndata object inplace and returns None. If `copy=True`,
+        returns a modified copy.
     """
     adata = adata.copy() if copy else adata
     logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler.")
