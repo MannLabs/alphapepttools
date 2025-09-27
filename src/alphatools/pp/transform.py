@@ -90,7 +90,7 @@ def nanlog(
     verbosity : int, default 1
         If 1, log warnings for invalid values found in the data.
     layer
-        Name of the layer to scale. If None (default), the data matrix X is used.
+        Name of the layer to transform. If None (default), the data matrix X is used.
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
