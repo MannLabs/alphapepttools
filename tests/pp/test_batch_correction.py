@@ -82,12 +82,12 @@ def test_scanpy_pycombat(datatype, pycombat_test_data_simple, pycombat_test_data
 
     # Compute expected results
     expected_adata = adata.copy()
-    expected_adata = impute_gaussian(expected_adata)
+    expected_adata = impute_gaussian(expected_adata, copy=True)
     expected_adata = drop_singleton_batches(expected_adata, batch="batch")
     scanpy.pp.combat(expected_adata, key="batch", inplace=True)
 
     # Get comparison data from wrapper
-    adata = impute_gaussian(adata)
+    adata = impute_gaussian(adata, copy=True)
     adata = drop_singleton_batches(adata, batch="batch")
     adata = scanpy_pycombat(adata, batch="batch")
 
