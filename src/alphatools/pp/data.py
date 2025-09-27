@@ -420,11 +420,8 @@ def data_column_to_array(
 
 
 def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
-    adata: ad.AnnData,
-    scaler: str = "standard",
-    from_layer: str | None = None,
-    to_layer: str | None = None,
-) -> None:
+    adata: ad.AnnData, scaler: str = "standard", layer: str | None = None, *, copy: bool = False
+) -> None | ad.AnnData:
     """Scale and center data.
 
     Either use standard or robust scaling. 'robust' scaling relies
@@ -446,9 +443,8 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     -------
     None
     """
-    mod_status = "inplace" if to_layer is None else f"to layer '{to_layer}'"
-
-    logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler {mod_status}.")
+    adata = adata.copy() if copy else adata
+    logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler.")
 
     if scaler == "standard":
         scaler = StandardScaler(with_mean=True, with_std=True)
@@ -457,12 +453,14 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     else:
         raise NotImplementedError(f"Scaler {scaler} not implemented.")
 
-    input_data = adata.X if from_layer is None else adata.layers[from_layer]
+    input_data = adata.X if layer is None else adata.layers[layer]
     result = scaler.fit_transform(input_data)
-    if to_layer is None:
+    if layer is None:
         adata.X = result
     else:
-        adata.layers[to_layer] = result
+        adata.layers[layer] = result
+
+    return adata if copy else None
 
 
 # TODO: Abstract class for validation of AnnData objects?
