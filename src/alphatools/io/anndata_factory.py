@@ -31,24 +31,14 @@ class AnnDataFactory:
 
         self._psm_df = psm_df
 
-        # # Warn if duplicated features exist which get dropped;
-        # # TODO: This is not relevant for protein-level analysis, since there it is expected to have duplicated features
-        # # (i.e. the same protein id will almost inevitably have more than one precursor per file). However, if the analysis
-        # # level is precursors, we would not expect to see duplicated precursor IDs in the same file. In the future, there should
-        # # be an explicit flag to indicate whether we are analysing proteins or precursors, and whether the warning
-        # # below should be shown
-        # duplicated_features: pd.Series = self._psm_df.groupby(PsmDfCols.RAW_NAME).apply(
-        #     lambda df: df[PsmDfCols.PROTEINS].duplicated().sum(), include_groups=False
-        # )
-
-        # if any(duplicated_features > 0):
-        #     warnings.warn(
-        #         f"Found {duplicated_features.sum()} duplicated features. Using only first.",
-        #         stacklevel=1,
-        #     )
-
-    def create_anndata(self) -> ad.AnnData:
+    def create_anndata(self, var_cols: str | list[str] | None = None) -> ad.AnnData:
         """Create AnnData object from PSM DataFrame.
+
+        Parameter
+        ---------
+        var_cols
+            Columns in peptide spectrum match table that should be added as metadata
+            to `adata.var`. If `None` only keeps the `protein_id_column`
 
         Returns
         -------
@@ -59,11 +49,14 @@ class AnnDataFactory:
             - X contains intensity values
 
         """
+        var_cols = var_cols if var_cols is not None else []
+        var_cols = [var_cols] if isinstance(var_cols, str) else var_cols
+
         # Create pivot table: raw names x proteins with intensity values
         pivot_df = pd.pivot_table(
             self._psm_df,
             index=PsmDfCols.RAW_NAME,
-            columns=PsmDfCols.PROTEINS,
+            columns={PsmDfCols.PROTEINS, *var_cols},
             values=PsmDfCols.INTENSITY,
             aggfunc="first",  # DataFrameGroupBy.first -> will skip NA
             fill_value=np.nan,
@@ -72,8 +65,8 @@ class AnnDataFactory:
 
         return ad.AnnData(
             X=pivot_df.values,
-            obs=pd.DataFrame(index=pivot_df.index),
-            var=pd.DataFrame(index=pivot_df.columns),
+            obs=pivot_df.index.to_frame(index=False).set_index(PsmDfCols.RAW_NAME),
+            var=pivot_df.columns.to_frame(index=False).set_index(PsmDfCols.PROTEINS),
         )
 
     @classmethod
