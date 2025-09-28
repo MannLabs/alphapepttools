@@ -307,6 +307,9 @@ def add_legend_to_axes_from_patches(
     if "fontsize" not in kwargs:
         kwargs["fontsize"] = config["legend"]["font_size"]
 
+    if "loc" not in kwargs:
+        kwargs["loc"] = "upper center"
+
     _legend = ax.legend(handles=patches, **kwargs)
 
     # Resize legend title based on config legend title_size

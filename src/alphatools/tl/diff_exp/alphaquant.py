@@ -87,11 +87,11 @@ def diff_exp_alphaquant(
 
     # check that between column exists in obs
     if between_column not in adata.obs.columns:
-        raise ValueError(f"Error in group_ratios_ttest_ind: Column '{between_column}' not found in adata.obs.")
+        raise ValueError(f"Column '{between_column}' not found in adata.obs.")
 
     # validate comparison tuple
     if not isinstance(comparison, tuple) or len(comparison) != 2:  # noqa: PLR2004 since this is a tuple check
-        raise ValueError("Error in group_ratios_ttest_ind: 'comparison' must be a tuple of exactly two group names.")
+        raise ValueError("'comparison' must be a tuple of exactly two group names.")
 
     # Generate samplemap in AlphaQuant format
     def _get_samplemap(
