@@ -10,6 +10,7 @@ def read_psm_table(
     intensity_column: str | None = None,
     feature_id_column: str | None = None,
     sample_id_column: str | None = None,
+    secondary_feature_columns: str | list[str] | None = None,
     **kwargs,
 ) -> ad.AnnData:
     """Read peptide spectrum match tables to the :class:`anndata.AnnData` format
@@ -41,6 +42,9 @@ def read_psm_table(
     sample_id_column
         Column that holds the sample identifier in the PSM table. Defaults to the pre-configured value
         in `alphabase`.
+    secondary_feature_columns
+        Additional columns to annotate features in the `adata.var` table. Can be a single column name or a list of column names.
+        Defaults to None.
     **kwargs
         Keyword arguments passed to :meth:`alphabase.psm_reader.psm_reader_provider.get_reader`
 
@@ -76,7 +80,7 @@ def read_psm_table(
         file_paths=file_paths,
         reader_type=search_engine,
         intensity_column=intensity_column,
-        protein_id_column=feature_id_column,
-        raw_name_column=sample_id_column,
+        feature_id_column=feature_id_column,
+        sample_id_column=sample_id_column,
         **kwargs,
-    ).create_anndata()
+    ).create_anndata(secondary_id_columns=secondary_feature_columns)

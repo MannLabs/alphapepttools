@@ -86,8 +86,8 @@ def test_anndata_diann_181():
         factory = AnnDataFactory.from_files(
             file_paths=file_path,
             reader_type="diann",
-            raw_name_column="File.Name",
-            protein_id_column="Protein.Group",
+            sample_id_column="File.Name",
+            feature_id_column="Protein.Group",
             intensity_column="PG.MaxLFQ",
         )
 
@@ -107,8 +107,8 @@ def test_anndata_diann_190():
         factory = AnnDataFactory.from_files(
             file_paths=file_path,
             reader_type="diann",
-            raw_name_column="File.Name",
-            protein_id_column="Protein.Group",
+            sample_id_column="File.Name",
+            feature_id_column="Protein.Group",
             intensity_column="PG.MaxLFQ",
         )
 
