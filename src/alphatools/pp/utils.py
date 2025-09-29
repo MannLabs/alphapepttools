@@ -11,6 +11,8 @@ import numpy as np
 AnnDataFunc = Callable[[ad.AnnData, Any], ad.AnnData]
 CopyAnnDataFunc = Callable[[ad.AnnData, Any], None | ad.AnnData]
 
+_COPY_DEFAULT: bool = False
+
 
 def add_function_parameter_to_signature(
     func: Callable, parameter: str, kind: inspect._ParameterKind = inspect.Parameter.KEYWORD_ONLY, **kwargs
@@ -66,17 +68,16 @@ def copy_decorator(func: AnnDataFunc) -> CopyAnnDataFunc:
         help(set_to_zero)
         > set_to_zero(adata: anndata._core.anndata.AnnData, *, copy: bool = False) -> anndata._core.anndata.AnnData | None
     """
-    COPY_DEFAULT = False
 
     @functools.wraps(func)
-    def wrapper(adata: ad.AnnData, *args, copy: bool = COPY_DEFAULT, **kwargs) -> None | ad.AnnData:
+    def wrapper(adata: ad.AnnData, *args, copy: bool = _COPY_DEFAULT, **kwargs) -> None | ad.AnnData:
         adata = adata.copy() if copy else adata
         result = func(adata, *args, **kwargs)
         return result if copy else None
 
     # Add copy to function signature
     return add_function_parameter_to_signature(
-        wrapper, parameter="copy", kind=inspect.Parameter.KEYWORD_ONLY, default=COPY_DEFAULT, annotation=bool
+        wrapper, parameter="copy", kind=inspect.Parameter.KEYWORD_ONLY, default=_COPY_DEFAULT, annotation=bool
     )
 
 
