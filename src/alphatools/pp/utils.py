@@ -106,8 +106,7 @@ def get_anndata_layer(adata: ad.AnnData, layer: str | None = None) -> np.ndarray
     return adata.X if layer is None else adata.layers[layer]
 
 
-@copy_decorator
-def update_adata_layer(adata: ad.AnnData, data: np.ndarray, layer: str | None = None) -> ad.AnnData:
+def update_adata_layer(adata: ad.AnnData, data: np.ndarray, layer: str | None = None) -> None:
     """Set data to a layer in an anndata object
 
     Parameters
@@ -117,20 +116,17 @@ def update_adata_layer(adata: ad.AnnData, data: np.ndarray, layer: str | None = 
     layer
         Name of layer. The layer might already exist which overwrites the current values.
         If None (default), updates adata.X
-    copy
-        Whether the object is updated inplace (default) or a copy is returned.
 
     Returns
     -------
-    None | anndata.AnnData
-        If `copy=False`, updates the object inplace. If `copy=True`, returns a copy of the object with updated layer.
+    None
+        The adata object is modified inplace
+
     """
     if not isinstance(adata, ad.AnnData):
         raise TypeError(f"Expected an anndata.AnnData object, got {type(adata)}")
 
-    if (layer is not None) and (layer not in adata.layers):
-        raise KeyError(
-            f"Layer {layer} is not in anndata. Please specify `None` for adata.X or an existing layer {adata.layers.keys()}"
-        )
-
-    return adata.X if layer is None else adata.layers[layer]
+    if layer is None:
+        adata.X = data
+    else:
+        adata.layers[layer] = data
