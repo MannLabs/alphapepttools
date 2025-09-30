@@ -42,7 +42,7 @@ pip install -e ".[dev,test,doc]"
 
 ## Handling anndata objects
 
-The central data structure of `alphatools` is the :class:`anndata.AnnData` object. All functions should be compatible with :class:`anndata.AnnData`.
+The central data structure of `alphatools` is the `anndata.AnnData` object. All functions should be compatible with `anndata.AnnData`.
 
 Functions that act on the omics data in the anndata object (typically in the `.pp` and `.tl` modules) should generally follow the following call signature
 
@@ -54,9 +54,9 @@ alphatools.tl.func(adata: ad.AnnData, ..., layer: str | None = None, copy: bool 
 
 ```
 
-**Layer modification** This means that they take an anndata object and act on a specific measurement layer in the object. Per default (`None`), this will be the `anndata.AnnData.X` attribute, otherwise the specified layer.
+**Layer modification** This means that they take an `anndata.AnnData` object and modify/update a specific measurement layer in the object. Per default (`None`), this will be the `anndata.AnnData.X` attribute, otherwise the specified layer.
 
-**Modification inplace** Per default, the :class:`anndata.AnnData` object is modified inplace (`copy=False`), this means that the current object is updated and the function returns `None`. If `copy=True`, an updated copy of the object is returned
+**Modification inplace** Per default, the `anndata.AnnData` object is modified inplace (`copy=False`), this means that the current object is updated and the function returns `None`. If `copy=True`, an updated copy of the object is returned and the original object remains unchanged.
 
 This behaviour is adapted from [`scanpy`](https://scanpy.readthedocs.io/en/stable/) and aims to maximize the compatibility of the interfaces.
 
@@ -67,9 +67,9 @@ Default behaviour:
 ```python
 adata.layers["original"] = adata.X.copy()
 
-alphatools.pp.func(adata)
-# returns None
-assert not np.all(np.isclose(adata.X, adata.layers["original"]))
+return_value = alphatools.pp.func(adata)
+assert return_value is None
+assert not np.array_equal(adata.X, adata.layers["original"])
 ```
 
 Act on a specific layer
@@ -78,14 +78,14 @@ Act on a specific layer
 adata.layers["original"] = adata.X.copy()
 adata.layers["new_layer"] = adata.X.copy()
 
-alphatools.pp.func(adata, layer="new_layer")
-# returns None
+return_value = alphatools.pp.func(adata, layer="new_layer")
+assert return_value is None
 
 # adata.X is unchanged
-assert np.all(np.isclose(adata.X, adata.layers["original"]))
+assert np.array_equal(adata.X, adata.layers["original"])
 
 # New layer is changed
-assert not np.all(np.isclose(adata.layers["new_layer"], adata.layers["original"]))
+assert not np.array_equal(adata.layers["new_layer"], adata.layers["original"])
 ```
 
 Return an updated copy
@@ -94,10 +94,10 @@ Return an updated copy
 adata_original = adata.copy()
 adata_new = alphatools.pp.func(adata, copy=True)
 # Returns an updated anndata object
-assert not np.all(np.isclose(adata.X, adata_new.X))
+assert not np.array_equal(adata.X, adata_new.X)
 
 # The original anndata remains unchanged
-assert np.all(np.isclose(adata.X, adata_original.X))
+assert np.array_equal(adata.X, adata_original.X)
 
 ```
 
