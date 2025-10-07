@@ -54,7 +54,7 @@ pip install -e .
 or with more dependencies:
 
 ```bash
-pip install -e ".[test, dev, doc]"
+pip install -e ".[test,dev,doc]"
 ```
 
 ## Getting started
@@ -64,7 +64,7 @@ in particular, the [API documentation][].
 
 💡 While the project is still in development, you can generate the documentation locally from the alphatools directory. You will need to have the extra `doc` dependencies installed
 
-```
+```bash
 # Make sure that you are in the alphatools git repository
 # Make sure that all dependencies are installed
 pip install -e ".[doc]"
@@ -72,7 +72,7 @@ pip install -e ".[doc]"
 
 Then you can compile the docs and interact with them in your favorite browser:
 
-```
+```bash
 # Make sure that you are in the alphatools git repository
 cd ./docs
 make clean html
