@@ -1,0 +1,26 @@
+# Build docs while project is still private
+# .github/workflows/docs.yml
+# TODO: Remove when repository becomes public
+name: Build and Deploy Docs
+on:
+  push:
+    branches: [docs]
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Install dependencies
+        run: |
+          pip install -e .[doc]
+      - name: Build docs
+        run: |
+          sphinx-build -b html docs docs/_build/html
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: docs/_build/html
