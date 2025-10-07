@@ -101,5 +101,6 @@ If you found a bug, please use the [issue tracker][].
 <!-- [api documentation]: https://alphatools.readthedocs.io/en/latest/api.html -->
 
 [documentation]: https://mannlabs.github.io/alphatools/index.html
+[changelog]: https://github.com/MannLabs/alphatools/releases
 [api documentation]: https://mannlabs.github.io/alphatools/api.html
 [pypi]: https://pypi.org/project/alphatools
