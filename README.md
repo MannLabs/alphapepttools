@@ -19,11 +19,8 @@ Functionalities are intended to be as close to pure python as possible, avoiding
 ### Design choices of `alphatools`:
 
 - **Data handling**: `AnnData` was chosen as a data container for two main reasons:
-
     1. For presenting a lightweight, powerful solution to a fundamental challenge with dataframes, which is keeping numerical data and metadata aligned together at all times. Using dataframes, the options are to either include non-numeric metadata columns in the dataframe (complicating data operations) or to add cumbersome multi-level indices and
-
     2. For their compatibility with the Scverse, Scanpy and all associated tools, essentially removing the barrier between proteomics and transcriptomics data analysis and enabling multi-omics analyses.
-
 - **Plotting**: Inspired by the [`stylia`] package, `alphatools` aims to provide a consistent and aesthetically pleasing visual experience for all plots. A core component of this implementation is the fact that `create_figure` returns subplots as an iterable data structure, meaning that once the basic layout of a plot is decided, users simply jump from one plot window to the next and populate each one with figure elements.
 - **Standardization**: A key consideration of this package is the loading of proteomics data, the biggest painpoint of which is the nonstandard output of various proteomic search engines. By building on `alphabase`, we handle this complexity early and provide the user with AnnData objects containing either proteins or precursors, where the familiar Pandas DataFrame is always just a '`df = adata.to_df().join(adata.obs)`' away.
 
