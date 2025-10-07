@@ -19,6 +19,7 @@ Functionalities are intended to be as close to pure python as possible, avoiding
 ### Design choices of `alphatools`:
 
 - **Data handling**: `AnnData` was chosen as a data container for two main reasons:
+
     1. For presenting a lightweight, powerful solution to a fundamental challenge with dataframes, which is keeping numerical data and metadata aligned together at all times. Using dataframes, the options are to either include non-numeric metadata columns in the dataframe (complicating data operations) or to add cumbersome multi-level indices and
     2. For their compatibility with the Scverse, Scanpy and all associated tools, essentially removing the barrier between proteomics and transcriptomics data analysis and enabling multi-omics analyses.
        <br>
@@ -27,11 +28,6 @@ Functionalities are intended to be as close to pure python as possible, avoiding
 - **Standardization**: A key consideration of this package is the loading of proteomics data, the biggest painpoint of which is the nonstandard output of various proteomic search engines. By building on `alphabase`, we handle this complexity early and provide the user with AnnData objects containing either proteins or precursors, where the familiar Pandas DataFrame is always just a '`df = adata.to_df().join(adata.obs)`' away.
 
 [`stylia`]: https://github.com/ersilia-os/stylia.git
-
-## Getting started
-
-Please refer to the [documentation][],
-in particular, the [API documentation][].
 
 ## Installation
 
@@ -58,8 +54,31 @@ pip install -e .
 or with more dependencies:
 
 ```bash
-pip install -e ".[test, dev]"
+pip install -e ".[test, dev, doc]"
 ```
+
+## Getting started
+
+Please refer to the [documentation][],
+in particular, the [API documentation][].
+
+💡 While the project is still in development, you can generate the documentation locally from the from the alphatools directory. You will need to have the extra `doc` dependencies installed
+
+```
+# Make sure that you are in the alphatools git repository
+# Make sure that all dependencies are installed
+pip install -e ".[doc]"
+```
+
+Then you can compile the docs and interact with them in your favorite browser:
+
+```
+# Make sure that you are in the alphatools git repository
+cd ./docs
+make clean html
+```
+
+The documentation can be found in the `/docs/_build/html/` directory. You can open the `index.html` file and interact with the documentation in your favorite browser.
 
 ## Release notes
 
