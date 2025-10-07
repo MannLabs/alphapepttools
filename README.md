@@ -19,6 +19,7 @@ Functionalities are intended to be as close to pure python as possible, avoiding
 ### Design choices of `alphatools`:
 
 - **Data handling**: `AnnData` was chosen as a data container for two main reasons:
+
     1. For presenting a lightweight, powerful solution to a fundamental challenge with dataframes, which is keeping numerical data and metadata aligned together at all times. Using dataframes, the options are to either include non-numeric metadata columns in the dataframe (complicating data operations) or to add cumbersome multi-level indices and
     2. For their compatibility with the Scverse, Scanpy and all associated tools, essentially removing the barrier between proteomics and transcriptomics data analysis and enabling multi-omics analyses.
        <br>
@@ -96,7 +97,12 @@ If you found a bug, please use the [issue tracker][].
 [scverse discourse]: https://discourse.scverse.org/
 [issue tracker]: https://github.com/MannLabs/alphatools/issues
 [tests]: https://github.com/MannLabs/alphatools/actions/workflows/test.yml
-[documentation]: https://alphatools.readthedocs.io
-[changelog]: https://alphatools.readthedocs.io/en/latest/changelog.html
-[api documentation]: https://alphatools.readthedocs.io/en/latest/api.html
+
+<!-- TODO: Change documentation pages back to readthedocs upon public release -->
+<!-- [documentation]: https://alphatools.readthedocs.io -->
+<!-- [changelog]: https://alphatools.readthedocs.io/en/latest/changelog.html -->
+<!-- [api documentation]: https://alphatools.readthedocs.io/en/latest/api.html -->
+
+[documentation]: https://mannlabs.github.io/alphatools/index.html
+[api documentation]: https://mannlabs.github.io/alphatools/api.html
 [pypi]: https://pypi.org/project/alphatools
