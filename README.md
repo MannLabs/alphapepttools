@@ -62,7 +62,7 @@ pip install -e ".[test, dev, doc]"
 Please refer to the [documentation][],
 in particular, the [API documentation][].
 
-💡 While the project is still in development, you can generate the documentation locally from the from the alphatools directory. You will need to have the extra `doc` dependencies installed
+💡 While the project is still in development, you can generate the documentation locally from the alphatools directory. You will need to have the extra `doc` dependencies installed
 
 ```
 # Make sure that you are in the alphatools git repository
@@ -78,7 +78,7 @@ cd ./docs
 make clean html
 ```
 
-The documentation can be found in the `/docs/_build/html/` directory. You can open the `index.html` file and interact with the documentation in your favorite browser.
+The documentation can be found in the `/docs/_build/html/` directory. Open the `index.html` file in your preferred browser to explore the documentation.
 
 ## Release notes
 
