@@ -33,7 +33,9 @@
 
     tl.nan_safe_bh_correction
     tl.nan_safe_ttest_ind
-    tl.group_ratios_ttest_ind
+    tl.diff_exp_ttest
+    tl.diff_exp_alphaquant
+
 ```
 
 ## Metrics

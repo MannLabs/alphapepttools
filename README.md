@@ -21,8 +21,6 @@ Functionalities are intended to be as close to pure python as possible, avoiding
 - **Data handling**: `AnnData` was chosen as a data container for two main reasons:
     1. For presenting a lightweight, powerful solution to a fundamental challenge with dataframes, which is keeping numerical data and metadata aligned together at all times. Using dataframes, the options are to either include non-numeric metadata columns in the dataframe (complicating data operations) or to add cumbersome multi-level indices and
     2. For their compatibility with the Scverse, Scanpy and all associated tools, essentially removing the barrier between proteomics and transcriptomics data analysis and enabling multi-omics analyses.
-       <br>
-
 - **Plotting**: Inspired by the [`stylia`] package, `alphatools` aims to provide a consistent and aesthetically pleasing visual experience for all plots. A core component of this implementation is the fact that `create_figure` returns subplots as an iterable data structure, meaning that once the basic layout of a plot is decided, users simply jump from one plot window to the next and populate each one with figure elements.
 - **Standardization**: A key consideration of this package is the loading of proteomics data, the biggest painpoint of which is the nonstandard output of various proteomic search engines. By building on `alphabase`, we handle this complexity early and provide the user with AnnData objects containing either proteins or precursors, where the familiar Pandas DataFrame is always just a '`df = adata.to_df().join(adata.obs)`' away.
 
@@ -96,7 +94,13 @@ If you found a bug, please use the [issue tracker][].
 [scverse discourse]: https://discourse.scverse.org/
 [issue tracker]: https://github.com/MannLabs/alphatools/issues
 [tests]: https://github.com/MannLabs/alphatools/actions/workflows/test.yml
-[documentation]: https://alphatools.readthedocs.io
-[changelog]: https://alphatools.readthedocs.io/en/latest/changelog.html
-[api documentation]: https://alphatools.readthedocs.io/en/latest/api.html
+
+<!-- TODO: Change documentation pages back to readthedocs upon public release -->
+<!-- [documentation]: https://alphatools.readthedocs.io -->
+<!-- [changelog]: https://alphatools.readthedocs.io/en/latest/changelog.html -->
+<!-- [api documentation]: https://alphatools.readthedocs.io/en/latest/api.html -->
+
+[documentation]: https://mannlabs.github.io/alphatools/index.html
+[changelog]: https://github.com/MannLabs/alphatools/releases
+[api documentation]: https://mannlabs.github.io/alphatools/api.html
 [pypi]: https://pypi.org/project/alphatools

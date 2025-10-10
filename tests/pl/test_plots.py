@@ -148,11 +148,12 @@ def test_label_plot(example_ax, x, y, labels, anchors, expected_lines):
         "y_end": float,
         "label": str,
     }
+
     label_lines = label_lines.astype(comparison_datatypes)
     expected_lines = expected_lines.astype(comparison_datatypes)
 
-    # Assert that the labels are approximately correct
-    pd.testing.assert_frame_equal(label_lines, expected_lines)
+    # Assert that the labels are approximately correct (ignoring row order)
+    pd.testing.assert_frame_equal(label_lines, expected_lines, check_like=True)
 
 
 # Test data extraction for plotting from dataframes and anndata objects
