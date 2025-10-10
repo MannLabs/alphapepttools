@@ -47,12 +47,23 @@ def _pcr(principal_component_embeddings: np.ndarray, covariate: np.ndarray, expl
     Returns
     -------
     Explained variance of covariate over C components assuming a linear relationship
+
+    Notes
+    -----
+    The R2 per component is clamped at a minimum of 0 as done in the reference implementation (Luecken, 2022),
+    since a negative explained variance is non-sensical. It follows that the implementation
+    tends to overestimate the explained variance by a covariate.
+
+    References
+    ----------
+    - Luecken, M.D., Büttner, M., Chaichoompu, K. et al. Benchmarking atlas-level data integration in single-cell genomics. Nat Methods 19, 41-50 (2022). https://doi.org/10.1038/s41592-021-01336-8
+
     """
     # Transpose from (samples, PCs) to (PCs, samples) to easily iterate through PCs
     principal_component_embeddings = principal_component_embeddings.T
 
     return sum(
-        var_explained * LinearRegression(fit_intercept=True).fit(covariate, pc_i).score(covariate, pc_i)
+        var_explained * max(0, LinearRegression(fit_intercept=True).fit(covariate, pc_i).score(covariate, pc_i))
         for pc_i, var_explained in zip(principal_component_embeddings, explained_variance, strict=True)
     )
 
