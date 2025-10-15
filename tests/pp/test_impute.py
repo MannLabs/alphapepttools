@@ -16,7 +16,7 @@ def gaussian_imputation_dummy_data():
             },
             index=["s1", "s2", "s3", "s4", "s5"],
         )
-        return ad.AnnData(data)
+        return ad.AnnData(data, layers={"new_layer": data})
 
     return create_data()
 
@@ -101,7 +101,9 @@ def median_imputation_dummy_anndata_all_nan(median_imputation_dummy_data_all_nan
     return ad.AnnData(X=median_imputation_dummy_data_all_nan, obs=obs)
 
 
-def test_impute_gaussian(gaussian_imputation_dummy_data):
+@pytest.mark.parametrize("copy", [False, True])
+@pytest.mark.parametrize("layer", [None, "new_layer"])
+def test_impute_gaussian(gaussian_imputation_dummy_data: ad.AnnData, layer: str, *, copy: bool) -> None:
     """Test that imputation with fixed random state produces reproducible results."""
 
     RANDOM_STATE = 42
@@ -110,8 +112,13 @@ def test_impute_gaussian(gaussian_imputation_dummy_data):
     A_VALS = [1, 2, 4, 5]
     B_VALS = [10, 30, 40, 50]
 
-    adata_imputed = impute_gaussian(
-        gaussian_imputation_dummy_data, std_offset=STD_OFFSET, std_factor=STD_FACTOR, random_state=RANDOM_STATE
+    result = impute_gaussian(
+        gaussian_imputation_dummy_data,
+        std_offset=STD_OFFSET,
+        std_factor=STD_FACTOR,
+        random_state=RANDOM_STATE,
+        layer=layer,
+        copy=copy,
     )
 
     rng = np.random.default_rng(RANDOM_STATE)
@@ -126,7 +133,9 @@ def test_impute_gaussian(gaussian_imputation_dummy_data):
         size=1,
     )[0]
 
-    imputed = adata_imputed.to_df()
+    adata_imputed = result if copy else gaussian_imputation_dummy_data
+
+    imputed = adata_imputed.to_df(layer=layer)
 
     assert np.allclose(imputed.loc["s3", "A"], expected_A3)
     assert np.allclose(imputed.loc["s2", "B"], expected_B2)

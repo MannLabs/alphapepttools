@@ -66,9 +66,7 @@ def detect_special_values(
 
 
 def nanlog(
-    data: ad.AnnData,
-    base: int = 2,
-    verbosity: int = 1,
+    data: ad.AnnData, base: int = 2, verbosity: int = 1, layer: str | None = None, *, copy: bool = False
 ) -> ad.AnnData:
     """Logarithmize a data matrix.
 
@@ -91,11 +89,18 @@ def nanlog(
         Base of the logarithm. Defaults to 2 (log2).
     verbosity : int, default 1
         If 1, log warnings for invalid values found in the data.
+    layer
+        Name of the layer to transform. If None (default), the data matrix X is used.
+    copy
+        Whether to return a modified copy (True) of the anndata object. If False (default)
+        modifies the object inplace
 
     Returns
     -------
-    anndata.AnnData
+    None | anndata.AnnData
         Log-transformed data with invalid values replaced by np.nan.
+        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
+        returns a modified copy.
 
     """
     if not isinstance(data, ad.AnnData):
@@ -104,7 +109,7 @@ def nanlog(
     if base in {0, 1} or base < 0:
         raise ValueError("Base cannot be 0 (divide by -Inf) or 1 (divide by 0) or negative (invalid log).")
 
-    data = data.copy()
+    data = data.copy() if copy else data
 
     def _log_func(
         x: np.ndarray | pd.DataFrame | pd.Series,
@@ -119,6 +124,11 @@ def nanlog(
 
     # Handle subtleties with filtering and assignment of different datatypes
     special_values_mask = detect_special_values(data.X, verbosity)
-    data.X = _log_func(np.where(~special_values_mask, data.X, np.nan), base)
 
-    return data
+    input_data = data.X if layer is None else data.layers[layer]
+    if layer is None:
+        data.X = _log_func(np.where(~special_values_mask, input_data, np.nan), base)
+    else:
+        data.layers[layer] = _log_func(np.where(~special_values_mask, input_data, np.nan), base)
+
+    return data if copy else None

@@ -20,6 +20,9 @@ def impute_gaussian(
     std_offset: float = 3,
     std_factor: float = 0.3,
     random_state: int = 42,
+    layer: str | None = None,
+    *,
+    copy: bool = False,
 ) -> ad.AnnData:
     """Impute missing values in each column by random sampling from a gaussian distribution.
 
@@ -37,17 +40,25 @@ def impute_gaussian(
     std_factor : float
         Factor to multiply the feature's standard deviation with to
         get the standard deviation of the gaussian distribution.
+    layer
+        Name of the layer to impute. If None (default), the data matrix X is used.
+    copy
+        Whether to return a modified copy (True) of the anndata object. If False (default)
+        modifies the object inplace
 
     Returns
     -------
-    anndata.AnnData
-        Copy of AnnData object with imputed values in place of NaNs.
+    None | anndata.AnnData
+        AnnData object with imputed values in layer.
+        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
+        returns a modified copy.
 
     """
     # always copy for now, implement inplace later if needed
-    input_X_shape = adata.X.shape
-    adata = adata.copy()
-    X = adata.X
+    adata = adata.copy() if copy else adata
+
+    X = adata.X if layer is None else adata.layers[layer]
+    input_X_shape = X.shape
 
     # All columns must be either int or float
     if not np.issubdtype(X.dtype, np.number):
@@ -81,7 +92,13 @@ def impute_gaussian(
         raise ValueError(" impute_gaussian: Imputation failed, data retained NaN values.")
 
     logging.info(f" impute_gaussian: Imputation complete. Imputed {nan_count} NaN values with Gaussian distribution.")
-    return adata
+
+    if layer is None:
+        adata.X = X
+    else:
+        adata.layers[layer] = X
+
+    return adata if copy else None
 
 
 def _check_all_nan(data: np.ndarray) -> None:
