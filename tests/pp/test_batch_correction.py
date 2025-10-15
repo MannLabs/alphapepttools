@@ -59,6 +59,8 @@ def test_convert_na_to_batch():
     assert result.obs["batch"].tolist() == expected_batch
 
 
+@pytest.mark.parametrize("copy", [False, True])
+@pytest.mark.parametrize("layer", [False, True])
 @pytest.mark.parametrize(
     ("datatype"),
     [
@@ -68,7 +70,7 @@ def test_convert_na_to_batch():
         ("complex"),
     ],
 )
-def test_scanpy_pycombat(datatype, pycombat_test_data_simple, pycombat_test_data_complex):
+def test_scanpy_pycombat(datatype, pycombat_test_data_simple, pycombat_test_data_complex, layer: str, *, copy: bool):
     """
     Test the scanpy_pycombat function with various scenarios.
     """
@@ -79,16 +81,21 @@ def test_scanpy_pycombat(datatype, pycombat_test_data_simple, pycombat_test_data
         df, md = pycombat_test_data_complex
 
     adata = ad.AnnData(df, obs=md)
+    adata = impute_gaussian(adata, copy=True)
+    adata = drop_singleton_batches(adata, batch="batch")
+    adata.layers["new_layer"] = adata.X.copy()
 
     # Compute expected results
     expected_adata = adata.copy()
-    expected_adata = impute_gaussian(expected_adata)
-    expected_adata = drop_singleton_batches(expected_adata, batch="batch")
     scanpy.pp.combat(expected_adata, key="batch", inplace=True)
 
     # Get comparison data from wrapper
-    adata = impute_gaussian(adata)
-    adata = drop_singleton_batches(adata, batch="batch")
-    adata = scanpy_pycombat(adata, batch="batch")
+    result = scanpy_pycombat(adata, batch="batch", layer=layer, copy=copy)
 
-    pd.testing.assert_frame_equal(adata.to_df(), expected_adata.to_df())
+    if copy:
+        assert isinstance(result, ad.AnnData)
+        adata = result
+    else:
+        assert result is None
+
+    pd.testing.assert_frame_equal(adata.to_df(layer=layer), expected_adata.to_df())
