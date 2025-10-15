@@ -1,9 +1,11 @@
 # Imputation methods for proteomics data
 
 import logging
+import warnings
 
 import anndata as ad
 import numpy as np
+import pandas as pd
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -91,6 +93,13 @@ def _impute_nanmedian(data: np.ndarray) -> np.ndarray:
     data
         Samples x Features array
     """
+    # If a feature is all nan
+    all_nan_features = np.isnan(data).all(axis=0)
+    if any(all_nan_features):
+        warnings.warn(
+            f"Features {list(np.where(all_nan_features)[0])} contain all nan values. Will remain nan.", stacklevel=2
+        )
+
     return np.where(np.isnan(data), np.nanmedian(data, axis=0), data)
 
 
@@ -113,11 +122,19 @@ def impute_median(adata: ad.AnnData, layer: str | None = None, group_column: str
         Defines a group column that is used to subset the samples that should be used for imputation.
         If specified, computes median separately for each group and imputes
         missing values using the group-specific median.
+        If `group_column` contains NaNs, the respective observations are ignored.
 
     Returns
     -------
     :class:`ad.AnnData`
         Copy of anndata object with modified layer
+
+    Raises
+    ------
+    Warning
+        If `group_column` contains NaNs
+    Warning
+        If a feature contains only NaNs
 
     Notes
     -----
@@ -151,7 +168,14 @@ def impute_median(adata: ad.AnnData, layer: str | None = None, group_column: str
     if group_column is None:
         data = _impute_nanmedian(data)
     else:
-        groups = adata.obs.groupby(group_column).indices
+        if pd.isna(adata.obs[group_column]).any():
+            warnings.warn(
+                f"`group_column` {group_column} contains nans. The respective observations will be dropped and not get imputed.",
+                stacklevel=2,
+            )
+
+        groups = adata.obs.groupby(group_column, dropna=True).indices
+
         for group_indices in groups.values():
             data[group_indices, :] = _impute_nanmedian(data[group_indices])
 
