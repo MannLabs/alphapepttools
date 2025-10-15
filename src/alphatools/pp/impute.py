@@ -7,6 +7,7 @@ import numpy as np
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def impute() -> None:
@@ -59,7 +60,7 @@ def impute_gaussian(
     na_col_idxs = np.where(np.isnan(X).sum(axis=0) > 0)[0]
 
     if len(na_col_idxs) == 0:
-        logging.info(" impute_gaussian: No NaN values found, no imputation performed.")
+        logger.info(" impute_gaussian: No NaN values found, no imputation performed.")
         return adata
 
     # generate corresponding downshifted features
@@ -79,7 +80,7 @@ def impute_gaussian(
     if np.isnan(X).any():
         raise ValueError(" impute_gaussian: Imputation failed, data retained NaN values.")
 
-    logging.info(f" impute_gaussian: Imputation complete. Imputed {nan_count} NaN values with Gaussian distribution.")
+    logger.info(f" impute_gaussian: Imputation complete. Imputed {nan_count} NaN values with Gaussian distribution.")
     return adata
 
 
@@ -112,7 +113,8 @@ def impute_median(adata: ad.AnnData, layer: str | None = None, group_column: str
         If `None` (default), computes median across all samples.
         Defines a group column that is used to subset the samples that should be used for imputation.
         If specified, computes median separately for each group and imputes
-        missing values using the group-specific median.
+        missing values using the group-specific median. Notice that this column cannot contain NaN values,
+        as that would make it possible for missing values to persist in the imputed data.
 
     Returns
     -------
@@ -151,9 +153,18 @@ def impute_median(adata: ad.AnnData, layer: str | None = None, group_column: str
     if group_column is None:
         data = _impute_nanmedian(data)
     else:
+        if any(adata.obs[group_column].isna()):
+            raise ValueError(
+                f" impute_median: Found NaN values in adata.obs['{group_column}']. Please remove or impute these first."
+            )
+
         groups = adata.obs.groupby(group_column).indices
         for group_indices in groups.values():
             data[group_indices, :] = _impute_nanmedian(data[group_indices])
+
+    # Sanity check
+    if np.isnan(data).any():
+        raise ValueError(" impute_median: Imputation failed, data retained NaN values.")
 
     if layer is None:
         adata.X = data
