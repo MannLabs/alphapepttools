@@ -144,3 +144,14 @@ def test_impute_median__missing_layer(
 
     with pytest.raises(KeyError):
         impute_median(adata, layer="non_existent_layer")
+
+
+def test_impute_median__nan_in_group_column(
+    median_imputation_dummy_anndata,
+) -> None:
+    """Test that ValueError is raised if `group_column` contains NaN values"""
+    adata, _, _ = median_imputation_dummy_anndata
+    adata.obs.loc["A", "sample_group"] = np.nan
+
+    with pytest.raises(ValueError, match="Found NaN values in adata.obs"):
+        impute_median(adata, group_column="sample_group")
