@@ -22,5 +22,6 @@ __pycache__/
 
 # misc
 /docs/notebooks/example_outputs
+/assets/at_pitch_slide_VB.pptx
 
 .idea/

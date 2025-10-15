@@ -29,9 +29,11 @@
 .. autosummary::
     :toctree: generated
 
-    tl.pca
-    tl.ttest
-    tl.umap
+    tl.nan_safe_bh_correction
+    tl.nan_safe_ttest_ind
+    tl.diff_exp_ttest
+    tl.diff_exp_alphaquant
+
 ```
 
 ## Metrics
@@ -73,6 +75,6 @@
     :toctree: generated
 
     io.read_psm_table
-    read_pg_table
+    io.read_pg_table
     io.AnnDataFactory
 ```

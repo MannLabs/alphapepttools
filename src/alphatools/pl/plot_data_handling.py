@@ -1,3 +1,4 @@
+# TODO: move this submodule to tl module
 """
 Auxiliary functions for handling data and formatting for PCA plot input.
 
@@ -12,7 +13,7 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 
-from alphatools.pp.data import _adata_column_to_array
+from alphatools.pp.data import data_column_to_array
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -229,16 +230,16 @@ def prepare_pca_data_to_plot(
 
     # Add color column if specified
     if color_map_column is not None:
-        color_values = _adata_column_to_array(data, color_map_column)
+        color_values = data_column_to_array(data, color_map_column)
         pca_coor_df[color_map_column] = color_values
 
     # Prepare labels if requested
     labels = None
     if label:
         if dim_space == "obs":
-            labels = data.obs.index if label_column is None else _adata_column_to_array(data, label_column)
+            labels = data.obs.index if label_column is None else data_column_to_array(data, label_column)
         else:  # dim_space == "var"
-            labels = data.var.index if label_column is None else _adata_column_to_array(data, label_column)
+            labels = data.var.index if label_column is None else data_column_to_array(data, label_column)
         pca_coor_df["labels"] = labels
 
     return pca_coor_df

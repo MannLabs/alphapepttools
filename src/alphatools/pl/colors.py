@@ -21,10 +21,16 @@ import pandas as pd
 from matplotlib import colors as mpl_colors
 from matplotlib.colors import Colormap
 
+from alphatools.pl import defaults
+
+logger = logging.getLogger(__name__)
+
+config = defaults.plot_settings.to_dict()
+
 
 def show_rgba_color_list(colors: list) -> None:
     """Show a list of RGBA colors for quick inspection"""
-    fig, ax = plt.subplots(figsize=(10, 1))
+    fig, ax = plt.subplots(figsize=(np.min([len(colors), 10]), 1))
     ax.imshow([colors], aspect="auto")
     ax.axis("off")
     plt.show()
@@ -110,7 +116,10 @@ def _get_colors_from_cmap(
 
     if isinstance(values, int):
         return [tuple(color) for color in cmap(np.linspace(0, 1, values))]
-    values = np.array(values, dtype=float)
+
+    if not pd.api.types.is_numeric_dtype(values):
+        raise TypeError("values must be an integer or a numeric numpy array")
+
     vmin, vmax = np.nanmin(values), np.nanmax(values)
     values = mpl_colors.Normalize(vmin=vmin, vmax=vmax)(values)
     return cmap(values)
@@ -144,8 +153,37 @@ def _base_qualitative_colorscale() -> list:
     return picked_colors
 
 
+def _perceptually_uniform_qualitative_colorscale() -> list:
+    """Base colorscale selected from a perceptually uniform colormap
+
+    Sample along the lipari colorscale from cmcrameri to get 10 distinct colors
+
+    """
+    colors = _get_colors_from_cmap(cmc.batlow, 9)
+
+    # interlace colors 1-5, 2-6, etc. to maximize color distance
+    # Custom hue for maximum contrast between levels
+    return [
+        colors[0],
+        _lighten_color(colors[3], 0.1),
+        colors[6],
+        _lighten_color(colors[1], 0.3),
+        _lighten_color(colors[4], 0.3),
+        _lighten_color(colors[7], -0.3),
+        _lighten_color(colors[2], 0.3),
+        _lighten_color(colors[5], 0.0),
+        _lighten_color(colors[8], 0.0),
+    ]
+
+
 def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.colors.Colormap) -> dict:
-    """Map values to colors
+    """Map categorical values to colors.
+
+    Maps unique values in `values` to colors from `palette`. If `palette` is a list of colors,
+    colors are assigned in a cycling manner, which can lead to non-unique assignments if there
+    are more unique values than colors in the palette. If `palette` is a colormap, colors are
+    assigned uniquely based on the number of unique values. Missing values (as defined in
+    `config["na_identifiers"]`) are assigned the default NA color (`config["na_color"]`).
 
     Parameters
     ----------
@@ -161,25 +199,43 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
         Dictionary mapping values to colors
 
     """
-    values = pd.unique(values)
+    values = pd.unique(values.astype(str))
 
+    # Set missing values aside for later addition with default NA-color
+    na_values = np.array([v for v in values if v in config["na_identifiers"]])
+    na_dict = dict(zip(na_values, [config["na_color"]] * len(na_values), strict=True))
+
+    # Continue with non-missing values only
+    values = np.array([v for v in values if v not in config["na_identifiers"]])
+
+    # Ensure predictable color mapping
+    values = np.sort(values)
+
+    # Map color levels to a palette or a colormap
     if isinstance(palette, list):
         _palette = _cycle_palette(palette, n=len(values))
     elif isinstance(palette, mpl.colors.Colormap):
-        _palette = _get_colors_from_cmap(palette, values=values)
+        # Use the color mapping with an integer number of values, i.e. get equally spaced colors from the colormap
+        _palette = _get_colors_from_cmap(palette, values=len(values))
     else:
         raise TypeError("palette must be a list of colors or a matplotlib colormap")
 
-    return dict(zip(values, _palette, strict=True))
+    result_dict = dict(zip(values, _palette, strict=True))
+
+    # Add missing values to the mapping with the default na color
+    if na_values:
+        result_dict.update(na_dict)
+
+    return result_dict
 
 
 def _base_binary_colorscale() -> list:
     """Base colorscale for binary data"""
-    colors = _get_colors_from_cmap("BrBG", 10)
+    colors_left = _get_colors_from_cmap("cmc.batlow", 10)
+    colors_right = _get_colors_from_cmap("cmc.devon", 10)
 
-    # hand-selected colors
-    color_indices = [2, 7]
-    return [_lighten_color(colors[i], 0.1) for i in color_indices]
+    # hand-selected colors along the respective palettes to obtain good contrast and aesthetics
+    return [colors_left[7], colors_right[3]]
 
 
 class BaseColors:
@@ -236,7 +292,8 @@ class BasePalettes:
     """Base color palettes for AlphaTools plots"""
 
     default_palettes: ClassVar[dict] = {
-        "qualitative": _base_qualitative_colorscale(),
+        "qualitative_spectral": _base_qualitative_colorscale(),
+        "qualitative": _perceptually_uniform_qualitative_colorscale(),
         "binary": _base_binary_colorscale(),
     }
 
@@ -244,7 +301,7 @@ class BasePalettes:
     def get(
         cls,
         palette_name: str,
-        n: int = 10,
+        n: int = 9,
     ) -> list:
         """Get a default color palette by name"""
         palette = None
