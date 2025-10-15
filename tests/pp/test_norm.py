@@ -129,8 +129,8 @@ class TestNormalizeFunction:
         assert "norm_factors" in adata.obs.columns
 
     @pytest.mark.parametrize("copy", [False, True])
-    @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
     @pytest.mark.parametrize("layer", [None, "new_layer", "different_layer"])
+    @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
     def test_normalize_function_layer_operations(
         self,
         strategy: str,
