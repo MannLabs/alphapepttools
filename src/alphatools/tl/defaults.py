@@ -1,0 +1,20 @@
+from typing import ClassVar
+
+
+class TLDefaults:
+    """Default values and constants for the tl module."""
+
+    DIFF_EXP_COLS: ClassVar[list[str]] = [
+        "condition_pair",
+        "protein",
+        "log2fc",
+        "p_value",
+        "-log10(p_value)",
+        "fdr",
+        "-log10(fdr)",
+        "method",
+    ]
+
+
+# Create a singleton instance for easy import
+tl_defaults = TLDefaults()
