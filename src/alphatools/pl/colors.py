@@ -162,7 +162,18 @@ def _perceptually_uniform_qualitative_colorscale() -> list:
     colors = _get_colors_from_cmap(cmc.batlow, 9)
 
     # interlace colors 1-5, 2-6, etc. to maximize color distance
-    return [colors[i] for start in range(3) for i in range(start, len(colors), 3)]
+    # Custom hue for maximum contrast between levels
+    return [
+        colors[0],
+        _lighten_color(colors[3], 0.1),
+        colors[6],
+        _lighten_color(colors[1], 0.3),
+        _lighten_color(colors[4], 0.3),
+        _lighten_color(colors[7], -0.3),
+        _lighten_color(colors[2], 0.3),
+        _lighten_color(colors[5], 0.0),
+        _lighten_color(colors[8], 0.0),
+    ]
 
 
 def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.colors.Colormap) -> dict:
