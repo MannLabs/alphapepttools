@@ -1,5 +1,6 @@
 import warnings
 
+import anndata as ad
 import numpy as np
 import pandas as pd
 import pytest
@@ -742,92 +743,61 @@ def test_filter_by_metadata(adata_for_filtering, expected_adata_index, filter_di
         assert np.array_equal(adata.obs.index if axis == 0 else adata.var.index, expected_adata_index)
 
 
-# test scaling of data
-@pytest.mark.parametrize(
-    ("expected_data", "scaler", "from_layer", "to_layer"),
-    [
-        # standard scaler from X to X
-        (
-            pd.DataFrame(
+class TestScaleAndCenter:
+    @pytest.fixture
+    def anndata_scale_and_center(self, example_data) -> tuple[ad.AnnData, dict[str, pd.DataFrame]]:
+        """Generate example anndata with ground truths"""
+        adata = _to_anndata(example_data)
+        adata.layers["new_layer"] = adata.X.copy()
+
+        expected = {
+            "standard": pd.DataFrame(
                 {"G1": [-1.224745, 0.0, 1.224745], "G2": [-1.224745, 0.0, 1.224745], "G3": [-1.224745, 0.0, 1.224745]},
                 index=["cell1", "cell2", "cell3"],
             ),
-            "standard",
-            None,
-            None,
-        ),
-        # robust from X to X
-        (
-            pd.DataFrame(
+            "robust": pd.DataFrame(
                 {"G1": [-1.0, 0.0, 1.0], "G2": [-1.0, 0.0, 1.0], "G3": [-1.0, 0.0, 1.0]},
                 index=["cell1", "cell2", "cell3"],
             ),
-            "robust",
-            None,
-            None,
-        ),
-        # standard scaler from layer to X
-        (
-            pd.DataFrame(
-                {"G1": [-1.224745, 0.0, 1.224745], "G2": [-1.224745, 0.0, 1.224745], "G3": [-1.224745, 0.0, 1.224745]},
-                index=["cell1", "cell2", "cell3"],
-            ),
-            "standard",
-            "source_layer",
-            None,
-        ),
-        # standard scaler from X to layer
-        (
-            pd.DataFrame(
-                {"G1": [-1.224745, 0.0, 1.224745], "G2": [-1.224745, 0.0, 1.224745], "G3": [-1.224745, 0.0, 1.224745]},
-                index=["cell1", "cell2", "cell3"],
-            ),
-            "standard",
-            None,
-            "target_layer",
-        ),
-        # standard scaler from layer to layer
-        (
-            pd.DataFrame(
-                {"G1": [-1.224745, 0.0, 1.224745], "G2": [-1.224745, 0.0, 1.224745], "G3": [-1.224745, 0.0, 1.224745]},
-                index=["cell1", "cell2", "cell3"],
-            ),
-            "standard",
-            "source_layer",
-            "target_layer",
-        ),
-    ],
-)
-def test_scale_and_center(
-    example_data,
-    expected_data,
-    scaler,
-    from_layer,
-    to_layer,
-):
-    # get input datasets
-    df = example_data.copy()
+        }
 
-    # create AnnData object (this would already be done during data loading; here substituted with a private method)
-    if from_layer is None:
-        adata = _to_anndata(df)
-    elif from_layer is not None:
-        adata = _to_anndata(df)
-        adata.layers[from_layer] = adata.X.copy()
-        # remove X to test whether data is scaled correctly
-        adata.X = 0
+        return adata, expected
 
-    # scale data
-    at.pp.scale_and_center(adata, scaler=scaler, to_layer=to_layer, from_layer=from_layer)
+    @pytest.mark.parametrize("layer", [None, "new_layer"])
+    @pytest.mark.parametrize("scaler", ["standard", "robust"])
+    def test_scale_and_center_inplace(self, anndata_scale_and_center, scaler: str, layer: str) -> None:
+        """Test that alphatools.pp.scale_and_center modifies anndata correctly inplace"""
+        adata, expected = anndata_scale_and_center
 
-    # check whether data was correctly scaled
-    if to_layer is None:
-        assert np.all(np.isclose(adata.X, expected_data.values))
-    elif to_layer is not None:
-        assert np.all(np.isclose(adata.layers[to_layer], expected_data.values))
+        return_value = at.pp.scale_and_center(adata, scaler=scaler, layer=layer, copy=False)
 
-    # assert whether input data was changed
-    assert df.equals(example_data), "Data should not be changed by scaling"
+        assert return_value is None  # inplace expected
+
+        if layer is None:
+            assert np.all(np.isclose(adata.X, expected[scaler].values))
+        else:
+            assert np.all(np.isclose(adata.layers[layer], expected[scaler].values))
+
+    @pytest.mark.parametrize("layer", [None, "new_layer"])
+    @pytest.mark.parametrize("scaler", ["standard", "robust"])
+    def test_scale_and_center_copy(self, anndata_scale_and_center, scaler: str, layer: str) -> None:
+        """Test that alphatools.pp.scale_and_center correctly returns a copy"""
+        adata, expected = anndata_scale_and_center
+        adata_original = adata.copy()
+
+        adata_new = at.pp.scale_and_center(adata, scaler=scaler, layer=layer, copy=True)
+
+        assert isinstance(adata_new, ad.AnnData)
+
+        if layer is None:
+            assert np.all(np.isclose(adata_new.X, expected[scaler].values))
+            # Original object was not modified
+            assert np.all(np.isclose(adata.X, adata_original.X))
+
+        else:
+            assert np.all(np.isclose(adata_new.layers[layer], expected[scaler].values))
+            # Original object was not modified
+            assert np.all(np.isclose(adata.layers[layer], adata_original.layers[layer]))
 
 
 @pytest.fixture
