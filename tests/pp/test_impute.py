@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alphatools.pp.impute import _impute_nanmedian, impute_gaussian, impute_median
+from alphatools.pp.impute import _check_all_nan, _impute_nanmedian, impute_gaussian, impute_median
 
 
 @pytest.fixture
@@ -25,9 +25,32 @@ def gaussian_imputation_dummy_data():
 def median_imputation_dummy_data() -> tuple[np.ndarray, np.ndarray]:
     """Test data for median imputation"""
 
-    # 4 x 3
+    # 4 x 4
     # Complete feature, complete feature, imputed feature, all nan
     X = np.array(
+        [
+            [0.0, 0.0, 2.0, np.nan],
+            [1.0, 1.0, 3.0, 1.0],
+            [0.0, 2.0, 4.0, np.nan],
+            [np.nan, 3.0, 5.0, 3.0],
+        ]
+    )
+    X_ref = np.array(
+        [
+            [0.0, 0.0, 2.0, 2.0],
+            [1.0, 1.0, 3.0, 1.0],
+            [0.0, 2.0, 4.0, 2.0],
+            [0.0, 3.0, 5.0, 3.0],
+        ]
+    )
+
+    return X, X_ref
+
+
+@pytest.fixture
+def median_imputation_dummy_data_all_nan() -> np.ndarray:
+    """Dummy data with a feature that only contains NaNs"""
+    return np.array(
         [
             [0.0, 0.0, 2.0, np.nan, np.nan],
             [1.0, 1.0, 3.0, 1.0, np.nan],
@@ -35,16 +58,6 @@ def median_imputation_dummy_data() -> tuple[np.ndarray, np.ndarray]:
             [np.nan, 3.0, 5.0, 3.0, np.nan],
         ]
     )
-    X_ref = np.array(
-        [
-            [0.0, 0.0, 2.0, 2.0, np.nan],
-            [1.0, 1.0, 3.0, 1.0, np.nan],
-            [0.0, 2.0, 4.0, 2.0, np.nan],
-            [0.0, 3.0, 5.0, 3.0, np.nan],
-        ]
-    )
-
-    return X, X_ref
 
 
 @pytest.fixture
@@ -63,21 +76,29 @@ def median_imputation_dummy_anndata(
     X, X_ref = median_imputation_dummy_data
     X_ref_grouped = np.array(
         [
-            [0.0, 0.0, 2.0, 1.0, np.nan],
-            [1.0, 1.0, 3.0, 1.0, np.nan],
-            [0.0, 2.0, 4.0, 3.0, np.nan],
-            [0.0, 3.0, 5.0, 3.0, np.nan],
+            [0.0, 0.0, 2.0, 1.0],
+            [1.0, 1.0, 3.0, 1.0],
+            [0.0, 2.0, 4.0, 3.0],
+            [0.0, 3.0, 5.0, 3.0],
         ]
     )
-    X_ref_grouped_with_nan = np.array(
-        [
-            [0.0, 0.0, 2.0, 1.0, np.nan],
-            [1.0, 1.0, 3.0, 1.0, np.nan],
-            [0.0, 2.0, 4.0, np.nan, np.nan],
-            [np.nan, 3.0, 5.0, 3.0, np.nan],
-        ]
+
+    return ad.AnnData(X, obs=obs, layers={"layer2": X}), X_ref, X_ref_grouped
+
+
+@pytest.fixture
+def median_imputation_dummy_anndata_all_nan(median_imputation_dummy_data_all_nan: np.ndarray) -> ad.AnnData:
+    """AnnData object with a feature that contains only NaNs"""
+
+    obs = pd.DataFrame(
+        {
+            "sample_id": ["A", "B", "C", "D"],
+            "sample_group": ["A", "A", "B", "B"],
+            "sample_group_with_nan": ["A", "A", np.nan, np.nan],
+        }
     )
-    return ad.AnnData(X, obs=obs, layers={"layer2": X}), X_ref, X_ref_grouped, X_ref_grouped_with_nan
+
+    return ad.AnnData(X=median_imputation_dummy_data_all_nan, obs=obs)
 
 
 def test_impute_gaussian(gaussian_imputation_dummy_data):
@@ -113,12 +134,16 @@ def test_impute_gaussian(gaussian_imputation_dummy_data):
     assert not np.isnan(imputed.loc["s2", "B"])
 
 
+def test___check_all_nan(median_imputation_dummy_data_all_nan) -> None:
+    with pytest.raises(ValueError, match=r"Features with index \[4\]"):
+        _check_all_nan(median_imputation_dummy_data_all_nan)
+
+
 def test__impute_nanmedian(median_imputation_dummy_data) -> None:
     """Test median imputation for data with nan values"""
     X, X_ref = median_imputation_dummy_data
 
-    with pytest.warns(UserWarning, match="Will remain nan."):
-        X_imputed = _impute_nanmedian(X)
+    X_imputed = _impute_nanmedian(X)
 
     assert np.all(np.isclose(X_imputed, X_ref, equal_nan=True))
 
@@ -129,7 +154,7 @@ def test__impute_nanmedian(median_imputation_dummy_data) -> None:
 )
 def test_impute_median(median_imputation_dummy_anndata, layer: str, group_column: str) -> None:
     """Test median imputation for data with nan values"""
-    adata, X_ref, X_ref_grouped, _ = median_imputation_dummy_anndata
+    adata, X_ref, X_ref_grouped = median_imputation_dummy_anndata
 
     adata_imputed = impute_median(
         adata,
@@ -147,24 +172,29 @@ def test_impute_median(median_imputation_dummy_anndata, layer: str, group_column
         pytest.fail("Unexpected group column passed")
 
 
-def test_impute_median__warns_if_group_column_contains_nan(median_imputation_dummy_anndata) -> None:
+@pytest.mark.parametrize("group_column", [None, "sample_group"])
+def test_impute_median__feature_all_nan(median_imputation_dummy_anndata_all_nan, group_column: str) -> None:
+    """Test median imputation raises if a feature contains all nan"""
+    adata = median_imputation_dummy_anndata_all_nan
+
+    with pytest.raises(ValueError, match=r"Features with index \[4\]"):
+        _ = impute_median(adata, group_column=group_column)
+
+
+def test_impute_median__raises_if_group_column_contains_nan(median_imputation_dummy_anndata) -> None:
     """Test that median imputation raises warning if group_column contains nan"""
 
-    adata, _, _, X_ref_grouped_with_nan = median_imputation_dummy_anndata
+    adata, _, _ = median_imputation_dummy_anndata
 
-    with pytest.warns(UserWarning, match="`group_column`"):
-        adata_imputed = impute_median(adata, layer=None, group_column="sample_group_with_nan")
-
-    X_imputed = adata_imputed.X
-
-    assert np.all(np.isclose(X_imputed, X_ref_grouped_with_nan, equal_nan=True))
+    with pytest.raises(ValueError, match="`group_column`"):
+        _ = impute_median(adata, layer=None, group_column="sample_group_with_nan")
 
 
 def test_impute_median__missing_group_column(
     median_imputation_dummy_anndata,
 ) -> None:
     """Test that KeyError is raised if `group_column` does not exist in `adata.obs`"""
-    adata, _, _, _ = median_imputation_dummy_anndata
+    adata, _, _ = median_imputation_dummy_anndata
 
     with pytest.raises(KeyError):
         impute_median(adata, group_column="non_existent_column")
@@ -174,7 +204,7 @@ def test_impute_median__missing_layer(
     median_imputation_dummy_anndata,
 ) -> None:
     """Test that KeyError is raised if `layer` does not exist in `adata`"""
-    adata, _, _, _ = median_imputation_dummy_anndata
+    adata, _, _ = median_imputation_dummy_anndata
 
     with pytest.raises(KeyError):
         impute_median(adata, layer="non_existent_layer")

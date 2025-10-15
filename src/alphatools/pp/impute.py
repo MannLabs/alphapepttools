@@ -1,7 +1,6 @@
 # Imputation methods for proteomics data
 
 import logging
-import warnings
 
 import anndata as ad
 import numpy as np
@@ -85,6 +84,26 @@ def impute_gaussian(
     return adata
 
 
+def _check_all_nan(data: np.ndarray) -> None:
+    """Check if a feature contains all nan
+
+    Parameters
+    ----------
+    data
+        Samples x Features array
+
+    Raises
+    ------
+    ValueError
+        If any feature contains only NaNs
+    """
+    all_nan_features = np.isnan(data).all(axis=0)
+    if any(all_nan_features):
+        raise ValueError(
+            f"Features with index {list(np.where(all_nan_features)[0])} contain all nan values. Drop these features beforehand."
+        )
+
+
 def _impute_nanmedian(data: np.ndarray) -> np.ndarray:
     """Impute nan values in array with column-wise nanmedian
 
@@ -93,13 +112,6 @@ def _impute_nanmedian(data: np.ndarray) -> np.ndarray:
     data
         Samples x Features array
     """
-    # If a feature is all nan
-    all_nan_features = np.isnan(data).all(axis=0)
-    if any(all_nan_features):
-        warnings.warn(
-            f"Features {list(np.where(all_nan_features)[0])} contain all nan values. Will remain nan.", stacklevel=2
-        )
-
     return np.where(np.isnan(data), np.nanmedian(data, axis=0), data)
 
 
@@ -166,18 +178,20 @@ def impute_median(adata: ad.AnnData, layer: str | None = None, group_column: str
     data = adata.X if layer is None else adata.layers[layer]
 
     if group_column is None:
+        _check_all_nan(data)
         data = _impute_nanmedian(data)
     else:
         if pd.isna(adata.obs[group_column]).any():
-            warnings.warn(
+            raise ValueError(
                 f"`group_column` {group_column} contains nans. The respective observations will be dropped and not get imputed.",
-                stacklevel=2,
             )
 
         groups = adata.obs.groupby(group_column, dropna=True).indices
 
         for group_indices in groups.values():
-            data[group_indices, :] = _impute_nanmedian(data[group_indices])
+            group = data[group_indices]
+            _check_all_nan(group)
+            data[group_indices, :] = _impute_nanmedian(group)
 
     if layer is None:
         adata.X = data
