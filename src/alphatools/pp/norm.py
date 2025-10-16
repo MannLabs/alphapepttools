@@ -1,4 +1,3 @@
-import warnings
 from typing import Literal
 
 import anndata as ad
@@ -77,10 +76,11 @@ def _total_median_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarra
 
 def normalize(
     adata: ad.AnnData,
-    from_layer: str | None = None,
-    to_layer: str | None = None,
+    layer: str | None = None,
     strategy: Literal["total_mean", "total_median"] = "total_mean",
     key_added: str | None = None,
+    *,
+    copy: bool = False,
 ) -> ad.AnnData:
     """Normalize measured counts per sample
 
@@ -88,10 +88,8 @@ def normalize(
     ----------
     adata
         Count data
-    from_layer:
+    layer:
         Layer that will be normalized. If `None` uses `anndata.AnnData.X`
-    to_layer:
-        Layer to which the normalized data will be added. If `None` overwrites `anndata.AnnData.X`
     strategy
         Normalization strategy
 
@@ -99,14 +97,18 @@ def normalize(
             total sample intensity is equal to the mean of the total sample intensities across all samples
             - *total_median* The intensity of each feature is adjusted by a normalizing factor so that the
             total sample intensity is equal to the median of the total sample intensities across all samples
-
     key_added
         If not None, adds normalization factors to column in `adata.obs`
+    copy
+        Whether to return a modified copy (True) of the anndata object. If False (default)
+        modifies the object inplace
 
     Returns
     -------
-    None
-        Modifies the :class:`anndata.AnnData` object in place
+    None | anndata.AnnData
+        AnnData object with normalized measurement layer.
+        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
+        returns a modified copy.
 
     Example
     -------
@@ -133,10 +135,12 @@ def normalize(
         [0.        , 1.93333333]]
         )
 
-    Alternatively, we can generate a new layer
+    Alternatively, we can normalize a different layer
 
     .. code-block:: python
-        normalize(adata, strategy="total_mean", to_layer="normalized")
+
+        adata.layers["normalized"] = adata.X.copy()
+        normalize(adata, strategy="total_mean", layer="normalized")
         adata.X
         # Unchanged
         > array([
@@ -152,10 +156,18 @@ def normalize(
         [1.93333333, 0.        ],
         [0.        , 1.93333333]]
         )
+
+    Or we return a copy of the object
+
+    .. code-block:: python
+
+        new_adata = normalize(adata, copy=True)
     """
     _validate_strategies(strategy=strategy)
 
-    data = adata.layers[from_layer] if from_layer is not None else adata.X
+    adata = adata.copy() if copy else adata
+
+    data = adata.layers[layer] if layer is not None else adata.X
 
     if strategy == "total_mean":
         normalized_data, norm_factors = _total_mean_normalization(data)
@@ -163,12 +175,12 @@ def normalize(
         normalized_data, norm_factors = _total_median_normalization(data)
 
     # Reassign to anndata
-    if to_layer is None:
+    if layer is None:
         adata.X = normalized_data
     else:
-        if to_layer in adata.layers:
-            warnings.warn(f"Layer {to_layer} already in adata. Overwriting in memory.", stacklevel=2)
-        adata.layers[to_layer] = normalized_data
+        adata.layers[layer] = normalized_data
 
     if key_added is not None:
         adata.obs[key_added] = norm_factors
+
+    return adata if copy else None
