@@ -21,8 +21,8 @@ class TestReadPsmTable:
             file_paths="/path/to/file.txt",
             reader_type="alphadia",
             intensity_column=None,
-            protein_id_column=None,
-            raw_name_column=None,
+            feature_id_column=None,
+            sample_id_column=None,
         )
         mock_factory_instance.create_anndata.assert_called_once()
         assert result == mock_anndata
@@ -48,7 +48,7 @@ class TestReadPsmTable:
             file_paths=["/path/to/file1.txt", "/path/to/file2.txt"],
             reader_type="maxquant",
             intensity_column="custom_intensity",
-            protein_id_column="custom_feature",
-            raw_name_column="custom_sample",
+            feature_id_column="custom_feature",
+            sample_id_column="custom_sample",
             extra_param="extra_value",
         )

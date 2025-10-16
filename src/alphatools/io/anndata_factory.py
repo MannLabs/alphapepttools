@@ -7,6 +7,7 @@ import numpy as np
 import pandas as pd
 from alphabase.psm_reader import PSMReaderBase
 from alphabase.psm_reader.keys import PsmDfCols
+from alphabase.psm_reader.psm_reader import psm_reader_provider
 
 from alphatools.pp.data import add_metadata
 
@@ -33,13 +34,19 @@ class AnnDataFactory:
 
         self._psm_df = psm_df
 
-    def create_anndata(self, secondary_id_columns: str | list[str] | None = None) -> ad.AnnData:
+    def create_anndata(
+        self,
+        var_columns: str | list[str] | None = None,
+        obs_columns: str | list[str] | None = None,
+    ) -> ad.AnnData:
         """Create AnnData object from PSM DataFrame.
 
         Parameters
         ----------
-        secondary_id_columns : Union[str, List[str]], optional
+        var_columns : Union[str, List[str]], optional
             Additional columns to include in `var` of the AnnData object, by default None
+        obs_columns : Union[str, List[str]], optional
+            Additional columns to include in `obs` of the AnnData object, by default None
 
         Returns
         -------
@@ -50,19 +57,6 @@ class AnnDataFactory:
             - X contains intensity values
 
         """
-        # Extract additional feature metadata if needed
-        if secondary_id_columns:
-            if isinstance(secondary_id_columns, str):
-                secondary_id_columns = [secondary_id_columns]
-        else:
-            secondary_id_columns = []
-
-        # Ensure PsmDfCols.PROTEINS is included in feature metadata
-        if PsmDfCols.PROTEINS not in secondary_id_columns:
-            secondary_id_columns.append(PsmDfCols.PROTEINS)
-
-        feature_metadata = self._psm_df[secondary_id_columns].drop_duplicates().set_index(PsmDfCols.PROTEINS, drop=True)
-
         # Create pivot table: raw names x proteins with intensity values
         pivot_df = pd.pivot_table(
             self._psm_df,
@@ -74,17 +68,56 @@ class AnnDataFactory:
             dropna=False,
         )
 
+        # Create Nxp AnnData object where N=raw names and p=features (e.g. proteins)
         adata = ad.AnnData(
             X=pivot_df.values,
             obs=pd.DataFrame(index=pivot_df.index),
             var=pd.DataFrame(index=pivot_df.columns),
         )
 
-        # Add feature metadata to var of the resulting AnnData
+        # Extract additional metadata if needed
+        adata = self._add_metadata_from_columns(adata, var_columns, PsmDfCols.PROTEINS, axis=1)
+        return self._add_metadata_from_columns(adata, obs_columns, PsmDfCols.RAW_NAME, axis=0)
+
+    def _add_metadata_from_columns(
+        self,
+        adata: ad.AnnData,
+        columns: str | list[str] | None,
+        index_column: str,
+        axis: int,
+    ) -> ad.AnnData:
+        """Add metadata to AnnData object from specified columns.
+
+        Parameters
+        ----------
+        adata : ad.AnnData
+            AnnData object to add metadata to
+        columns : str | list[str] | None
+            Columns to extract as metadata
+        index_column : str
+            Column to use as index
+        axis : int
+            0 for obs (samples), 1 for var (features)
+
+        Returns
+        -------
+        ad.AnnData
+            AnnData object with added metadata
+        """
+        if columns is None:
+            return adata
+
+        columns = [columns] if isinstance(columns, str) else columns
+
+        if index_column not in columns:
+            columns.append(index_column)
+
+        metadata = self._psm_df[columns].drop_duplicates().set_index(index_column, drop=True)
+
         return add_metadata(
             adata=adata,
-            incoming_metadata=feature_metadata,
-            axis=1,
+            incoming_metadata=metadata,
+            axis=axis,
             keep_data_shape=True,
             verbose=False,
         )
@@ -123,8 +156,6 @@ class AnnDataFactory:
             Initialized AnnDataFactory instance
 
         """
-        from alphabase.psm_reader.psm_reader import psm_reader_provider
-
         reader_config = cls._get_reader_configuration(reader_type)
 
         reader: PSMReaderBase = psm_reader_provider.get_reader(reader_type, **reader_config, **kwargs)

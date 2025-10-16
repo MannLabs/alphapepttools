@@ -94,6 +94,10 @@ def add_metadata(  # noqa: C901, PLR0912
     if axis not in [0, 1]:
         raise ValueError("Axis must be 0 or 1.")
 
+    if adata.shape == (0, 0):
+        logging.info("adata is empty")
+        return adata
+
     if not isinstance(incoming_metadata, pd.DataFrame) or incoming_metadata.index.nlevels > 1:
         raise TypeError("metadata must be a pd.DataFrame with single-level index.")
 
