@@ -8,6 +8,8 @@ import pandas as pd
 from alphabase.psm_reader import PSMReaderBase
 from alphabase.psm_reader.keys import PsmDfCols
 
+from alphatools.pp.data import add_metadata
+
 
 class AnnDataFactory:
     """Factory class to convert AlphaBase PSM DataFrames to AnnData format."""
@@ -31,8 +33,13 @@ class AnnDataFactory:
 
         self._psm_df = psm_df
 
-    def create_anndata(self) -> ad.AnnData:
+    def create_anndata(self, secondary_id_columns: str | list[str] | None = None) -> ad.AnnData:
         """Create AnnData object from PSM DataFrame.
+
+        Parameters
+        ----------
+        secondary_id_columns : Union[str, List[str]], optional
+            Additional columns to include in `var` of the AnnData object, by default None
 
         Returns
         -------
@@ -43,6 +50,19 @@ class AnnDataFactory:
             - X contains intensity values
 
         """
+        # Extract additional feature metadata if needed
+        if secondary_id_columns:
+            if isinstance(secondary_id_columns, str):
+                secondary_id_columns = [secondary_id_columns]
+        else:
+            secondary_id_columns = []
+
+        # Ensure PsmDfCols.PROTEINS is included in feature metadata
+        if PsmDfCols.PROTEINS not in secondary_id_columns:
+            secondary_id_columns.append(PsmDfCols.PROTEINS)
+
+        feature_metadata = self._psm_df[secondary_id_columns].drop_duplicates().set_index(PsmDfCols.PROTEINS, drop=True)
+
         # Create pivot table: raw names x proteins with intensity values
         pivot_df = pd.pivot_table(
             self._psm_df,
@@ -54,10 +74,19 @@ class AnnDataFactory:
             dropna=False,
         )
 
-        return ad.AnnData(
+        adata = ad.AnnData(
             X=pivot_df.values,
             obs=pd.DataFrame(index=pivot_df.index),
             var=pd.DataFrame(index=pivot_df.columns),
+        )
+
+        # Add feature metadata to var of the resulting AnnData
+        return add_metadata(
+            adata=adata,
+            incoming_metadata=feature_metadata,
+            axis=1,
+            keep_data_shape=True,
+            verbose=False,
         )
 
     @classmethod
@@ -67,8 +96,8 @@ class AnnDataFactory:
         reader_type: str = "maxquant",
         *,
         intensity_column: str | None = None,
-        protein_id_column: str | None = None,
-        raw_name_column: str | None = None,
+        feature_id_column: str | None = None,
+        sample_id_column: str | None = None,
         **kwargs,
     ) -> "AnnDataFactory":
         """Create AnnDataFactory from PSM files.
@@ -104,8 +133,8 @@ class AnnDataFactory:
             k: v
             for k, v in {
                 PsmDfCols.INTENSITY: intensity_column if intensity_column else None,
-                PsmDfCols.PROTEINS: protein_id_column if protein_id_column else None,
-                PsmDfCols.RAW_NAME: raw_name_column if raw_name_column else None,
+                PsmDfCols.PROTEINS: feature_id_column if feature_id_column else None,
+                PsmDfCols.RAW_NAME: sample_id_column if sample_id_column else None,
             }.items()
             if v is not None
         }
