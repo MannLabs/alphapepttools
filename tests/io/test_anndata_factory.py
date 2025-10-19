@@ -44,15 +44,6 @@ def test_anndata():
     return make_dummy_data()
 
 
-def test_initialization_with_missing_columns(test_psm_df):
-    """Test that an error is raised when the input DataFrame is missing required columns."""
-    psm_df = test_psm_df.drop(columns=[PsmDfCols.INTENSITY])
-
-    with pytest.raises(ValueError, match=r"Missing required columns: \['intensity'\]"):
-        # when
-        AnnDataFactory(psm_df)
-
-
 @pytest.mark.parametrize(
     ("var_columns", "obs_columns", "extra_obs_cols", "extra_var_cols"),
     [

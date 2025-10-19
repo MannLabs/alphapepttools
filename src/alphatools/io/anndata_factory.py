@@ -1,5 +1,6 @@
 """Factory class to convert PSM DataFrames to AnnData format."""
 
+from types import MethodType
 from typing import Any
 
 import anndata as ad
@@ -27,11 +28,6 @@ class AnnDataFactory:
             - PsmDfCols.INTENSITY
 
         """
-        required_cols = [PsmDfCols.RAW_NAME, PsmDfCols.PROTEINS, PsmDfCols.INTENSITY]
-        missing_cols = [col for col in required_cols if col not in psm_df.columns]
-        if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
-
         self._psm_df = psm_df
 
     def create_anndata(
@@ -121,6 +117,68 @@ class AnnDataFactory:
             keep_data_shape=True,
             verbose=False,
         )
+
+    @classmethod
+    def from_df(
+        cls,
+        psm_df: pd.DataFrame,
+        reader_type: str = "maxquant",
+        *,
+        intensity_column: str | None = None,
+        feature_id_column: str | None = None,
+        sample_id_column: str | None = None,
+        **kwargs,
+    ) -> "AnnDataFactory":
+        """Create AnnDataFactory from a PSM DataFrame.
+
+        Parameters
+        ----------
+        psm_df : pd.DataFrame
+            PSM DataFrame with custom or standardized column names
+        reader_type : str
+            Kind of PSM reader, e.g. "alphadia", "diann", "spectronaut", "maxquant", etc.
+        intensity_column : str, optional
+            Name of the column storing intensity data. If not specified, assumes PsmDfCols.INTENSITY
+        feature_id_column : str, optional
+            Name of the column storing feature IDs. If not specified, assumes PsmDfCols.PROTEINS
+        sample_id_column : str, optional
+            Name of the column storing sample IDs. If not specified, assumes PsmDfCols.RAW_NAME
+
+        Returns
+        -------
+        AnnDataFactory
+            Initialized AnnDataFactory instance
+
+        """
+        # Create a copy to avoid modifying the original DataFrame
+        psm_df = psm_df.copy()
+
+        reader_config = cls._get_reader_configuration(reader_type)
+
+        # column_mapping here??
+        reader: PSMReaderBase = psm_reader_provider.get_reader(reader_type, **reader_config, **kwargs)
+
+        custom_column_mapping = {
+            k: v
+            for k, v in {
+                PsmDfCols.INTENSITY: intensity_column if intensity_column else None,
+                PsmDfCols.PROTEINS: feature_id_column if feature_id_column else None,
+                PsmDfCols.RAW_NAME: sample_id_column if sample_id_column else None,
+            }.items()
+            if v is not None
+        }
+
+        if custom_column_mapping:
+            reader.add_column_mapping(custom_column_mapping)
+
+        # Helper function to apply alphabase standardization to dataframe
+        def _load_file_from_df(self, filename) -> pd.DataFrame:  # noqa: ANN001
+            return psm_df
+
+        reader._load_file = MethodType(_load_file_from_df, reader)  # noqa: SLF001
+        psm_df = reader.import_file("dummy_path")
+
+        return cls(psm_df)
 
     @classmethod
     def from_files(
