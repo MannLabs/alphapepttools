@@ -103,12 +103,16 @@ class AnnDataFactory:
         if columns is None:
             return adata
 
-        columns = [columns] if isinstance(columns, str) else columns
+        # Normalize to list and create a copy to avoid mutating caller's input
+        columns = [columns] if isinstance(columns, str) else list(columns)
 
         if index_column not in columns:
             columns.append(index_column)
 
-        metadata = self._psm_df[columns].drop_duplicates().set_index(index_column, drop=True)
+        # Set index first, then drop duplicates based on index only
+        metadata = self._psm_df[columns].set_index(index_column, drop=True)
+        metadata.index.name = None
+        metadata = metadata[~metadata.index.duplicated(keep="first")]
 
         return add_metadata(
             adata=adata,

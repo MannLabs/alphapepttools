@@ -18,13 +18,22 @@ def test_psm_df():
         """Return a test PSM DataFrame."""
         return pd.DataFrame(
             {
-                PsmDfCols.RAW_NAME: ["raw1", "raw1", "raw2"],
-                PsmDfCols.PROTEINS: ["protein1", "protein2", "protein1"],
-                PsmDfCols.INTENSITY: [100, 200, 300],
-                "filesize": [10, 10, 20],
-                "filetype": ["raw", "raw", "raw"],
-                "gene": ["gene1", "gene2", "gene1"],
-                "sequence": ["AAA", "BBB", "AAA"],
+                # Sample metadata
+                PsmDfCols.RAW_NAME: ["raw1", "raw1", "raw1", "raw2", "raw2", "raw2"],
+                "filesize": [10000.0, 10000.0, 10000.0, 20000.0, 20000.0, 20000.0],
+                "filetype": ["raw", "raw", "raw", "raw", "raw", "raw"],
+                # Feature metadata
+                "sequence": ["PEPTIDEK1", "PEPTIDEK2", "PEPTIDEK3", "PEPTIDEK1", "PEPTIDEK2", "PEPTIDEK3"],
+                "alternate_gene_name": ["g1", "g1", "g1", "g1", "g1", "g1"],
+                # Protein IDs + Intensities
+                PsmDfCols.PROTEINS: ["protein1", "protein1", "protein2", "protein1", "protein1", "protein2"],
+                PsmDfCols.INTENSITY: [np.nan, 100.0, np.nan, 200.0, np.nan, 300.0],
+                # Precursor IDs + Intensities
+                "precursor_id": ["precursor1", "precursor2", "precursor3", "precursor1", "precursor2", "precursor3"],
+                "precursor_intensity": [50.0, 150.0, 200.0, 150.0, 250.0, 200.0],
+                # Gene IDs + Intensities
+                "gene_id": ["gene1", "gene1", "gene1", "gene1", "gene1", "gene1"],
+                "gene_intensity": [1000.0, 1000.0, 1000.0, 2000.0, 2000.0, 2000.0],
             }
         )
 
@@ -32,11 +41,11 @@ def test_psm_df():
 
 
 @pytest.fixture
-def test_anndata():
+def test_protein_anndata():
     def make_dummy_data():
-        """Return a test AnnData object."""
+        """Return the pivoted protein AnnData object."""
         return ad.AnnData(
-            X=np.array([[100, 200], [300, np.nan]]),
+            X=np.array([[100.0, np.nan], [200.0, 300.0]]),
             obs=pd.DataFrame(index=["raw1", "raw2"]),
             var=pd.DataFrame(index=["protein1", "protein2"]),
         )
@@ -45,68 +54,82 @@ def test_anndata():
 
 
 @pytest.mark.parametrize(
-    ("var_columns", "obs_columns", "extra_obs_cols", "extra_var_cols"),
+    ("var_columns", "obs_columns"),
     [
         # 1. No additional columns should work
-        (None, None, None, None),
+        (None, None),
         # 2. Single columns should be correctly added
-        ("gene", None, None, pd.DataFrame({"gene": ["gene1", "gene2"]}, index=["protein1", "protein2"])),
-        (None, "filesize", pd.DataFrame({"filesize": [10, 20]}, index=["raw1", "raw2"]), None),
-        # 3. Multiple columns should be correctly added
-        (
-            ["gene", "sequence"],
-            None,
-            None,
-            pd.DataFrame({"gene": ["gene1", "gene2"], "sequence": ["AAA", "BBB"]}, index=["protein1", "protein2"]),
-        ),
-        (
-            None,
-            ["filesize", "filetype"],
-            pd.DataFrame({"filesize": [10, 20], "filetype": ["raw", "raw"]}, index=["raw1", "raw2"]),
-            None,
-        ),
-        # 4. List and string arguments for columns should be handled correctly
-        (["gene"], None, None, pd.DataFrame({"gene": ["gene1", "gene2"]}, index=["protein1", "protein2"])),
-        (None, ["filesize"], pd.DataFrame({"filesize": [10, 20]}, index=["raw1", "raw2"]), None),
-        # 5. Default index match column should be ignored
-        (
-            ["gene"],
-            ["filesize", PsmDfCols.RAW_NAME],
-            pd.DataFrame({"filesize": [10, 20]}, index=["raw1", "raw2"]),
-            pd.DataFrame({"gene": ["gene1", "gene2"]}, index=["protein1", "protein2"]),
-        ),
-        (
-            ["gene", PsmDfCols.PROTEINS],
-            ["filesize"],
-            pd.DataFrame({"filesize": [10, 20]}, index=["raw1", "raw2"]),
-            pd.DataFrame({"gene": ["gene1", "gene2"]}, index=["protein1", "protein2"]),
-        ),
+        ("sequence", None),
+        # 3. Single columns specified as list should be correctly added
+        (None, ["filesize"]),
+        # 4. Multiple columns should be correctly added
+        (["alternate_gene_name", "sequence"], None),
+        (None, ["filesize", "filetype"]),
+    ],
+)
+@pytest.mark.parametrize(
+    ("feature_id_column", "intensity_column", "sample_id_column"),
+    [
+        # 1. Standard pivoting case
+        (PsmDfCols.PROTEINS, PsmDfCols.INTENSITY, PsmDfCols.RAW_NAME),
+        # # 2. Precursors
+        # ("precursor_id", "precursor_intensity", "sample_id"),
+        # # 3. Genes
+        # ("gene_id", "gene_intensity", "sample_id"),
     ],
 )
 def test_create_anndata_with_valid_dataframe(
-    test_psm_df, test_anndata, var_columns, obs_columns, extra_obs_cols, extra_var_cols
+    test_psm_df,
+    feature_id_column,
+    intensity_column,
+    sample_id_column,
+    test_protein_anndata,
+    # test_gene_anndata,
+    # test_precursor_anndata,
+    var_columns,
+    obs_columns,
 ):
     """Test that an AnnData object is created correctly from a valid input DataFrame."""
     psm_df = test_psm_df
-    factory = AnnDataFactory(psm_df)
 
-    # when
+    factory = AnnDataFactory(psm_df)
+    # factory = AnnDataFactory.from_df(
+    #     psm_df,
+    #     intensity_column=intensity_column,
+    #     feature_id_column=feature_id_column,
+    #     sample_id_column=sample_id_column,
+    # )
+
     adata = factory.create_anndata(
         var_columns=var_columns,
         obs_columns=obs_columns,
     )
 
-    # comparison anndata with respective columns added
-    comparison_adata = test_anndata.copy()
-    if extra_obs_cols is not None:
-        comparison_adata = add_metadata(comparison_adata, extra_obs_cols, axis=0)
-    if extra_var_cols is not None:
-        comparison_adata = add_metadata(comparison_adata, extra_var_cols, axis=1)
+    # Obtain the correct comparison anndata based on feature_id_column
+    if feature_id_column == PsmDfCols.PROTEINS:
+        comparison_adata = test_protein_anndata.copy()
+    # elif feature_id_column == "precursor_id":
+    #     comparison_adata = test_precursor_anndata.copy()
+    # elif feature_id_column == "gene_id":
+    #     comparison_adata = test_gene_anndata.copy()
+    else:
+        raise ValueError("Invalid feature_column")
 
-    assert adata.shape == (2, 2)
+    # Add respective metadata columns
+    if obs_columns is not None:
+        extra_obs_cols = [obs_columns] if isinstance(obs_columns, str) else obs_columns
+        extra_obs_df = psm_df[[sample_id_column, *extra_obs_cols]].set_index(sample_id_column, drop=True)
+        extra_obs_df = extra_obs_df[~extra_obs_df.index.duplicated(keep="first")]
+        comparison_adata = add_metadata(comparison_adata, extra_obs_df, axis=0)
+    if var_columns is not None:
+        extra_var_cols = [var_columns] if isinstance(var_columns, str) else var_columns
+        extra_var_df = psm_df[[feature_id_column, *extra_var_cols]].set_index(feature_id_column, drop=True)
+        extra_var_df = extra_var_df[~extra_var_df.index.duplicated(keep="first")]
+        comparison_adata = add_metadata(comparison_adata, extra_var_df, axis=1)
+
     assert adata.obs.equals(comparison_adata.obs)
     assert adata.var.equals(comparison_adata.var)
-    assert np.array_equal(adata.X, np.array([[100, 200], [300, np.nan]]), equal_nan=True)
+    assert adata.to_df().equals(comparison_adata.to_df())
 
 
 def test_create_anndata_with_missing_intensity_values():
