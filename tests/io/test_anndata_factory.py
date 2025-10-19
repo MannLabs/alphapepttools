@@ -188,7 +188,7 @@ def test_create_anndata_with_empty_dataframe():
 
 @patch("alphabase.psm_reader.psm_reader.psm_reader_provider.get_reader")
 @patch("alphatools.io.anndata_factory.AnnDataFactory._get_reader_configuration")
-def test_from_files(mock_get_reader_configuration, mock_reader, test_psm_df):
+def test_from_files(mock_get_reader_configuration, mock_reader, test_psm_df, test_protein_anndata):
     mock_reader.return_value.load.return_value = test_psm_df
 
     mock_get_reader_configuration.return_value = {"extra_key": "extra_value"}
@@ -197,39 +197,27 @@ def test_from_files(mock_get_reader_configuration, mock_reader, test_psm_df):
     # when
     adata = factory.create_anndata()
 
-    assert adata.shape == (2, 2)
-    assert adata.obs_names.tolist() == ["raw1", "raw2"]
-    assert adata.var_names.tolist() == ["protein1", "protein2"]
-    assert np.array_equal(adata.X, np.array([[100, 200], [300, np.nan]]), equal_nan=True)
+    comparison_adata = test_protein_anndata
+    assert adata.obs.equals(comparison_adata.obs)
+    assert adata.var.equals(comparison_adata.var)
+    assert adata.to_df().equals(comparison_adata.to_df())
 
     mock_reader.assert_called_once_with("some_reader_type", extra_key="extra_value")
 
 
 @patch("alphabase.psm_reader.psm_reader.psm_reader_provider.get_reader")
-def test_from_files_nan(mock_reader, test_psm_df):
-    df = pd.concat(
-        [
-            pd.DataFrame(
-                {
-                    PsmDfCols.RAW_NAME: ["raw2"],
-                    PsmDfCols.PROTEINS: ["protein2"],
-                    PsmDfCols.INTENSITY: [np.nan],
-                }
-            ),
-            test_psm_df,
-        ]
-    )
-    mock_reader.return_value.load.return_value = df
+def test_from_files_nan(mock_reader, test_psm_df, test_protein_anndata):
+    mock_reader.return_value.load.return_value = test_psm_df
 
     factory = AnnDataFactory.from_files(["file1", "file2"], reader_type="some_reader_type")
 
     # when
     adata = factory.create_anndata()
 
-    assert adata.shape == (2, 2)
-    assert adata.obs_names.tolist() == ["raw1", "raw2"]
-    assert adata.var_names.tolist() == ["protein1", "protein2"]
-    assert np.array_equal(adata.X, np.array([[100, 200], [300, np.nan]]), equal_nan=True)
+    comparison_adata = test_protein_anndata
+    assert adata.obs.equals(comparison_adata.obs)
+    assert adata.var.equals(comparison_adata.var)
+    assert adata.to_df().equals(comparison_adata.to_df())
 
     mock_reader.assert_called_once_with("some_reader_type")
 
