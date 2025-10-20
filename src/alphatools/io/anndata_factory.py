@@ -3,7 +3,6 @@
 from typing import Any
 
 import anndata as ad
-import numpy as np
 import pandas as pd
 from alphabase.psm_reader import PSMReaderBase
 from alphabase.psm_reader.keys import PsmDfCols
@@ -78,7 +77,6 @@ class AnnDataFactory:
             columns=self.feature_id,
             values=self.intensity,
             aggfunc="first",  # DataFrameGroupBy.first -> will skip NA
-            fill_value=np.nan,
             dropna=False,
         )
 
@@ -145,11 +143,12 @@ class AnnDataFactory:
         cls,
         file_paths: str | list[str],
         reader_type: str = "maxquant",
-        *,
         level: str = "proteins",
+        *,
         intensity_column: str | None = None,
         feature_id_column: str | None = None,
         sample_id_column: str | None = None,
+        additional_columns: list[str] | None = None,
         **kwargs,
     ) -> "AnnDataFactory":
         """Create AnnDataFactory from PSM files.
@@ -164,10 +163,13 @@ class AnnDataFactory:
             Level of quantification to read. One of "proteins", "precursors", or "genes". Defaults to "proteins".
         intensity_column: str, optional
             Name of the column storing intensity data. Default is taken from `psm_reader.yaml`
-        protein_id_column: str, optional
-            Name of the column storing proteins ids. Default is taken from `psm_reader.yaml`
-        raw_name_column: str, optional
-            Name of the column storing raw (or run) name. Default is taken from `psm_reader.yaml`
+        feature_id_column: str, optional
+            Name of the column storing feature ids. Default is taken from `psm_reader.yaml`
+        sample_id_column: str, optional
+            Name of the column storing sample ids. Default is taken from `psm_reader.yaml`
+        additional_columns: list[str], optional
+            Additional column names to be directly retained from the psm-table in order to enable experiment-specific
+            metadata retention.
         **kwargs
             Additional arguments passed to PSM reader
 
@@ -183,6 +185,10 @@ class AnnDataFactory:
 
         # Identify the columns we need for this reader, but which are not yet covered by alphabase PsmDfCols
         extra_columns = cls._identify_non_alphabase_columns(reader_type)
+
+        # Add user-specified additional columns
+        if additional_columns:
+            extra_columns.extend(additional_columns)
 
         # Add identity mappings for extra columns so they're retained during reading
         if extra_columns:
