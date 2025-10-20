@@ -191,7 +191,16 @@ class AnnDataFactory:
             reader.add_column_mapping(custom_column_mapping)
 
         psm_df = reader.load(file_paths)
-        return cls(psm_df)
+
+        kwargs_for_init = {}
+        if intensity_column:
+            kwargs_for_init["intensity"] = intensity_column
+        if feature_id_column:
+            kwargs_for_init["feature_id"] = feature_id_column
+        if sample_id_column:
+            kwargs_for_init["sample_id"] = sample_id_column
+
+        return cls(psm_df, **kwargs_for_init)
 
     @classmethod
     def _get_reader_configuration(cls, reader_type: str) -> dict[str, dict[str, Any]]:
