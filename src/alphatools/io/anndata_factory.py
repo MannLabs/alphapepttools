@@ -146,6 +146,7 @@ class AnnDataFactory:
         file_paths: str | list[str],
         reader_type: str = "maxquant",
         *,
+        level: str = "proteins",
         intensity_column: str | None = None,
         feature_id_column: str | None = None,
         sample_id_column: str | None = None,
@@ -159,6 +160,8 @@ class AnnDataFactory:
             Path(s) to PSM file(s)
         reader_type : str, optional
             Type of PSM reader to use, by default "maxquant"
+        level : str, optional
+            Level of quantification to read. One of "proteins", "precursors", or "genes". Defaults to "proteins".
         intensity_column: str, optional
             Name of the column storing intensity data. Default is taken from `psm_reader.yaml`
         protein_id_column: str, optional
@@ -188,13 +191,22 @@ class AnnDataFactory:
 
         psm_df = reader.load(file_paths)
 
-        kwargs_for_init = {}
-        if intensity_column:
-            kwargs_for_init["intensity"] = intensity_column
-        if feature_id_column:
-            kwargs_for_init["feature_id"] = feature_id_column
-        if sample_id_column:
-            kwargs_for_init["sample_id"] = sample_id_column
+        # Get defaults for this reader/level, user input overrides
+        defaults = READER_COLUMNS.get(reader_type, {}).get(level, {})
+        intensity_column = intensity_column or defaults.get("intensity_column")
+        feature_id_column = feature_id_column or defaults.get("feature_id_column")
+        sample_id_column = sample_id_column or defaults.get("sample_id_column")
+
+        # Build kwargs, filtering out None values
+        kwargs_for_init = {
+            k: v
+            for k, v in {
+                "intensity": intensity_column,
+                "feature_id": feature_id_column,
+                "sample_id": sample_id_column,
+            }.items()
+            if v is not None
+        }
 
         return cls(psm_df, **kwargs_for_init)
 

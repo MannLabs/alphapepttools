@@ -55,6 +55,32 @@ def test_protein_anndata():
     return make_dummy_data()
 
 
+@pytest.fixture
+def test_precursor_anndata():
+    def make_dummy_data():
+        """Return a test AnnData object"""
+        return ad.AnnData(
+            X=np.array([[50.0, 150.0, 200.0], [150.0, 250.0, 200.0]]),
+            obs=pd.DataFrame(index=["raw1", "raw2"]),
+            var=pd.DataFrame(index=["precursor1", "precursor2", "precursor3"]),
+        )
+
+    return make_dummy_data()
+
+
+@pytest.fixture
+def test_gene_anndata():
+    def make_dummy_data():
+        """Return the pivoted gene AnnData object."""
+        return ad.AnnData(
+            X=np.array([[1000.0], [2000.0]]),
+            obs=pd.DataFrame(index=["raw1", "raw2"]),
+            var=pd.DataFrame(index=["gene1"]),
+        )
+
+    return make_dummy_data()
+
+
 @pytest.mark.parametrize(
     ("var_columns", "obs_columns"),
     [
@@ -74,10 +100,10 @@ def test_protein_anndata():
     [
         # 1. Standard pivoting case: proteins
         ("protein_id", "protein_intensity", "file_id"),
-        # # 2. Precursors
-        # ("precursor_id", "precursor_intensity", "sample_id"),
-        # # 3. Genes
-        # ("gene_id", "gene_intensity", "sample_id"),
+        # 2. Precursors
+        ("precursor_id", "precursor_intensity", "file_id"),
+        # 3. Genes
+        ("gene_id", "gene_intensity", "file_id"),
     ],
 )
 def test_create_anndata_with_valid_dataframe(
@@ -86,8 +112,8 @@ def test_create_anndata_with_valid_dataframe(
     intensity_column,
     sample_id_column,
     test_protein_anndata,
-    # test_gene_anndata,
-    # test_precursor_anndata,
+    test_gene_anndata,
+    test_precursor_anndata,
     var_columns,
     obs_columns,
 ):
@@ -109,10 +135,10 @@ def test_create_anndata_with_valid_dataframe(
     # Obtain the correct comparison anndata based on feature_id_column
     if feature_id_column == "protein_id":
         comparison_adata = test_protein_anndata.copy()
-    # elif feature_id_column == "precursor_id":
-    #     comparison_adata = test_precursor_anndata.copy()
-    # elif feature_id_column == "gene_id":
-    #     comparison_adata = test_gene_anndata.copy()
+    elif feature_id_column == "precursor_id":
+        comparison_adata = test_precursor_anndata.copy()
+    elif feature_id_column == "gene_id":
+        comparison_adata = test_gene_anndata.copy()
     else:
         raise ValueError("Invalid feature_column")
 

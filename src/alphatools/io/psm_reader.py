@@ -6,6 +6,7 @@ from .anndata_factory import AnnDataFactory
 def read_psm_table(
     file_paths: str | list[str],
     search_engine: str,
+    level: str = "proteins",
     *,
     intensity_column: str | None = None,
     feature_id_column: str | None = None,
@@ -34,6 +35,8 @@ def read_psm_table(
         Path to peptide spectrum match reports. If a list of reports is passed, all must be from the same search engine.
     search_engine
         Name of search engine that generated the output, pass the method name of the corresponding reader.
+    level
+        Level of quantification to read. One of "proteins", "precursors", or "genes". Defaults to "proteins".
     intensity_column
         Column that holds the quantified intensities in the PSM table. Defaults to the pre-configured protein intensities value
         in `alphabase`.
@@ -83,6 +86,7 @@ def read_psm_table(
     return AnnDataFactory.from_files(
         file_paths=file_paths,
         reader_type=search_engine,
+        level=level,
         intensity_column=intensity_column,
         feature_id_column=feature_id_column,
         sample_id_column=sample_id_column,
