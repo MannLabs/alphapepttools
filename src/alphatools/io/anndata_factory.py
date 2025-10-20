@@ -186,21 +186,6 @@ class AnnDataFactory:
             extra_column_mapping = {col: col for col in extra_columns}
             reader.add_column_mapping(extra_column_mapping)
 
-        ### TO DO: delete this v
-        custom_column_mapping = {
-            k: v
-            for k, v in {
-                PsmDfCols.INTENSITY: intensity_column if intensity_column else None,
-                PsmDfCols.PROTEINS: feature_id_column if feature_id_column else None,
-                PsmDfCols.RAW_NAME: sample_id_column if sample_id_column else None,
-            }.items()
-            if v is not None
-        }
-
-        if custom_column_mapping:
-            reader.add_column_mapping(custom_column_mapping)
-        ### TO DO: delete this ^
-
         psm_df = reader.load(file_paths)
 
         kwargs_for_init = {}
