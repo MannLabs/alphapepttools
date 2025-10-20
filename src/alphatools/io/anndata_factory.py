@@ -1,6 +1,5 @@
 """Factory class to convert PSM DataFrames to AnnData format."""
 
-from types import MethodType
 from typing import Any
 
 import anndata as ad
@@ -16,19 +15,37 @@ from alphatools.pp.data import add_metadata
 class AnnDataFactory:
     """Factory class to convert AlphaBase PSM DataFrames to AnnData format."""
 
-    def __init__(self, psm_df: pd.DataFrame):
+    def __init__(
+        self,
+        psm_df: pd.DataFrame,
+        intensity: str = PsmDfCols.INTENSITY,
+        sample_id: str = PsmDfCols.RAW_NAME,
+        feature_id: str = PsmDfCols.PROTEINS,
+    ):
         """Initialize AnnDataFactory.
+
+        The anndata factory retains its choice for intensity,
+        sample_id and feature_id columns. This is a way to process
+        any dataframe with the AnnDataFactory class, however the default
+        use-case is to call it in the context of the psm_reader function,
+        operating on alphabase-standardized column names (handled by from_files).
 
         Parameters
         ----------
-        psm_df : pd.DataFrame
-            AlphaBase PSM DataFrame containing at minimum the columns:
-            - PsmDfCols.RAW_NAME
-            - PsmDfCols.PROTEINS
-            - PsmDfCols.INTENSITY
+        psm_df: pd.DataFrame
+            Dataframe containing precursor intensity, sample_id and feature_id columns in a longtable
+        intensity: str
+            Column containing the precursor intensities
+        sample_id: str
+            Column containing the sample identifiers
+        feature_id: str
+            Column dictating which feature ends up as the AnnData's var_names after the pivoting operation
 
         """
         self._psm_df = psm_df
+        self.intensity = intensity
+        self.sample_id = sample_id
+        self.feature_id = feature_id
 
     def create_anndata(
         self,
@@ -56,9 +73,9 @@ class AnnDataFactory:
         # Create pivot table: raw names x proteins with intensity values
         pivot_df = pd.pivot_table(
             self._psm_df,
-            index=PsmDfCols.RAW_NAME,
-            columns=PsmDfCols.PROTEINS,
-            values=PsmDfCols.INTENSITY,
+            index=self.sample_id,
+            columns=self.feature_id,
+            values=self.intensity,
             aggfunc="first",  # DataFrameGroupBy.first -> will skip NA
             fill_value=np.nan,
             dropna=False,
@@ -72,8 +89,8 @@ class AnnDataFactory:
         )
 
         # Extract additional metadata if needed
-        adata = self._add_metadata_from_columns(adata, var_columns, PsmDfCols.PROTEINS, axis=1)
-        return self._add_metadata_from_columns(adata, obs_columns, PsmDfCols.RAW_NAME, axis=0)
+        adata = self._add_metadata_from_columns(adata, var_columns, self.feature_id, axis=1)
+        return self._add_metadata_from_columns(adata, obs_columns, self.sample_id, axis=0)
 
     def _add_metadata_from_columns(
         self,
@@ -121,68 +138,6 @@ class AnnDataFactory:
             keep_data_shape=True,
             verbose=False,
         )
-
-    @classmethod
-    def from_df(
-        cls,
-        psm_df: pd.DataFrame,
-        reader_type: str = "maxquant",
-        *,
-        intensity_column: str | None = None,
-        feature_id_column: str | None = None,
-        sample_id_column: str | None = None,
-        **kwargs,
-    ) -> "AnnDataFactory":
-        """Create AnnDataFactory from a PSM DataFrame.
-
-        Parameters
-        ----------
-        psm_df : pd.DataFrame
-            PSM DataFrame with custom or standardized column names
-        reader_type : str
-            Kind of PSM reader, e.g. "alphadia", "diann", "spectronaut", "maxquant", etc.
-        intensity_column : str, optional
-            Name of the column storing intensity data. If not specified, assumes PsmDfCols.INTENSITY
-        feature_id_column : str, optional
-            Name of the column storing feature IDs. If not specified, assumes PsmDfCols.PROTEINS
-        sample_id_column : str, optional
-            Name of the column storing sample IDs. If not specified, assumes PsmDfCols.RAW_NAME
-
-        Returns
-        -------
-        AnnDataFactory
-            Initialized AnnDataFactory instance
-
-        """
-        # Create a copy to avoid modifying the original DataFrame
-        psm_df = psm_df.copy()
-
-        reader_config = cls._get_reader_configuration(reader_type)
-
-        # column_mapping here??
-        reader: PSMReaderBase = psm_reader_provider.get_reader(reader_type, **reader_config, **kwargs)
-
-        custom_column_mapping = {
-            k: v
-            for k, v in {
-                PsmDfCols.INTENSITY: intensity_column if intensity_column else None,
-                PsmDfCols.PROTEINS: feature_id_column if feature_id_column else None,
-                PsmDfCols.RAW_NAME: sample_id_column if sample_id_column else None,
-            }.items()
-            if v is not None
-        }
-
-        if custom_column_mapping:
-            reader.add_column_mapping(custom_column_mapping)
-
-        # Helper function to apply alphabase standardization to dataframe
-        def _load_file_from_df(self, filename) -> pd.DataFrame:  # noqa: ANN001
-            return psm_df
-
-        reader._load_file = MethodType(_load_file_from_df, reader)  # noqa: SLF001
-        psm_df = reader.import_file("dummy_path")
-
-        return cls(psm_df)
 
     @classmethod
     def from_files(

@@ -19,21 +19,23 @@ def test_psm_df():
         return pd.DataFrame(
             {
                 # Sample metadata
-                PsmDfCols.RAW_NAME: ["raw1", "raw1", "raw1", "raw2", "raw2", "raw2"],
+                "file_id": ["raw1", "raw1", "raw1", "raw2", "raw2", "raw2"],
                 "filesize": [10000.0, 10000.0, 10000.0, 20000.0, 20000.0, 20000.0],
                 "filetype": ["raw", "raw", "raw", "raw", "raw", "raw"],
                 # Feature metadata
                 "sequence": ["PEPTIDEK1", "PEPTIDEK2", "PEPTIDEK3", "PEPTIDEK1", "PEPTIDEK2", "PEPTIDEK3"],
                 "alternate_gene_name": ["g1", "g1", "g1", "g1", "g1", "g1"],
                 # Protein IDs + Intensities
-                PsmDfCols.PROTEINS: ["protein1", "protein1", "protein2", "protein1", "protein1", "protein2"],
-                PsmDfCols.INTENSITY: [np.nan, 100.0, np.nan, 200.0, np.nan, 300.0],
+                "protein_id": ["protein1", "protein1", "protein2", "protein1", "protein1", "protein2"],
+                "protein_intensity": [np.nan, 100.0, np.nan, 200.0, np.nan, 300.0],
                 # Precursor IDs + Intensities
                 "precursor_id": ["precursor1", "precursor2", "precursor3", "precursor1", "precursor2", "precursor3"],
                 "precursor_intensity": [50.0, 150.0, 200.0, 150.0, 250.0, 200.0],
                 # Gene IDs + Intensities
                 "gene_id": ["gene1", "gene1", "gene1", "gene1", "gene1", "gene1"],
                 "gene_intensity": [1000.0, 1000.0, 1000.0, 2000.0, 2000.0, 2000.0],
+                # MaxQuant-like column
+                "Retention time": [1, 2, 3, 2, 3, 4],
             }
         )
 
@@ -70,8 +72,8 @@ def test_protein_anndata():
 @pytest.mark.parametrize(
     ("feature_id_column", "intensity_column", "sample_id_column"),
     [
-        # 1. Standard pivoting case
-        (PsmDfCols.PROTEINS, PsmDfCols.INTENSITY, PsmDfCols.RAW_NAME),
+        # 1. Standard pivoting case: proteins
+        ("protein_id", "protein_intensity", "file_id"),
         # # 2. Precursors
         # ("precursor_id", "precursor_intensity", "sample_id"),
         # # 3. Genes
@@ -92,13 +94,12 @@ def test_create_anndata_with_valid_dataframe(
     """Test that an AnnData object is created correctly from a valid input DataFrame."""
     psm_df = test_psm_df
 
-    factory = AnnDataFactory(psm_df)
-    # factory = AnnDataFactory.from_df(
-    #     psm_df,
-    #     intensity_column=intensity_column,
-    #     feature_id_column=feature_id_column,
-    #     sample_id_column=sample_id_column,
-    # )
+    factory = AnnDataFactory(
+        psm_df=psm_df,
+        intensity=intensity_column,
+        sample_id=sample_id_column,
+        feature_id=feature_id_column,
+    )
 
     adata = factory.create_anndata(
         var_columns=var_columns,
@@ -106,7 +107,7 @@ def test_create_anndata_with_valid_dataframe(
     )
 
     # Obtain the correct comparison anndata based on feature_id_column
-    if feature_id_column == PsmDfCols.PROTEINS:
+    if feature_id_column == "protein_id":
         comparison_adata = test_protein_anndata.copy()
     # elif feature_id_column == "precursor_id":
     #     comparison_adata = test_precursor_anndata.copy()
@@ -189,10 +190,23 @@ def test_create_anndata_with_empty_dataframe():
 @patch("alphabase.psm_reader.psm_reader.psm_reader_provider.get_reader")
 @patch("alphatools.io.anndata_factory.AnnDataFactory._get_reader_configuration")
 def test_from_files(mock_get_reader_configuration, mock_reader, test_psm_df, test_protein_anndata):
-    mock_reader.return_value.load.return_value = test_psm_df
+    mock_reader.return_value.load.return_value = test_psm_df.rename(
+        columns={
+            "protein_intensity": PsmDfCols.INTENSITY,
+            "protein_id": PsmDfCols.PROTEINS,
+            "file_id": PsmDfCols.RAW_NAME,
+        }
+    )
 
     mock_get_reader_configuration.return_value = {"extra_key": "extra_value"}
-    factory = AnnDataFactory.from_files(["file1", "file2"], reader_type="some_reader_type")
+
+    factory = AnnDataFactory.from_files(
+        file_paths=["file1", "file2"],
+        reader_type="some_reader_type",
+        intensity_column=PsmDfCols.INTENSITY,
+        feature_id_column=PsmDfCols.PROTEINS,
+        sample_id_column=PsmDfCols.RAW_NAME,
+    )
 
     # when
     adata = factory.create_anndata()
@@ -207,7 +221,13 @@ def test_from_files(mock_get_reader_configuration, mock_reader, test_psm_df, tes
 
 @patch("alphabase.psm_reader.psm_reader.psm_reader_provider.get_reader")
 def test_from_files_nan(mock_reader, test_psm_df, test_protein_anndata):
-    mock_reader.return_value.load.return_value = test_psm_df
+    mock_reader.return_value.load.return_value = test_psm_df.rename(
+        columns={
+            "protein_intensity": PsmDfCols.INTENSITY,
+            "protein_id": PsmDfCols.PROTEINS,
+            "file_id": PsmDfCols.RAW_NAME,
+        }
+    )
 
     factory = AnnDataFactory.from_files(["file1", "file2"], reader_type="some_reader_type")
 
