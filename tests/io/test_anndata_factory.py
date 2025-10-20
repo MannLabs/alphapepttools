@@ -202,7 +202,7 @@ def test_from_files(mock_get_reader_configuration, mock_reader, test_psm_df, tes
 
     factory = AnnDataFactory.from_files(
         file_paths=["file1", "file2"],
-        reader_type="some_reader_type",
+        reader_type="diann",
         intensity_column=PsmDfCols.INTENSITY,
         feature_id_column=PsmDfCols.PROTEINS,
         sample_id_column=PsmDfCols.RAW_NAME,
@@ -216,7 +216,7 @@ def test_from_files(mock_get_reader_configuration, mock_reader, test_psm_df, tes
     assert adata.var.equals(comparison_adata.var)
     assert adata.to_df().equals(comparison_adata.to_df())
 
-    mock_reader.assert_called_once_with("some_reader_type", extra_key="extra_value")
+    mock_reader.assert_called_once_with("diann", extra_key="extra_value")
 
 
 @patch("alphabase.psm_reader.psm_reader.psm_reader_provider.get_reader")

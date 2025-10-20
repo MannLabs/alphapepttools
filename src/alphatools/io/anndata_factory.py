@@ -9,6 +9,7 @@ from alphabase.psm_reader import PSMReaderBase
 from alphabase.psm_reader.keys import PsmDfCols
 from alphabase.psm_reader.psm_reader import psm_reader_provider
 
+from alphatools.io.reader_columns import READER_COLUMNS
 from alphatools.pp.data import add_metadata
 
 
@@ -177,6 +178,15 @@ class AnnDataFactory:
 
         reader: PSMReaderBase = psm_reader_provider.get_reader(reader_type, **reader_config, **kwargs)
 
+        # Identify the columns we need for this reader, but which are not yet covered by alphabase PsmDfCols
+        extra_columns = cls._identify_non_alphabase_columns(reader_type)
+
+        # Add identity mappings for extra columns so they're retained during reading
+        if extra_columns:
+            extra_column_mapping = {col: col for col in extra_columns}
+            reader.add_column_mapping(extra_column_mapping)
+
+        ### TO DO: delete this v
         custom_column_mapping = {
             k: v
             for k, v in {
@@ -189,6 +199,7 @@ class AnnDataFactory:
 
         if custom_column_mapping:
             reader.add_column_mapping(custom_column_mapping)
+        ### TO DO: delete this ^
 
         psm_df = reader.load(file_paths)
 
@@ -201,6 +212,39 @@ class AnnDataFactory:
             kwargs_for_init["sample_id"] = sample_id_column
 
         return cls(psm_df, **kwargs_for_init)
+
+    @staticmethod
+    def _identify_non_alphabase_columns(reader_type: str) -> list[str]:
+        """Identify columns from READER_COLUMNS that are not covered by PsmDfCols.
+
+        Parameters
+        ----------
+        reader_type : str
+            Type of PSM reader
+
+        Returns
+        -------
+        list[str]
+            List of column names that need special retention (not in PsmDfCols)
+        """
+        # Get all required columns from all levels for this reader type
+        required_columns = list(
+            {
+                col_value
+                for level_dict in READER_COLUMNS.get(reader_type, {}).values()
+                for col_value in level_dict.values()
+            }
+        )
+
+        # Get all PsmDfCols constant values (the actual column name strings)
+        psm_df_cols_values = {
+            getattr(PsmDfCols, attr)
+            for attr in dir(PsmDfCols)
+            if not attr.startswith("_") and isinstance(getattr(PsmDfCols, attr), str)
+        }
+
+        # Filter for non-standard columns that need retention (not covered by PsmDfCols)
+        return [col for col in required_columns if col not in psm_df_cols_values]
 
     @classmethod
     def _get_reader_configuration(cls, reader_type: str) -> dict[str, dict[str, Any]]:
