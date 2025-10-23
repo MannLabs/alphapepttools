@@ -7,21 +7,6 @@ from alphatools.pp.impute import _check_all_nan, _impute_nanmedian, impute_gauss
 
 
 @pytest.fixture
-def gaussian_imputation_dummy_data():
-    def create_data():
-        data = pd.DataFrame(
-            {
-                "A": [1.0, 2.0, np.nan, 4.0, 5.0],
-                "B": [10.0, np.nan, 30.0, 40.0, 50.0],
-            },
-            index=["s1", "s2", "s3", "s4", "s5"],
-        )
-        return ad.AnnData(data, layers={"new_layer": data})
-
-    return create_data()
-
-
-@pytest.fixture
 def imputation_dummy_data() -> np.ndarray:
     """Test data for imputation methods"""
     # 4 x 5
@@ -65,48 +50,6 @@ def median_imputation_dummy_data(imputation_dummy_data) -> tuple[np.ndarray, np.
     return imputation_dummy_data, X_ref
 
 
-@pytest.mark.parametrize("copy", [False, True])
-@pytest.mark.parametrize("layer", [None, "new_layer"])
-def test_impute_gaussian(gaussian_imputation_dummy_data: ad.AnnData, layer: str, *, copy: bool) -> None:
-    """Test that imputation with fixed random state produces reproducible results."""
-
-    RANDOM_STATE = 42
-    STD_FACTOR = 0.3
-    STD_OFFSET = 3
-    A_VALS = [1, 2, 4, 5]
-    B_VALS = [10, 30, 40, 50]
-
-    result = impute_gaussian(
-        gaussian_imputation_dummy_data,
-        std_offset=STD_OFFSET,
-        std_factor=STD_FACTOR,
-        random_state=RANDOM_STATE,
-        layer=layer,
-        copy=copy,
-    )
-
-    rng = np.random.default_rng(RANDOM_STATE)
-
-    expected_A3 = rng.normal(
-        loc=np.nanmean(A_VALS) - STD_OFFSET * np.nanstd(A_VALS), scale=np.nanstd(A_VALS) * STD_FACTOR, size=1
-    )[0]
-
-    expected_B2 = rng.normal(
-        loc=np.nanmean(B_VALS) - STD_OFFSET * np.nanstd(B_VALS),
-        scale=np.nanstd(B_VALS) * STD_FACTOR,
-        size=1,
-    )[0]
-
-    adata_imputed = result if copy else gaussian_imputation_dummy_data
-
-    imputed = adata_imputed.to_df(layer=layer)
-
-    assert np.allclose(imputed.loc["s3", "A"], expected_A3)
-    assert np.allclose(imputed.loc["s2", "B"], expected_B2)
-    assert not np.isnan(imputed.loc["s3", "A"])
-    assert not np.isnan(imputed.loc["s2", "B"])
-
-
 def test___check_all_nan(dummy_data_all_nan) -> None:
     with pytest.raises(ValueError, match=r"Features with index \[4\]"):
         _check_all_nan(dummy_data_all_nan)
@@ -119,6 +62,63 @@ def test__impute_nanmedian(median_imputation_dummy_data) -> None:
     X_imputed = _impute_nanmedian(X)
 
     assert np.all(np.isclose(X_imputed, X_ref, equal_nan=True))
+
+
+class TestImputeGaussian:
+    @pytest.fixture
+    def gaussian_imputation_dummy_data(self):
+        def create_data():
+            data = pd.DataFrame(
+                {
+                    "A": [1.0, 2.0, np.nan, 4.0, 5.0],
+                    "B": [10.0, np.nan, 30.0, 40.0, 50.0],
+                },
+                index=["s1", "s2", "s3", "s4", "s5"],
+            )
+            return ad.AnnData(data, layers={"new_layer": data})
+
+        return create_data()
+
+    @pytest.mark.parametrize("copy", [False, True])
+    @pytest.mark.parametrize("layer", [None, "new_layer"])
+    def test_impute_gaussian(self, gaussian_imputation_dummy_data: ad.AnnData, layer: str, *, copy: bool) -> None:
+        """Test that imputation with fixed random state produces reproducible results."""
+
+        RANDOM_STATE = 42
+        STD_FACTOR = 0.3
+        STD_OFFSET = 3
+        A_VALS = [1, 2, 4, 5]
+        B_VALS = [10, 30, 40, 50]
+
+        result = impute_gaussian(
+            gaussian_imputation_dummy_data,
+            std_offset=STD_OFFSET,
+            std_factor=STD_FACTOR,
+            random_state=RANDOM_STATE,
+            layer=layer,
+            copy=copy,
+        )
+
+        rng = np.random.default_rng(RANDOM_STATE)
+
+        expected_A3 = rng.normal(
+            loc=np.nanmean(A_VALS) - STD_OFFSET * np.nanstd(A_VALS), scale=np.nanstd(A_VALS) * STD_FACTOR, size=1
+        )[0]
+
+        expected_B2 = rng.normal(
+            loc=np.nanmean(B_VALS) - STD_OFFSET * np.nanstd(B_VALS),
+            scale=np.nanstd(B_VALS) * STD_FACTOR,
+            size=1,
+        )[0]
+
+        adata_imputed = result if copy else gaussian_imputation_dummy_data
+
+        imputed = adata_imputed.to_df(layer=layer)
+
+        assert np.allclose(imputed.loc["s3", "A"], expected_A3)
+        assert np.allclose(imputed.loc["s2", "B"], expected_B2)
+        assert not np.isnan(imputed.loc["s3", "A"])
+        assert not np.isnan(imputed.loc["s2", "B"])
 
 
 class TestImputeMedianAnnData:
