@@ -225,4 +225,4 @@ def available_data() -> StudyCollection:
 def get_data(study: str, output_dir: str | Path | None = None) -> Path:
     """Get data from a specific study"""
     study_data = study_collection.get_study(study)
-    return study_data.download(output_dir)
+    return Path(study_data.download(output_dir))
