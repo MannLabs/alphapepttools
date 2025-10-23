@@ -132,7 +132,9 @@ def _impute_nanmedian(data: np.ndarray) -> np.ndarray:
     return np.where(np.isnan(data), np.nanmedian(data, axis=0), data)
 
 
-def impute_median(adata: ad.AnnData, layer: str | None = None, group_column: str | None = None) -> ad.AnnData:
+def impute_median(
+    adata: ad.AnnData, group_column: str | None = None, layer: str | None = None, *, copy: bool = True
+) -> ad.AnnData:
     """Impute missing values using median imputation
 
     Replace missing (NaN) values in the data matrix with the median of non-missing
@@ -152,6 +154,9 @@ def impute_median(adata: ad.AnnData, layer: str | None = None, group_column: str
         If specified, computes median separately for each group and imputes
         missing values using the group-specific median.
         If `group_column` contains NaNs, the respective observations are ignored.
+    copy
+        Whether to return a modified copy (True) of the anndata object. If False (default)
+        modifies the object inplace
 
     Returns
     -------
@@ -190,7 +195,7 @@ def impute_median(adata: ad.AnnData, layer: str | None = None, group_column: str
         adata = at.pp.impute_median(adata, group_column="cell_type")
         # Imputes group-wise medians
     """
-    adata = adata.copy()
+    adata = adata.copy() if copy else adata
 
     data = adata.X if layer is None else adata.layers[layer]
 
@@ -215,4 +220,4 @@ def impute_median(adata: ad.AnnData, layer: str | None = None, group_column: str
     else:
         adata.layers[layer] = data
 
-    return adata
+    return adata if copy else None
