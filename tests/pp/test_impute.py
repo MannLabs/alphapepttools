@@ -22,12 +22,11 @@ def gaussian_imputation_dummy_data():
 
 
 @pytest.fixture
-def median_imputation_dummy_data() -> tuple[np.ndarray, np.ndarray]:
-    """Test data for median imputation"""
-
-    # 4 x 4
+def imputation_dummy_data() -> np.ndarray:
+    """Test data for imputation methods"""
+    # 4 x 5
     # Complete feature, complete feature, imputed feature, all nan
-    X = np.array(
+    return np.array(
         [
             [0.0, 0.0, 2.0, np.nan, 0.0],
             [1.0, 1.0, 3.0, 1.0, 10.0],
@@ -35,20 +34,10 @@ def median_imputation_dummy_data() -> tuple[np.ndarray, np.ndarray]:
             [np.nan, 3.0, 5.0, 3.0, np.nan],
         ]
     )
-    X_ref = np.array(
-        [
-            [0.0, 0.0, 2.0, 2.0, 0.0],
-            [1.0, 1.0, 3.0, 1.0, 10.0],
-            [0.0, 2.0, 4.0, 2.0, 20.0],
-            [0.0, 3.0, 5.0, 3.0, 10.0],
-        ]
-    )
-
-    return X, X_ref
 
 
 @pytest.fixture
-def median_imputation_dummy_data_all_nan() -> np.ndarray:
+def dummy_data_all_nan() -> np.ndarray:
     """Dummy data with a feature that only contains NaNs"""
     return np.array(
         [
@@ -58,6 +47,22 @@ def median_imputation_dummy_data_all_nan() -> np.ndarray:
             [np.nan, 3.0, 5.0, 3.0, np.nan],
         ]
     )
+
+
+@pytest.fixture
+def median_imputation_dummy_data(imputation_dummy_data) -> tuple[np.ndarray, np.ndarray]:
+    """Test data and reference for median imputation"""
+
+    X_ref = np.array(
+        [
+            [0.0, 0.0, 2.0, 2.0, 0.0],
+            [1.0, 1.0, 3.0, 1.0, 10.0],
+            [0.0, 2.0, 4.0, 2.0, 20.0],
+            [0.0, 3.0, 5.0, 3.0, 10.0],
+        ]
+    )
+
+    return imputation_dummy_data, X_ref
 
 
 @pytest.fixture
@@ -87,7 +92,7 @@ def median_imputation_dummy_anndata(
 
 
 @pytest.fixture
-def median_imputation_dummy_anndata_all_nan(median_imputation_dummy_data_all_nan: np.ndarray) -> ad.AnnData:
+def median_imputation_dummy_anndata_all_nan(dummy_data_all_nan: np.ndarray) -> ad.AnnData:
     """AnnData object with a feature that contains only NaNs"""
 
     obs = pd.DataFrame(
@@ -98,7 +103,7 @@ def median_imputation_dummy_anndata_all_nan(median_imputation_dummy_data_all_nan
         }
     )
 
-    return ad.AnnData(X=median_imputation_dummy_data_all_nan, obs=obs)
+    return ad.AnnData(X=dummy_data_all_nan, obs=obs)
 
 
 @pytest.mark.parametrize("copy", [False, True])
@@ -143,9 +148,9 @@ def test_impute_gaussian(gaussian_imputation_dummy_data: ad.AnnData, layer: str,
     assert not np.isnan(imputed.loc["s2", "B"])
 
 
-def test___check_all_nan(median_imputation_dummy_data_all_nan) -> None:
+def test___check_all_nan(dummy_data_all_nan) -> None:
     with pytest.raises(ValueError, match=r"Features with index \[4\]"):
-        _check_all_nan(median_imputation_dummy_data_all_nan)
+        _check_all_nan(dummy_data_all_nan)
 
 
 def test__impute_nanmedian(median_imputation_dummy_data) -> None:
