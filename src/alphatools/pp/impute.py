@@ -329,8 +329,10 @@ def impute_knn(
 
         groups = adata.obs.groupby(group_column, dropna=True).indices
 
-        if any(len(group) for group in groups) < n_neighbors:
-            raise ValueError("Number of members per group must be greater equal number of `n_neighbors` for all groups")
+        if any(len(indices) < n_neighbors for _, indices in groups.items()):
+            raise ValueError(
+                "Number of members per group must be greater equal number of `n_neighbors` for all groups."
+            )
 
         for group_indices in groups.values():
             group = data[group_indices]
