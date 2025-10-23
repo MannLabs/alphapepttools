@@ -114,7 +114,7 @@ class StudyCollection:
 
         html = f"""
         <div>
-            <h3>Collection of {self.__len__} {"study" if self.__len__ == 1 else "studies"}</h3>
+            <h3>Collection of {self.__len__()} {"study" if self.__len__ == 1 else "studies"}</h3>
             <table style="border-collapse: collapse; width: 100%;">
                 <thead>
                     <tr style="border-bottom: 2px solid #ddd;">
