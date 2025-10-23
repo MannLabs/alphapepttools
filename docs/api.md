@@ -12,7 +12,6 @@
     pp.add_metadata
     pp.filter_by_metadata
     pp.filter_data_completeness
-    pp.load_diann_pg_matrix
     pp.scale_and_center
     pp.nanlog
     pp.detect_special_values
