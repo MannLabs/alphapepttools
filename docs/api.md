@@ -21,6 +21,7 @@
     pp.impute
     pp.impute_gaussian
     pp.impute_median
+    pp.impute_knn
     pp.add_core_proteome_mask
     pp.scanpy_pycombat
 
