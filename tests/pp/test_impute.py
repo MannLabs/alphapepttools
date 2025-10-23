@@ -157,19 +157,23 @@ def test__impute_nanmedian(median_imputation_dummy_data) -> None:
     assert np.all(np.isclose(X_imputed, X_ref, equal_nan=True))
 
 
+@pytest.mark.parametrize("copy", [False, True])
 @pytest.mark.parametrize(
     ("layer", "group_column"),
     [(None, None), ("layer2", None), (None, "sample_group"), ("layer2", "sample_group")],
 )
-def test_impute_median(median_imputation_dummy_anndata, layer: str, group_column: str) -> None:
+def test_impute_median(median_imputation_dummy_anndata, layer: str, group_column: str, *, copy: bool) -> None:
     """Test median imputation for data with nan values"""
     adata, X_ref, X_ref_grouped = median_imputation_dummy_anndata
 
-    adata_imputed = impute_median(
-        adata,
-        layer=layer,
-        group_column=group_column,
-    )
+    result = impute_median(adata, layer=layer, group_column=group_column, copy=copy)
+
+    if copy:
+        assert isinstance(result, ad.AnnData)
+        adata_imputed = result
+    else:
+        assert result is None
+        adata_imputed = adata
 
     X_imputed = adata_imputed.X if layer is None else adata_imputed.layers[layer]
 
