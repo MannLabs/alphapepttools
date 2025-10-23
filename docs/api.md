@@ -18,7 +18,6 @@
     pp.detect_special_values
     pp.normalize
     pp.pca
-    pp.impute
     pp.impute_gaussian
     pp.impute_median
     pp.add_core_proteome_mask
