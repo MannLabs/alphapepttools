@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
+import pandas as pd
 from alphabase.tools.data_downloader import DataShareDownloader
 
 
@@ -40,6 +41,22 @@ class StudyData:
         """Download data"""
         output_dir = Path.cwd() if output_dir is None else output_dir
         return DataShareDownloader(url=self.url, output_dir=output_dir).download()
+
+    @property
+    def df(self) -> pd.DataFrame:
+        """Representation of study data as dataframe"""
+        return pd.DataFrame(
+            data=[
+                {
+                    "name": self.name,
+                    "url": self.url,
+                    "search_engine": self.search_engine,
+                    "data_type": self.data_type,
+                    "citation": self.citation,
+                    "description": self.description,
+                }
+            ]
+        )
 
     def _repr_html_(self) -> str:
         """HTML representation for Jupyter notebooks"""
@@ -83,55 +100,17 @@ class StudyCollection:
     def __len__(self):
         return len(self.collection)
 
+    @property
+    def df(self) -> pd.DataFrame:
+        """Dataframe of available studies"""
+        return pd.concat([study.df for study in self.collection]) if len(self.collection) > 0 else pd.DataFrame()
+
     def __repr__(self):
-        study_representation = [
-            f"- {study.name} ({study.data_type}, {study.search_engine}): {study.description if study.description is not None else ''}"
-            for study in self.collection
-        ]
-
-        study_representation = "\n\t".join(study_representation)
-
-        return f"""Collection of {self.__len__()} {"study" if self.__len__() == 1 else "studies"}\n\t{study_representation}"""
+        return self.df.__repr__()
 
     def _repr_html_(self) -> str:
         """HTML representation for Jupyter notebooks"""
-        if not self.collection:
-            return "<p>Empty collection</p>"
-
-        rows = ""
-        for study in self.collection:
-            description = study.description if study.description else ""
-            citation = f"<small>{study.citation}</small>" if study.citation else ""
-            rows += f"""
-            <tr>
-                <td><strong>{study.name}</strong></td>
-                <td>{study.data_type}</td>
-                <td>{study.search_engine}</td>
-                <td>{description}</td>
-                <td>{citation}</td>
-            </tr>
-            """
-
-        html = f"""
-        <div>
-            <h3>Collection of {self.__len__()} {"study" if self.__len__ == 1 else "studies"}</h3>
-            <table style="border-collapse: collapse; width: 100%;">
-                <thead>
-                    <tr style="border-bottom: 2px solid #ddd;">
-                        <th style="text-align: left; padding: 8px;">Name</th>
-                        <th style="text-align: left; padding: 8px;">Data Type</th>
-                        <th style="text-align: left; padding: 8px;">Search Engine</th>
-                        <th style="text-align: left; padding: 8px;">Description</th>
-                        <th style="text-align: left; padding: 8px;">Citation</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {rows}
-                </tbody>
-            </table>
-        </div>
-        """
-        return html  # noqa: RET504 Remove unnecessary assignment - return value would be very long
+        return self.df.to_html()
 
 
 bader2020_pg_alphadia = StudyData(

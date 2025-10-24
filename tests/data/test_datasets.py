@@ -1,5 +1,6 @@
 from unittest.mock import Mock, patch
 
+import pandas as pd
 import pytest
 
 from alphatools.data.datasets import StudyCollection, StudyData, available_data, get_data, study_collection
@@ -230,3 +231,63 @@ def test_study_data_download_should__use_cwd(minimal_study) -> None:
     mock_class.assert_called_once()
     call_args = mock_class.call_args
     assert call_args.kwargs["output_dir"] == mock_cwd.return_value
+
+
+def test_study_data_df_property_should_return_dataframe_with_all_fields(full_study) -> None:
+    """Test that StudyData.df returns a DataFrame with all study information."""
+    # given
+    expected_df = pd.DataFrame(
+        data=[
+            {
+                "name": "full_test_study",
+                "url": "https://example.com/full_data",
+                "search_engine": "test_engine",
+                "data_type": "psm",
+                "citation": "Test Citation 2024",
+                "description": "A test study with full metadata",
+            }
+        ]
+    )
+
+    # when
+    result_df = full_study.df
+
+    # then
+    pd.testing.assert_frame_equal(result_df, expected_df)
+
+
+def test_study_data_df_property_should_return_dataframe_with_none_for_optional_fields(minimal_study) -> None:
+    """Test that StudyData.df returns a DataFrame with None values for optional fields."""
+    # given
+    expected_df = pd.DataFrame(
+        data=[
+            {
+                "name": "test_study",
+                "url": "https://example.com/data",
+                "search_engine": "test_engine",
+                "data_type": "pg",
+                "citation": None,
+                "description": None,
+            }
+        ]
+    )
+
+    # when
+    result_df = minimal_study.df
+
+    # then
+    pd.testing.assert_frame_equal(result_df, expected_df)
+
+
+def test_study_collection_df_property_should_concatenate_all_studies(
+    populated_collection, minimal_study, full_study
+) -> None:
+    """Test that StudyCollection.df returns a concatenated DataFrame of all studies."""
+    # given
+    expected_df = pd.concat([minimal_study.df, full_study.df])
+
+    # when
+    result_df = populated_collection.df
+
+    # then
+    pd.testing.assert_frame_equal(result_df, expected_df)
