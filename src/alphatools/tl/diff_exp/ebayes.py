@@ -17,8 +17,6 @@ logger.setLevel(logging.INFO)
 def _standardize_limma_results(
     comparison_key: str,
     result_df: pd.DataFrame,
-    adata: ad.AnnData = None,
-    var_columns: list[str] | None = None,
 ) -> pd.DataFrame:
     """Standardize Limma eBayes result columns
 
@@ -54,14 +52,6 @@ def _standardize_limma_results(
     current_result_df["-log10(p_value)"] = -current_result_df["p_value"].apply(lambda x: 300 if x == 0 else np.log10(x))
     current_result_df["-log10(fdr)"] = -current_result_df["fdr"].apply(lambda x: 300 if x == 0 else np.log10(x))
 
-    # Add gene annotation from AnnData var
-    if var_columns is not None:
-        var_columns = [var_columns] if not isinstance(var_columns, list) else var_columns
-        if not all(col in adata.var.columns for col in var_columns):
-            raise ValueError(f"Not all var columns {var_columns} are present in adata.var")
-        current_result_df = current_result_df.join(adata.var[var_columns], how="left")
-        diff_exp_columns = diff_exp_columns + var_columns
-
     # Extra columns specific to Limma
     return_cols = [*diff_exp_columns, "stat", "B", "AveExpr", "max_level_1_samples", "max_level_2_samples"]
 
@@ -75,7 +65,6 @@ def diff_exp_limma(
     between_column: str,
     comparison: tuple[str, str],
     min_valid_values: int = 2,
-    var_columns: list[str] | None = None,
 ) -> tuple[str, pd.DataFrame]:
     """Run Limma eBayes moderated ttest for differential expression
 
@@ -176,4 +165,4 @@ def diff_exp_limma(
     result_df["max_level_2_samples"] = max_samples_level_2
 
     comparison_key = f"{level_1}_VS_{level_2}"
-    return comparison_key, _standardize_limma_results(comparison_key, result_df, adata=adata, var_columns=var_columns)
+    return comparison_key, _standardize_limma_results(comparison_key, result_df)

@@ -262,14 +262,7 @@ def example_adata_ebayes():
         index=[f"cell{i}" for i in range(10)],
     )
 
-    var = pd.DataFrame(
-        {
-            "gene_name": ["Gene 1", "Gene 2", "Gene 3", "Gene 4"],
-        },
-        index=["X1", "X2", "X3", "X4"],
-    )
-
-    adata = ad.AnnData(X=X, obs=obs, var=var)
+    adata = ad.AnnData(X=X, obs=obs)
 
     # data has to be log-transformed
     nanlog(adata)
@@ -279,7 +272,7 @@ def example_adata_ebayes():
 
 # Test diff_exp_limma by loading small example datasets
 @pytest.mark.parametrize(
-    ("expected_df", "comparison", "expected_comparison_key", "between_column", "min_valid_values", "var_columns"),
+    ("expected_df", "comparison", "expected_comparison_key", "between_column", "min_valid_values"),
     [
         (
             pd.DataFrame(
@@ -292,7 +285,6 @@ def example_adata_ebayes():
                     "fdr": [0.0030228412720276574, 0.00019692512133911947, 0.0030228412720276574],
                     "-log10(fdr)": [2.5195846568222966, 3.7056988782598457, 2.5195846568222966],
                     "method": ["limma_ebayes_inmoose", "limma_ebayes_inmoose", "limma_ebayes_inmoose"],
-                    "gene_name": ["Gene 1", "Gene 2", "Gene 3"],
                     "stat": [-3.804007666004946, -6.2764817445960475, -3.9999011197249166],
                     "B": [-1.8736068846693623, 2.010219213410613, -1.5373419998901845],
                     "AveExpr": [4.175828737355294, 2.8008384166375, 2.1791061114716954],
@@ -305,7 +297,6 @@ def example_adata_ebayes():
             "B_VS_A",
             "group",
             5,  # Ensure that the feature with insufficient valid values is dropped
-            ["gene_name"],
         ),
     ],
 )
@@ -316,7 +307,6 @@ def test_diff_exp_limma(
     expected_df,
     between_column,
     min_valid_values,
-    var_columns,
 ):
     """Testing function to ascertain stable functionality of diff_exp_limma on a small example dataset."""
 
@@ -327,7 +317,6 @@ def test_diff_exp_limma(
         between_column=between_column,
         comparison=comparison,
         min_valid_values=min_valid_values,
-        var_columns=var_columns,
     )
 
     pd.testing.assert_frame_equal(
