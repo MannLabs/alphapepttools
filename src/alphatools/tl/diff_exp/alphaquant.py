@@ -55,10 +55,10 @@ def _standardize_alphaquant_results(
 
     # Common standardization logic
     current_result_df["method"] = "alphaquant"
-    current_result_df["-log10(p_value)"] = -current_result_df[pval_column].apply(
-        lambda x: np.nan if x == 0 else np.log10(x)
-    )
-    current_result_df["-log10(fdr)"] = -current_result_df[fdr_column].apply(lambda x: np.nan if x == 0 else np.log10(x))
+
+    # For p-values of exactly 0, use a very large value instead of NaN
+    current_result_df["-log10(p_value)"] = -current_result_df["p_value"].apply(lambda x: 300 if x == 0 else np.log10(x))
+    current_result_df["-log10(fdr)"] = -current_result_df["fdr"].apply(lambda x: 300 if x == 0 else np.log10(x))
 
     # Renaming to common names
     current_result_df = current_result_df.rename(

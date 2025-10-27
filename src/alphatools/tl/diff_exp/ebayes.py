@@ -50,7 +50,6 @@ def _standardize_limma_results(
     current_result_df["protein"] = current_result_df.index
     current_result_df["method"] = "limma_ebayes_inmoose"
 
-    # Calculate -log10 transformations
     # For p-values of exactly 0, use a very large value instead of NaN
     current_result_df["-log10(p_value)"] = -current_result_df["p_value"].apply(lambda x: 300 if x == 0 else np.log10(x))
     current_result_df["-log10(fdr)"] = -current_result_df["fdr"].apply(lambda x: 300 if x == 0 else np.log10(x))

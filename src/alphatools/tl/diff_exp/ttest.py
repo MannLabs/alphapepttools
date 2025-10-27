@@ -122,11 +122,9 @@ def _standardize_diff_exp_ttest_results(
     current_result_df["protein"] = current_result_df.index
     current_result_df["method"] = "ttest"
 
-    # Calculate -log10 transformations
-    current_result_df["-log10(p_value)"] = -current_result_df["p_value"].apply(
-        lambda x: np.nan if x == 0 else np.log10(x)
-    )
-    current_result_df["-log10(fdr)"] = -current_result_df["fdr"].apply(lambda x: np.nan if x == 0 else np.log10(x))
+    # For p-values of exactly 0, use a very large value instead of NaN
+    current_result_df["-log10(p_value)"] = -current_result_df["p_value"].apply(lambda x: 300 if x == 0 else np.log10(x))
+    current_result_df["-log10(fdr)"] = -current_result_df["fdr"].apply(lambda x: 300 if x == 0 else np.log10(x))
 
     # Reorder columns to match DIFF_EXP_COLS
     return current_result_df[tl_defaults.DIFF_EXP_COLS].copy()
