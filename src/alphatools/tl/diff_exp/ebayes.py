@@ -51,10 +51,9 @@ def _standardize_limma_results(
     current_result_df["method"] = "limma_ebayes_inmoose"
 
     # Calculate -log10 transformations
-    current_result_df["-log10(p_value)"] = -current_result_df["p_value"].apply(
-        lambda x: np.nan if x == 0 else np.log10(x)
-    )
-    current_result_df["-log10(fdr)"] = -current_result_df["fdr"].apply(lambda x: np.nan if x == 0 else np.log10(x))
+    # For p-values of exactly 0, use a very large value instead of NaN
+    current_result_df["-log10(p_value)"] = -current_result_df["p_value"].apply(lambda x: 300 if x == 0 else np.log10(x))
+    current_result_df["-log10(fdr)"] = -current_result_df["fdr"].apply(lambda x: 300 if x == 0 else np.log10(x))
 
     # Add gene annotation from AnnData var
     if var_columns is not None:
@@ -78,7 +77,7 @@ def diff_exp_limma(
     comparison: tuple[str, str],
     min_valid_values: int = 2,
     var_columns: list[str] | None = None,
-) -> tuple[str, dict[str, pd.DataFrame]]:
+) -> tuple[str, pd.DataFrame]:
     """Run Limma eBayes moderated ttest for differential expression
 
     Parameters
@@ -102,6 +101,7 @@ def diff_exp_limma(
 
     # Validate inputs
     level_1, level_2 = validate_ttest_inputs(adata, between_column, comparison, min_valid_values)
+    print(f"Comparing levels: {level_1} (treatment) vs {level_2} (control)")
 
     # Drop features with too few valid values
     adata = drop_features_with_too_few_valid_values(
@@ -133,6 +133,12 @@ def diff_exp_limma(
     # Patsy changes the column names, so the new ones need to be used going forward
     design_colnames = design_matrix.design_info.column_names
 
+    # Patsy insists on changing the column order to alphabetical, so we need to resort them
+    pure_patsy_order = [x.replace("condition[", "").replace("]", "") for x in design_colnames]
+    condition_order = [level_1, level_2]
+    sorted_indices = [pure_patsy_order.index(cond) for cond in condition_order]
+    design_colnames = [design_colnames[i] for i in sorted_indices]
+
     # Expression matrix: proteins (rows) x samples (columns)
     expr_matrix = adata_subset.X.T  # Transpose so proteins are rows
 
@@ -141,7 +147,7 @@ def diff_exp_limma(
     logger.info(f"Expression matrix dimensions: {expr_matrix.shape[0]} proteins x {expr_matrix.shape[1]} samples")
 
     # Format a contrast string for Limma
-    contrast_string = f"{design_colnames[1]}-{design_colnames[0]}"
+    contrast_string = f"{design_colnames[0]}-{design_colnames[1]}"
     logger.info(f"Computing contrast: {contrast_string}")
 
     # Initial linear fit (lmFit equivalent)

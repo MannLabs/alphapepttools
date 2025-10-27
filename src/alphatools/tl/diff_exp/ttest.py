@@ -166,6 +166,7 @@ def diff_exp_ttest(
     """
     # Validate inputs
     g1, g2 = validate_ttest_inputs(adata, between_column, comparison, min_valid_values)
+    print(f"Comparing groups: {g1} vs {g2}")
 
     # perform single comparison between the two specified groups
     g1_df = filter_by_metadata(adata, {between_column: g1}, axis=0).to_df()

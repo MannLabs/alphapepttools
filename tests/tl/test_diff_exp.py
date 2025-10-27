@@ -7,6 +7,7 @@ import pytest
 from scipy.stats import ttest_ind
 
 from alphatools import tl
+from alphatools.pp import nanlog
 from alphatools.tl.defaults import tl_defaults
 from alphatools.tl.diff_exp.alphaquant import _standardize_alphaquant_results
 from alphatools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
@@ -239,6 +240,104 @@ def test_diff_exp_alphaquant():
             results[level],
             expected_results[level],
         )
+
+
+@pytest.fixture
+def example_adata_ebayes():
+    """AnnData fixture with example data and metadata for eBayes tests."""
+    X = pd.DataFrame(
+        {
+            "X1": [10, 12, 14, 16, 18, 20, 22, 24, 26, 28],
+            "X2": [1, 2, 3, 4, 5, 10, 15, 20, 25, 30],
+            "X3": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            "X4": [1, 2, 3, 4, np.nan, 6, 7, 8, 9, np.nan],
+        },
+        index=[f"cell{i}" for i in range(10)],
+    ).astype(float)
+
+    obs = pd.DataFrame(
+        {
+            "group": ["B", "B", "B", "B", "B", "A", "A", "A", "A", "A"],
+        },
+        index=[f"cell{i}" for i in range(10)],
+    )
+
+    var = pd.DataFrame(
+        {
+            "gene_name": ["Gene 1", "Gene 2", "Gene 3", "Gene 4"],
+        },
+        index=["X1", "X2", "X3", "X4"],
+    )
+
+    adata = ad.AnnData(X=X, obs=obs, var=var)
+
+    # data has to be log-transformed
+    nanlog(adata)
+
+    return adata
+
+
+# Test diff_exp_limma by loading small example datasets
+@pytest.mark.parametrize(
+    ("expected_df", "comparison", "expected_comparison_key", "between_column", "min_valid_values", "var_columns"),
+    [
+        (
+            pd.DataFrame(
+                {
+                    "condition_pair": ["B_VS_A", "B_VS_A", "B_VS_A"],
+                    "protein": ["X1", "X2", "X3"],
+                    "log2fc": [-0.7979892670672148, -2.8389205950315937, -1.5954559846999832],
+                    "p_value": [0.0030228412720276574, 6.564170711303982e-05, 0.002166002226930997],
+                    "-log10(p_value)": [2.5195846568222966, 4.182820132979508, 2.664341101199458],
+                    "fdr": [0.0030228412720276574, 0.00019692512133911947, 0.0030228412720276574],
+                    "-log10(fdr)": [2.5195846568222966, 3.7056988782598457, 2.5195846568222966],
+                    "method": ["limma_ebayes_inmoose", "limma_ebayes_inmoose", "limma_ebayes_inmoose"],
+                    "gene_name": ["Gene 1", "Gene 2", "Gene 3"],
+                    "stat": [-3.804007666004946, -6.2764817445960475, -3.9999011197249166],
+                    "B": [-1.8736068846693623, 2.010219213410613, -1.5373419998901845],
+                    "AveExpr": [4.175828737355294, 2.8008384166375, 2.1791061114716954],
+                    "max_level_1_samples": [5, 5, 5],
+                    "max_level_2_samples": [5, 5, 5],
+                },
+                index=["X1", "X2", "X3"],
+            ),
+            ("B", "A"),  # ensure that patsy's alphabetical ordering is cancelled out correctly
+            "B_VS_A",
+            "group",
+            5,  # Ensure that the feature with insufficient valid values is dropped
+            ["gene_name"],
+        ),
+    ],
+)
+def test_diff_exp_limma(
+    example_adata_ebayes,
+    comparison,
+    expected_comparison_key,
+    expected_df,
+    between_column,
+    min_valid_values,
+    var_columns,
+):
+    """Testing function to ascertain stable functionality of diff_exp_limma on a small example dataset."""
+
+    adata = example_adata_ebayes.copy()
+
+    comparison_key, results = tl.diff_exp_limma(
+        adata=adata,
+        between_column=between_column,
+        comparison=comparison,
+        min_valid_values=min_valid_values,
+        var_columns=var_columns,
+    )
+
+    pd.testing.assert_frame_equal(
+        results,
+        expected_df,
+    )
+
+    assert comparison_key == expected_comparison_key, (
+        f"Expected comparison key {expected_comparison_key}, got {comparison_key}"
+    )
 
 
 # Check standardization of the ttest output
