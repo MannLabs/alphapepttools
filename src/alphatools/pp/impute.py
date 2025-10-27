@@ -10,11 +10,6 @@ import pandas as pd
 logging.basicConfig(level=logging.INFO)
 
 
-def impute() -> None:
-    """Impute missing values in the data"""
-    raise NotImplementedError
-
-
 def impute_gaussian(
     adata: ad.AnnData,
     std_offset: float = 3,
