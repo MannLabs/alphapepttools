@@ -312,7 +312,7 @@ def test_diff_exp_limma(
 
     adata = example_adata_ebayes.copy()
 
-    comparison_key, results = tl.diff_exp_limma(
+    comparison_key, results = tl.diff_exp_ebayes(
         adata=adata,
         between_column=between_column,
         comparison=comparison,

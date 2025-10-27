@@ -60,7 +60,7 @@ def _standardize_limma_results(
     return current_result_df[return_cols].copy()
 
 
-def diff_exp_limma(
+def diff_exp_ebayes(
     adata: ad.AnnData,
     between_column: str,
     comparison: tuple[str, str],
