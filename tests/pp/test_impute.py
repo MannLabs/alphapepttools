@@ -188,28 +188,36 @@ class TestImputeMedianAnnData:
 
         return ad.AnnData(X=dummy_data_all_nan, obs=obs)
 
+    @pytest.mark.parametrize("copy", [False, True])
     @pytest.mark.parametrize(
         ("layer", "group_column"),
         [(None, None), ("layer2", None), (None, "sample_group"), ("layer2", "sample_group")],
     )
-    def test_impute_median(self, median_imputation_dummy_anndata, layer: str, group_column: str) -> None:
+    def test_impute_median(self, median_imputation_dummy_anndata, layer: str, group_column: str, *, copy: bool) -> None:
         """Test median imputation for data with nan values"""
         adata, X_ref, X_ref_grouped = median_imputation_dummy_anndata
+        result = impute_median(adata, layer=layer, group_column=group_column, copy=copy)
 
-        adata_imputed = impute_median(
-            adata,
-            layer=layer,
-            group_column=group_column,
-        )
-
-        X_imputed = adata_imputed.X if layer is None else adata_imputed.layers[layer]
-
-        if group_column is None:
-            assert np.all(np.isclose(X_imputed, X_ref, equal_nan=True))
-        elif group_column == "sample_group":
-            assert np.all(np.isclose(X_imputed, X_ref_grouped, equal_nan=True))
+        if copy:
+            assert isinstance(result, ad.AnnData)
+            adata_imputed = result
         else:
-            pytest.fail("Unexpected group column passed")
+            assert result is None
+            adata_imputed = adata
+            adata_imputed = impute_median(
+                adata,
+                layer=layer,
+                group_column=group_column,
+            )
+
+            X_imputed = adata_imputed.X if layer is None else adata_imputed.layers[layer]
+
+            if group_column is None:
+                assert np.all(np.isclose(X_imputed, X_ref, equal_nan=True))
+            elif group_column == "sample_group":
+                assert np.all(np.isclose(X_imputed, X_ref_grouped, equal_nan=True))
+            else:
+                pytest.fail("Unexpected group column passed")
 
     @pytest.mark.parametrize("group_column", [None, "sample_group"])
     def test_impute_median__feature_all_nan(self, median_imputation_dummy_anndata_all_nan, group_column: str) -> None:
