@@ -1,39 +1,60 @@
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import pandas as pd
 import pytest
+import yaml
 
 from alphatools.data.datasets import StudyCollection, StudyData, available_data, get_data, study_collection
 
 
 @pytest.fixture
-def minimal_study():
-    """Create a minimal StudyData instance for testing."""
-    return StudyData(
-        name="test_study",
-        url="https://example.com/data",
-        search_engine="test_engine",
-        data_type="pg",
-    )
+def minimal_study_config():
+    """Minimal study configuration passed to other fixtures"""
+    return {"name": "test_study", "url": "https://example.com/data", "search_engine": "test_engine", "data_type": "pg"}
 
 
 @pytest.fixture
-def full_study():
+def full_study_config():
+    """Minimal study configuration passed to other fixtures"""
+    return {
+        "name": "full_test_study",
+        "url": "https://example.com/full_data",
+        "search_engine": "test_engine",
+        "data_type": "psm",
+        "citation": "Test Citation 2024",
+        "description": "A test study with full metadata",
+    }
+
+
+@pytest.fixture
+def minimal_study(minimal_study_config):
+    """Create a minimal StudyData instance for testing."""
+    return StudyData(**minimal_study_config)
+
+
+@pytest.fixture
+def full_study(full_study_config):
     """Create a StudyData instance with all optional fields."""
-    return StudyData(
-        name="full_test_study",
-        url="https://example.com/full_data",
-        search_engine="test_engine",
-        data_type="psm",
-        citation="Test Citation 2024",
-        description="A test study with full metadata",
-    )
+    return StudyData(**full_study_config)
 
 
 @pytest.fixture
 def empty_collection():
     """Create an empty StudyCollection instance."""
     return StudyCollection()
+
+
+@pytest.fixture
+def study_collection_yaml_config(minimal_study_config, full_study_config, tmp_path) -> Path:
+    """Example yaml config"""
+    file_path = tmp_path / "config.yaml"
+    config = [minimal_study_config, full_study_config]
+
+    with Path.open(file_path, mode="w") as file:
+        file.write(yaml.safe_dump(config))
+
+    return file_path
 
 
 @pytest.fixture
@@ -150,6 +171,16 @@ def test_study_collection_register_should_accept_list_of_studies(empty_collectio
     assert len(empty_collection) == len(studies)
     assert empty_collection.get_study("test_study") == minimal_study
     assert empty_collection.get_study("full_test_study") == full_study
+
+
+def test_study_collection_from_yaml(study_collection_yaml_config, minimal_study, full_study) -> None:
+    """Test class initialization from yaml"""
+    study_collection = StudyCollection.from_yaml(study_collection_yaml_config)
+
+    reference_study_collection = StudyCollection().register([minimal_study, full_study])
+
+    assert isinstance(study_collection, StudyCollection)
+    pd.testing.assert_frame_equal(study_collection.df, reference_study_collection.df)
 
 
 def test_available_data_should_return_global_study_collection() -> None:
