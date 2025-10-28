@@ -2,7 +2,7 @@ from typing import Any
 
 import anndata as ad
 import pandas as pd
-from alphabase.pg_reader.pg_reader import pg_reader_provider
+from alphabase.pg_reader import pg_reader_provider
 
 SAMPLE_ID_NAME: str = "sample_id"
 
