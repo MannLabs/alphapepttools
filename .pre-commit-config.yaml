@@ -10,7 +10,9 @@ repos:
     rev: 4.0.1
     hooks:
       - id: nb-clean
-        args: [--preserve-cell-outputs]
+        args:
+          - --preserve-cell-outputs
+          - -- # no typo, see https://github.com/srstevenson/nb-clean?tab=readme-ov-file#cleaning-pre-commit-hook
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v4.0.0-alpha.8
     hooks:
