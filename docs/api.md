@@ -12,15 +12,14 @@
     pp.add_metadata
     pp.filter_by_metadata
     pp.filter_data_completeness
-    pp.load_diann_pg_matrix
     pp.scale_and_center
     pp.nanlog
     pp.detect_special_values
     pp.normalize
     pp.pca
-    pp.impute
     pp.impute_gaussian
     pp.impute_median
+    pp.impute_knn
     pp.add_core_proteome_mask
     pp.scanpy_pycombat
 

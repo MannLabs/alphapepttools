@@ -114,10 +114,7 @@ def drop_singleton_batches(
     return adata
 
 
-def scanpy_pycombat(
-    adata: ad.AnnData,
-    batch: str,
-) -> ad.AnnData:
+def scanpy_pycombat(adata: ad.AnnData, batch: str, layer: str | None = None, *, copy: bool = False) -> ad.AnnData:
     """Wrap scanpy's pp.combat function with error checks and preprocessing suggestions.
 
     Correct for the batch effect of a categorical covariate using an empirical
@@ -127,23 +124,28 @@ def scanpy_pycombat(
 
     Parameters
     ----------
-    adata : anndata.AnnData
+    adata
         Annotated data matrix, where rows are cells and columns are features. The data matrix
         cannot contain NaN values.
-    batch : str
+    batch
         Name of the batch feature in obs, the variation associated with this feature will be corrected.
         Missing values in this column will be replaced by one single "NA" batch.
+    layer
+        Name of the layer to batch correct. If None (default), the attribute adata.X is used.
+    copy
+        Whether to return a modified copy (True) of the anndata object. If False (default)
+        modifies the object inplace
 
     Returns
     -------
     adata : anndata.AnnData
-        Annotated data matrix with batch correction applied.
+        AnnData with batch correction applied to layer.
+        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
+        returns a modified copy.
 
     """
+    adata = adata.copy() if copy else adata
     logger.info(f" scanpy_pycombat: pply pyComBat to correct for {batch}")
-
-    # always copy for now, implement inplace later if needed
-    adata = adata.copy()
 
     # Ensure that X is numeric
     adata.X = adata.X.astype(float)
@@ -170,6 +172,12 @@ def scanpy_pycombat(
         )
         raise ValueError(" scanpy_pycombat: At least one batch contains only one single sample.")
 
-    scanpy.pp.combat(adata, key=batch, inplace=True)
+    # Adjust to scanpy API
+    batch_corrected_result = scanpy.pp.combat(adata, key=batch, inplace=False)
 
-    return adata
+    if layer is None:
+        adata.X = batch_corrected_result
+    else:
+        adata.layers[layer] = batch_corrected_result
+
+    return adata if copy else None

@@ -22,11 +22,13 @@ def log_dummy_data():
             },
             index=["a", "b", "c", "d", "e"],
         )
-        return ad.AnnData(data)
+        return ad.AnnData(data, layers={"new_layer": data})
 
     return create_data()
 
 
+@pytest.mark.parametrize("copy", [False, True])
+@pytest.mark.parametrize("layer", [None, "new_layer"])
 @pytest.mark.parametrize(
     ("base", "expected"),
     [
@@ -65,12 +67,20 @@ def log_dummy_data():
         ),
     ],
 )
-def test_nanlog(log_dummy_data, base, expected):
+def test_nanlog(log_dummy_data: ad.AnnData, base: float, expected: pd.DataFrame, layer: str, *, copy: bool) -> None:
     """Test nanlog function with different input types and log bases."""
 
     # AnnData
-    result = nanlog(log_dummy_data, base)
-    pd.testing.assert_frame_equal(result.to_df(), expected.to_df())
+    result = nanlog(log_dummy_data, base, layer=layer, copy=copy)
+
+    if copy:
+        assert isinstance(result, ad.AnnData)
+    else:
+        assert result is None
+
+    adata_updated = result if copy else log_dummy_data
+
+    pd.testing.assert_frame_equal(adata_updated.to_df(layer=layer), expected.to_df())
 
 
 @pytest.mark.parametrize(

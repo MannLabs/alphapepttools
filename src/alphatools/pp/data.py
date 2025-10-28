@@ -14,17 +14,6 @@ from sklearn.preprocessing import RobustScaler, StandardScaler
 logging.basicConfig(level=logging.INFO)
 
 
-### PLACEHOLDER FOR ALPHABASE DIANN-READER WRAPPERS ###
-def load_diann_pg_matrix(
-    data_path: str,
-) -> ad.AnnData:
-    """Placeholder for development; load diann sample data into a pandas dataframe"""
-    X = pd.read_pickle(data_path)
-
-    # to be replaced by AlphaBase PSM reader
-    return _to_anndata(X)
-
-
 def _to_anndata(
     data: np.ndarray | pd.DataFrame,
 ) -> ad.AnnData:
@@ -421,11 +410,8 @@ def data_column_to_array(
 
 
 def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
-    adata: ad.AnnData,
-    scaler: str = "standard",
-    from_layer: str | None = None,
-    to_layer: str | None = None,
-) -> None:
+    adata: ad.AnnData, scaler: str = "standard", layer: str | None = None, *, copy: bool = False
+) -> None | ad.AnnData:
     """Scale and center data.
 
     Either use standard or robust scaling. 'robust' scaling relies
@@ -434,22 +420,24 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
 
     Parameters
     ----------
-    adata : ad.AnnData
+    adata
         Anndata object with data to scale.
-    scaler : str
+    scaler
         Sklearn scaler to use. Available scalers are 'standard' and 'robust'.
-    from_layer : str, optional
-        Name of the layer to scale. If None, the data matrix X is used.
-    to_layer : str, optional
-        Name of the layer to scale. If None, the data matrix X is modified
+    layer
+        Name of the layer to scale. If None (default), the data matrix X is used.
+    copy
+        Whether to return a modified copy (True) of the anndata object. If False (default)
+        modifies the object inplace
 
     Returns
     -------
-    None
+    None | anndata.AnnData
+        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
+        returns a modified copy.
     """
-    mod_status = "inplace" if to_layer is None else f"to layer '{to_layer}'"
-
-    logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler {mod_status}.")
+    adata = adata.copy() if copy else adata
+    logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler.")
 
     if scaler == "standard":
         scaler = StandardScaler(with_mean=True, with_std=True)
@@ -458,12 +446,14 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     else:
         raise NotImplementedError(f"Scaler {scaler} not implemented.")
 
-    input_data = adata.X if from_layer is None else adata.layers[from_layer]
+    input_data = adata.X if layer is None else adata.layers[layer]
     result = scaler.fit_transform(input_data)
-    if to_layer is None:
+    if layer is None:
         adata.X = result
     else:
-        adata.layers[to_layer] = result
+        adata.layers[layer] = result
+
+    return adata if copy else None
 
 
 # TODO: Abstract class for validation of AnnData objects?
