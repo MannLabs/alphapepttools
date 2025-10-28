@@ -19,6 +19,7 @@
     pp.pca
     pp.impute_gaussian
     pp.impute_median
+    pp.impute_knn
     pp.add_core_proteome_mask
     pp.scanpy_pycombat
 
@@ -81,4 +82,19 @@
     io.read_psm_table
     io.read_pg_table
     io.AnnDataFactory
+```
+
+## Data
+
+Example data that can be accessed with the package.
+
+```{eval-rst}
+.. module:: alphatools.data
+.. currentmodule:: alphatools
+
+.. autosummary::
+    :toctree: generated
+
+    data.available_data
+    data.get_data
 ```
