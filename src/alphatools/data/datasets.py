@@ -41,7 +41,7 @@ class StudyData:
     description: str | None = None
 
     def download(self, output_dir: str | Path | None = None) -> Path:
-        """Download data"""
+        """Download data and return the path to it"""
         output_dir = Path.cwd() if output_dir is None else output_dir
         return DataShareDownloader(url=self.url, output_dir=output_dir).download()
 
