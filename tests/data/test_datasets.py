@@ -284,7 +284,7 @@ def test_study_collection_df_property_should_concatenate_all_studies(
 ) -> None:
     """Test that StudyCollection.df returns a concatenated DataFrame of all studies."""
     # given
-    expected_df = pd.concat([minimal_study.df, full_study.df])
+    expected_df = pd.concat([minimal_study.df, full_study.df], ignore_index=True)
 
     # when
     result_df = populated_collection.df

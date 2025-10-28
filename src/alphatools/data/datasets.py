@@ -112,13 +112,6 @@ class StudyCollection:
             else pd.DataFrame()
         )
 
-    def __repr__(self):
-        return self.df.__repr__()
-
-    def _repr_html_(self) -> str:
-        """HTML representation for Jupyter notebooks"""
-        return self.df.to_html()
-
     @classmethod
     def from_yaml(cls, file_path: str) -> "StudyCollection":
         """Initialize class with studies from yaml file"""
@@ -128,6 +121,13 @@ class StudyCollection:
         studies = [StudyData(**study) for study in studies]
 
         return cls().register(studies)
+
+    def __repr__(self):
+        return self.df.__repr__()
+
+    def _repr_html_(self) -> str:
+        """HTML representation for Jupyter notebooks"""
+        return self.df.to_html()
 
 
 # Initialize class and register all available studies
