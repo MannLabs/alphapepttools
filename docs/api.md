@@ -83,3 +83,18 @@
     io.read_pg_table
     io.AnnDataFactory
 ```
+
+## Data
+
+Example data that can be accessed with the package.
+
+```{eval-rst}
+.. module:: alphatools.data
+.. currentmodule:: alphatools
+
+.. autosummary::
+    :toctree: generated
+
+    data.available_data
+    data.get_data
+```

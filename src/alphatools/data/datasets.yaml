@@ -1,0 +1,39 @@
+- name: bader2020_pg_alphadia
+  url: https://datashare.biochem.mpg.de/s/yLpjkoQzMHpdDsB
+  search_engine: alphadia
+  citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
+  data_type: study_pg
+  description: Study on Cerebral Spinal Fluid of Alzheimer patients by Bader et al.
+
+- name: bader2020_pg_diann
+  url: https://datashare.biochem.mpg.de/s/3oZsya2L5bGnmtQ
+  search_engine: DiaNN
+  citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
+  data_type: study_pg
+  description: Study on Cerebral Spinal Fluid of Alzheimer patients by Bader et al.
+
+- name: spectronaut_pg
+  url: https://datashare.biochem.mpg.de/s/Ai9TiBTeaPHK5by
+  search_engine: spectronaut
+  data_type: pg
+  description: An example spectronaut report
+
+- name: bader2020_psm_alphadia
+  url: https://datashare.biochem.mpg.de/s/awYyxod4ksz86kk
+  search_engine: alphadia
+  citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
+  data_type: study_psm
+  description: Study on Cerebral Spinal Fluid of Alzheimer patients by Bader et al.
+
+- name: bader2020_psm_diann
+  url: https://datashare.biochem.mpg.de/s/c4Z5Yg6srKQyDym
+  search_engine: DiaNN
+  citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
+  data_type: study_psm
+  description: Study on Cerebral Spinal Fluid of Alzheimer patients by Bader et al.
+
+- name: spectronaut_psm
+  url: https://datashare.biochem.mpg.de/s/GtfJL49Rf9w78EE
+  search_engine: spectronaut
+  data_type: study_psm
+  description: An example spectronaut report
