@@ -24,7 +24,7 @@ class AnnDataFactory:
             - PsmDfCols.INTENSITY
 
         """
-        required_cols = [PsmDfCols.RAW_NAME, PsmDfCols.PROTEINS, PsmDfCols.INTENSIsTY]
+        required_cols = [PsmDfCols.RAW_NAME, PsmDfCols.PROTEINS, PsmDfCols.INTENSITY]
         missing_cols = [col for col in required_cols if col not in psm_df.columns]
         if missing_cols:
             raise ValueError(f"Missing required columns: {missing_cols}")
