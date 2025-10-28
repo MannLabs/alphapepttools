@@ -37,6 +37,7 @@
     tl.nan_safe_ttest_ind
     tl.diff_exp_ttest
     tl.diff_exp_alphaquant
+    tl.diff_exp_ebayes
 
 ```
 
