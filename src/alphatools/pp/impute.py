@@ -228,6 +228,17 @@ def impute_median(adata: ad.AnnData, layer: str | None = None, group_column: str
     return adata
 
 
+def _validate_knn_grouping(groups: dict, n_neighbors: int) -> None:
+    """Validate that knn grouping is valid"""
+    if any(pd.isna(key) for key in groups):
+        raise ValueError(
+            "`group_column` contains nans. The respective observations will be dropped and not get imputed.",
+        )
+
+    if any(len(indices) < n_neighbors for _, indices in groups.items()):
+        raise ValueError("Number of members per group must be greater equal number of `n_neighbors` for all groups.")
+
+
 def impute_knn(
     adata: ad.AnnData,
     group_column: str | None = None,
@@ -322,17 +333,8 @@ def impute_knn(
         _check_all_nan(data)
         data = _impute_knn(data, n_neighbors=n_neighbors, weights=weights, **kwargs)
     else:
-        if pd.isna(adata.obs[group_column]).any():
-            raise ValueError(
-                f"`group_column` {group_column} contains nans. The respective observations will be dropped and not get imputed.",
-            )
-
         groups = adata.obs.groupby(group_column, dropna=True).indices
-
-        if any(len(indices) < n_neighbors for _, indices in groups.items()):
-            raise ValueError(
-                "Number of members per group must be greater equal number of `n_neighbors` for all groups."
-            )
+        _validate_knn_grouping(groups=groups, n_neighbors=n_neighbors)
 
         for group_indices in groups.values():
             group = data[group_indices]
