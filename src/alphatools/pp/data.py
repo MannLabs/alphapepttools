@@ -14,17 +14,6 @@ from sklearn.preprocessing import RobustScaler, StandardScaler
 logging.basicConfig(level=logging.INFO)
 
 
-### PLACEHOLDER FOR ALPHABASE DIANN-READER WRAPPERS ###
-def load_diann_pg_matrix(
-    data_path: str,
-) -> ad.AnnData:
-    """Placeholder for development; load diann sample data into a pandas dataframe"""
-    X = pd.read_pickle(data_path)
-
-    # to be replaced by AlphaBase PSM reader
-    return _to_anndata(X)
-
-
 def _to_anndata(
     data: np.ndarray | pd.DataFrame,
 ) -> ad.AnnData:
@@ -212,6 +201,7 @@ def _filter_by_dict(
         feature = data[k] if k != "index" else data.index
         if v is None:
             current_mask = pd.Series(True, index=data.index)  # noqa: FBT003
+        # TODO: add function evaluation here if v is a callable, so that users can pass things like np.isnan or lambdas
         elif isinstance(v, str | numbers.Number):
             current_mask = feature == v
         elif isinstance(v, list):
