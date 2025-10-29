@@ -1,5 +1,7 @@
 import anndata as ad
 
+from alphatools.io.reader_columns import READER_COLUMNS
+
 from .anndata_factory import AnnDataFactory
 
 
@@ -13,7 +15,7 @@ def read_psm_table(
     sample_id_column: str | None = None,
     var_columns: str | list[str] | None = None,
     obs_columns: str | list[str] | None = None,
-    **kwargs,
+    **reader_kwargs,
 ) -> ad.AnnData:
     """Read peptide spectrum match tables to the :class:`anndata.AnnData` format
 
@@ -52,7 +54,7 @@ def read_psm_table(
     obs_columns
         Additional columns to annotate observations in the `adata.obs` table. Can be a single column name or a list of column names.
         Defaults to None.
-    **kwargs
+    **reader_kwargs
         Keyword arguments passed to :meth:`alphabase.psm_reader.psm_reader_provider.get_reader`
 
     Returns
@@ -83,6 +85,24 @@ def read_psm_table(
     :mod:`alphabase.psm_reader`
 
     """
+    # Determine which columns are not covered by the alphabase PsmDfCols
+    for _level in READER_COLUMNS[search_engine]:
+        covered_columns = set(READER_COLUMNS[search_engine][_level].values())
+
+    requested_columns = [x for x in [intensity_column, feature_id_column, sample_id_column] if x is not None]
+
+    for x in [var_columns, obs_columns]:
+        if x is not None:
+            if isinstance(x, list):
+                requested_columns.extend(x)
+            else:
+                requested_columns.append(x)
+
+    additional_columns = [col for col in requested_columns if col not in covered_columns]
+
+    if not additional_columns:
+        additional_columns = None
+
     return AnnDataFactory.from_files(
         file_paths=file_paths,
         reader_type=search_engine,
@@ -90,7 +110,8 @@ def read_psm_table(
         intensity_column=intensity_column,
         feature_id_column=feature_id_column,
         sample_id_column=sample_id_column,
-        **kwargs,
+        additional_columns=additional_columns,
+        **reader_kwargs,
     ).create_anndata(
         var_columns=var_columns,
         obs_columns=obs_columns,

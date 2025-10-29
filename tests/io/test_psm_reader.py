@@ -24,6 +24,7 @@ class TestReadPsmTable:
             intensity_column=None,
             feature_id_column=None,
             sample_id_column=None,
+            additional_columns=None,
         )
         mock_factory_instance.create_anndata.assert_called_once()
         assert result == mock_anndata
@@ -53,5 +54,6 @@ class TestReadPsmTable:
             intensity_column="custom_intensity",
             feature_id_column="custom_feature",
             sample_id_column="custom_sample",
+            additional_columns=["custom_intensity", "custom_feature", "custom_sample"],
             extra_param="extra_value",
         )

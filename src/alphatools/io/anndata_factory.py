@@ -149,7 +149,7 @@ class AnnDataFactory:
         feature_id_column: str | None = None,
         sample_id_column: str | None = None,
         additional_columns: list[str] | None = None,
-        **kwargs,
+        **reader_kwargs,
     ) -> "AnnDataFactory":
         """Create AnnDataFactory from PSM files.
 
@@ -170,7 +170,7 @@ class AnnDataFactory:
         additional_columns: list[str], optional
             Additional column names to be directly retained from the psm-table in order to enable experiment-specific
             metadata retention.
-        **kwargs
+        **reader_kwargs
             Additional arguments passed to PSM reader
 
         Returns
@@ -181,9 +181,10 @@ class AnnDataFactory:
         """
         reader_config = cls._get_reader_configuration(reader_type)
 
-        reader: PSMReaderBase = psm_reader_provider.get_reader(reader_type, **reader_config, **kwargs)
+        reader: PSMReaderBase = psm_reader_provider.get_reader(reader_type, **reader_config, **reader_kwargs)
 
         # Identify the columns we need for this reader, but which are not yet covered by alphabase PsmDfCols
+        # TODO: Once alphabase is updated we don't need this anymore since all columns will be covered by PsmDfCols
         extra_columns = cls._identify_non_alphabase_columns(reader_type)
 
         # Add user-specified additional columns
