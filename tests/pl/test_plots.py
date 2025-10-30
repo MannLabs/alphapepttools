@@ -83,7 +83,7 @@ def extract_label_plot_data(ax):
     [
         (
             [2, 1, 2, 1, 2, 1],
-            [2, 2, 3, 3, 1, 1],
+            [2, 2.1, 3, 3.1, 1, 1.1],
             ["middle_right", "middle_left", "top_right", "top_left", "bottom_right", "bottom_left"],
             None,
             # Expected lines read from plot visually
@@ -91,24 +91,31 @@ def extract_label_plot_data(ax):
                 {
                     "x_start": [1, 2, 1, 2, 1, 2],
                     "x_end": [1, 2, 1, 2, 1, 2],
-                    "y_start": [3, 3, 2, 2, 1, 1],
-                    "y_end": [3, 3, 2, 2, 1, 1],
+                    "y_start": [3.1, 3.0, 2.1, 2.0, 1.1, 1.0],
+                    "y_end": [3.1, 3.0, 2.1, 2.0, 1.1, 1.0],
                     "label": ["top_left", "top_right", "middle_left", "middle_right", "bottom_left", "bottom_right"],
                 }
             ),
         ),
         (
             [2, 1, 2, 1, 2, 1],
-            [2, 2, 3, 3, 1, 1],
+            [2, 2.1, 3, 3.1, 1, 1.1],
             ["middle_right", "middle_left", "top_right", "top_left", "bottom_right", "bottom_left"],
             (0.5, 2.5),
             # Expected lines read from plot visually
             pd.DataFrame(
                 {
-                    "x_start": [1, 1, 1, 2, 2, 2],
+                    "x_start": [1.0, 1.0, 1.0, 2.0, 2.0, 2.0],
                     "x_end": [0.5, 0.5, 0.5, 2.5, 2.5, 2.5],
-                    "y_start": [3, 2, 1, 3, 2, 1],
-                    "y_end": [3.094, 2.788, 2.484, 3.094, 2.788, 2.484],
+                    "y_start": [3.1, 2.1, 1.1, 3.0, 2.0, 1.0],
+                    "y_end": [
+                        3.0571428571428574,
+                        2.686502261783161,
+                        2.315861666423465,
+                        3.0571428571428574,
+                        2.686502261783161,
+                        2.315861666423465,
+                    ],
                     "label": ["top_left", "middle_left", "bottom_left", "top_right", "middle_right", "bottom_right"],
                 }
             ),

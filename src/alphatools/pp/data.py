@@ -197,6 +197,7 @@ def _filter_by_dict(
         feature = data[k] if k != "index" else data.index
         if v is None:
             current_mask = pd.Series(True, index=data.index)  # noqa: FBT003
+        # TODO: add function evaluation here if v is a callable, so that users can pass things like np.isnan or lambdas
         elif isinstance(v, str | numbers.Number):
             current_mask = feature == v
         elif isinstance(v, list):
