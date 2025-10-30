@@ -8,6 +8,7 @@ from scipy.stats import ttest_ind
 from alphatools.pp.data import filter_by_metadata
 from alphatools.tl.defaults import tl_defaults
 from alphatools.tl.stats import nan_safe_bh_correction
+from alphatools.tl.utils import validate_ttest_inputs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -121,74 +122,12 @@ def _standardize_diff_exp_ttest_results(
     current_result_df["protein"] = current_result_df.index
     current_result_df["method"] = "ttest"
 
-    # Calculate -log10 transformations
-    current_result_df["-log10(p_value)"] = -current_result_df["p_value"].apply(
-        lambda x: np.nan if x == 0 else np.log10(x)
-    )
-    current_result_df["-log10(fdr)"] = -current_result_df["fdr"].apply(lambda x: np.nan if x == 0 else np.log10(x))
+    # For p-values of exactly 0, use a very large value instead of NaN
+    current_result_df["-log10(p_value)"] = -current_result_df["p_value"].apply(lambda x: 300 if x == 0 else np.log10(x))
+    current_result_df["-log10(fdr)"] = -current_result_df["fdr"].apply(lambda x: 300 if x == 0 else np.log10(x))
 
     # Reorder columns to match DIFF_EXP_COLS
     return current_result_df[tl_defaults.DIFF_EXP_COLS].copy()
-
-
-def _validate_ttest_inputs(
-    adata: ad.AnnData,
-    between_column: str,
-    comparison: tuple,
-    min_valid_values: int,
-) -> tuple[str, str]:
-    """Validate inputs for group_ratios_ttest_ind.
-
-    Parameters
-    ----------
-    adata : ad.AnnData
-        AnnData object with features and observations.
-    between_column : str
-        Name of the column in adata.obs that contains the groups to compare.
-    comparison : tuple
-        Tuple of exactly two group names to compare (group1, group2).
-    min_valid_values : int
-        Minimum number of samples required per group.
-
-    Returns
-    -------
-    tuple[str, str]
-        Validated group names (g1, g2).
-
-    Raises
-    ------
-    ValueError
-        If any validation check fails.
-    """
-    # check that between column exists in obs
-    if between_column not in adata.obs.columns:
-        raise ValueError(f"Error in group_ratios_ttest_ind: Column '{between_column}' not found in adata.obs.")
-
-    # validate comparison tuple
-    if not isinstance(comparison, tuple) or len(comparison) != 2:  # noqa: PLR2004 since this is a tuple check
-        raise ValueError("Error in group_ratios_ttest_ind: 'comparison' must be a tuple of exactly two group names.")
-
-    g1, g2 = comparison
-    available_groups = set(adata.obs[between_column].dropna().unique())
-
-    # check that both groups exist in the data
-    if g1 not in available_groups:
-        raise ValueError(f"Error in group_ratios_ttest_ind: Group '{g1}' not found in column '{between_column}'.")
-    if g2 not in available_groups:
-        raise ValueError(f"Error in group_ratios_ttest_ind: Group '{g2}' not found in column '{between_column}'.")
-
-    # check that each group has sufficient samples to even meet min_valid_values
-    group_counts = adata.obs[between_column].value_counts()
-    if group_counts[g1] < min_valid_values:
-        raise ValueError(
-            f"Error in group_ratios_ttest_ind: Group '{g1}' has only {group_counts[g1]} samples, need at least {min_valid_values}."
-        )
-    if group_counts[g2] < min_valid_values:
-        raise ValueError(
-            f"Error in group_ratios_ttest_ind: Group '{g2}' has only {group_counts[g2]} samples, need at least {min_valid_values}."
-        )
-
-    return g1, g2
 
 
 def diff_exp_ttest(
@@ -224,7 +163,8 @@ def diff_exp_ttest(
         for the comparison between the two specified groups. Returns None if validation fails.
     """
     # Validate inputs
-    g1, g2 = _validate_ttest_inputs(adata, between_column, comparison, min_valid_values)
+    g1, g2 = validate_ttest_inputs(adata, between_column, comparison, min_valid_values)
+    print(f"Comparing groups: {g1} vs {g2}")
 
     # perform single comparison between the two specified groups
     g1_df = filter_by_metadata(adata, {between_column: g1}, axis=0).to_df()
