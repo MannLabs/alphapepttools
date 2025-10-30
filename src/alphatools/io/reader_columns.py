@@ -22,8 +22,8 @@ DEFAULT_COLUMNS_DICT = {
     },
     "alphadia": {
         "proteins": {
-            "intensity_column": None,
-            "feature_id_column": None,
+            "intensity_column": PsmDfCols.INTENSITY,
+            "feature_id_column": PsmDfCols.PROTEINS,
             "sample_id_column": PsmDfCols.RAW_NAME,
         },
         "precursors": {
