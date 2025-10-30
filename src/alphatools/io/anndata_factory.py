@@ -225,8 +225,9 @@ class AnnDataFactory:
         # TODO: Once alphabase is updated we don't need this anymore since all columns will be covered by PsmDfCols
         extra_columns = cls._identify_non_alphabase_columns(reader_type)
 
-        # Add user-specified additional columns
+        # Add user-specified additional columns which are not in PsmDfCols.get_values()
         if additional_columns:
+            additional_columns = [col for col in additional_columns if col not in PsmDfCols.get_values()]
             extra_columns.extend(additional_columns)
 
         # Add identity mappings for extra columns so they're retained during reading
