@@ -123,11 +123,11 @@ def pooled_median_absolute_deviation(
       quantification data using PRONE. *Briefings in Bioinformatics*, 26, bbaf201 (2025).
     """
     groups = adata.obs.groupby(group_key)
-    X = adata.X if layer is None else adata.layers[layer]
+    data = adata.X if layer is None else adata.layers[layer]
 
     pmad_groupwise = {}
     for group_name, indices in groups.indices.items():
-        pmad_groupwise[group_name] = _pmad(X[indices, :])
+        pmad_groupwise[group_name] = _pmad(data[indices, :])
 
     if inplace:
         adata.uns = _set_nested_dict(adata.uns, value=pmad_groupwise, keys=[METRICS_KEY, PMAD_KEY])
