@@ -122,9 +122,9 @@ def test_create_anndata_with_valid_dataframe(
 
     factory = AnnDataFactory(
         psm_df=psm_df,
-        intensity=intensity_column,
-        sample_id=sample_id_column,
-        feature_id=feature_id_column,
+        intensity_column=intensity_column,
+        sample_id_column=sample_id_column,
+        feature_id_column=feature_id_column,
     )
 
     adata = factory.create_anndata(

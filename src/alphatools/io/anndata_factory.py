@@ -18,34 +18,32 @@ class AnnDataFactory:
     def __init__(
         self,
         psm_df: pd.DataFrame,
-        intensity: str = PsmDfCols.INTENSITY,
-        sample_id: str = PsmDfCols.RAW_NAME,
-        feature_id: str = PsmDfCols.PROTEINS,
+        intensity_column: str = PsmDfCols.INTENSITY,
+        sample_id_column: str = PsmDfCols.RAW_NAME,
+        feature_id_column: str = PsmDfCols.PROTEINS,
     ):
         """Initialize AnnDataFactory.
 
-        The anndata factory retains its choice for intensity,
-        sample_id and feature_id columns. This is a way to process
-        any dataframe with the AnnDataFactory class, however the default
-        use-case is to call it in the context of the psm_reader function,
-        operating on alphabase-standardized column names (handled by from_files).
+        This is a way to process any dataframe with the AnnDataFactory class,
+        however the default use-case is to call it in the context of the psm_reader
+        function, operating on alphabase-standardized column names (handled by from_files).
 
         Parameters
         ----------
         psm_df: pd.DataFrame
             Dataframe containing precursor intensity, sample_id and feature_id columns in a longtable
-        intensity: str
+        intensity_column: str
             Column containing the precursor intensities
-        sample_id: str
+        sample_id_column: str
             Column containing the sample identifiers
-        feature_id: str
+        feature_id_column: str
             Column dictating which feature ends up as the AnnData's var_names after the pivoting operation
 
         """
         self._psm_df = psm_df
-        self.intensity = intensity
-        self.sample_id = sample_id
-        self.feature_id = feature_id
+        self._intensity_column = intensity_column
+        self._sample_id_column = sample_id_column
+        self._feature_id_column = feature_id_column
 
     def create_anndata(
         self,
@@ -73,9 +71,9 @@ class AnnDataFactory:
         # Create pivot table: raw names x proteins with intensity values
         pivot_df = pd.pivot_table(
             self._psm_df,
-            index=self.sample_id,
-            columns=self.feature_id,
-            values=self.intensity,
+            index=self._sample_id_column,
+            columns=self._feature_id_column,
+            values=self._intensity_column,
             aggfunc="first",  # DataFrameGroupBy.first -> will skip NA
             dropna=False,
         )
@@ -88,8 +86,8 @@ class AnnDataFactory:
         )
 
         # Extract additional metadata if needed
-        adata = self._add_metadata_from_columns(adata, var_columns, self.feature_id, axis=1)
-        return self._add_metadata_from_columns(adata, obs_columns, self.sample_id, axis=0)
+        adata = self._add_metadata_from_columns(adata, var_columns, self._feature_id_column, axis=1)
+        return self._add_metadata_from_columns(adata, obs_columns, self._sample_id_column, axis=0)
 
     def _add_metadata_from_columns(
         self,
@@ -208,9 +206,9 @@ class AnnDataFactory:
         kwargs_for_init = {
             k: v
             for k, v in {
-                "intensity": intensity_column,
-                "feature_id": feature_id_column,
-                "sample_id": sample_id_column,
+                "intensity_column": intensity_column,
+                "feature_id_column": feature_id_column,
+                "sample_id_column": sample_id_column,
             }.items()
             if v is not None
         }
