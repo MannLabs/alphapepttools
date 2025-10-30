@@ -54,7 +54,7 @@ def test_alphapept_pg_reader(example_alphapept_csv: tuple[Path, Path]):
     # Validate that measurement_regex works as expected
     adata = read_pg_table(file_path, search_engine="alphapept", measurement_regex="lfq")
 
-    reference_df = pd.read_parquet(reference_file_path).replace({"": np.nan}).astype(float)
+    reference_df = pd.read_parquet(reference_file_path).replace({"": np.nan}).astype(np.float64)
     # Reference .var attribute, validate parsing of metadata
     reference_var = pd.read_parquet(var_data_path)
 
