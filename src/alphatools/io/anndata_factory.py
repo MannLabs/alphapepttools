@@ -18,9 +18,9 @@ class AnnDataFactory:
     def __init__(
         self,
         psm_df: pd.DataFrame,
-        intensity_column: str = PsmDfCols.INTENSITY,
-        sample_id_column: str = PsmDfCols.RAW_NAME,
-        feature_id_column: str = PsmDfCols.PROTEINS,
+        intensity_column: str,
+        sample_id_column: str,
+        feature_id_column: str,
     ):
         """Initialize AnnDataFactory.
 
@@ -202,18 +202,23 @@ class AnnDataFactory:
         feature_id_column = feature_id_column or defaults.get("feature_id_column")
         sample_id_column = sample_id_column or defaults.get("sample_id_column")
 
-        # Build kwargs, filtering out None values
-        kwargs_for_init = {
-            k: v
-            for k, v in {
-                "intensity_column": intensity_column,
-                "feature_id_column": feature_id_column,
-                "sample_id_column": sample_id_column,
-            }.items()
-            if v is not None
-        }
+        # Validate that all required columns are present
+        if intensity_column is None:
+            msg = f"intensity_column is required but not provided and no default found for reader_type='{reader_type}' and level='{level}'"
+            raise ValueError(msg)
+        if feature_id_column is None:
+            msg = f"feature_id_column is required but not provided and no default found for reader_type='{reader_type}' and level='{level}'"
+            raise ValueError(msg)
+        if sample_id_column is None:
+            msg = f"sample_id_column is required but not provided and no default found for reader_type='{reader_type}' and level='{level}'"
+            raise ValueError(msg)
 
-        return cls(psm_df, **kwargs_for_init)
+        return cls(
+            psm_df,
+            intensity_column=intensity_column,
+            feature_id_column=feature_id_column,
+            sample_id_column=sample_id_column,
+        )
 
     @staticmethod
     def _identify_non_alphabase_columns(reader_type: str) -> list[str]:
