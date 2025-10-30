@@ -26,7 +26,7 @@ def adata_pmad(count_data_pmad) -> tuple[np.ndarray, float]:
     sample_types = ["A"] * n_obs + ["B"] * n_obs + ["C"] * n_obs
     X = np.concatenate([X for _ in range(3)], axis=0)
 
-    adata = ad.AnnData(X=X, obs=pd.DataFrame({"sample_type": sample_types}))
+    adata = ad.AnnData(X=X, layers={"layer": X}, obs=pd.DataFrame({"sample_type": sample_types}))
 
     return {"adata": adata, "pmad": {"A": pmad, "B": pmad, "C": pmad}, "group_key": "sample_type"}
 
@@ -57,18 +57,24 @@ def test__pmad(count_data_pmad) -> None:
     assert _pmad(x=X) == pmad
 
 
-def test_pooled_median_absolute_deviation_return(adata_pmad) -> None:
+@pytest.mark.parametrize("layer", [None, "layer"])
+def test_pooled_median_absolute_deviation_return(adata_pmad, layer) -> None:
     """Test if `pooled_median_absolute_deviation` computes group-wise PMAD correctly"""
     reference = pd.DataFrame.from_dict(adata_pmad["pmad"], orient="index", columns=["pmad"])
 
-    pmad = pooled_median_absolute_deviation(adata_pmad["adata"], group_key=adata_pmad["group_key"], inplace=False)
+    pmad = pooled_median_absolute_deviation(
+        adata_pmad["adata"], group_key=adata_pmad["group_key"], layer=layer, inplace=False
+    )
 
     assert pmad.equals(reference)
 
 
-def test_pooled_median_absolute_deviation_inplace(adata_pmad) -> None:
+@pytest.mark.parametrize("layer", [None, "layer"])
+def test_pooled_median_absolute_deviation_inplace(adata_pmad, layer) -> None:
     """Test if `pooled_median_absolute_deviation` sets PMAD correctly in anndata object"""
     reference = adata_pmad["pmad"]
-    adata = pooled_median_absolute_deviation(adata_pmad["adata"], group_key=adata_pmad["group_key"], inplace=True)
+    adata = adata_pmad["adata"].copy()
+
+    pooled_median_absolute_deviation(adata, group_key=adata_pmad["group_key"], layer=layer, inplace=True)
 
     assert adata.uns.get("metrics").get("pmad") == reference
