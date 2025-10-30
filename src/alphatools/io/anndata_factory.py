@@ -45,50 +45,6 @@ class AnnDataFactory:
         self._sample_id_column = sample_id_column
         self._feature_id_column = feature_id_column
 
-    def create_anndata(
-        self,
-        var_columns: str | list[str] | None = None,
-        obs_columns: str | list[str] | None = None,
-    ) -> ad.AnnData:
-        """Create AnnData object from PSM DataFrame.
-
-        Parameters
-        ----------
-        var_columns : Union[str, List[str]], optional
-            Additional columns to include in `var` of the AnnData object, by default None
-        obs_columns : Union[str, List[str]], optional
-            Additional columns to include in `obs` of the AnnData object, by default None
-
-        Returns
-        -------
-        ad.AnnData
-            AnnData object where:
-            - obs (rows) are raw names
-            - var (columns) are proteins
-            - X contains intensity values
-
-        """
-        # Create pivot table: raw names x proteins with intensity values
-        pivot_df = pd.pivot_table(
-            self._psm_df,
-            index=self._sample_id_column,
-            columns=self._feature_id_column,
-            values=self._intensity_column,
-            aggfunc="first",  # DataFrameGroupBy.first -> will skip NA
-            dropna=False,
-        )
-
-        # Create Nxp AnnData object where N=raw names and p=features (e.g. proteins)
-        adata = ad.AnnData(
-            X=pivot_df.values,
-            obs=pd.DataFrame(index=pivot_df.index),
-            var=pd.DataFrame(index=pivot_df.columns),
-        )
-
-        # Extract additional metadata if needed
-        adata = self._add_metadata_from_columns(adata, var_columns, self._feature_id_column, axis=1)
-        return self._add_metadata_from_columns(adata, obs_columns, self._sample_id_column, axis=0)
-
     def _add_metadata_from_columns(
         self,
         adata: ad.AnnData,
@@ -135,6 +91,50 @@ class AnnDataFactory:
             keep_data_shape=True,
             verbose=False,
         )
+
+    def create_anndata(
+        self,
+        var_columns: str | list[str] | None = None,
+        obs_columns: str | list[str] | None = None,
+    ) -> ad.AnnData:
+        """Create AnnData object from PSM DataFrame.
+
+        Parameters
+        ----------
+        var_columns : Union[str, List[str]], optional
+            Additional columns to include in `var` of the AnnData object, by default None
+        obs_columns : Union[str, List[str]], optional
+            Additional columns to include in `obs` of the AnnData object, by default None
+
+        Returns
+        -------
+        ad.AnnData
+            AnnData object where:
+            - obs (rows) are raw names
+            - var (columns) are proteins
+            - X contains intensity values
+
+        """
+        # Create pivot table: raw names x proteins with intensity values
+        pivot_df = pd.pivot_table(
+            self._psm_df,
+            index=self._sample_id_column,
+            columns=self._feature_id_column,
+            values=self._intensity_column,
+            aggfunc="first",  # DataFrameGroupBy.first -> will skip NA
+            dropna=False,
+        )
+
+        # Create Nxp AnnData object where N=raw names and p=features (e.g. proteins)
+        adata = ad.AnnData(
+            X=pivot_df.values,
+            obs=pd.DataFrame(index=pivot_df.index),
+            var=pd.DataFrame(index=pivot_df.columns),
+        )
+
+        # Extract additional metadata if needed
+        adata = self._add_metadata_from_columns(adata, var_columns, self._feature_id_column, axis=1)
+        return self._add_metadata_from_columns(adata, obs_columns, self._sample_id_column, axis=0)
 
     @staticmethod
     def _identify_non_alphabase_columns(reader_type: str) -> list[str]:
