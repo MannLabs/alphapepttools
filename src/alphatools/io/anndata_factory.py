@@ -8,7 +8,7 @@ from alphabase.psm_reader import PSMReaderBase
 from alphabase.psm_reader.keys import PsmDfCols
 from alphabase.psm_reader.psm_reader import psm_reader_provider
 
-from alphatools.io.reader_columns import READER_COLUMNS
+from alphatools.io.reader_columns import DEFAULT_COLUMNS_DICT
 from alphatools.pp.data import add_metadata
 
 
@@ -197,7 +197,7 @@ class AnnDataFactory:
         psm_df = reader.load(file_paths)
 
         # Get defaults for this reader/level, user input overrides
-        defaults = READER_COLUMNS.get(reader_type, {}).get(level, {})
+        defaults = DEFAULT_COLUMNS_DICT.get(reader_type, {}).get(level, {})
         intensity_column = intensity_column or defaults.get("intensity_column")
         feature_id_column = feature_id_column or defaults.get("feature_id_column")
         sample_id_column = sample_id_column or defaults.get("sample_id_column")
@@ -238,17 +238,13 @@ class AnnDataFactory:
         required_columns = list(
             {
                 col_value
-                for level_dict in READER_COLUMNS.get(reader_type, {}).values()
+                for level_dict in DEFAULT_COLUMNS_DICT.get(reader_type, {}).values()
                 for col_value in level_dict.values()
             }
         )
 
         # Get all PsmDfCols constant values (the actual column name strings)
-        psm_df_cols_values = {
-            getattr(PsmDfCols, attr)
-            for attr in dir(PsmDfCols)
-            if not attr.startswith("_") and isinstance(getattr(PsmDfCols, attr), str)
-        }
+        psm_df_cols_values = PsmDfCols.get_values()
 
         # Filter for non-standard columns that need retention (not covered by PsmDfCols)
         return [col for col in required_columns if col not in psm_df_cols_values]

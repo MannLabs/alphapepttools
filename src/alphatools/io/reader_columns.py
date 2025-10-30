@@ -2,7 +2,7 @@
 
 from alphabase.psm_reader.keys import PsmDfCols
 
-READER_COLUMNS = {
+DEFAULT_COLUMNS_DICT = {
     "diann": {
         "proteins": {
             "intensity_column": PsmDfCols.INTENSITY,
