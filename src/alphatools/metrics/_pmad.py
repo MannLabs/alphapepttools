@@ -73,8 +73,8 @@ def _pmad(x: np.ndarray) -> float:
 
 
 def pooled_median_absolute_deviation(
-    adata: ad.AnnData, group_key: str, *, inplace: bool = True
-) -> ad.AnnData | pd.DataFrame:
+    adata: ad.AnnData, group_key: str, *, layer: str | None = None, inplace: bool = True
+) -> None | pd.DataFrame:
     r"""Compute pooled median absolute deviation (PMAD) within sample groups.
 
     The PMAD quantifies the variability of features across samples within biologically defined groups.
@@ -97,16 +97,18 @@ def pooled_median_absolute_deviation(
     ----------
     adata : AnnData
         Annotated data matrix.
-    group_key : str
+    group_key
         Column in `adata.obs` that defines the sample groups to evaluate (e.g., biological replicates or batches).
-    inplace : bool, default: True
-        If `True`, the results are added to `adata.uns['pmad']`.
+    layer
+        Layer for which the metric is computed.
+    inplace
+        If `True`, the results are added to `adata.uns['pmad']`. The object is changed in place
         If `False`, a :class:`pandas.DataFrame` with the PMAD values is returned.
 
     Returns
     -------
     AnnData or pandas.DataFrame
-        If `inplace=True`, returns the input `adata` with PMAD values stored in `adata.uns["metrics"]["pmad"]`.
+        If `inplace=True`, modifies the input `adata` with PMAD values stored in `adata.uns["metrics"]["pmad"]`.
         If `inplace=False`, returns a DataFrame containing PMAD values per group.
 
     Notes
@@ -121,12 +123,12 @@ def pooled_median_absolute_deviation(
       quantification data using PRONE. *Briefings in Bioinformatics*, 26, bbaf201 (2025).
     """
     groups = adata.obs.groupby(group_key)
+    data = adata.X if layer is None else adata.layers[layer]
 
     pmad_groupwise = {}
     for group_name, indices in groups.indices.items():
-        pmad_groupwise[group_name] = _pmad(adata[indices, :].X)
+        pmad_groupwise[group_name] = _pmad(data[indices, :])
 
     if inplace:
         adata.uns = _set_nested_dict(adata.uns, value=pmad_groupwise, keys=[METRICS_KEY, PMAD_KEY])
-        return adata
     return pd.DataFrame.from_dict(pmad_groupwise, orient="index", columns=[PMAD_KEY])
