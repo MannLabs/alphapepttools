@@ -168,7 +168,12 @@ def test_create_anndata_with_missing_intensity_values():
             PsmDfCols.INTENSITY: [100, np.nan],
         }
     )
-    factory = AnnDataFactory(psm_df)
+    factory = AnnDataFactory(
+        psm_df=psm_df,
+        intensity_column=PsmDfCols.INTENSITY,
+        sample_id_column=PsmDfCols.RAW_NAME,
+        feature_id_column=PsmDfCols.PROTEINS,
+    )
 
     # when
     adata = factory.create_anndata()
@@ -188,7 +193,12 @@ def test_create_anndata_with_duplicate_proteins():
             PsmDfCols.INTENSITY: [100, 200, 300],
         }
     )
-    factory = AnnDataFactory(psm_df)
+    factory = AnnDataFactory(
+        psm_df=psm_df,
+        intensity_column=PsmDfCols.INTENSITY,
+        sample_id_column=PsmDfCols.RAW_NAME,
+        feature_id_column=PsmDfCols.PROTEINS,
+    )
 
     # when
     adata = factory.create_anndata()
@@ -205,7 +215,12 @@ def test_create_anndata_with_duplicate_proteins():
 def test_create_anndata_with_empty_dataframe():
     """Test that an empty AnnData object is created when the input DataFrame is empty."""
     psm_df = pd.DataFrame(columns=[PsmDfCols.RAW_NAME, PsmDfCols.PROTEINS, PsmDfCols.INTENSITY])
-    factory = AnnDataFactory(psm_df)
+    factory = AnnDataFactory(
+        psm_df=psm_df,
+        intensity_column=PsmDfCols.INTENSITY,
+        sample_id_column=PsmDfCols.RAW_NAME,
+        feature_id_column=PsmDfCols.PROTEINS,
+    )
 
     # when
     adata = factory.create_anndata()
@@ -255,7 +270,11 @@ def test_from_files_nan(mock_reader, test_psm_df, test_protein_anndata):
         }
     )
 
-    factory = AnnDataFactory.from_files(["file1", "file2"], reader_type="some_reader_type")
+    factory = AnnDataFactory.from_files(
+        file_paths=["file1", "file2"],
+        reader_type="diann",
+        level="proteins",
+    )
 
     # when
     adata = factory.create_anndata()
@@ -265,7 +284,7 @@ def test_from_files_nan(mock_reader, test_psm_df, test_protein_anndata):
     assert adata.var.equals(comparison_adata.var)
     assert adata.to_df().equals(comparison_adata.to_df())
 
-    mock_reader.assert_called_once_with("some_reader_type")
+    mock_reader.assert_called_once_with("diann", filter_first_search_fdr=True, filter_second_search_fdr=True)
 
 
 def test_get_reader_configuration_with_valid_reader_type():
