@@ -150,7 +150,7 @@ class AnnDataFactory:
         list[str]
             List of column names that need special retention (not in PsmDfCols)
         """
-        # Get all required columns from all levels for this reader type
+        # Get all required columns from all levels for this reader type from the defaults
         required_columns = list(
             {
                 col_value
@@ -162,7 +162,7 @@ class AnnDataFactory:
         # Get all PsmDfCols constant values (the actual column name strings)
         psm_df_cols_values = PsmDfCols.get_values()
 
-        # Filter for non-standard columns that need retention (not covered by PsmDfCols)
+        # Return those columns which are required for the current reader but not covered by PsmDfCols yet
         return [col for col in required_columns if col not in psm_df_cols_values]
 
     @classmethod
