@@ -136,6 +136,46 @@ class AnnDataFactory:
             verbose=False,
         )
 
+    @staticmethod
+    def _identify_non_alphabase_columns(reader_type: str) -> list[str]:
+        """Identify columns from READER_COLUMNS that are not covered by PsmDfCols.
+
+        Parameters
+        ----------
+        reader_type : str
+            Type of PSM reader
+
+        Returns
+        -------
+        list[str]
+            List of column names that need special retention (not in PsmDfCols)
+        """
+        # Get all required columns from all levels for this reader type
+        required_columns = list(
+            {
+                col_value
+                for level_dict in DEFAULT_COLUMNS_DICT.get(reader_type, {}).values()
+                for col_value in level_dict.values()
+            }
+        )
+
+        # Get all PsmDfCols constant values (the actual column name strings)
+        psm_df_cols_values = PsmDfCols.get_values()
+
+        # Filter for non-standard columns that need retention (not covered by PsmDfCols)
+        return [col for col in required_columns if col not in psm_df_cols_values]
+
+    @classmethod
+    def _get_reader_configuration(cls, reader_type: str) -> dict[str, dict[str, Any]]:
+        """Get reader-specific configuration for mapping PSMs to anndata."""
+        reader_configs = {
+            "diann": {
+                "filter_first_search_fdr": True,
+                "filter_second_search_fdr": True,
+            }
+        }
+        return reader_configs.get(reader_type, {})
+
     @classmethod
     def from_files(
         cls,
@@ -219,43 +259,3 @@ class AnnDataFactory:
             feature_id_column=feature_id_column,
             sample_id_column=sample_id_column,
         )
-
-    @staticmethod
-    def _identify_non_alphabase_columns(reader_type: str) -> list[str]:
-        """Identify columns from READER_COLUMNS that are not covered by PsmDfCols.
-
-        Parameters
-        ----------
-        reader_type : str
-            Type of PSM reader
-
-        Returns
-        -------
-        list[str]
-            List of column names that need special retention (not in PsmDfCols)
-        """
-        # Get all required columns from all levels for this reader type
-        required_columns = list(
-            {
-                col_value
-                for level_dict in DEFAULT_COLUMNS_DICT.get(reader_type, {}).values()
-                for col_value in level_dict.values()
-            }
-        )
-
-        # Get all PsmDfCols constant values (the actual column name strings)
-        psm_df_cols_values = PsmDfCols.get_values()
-
-        # Filter for non-standard columns that need retention (not covered by PsmDfCols)
-        return [col for col in required_columns if col not in psm_df_cols_values]
-
-    @classmethod
-    def _get_reader_configuration(cls, reader_type: str) -> dict[str, dict[str, Any]]:
-        """Get reader-specific configuration for mapping PSMs to anndata."""
-        reader_configs = {
-            "diann": {
-                "filter_first_search_fdr": True,
-                "filter_second_search_fdr": True,
-            }
-        }
-        return reader_configs.get(reader_type, {})
