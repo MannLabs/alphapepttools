@@ -12,12 +12,14 @@
     pp.add_metadata
     pp.filter_by_metadata
     pp.filter_data_completeness
-    pp.load_diann_pg_matrix
     pp.scale_and_center
     pp.nanlog
     pp.detect_special_values
     pp.normalize
-    pp.impute
+    pp.impute_gaussian
+    pp.impute_median
+    pp.impute_knn
+    pp.scanpy_pycombat
 ```
 
 ## Tools
@@ -77,4 +79,19 @@
     io.read_psm_table
     io.read_pg_table
     io.AnnDataFactory
+```
+
+## Data
+
+Example data that can be accessed with the package.
+
+```{eval-rst}
+.. module:: alphatools.data
+.. currentmodule:: alphatools
+
+.. autosummary::
+    :toctree: generated
+
+    data.available_data
+    data.get_data
 ```
