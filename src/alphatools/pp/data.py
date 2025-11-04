@@ -587,9 +587,14 @@ def handle_feature_completeness(  # noqa: C901, PLR0912
     n_dropped = drop_mask.sum()
 
     # Perform action
-    if action == "drop" and drop_mask.any():
-        adata._inplace_subset_var(~drop_mask)  # noqa: SLF001
-        logging.info(f"Dropped {n_dropped} / {drop_mask.size} features with >{max_missing:.2f} missing in any group.")
+    if action == "drop":
+        if drop_mask.any():
+            adata = adata[:, ~drop_mask]
+            logging.info(
+                f"Dropped {n_dropped} / {drop_mask.size} features with >{max_missing:.2f} missing in any group."
+            )
+        else:
+            logging.info("No features dropped.")
     elif action == "flag":
         if new_var_column_name is None:
             new_var_column_name = "passed_missing_filter"
