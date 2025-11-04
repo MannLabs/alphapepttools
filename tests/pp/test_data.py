@@ -801,7 +801,7 @@ class TestScaleAndCenter:
 
 
 @pytest.fixture
-def data_handle_feature_completeness():
+def data_test_completeness_filter():
     def make_dummy_data():
         X = pd.DataFrame(
             {
@@ -830,7 +830,7 @@ def data_handle_feature_completeness():
         adata.var = feature_metadata
         return adata
 
-    return make_dummy_data
+    return make_dummy_data()
 
 
 # test data completeness filtering
@@ -973,7 +973,7 @@ def data_handle_feature_completeness():
     ],
 )
 def test_handle_feature_completeness(
-    data_handle_feature_completeness,
+    data_test_completeness_filter,
     expected_columns,
     expected_rows,
     max_missing,
@@ -983,11 +983,11 @@ def test_handle_feature_completeness(
     new_var_column_name="completeness_filter_flag",
 ):
     # given
-    adata = data_handle_feature_completeness().copy()
+    adata = data_test_completeness_filter().copy()
 
     # when
     adata_result = at.pp.handle_feature_completeness(
-        adata=adata.copy(),
+        adata=adata,
         max_missing=max_missing,
         action=action,
         group_column=group_column,
@@ -999,8 +999,8 @@ def test_handle_feature_completeness(
     if action == "flag":
         # --- flagging mode ---
         # shape unchanged
-        assert adata_result.var.index.to_list() == adata.var.index.to_list()
-        assert adata_result.obs.index.to_list() == adata.obs.index.to_list()
+        assert adata_result.var.index.to_list() == data_test_completeness_filter.var.index.to_list()
+        assert adata_result.obs.index.to_list() == data_test_completeness_filter.obs.index.to_list()
         # new flag column present
         assert new_var_column_name in adata_result.var.columns
         assert adata_result.var[new_var_column_name].dtype == bool
