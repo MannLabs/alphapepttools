@@ -11,7 +11,7 @@
 
     pp.add_metadata
     pp.filter_by_metadata
-    pp.filter_data_completeness
+    pp.handle_feature_completeness
     pp.scale_and_center
     pp.nanlog
     pp.detect_special_values
@@ -35,6 +35,7 @@
     tl.nan_safe_ttest_ind
     tl.diff_exp_ttest
     tl.diff_exp_alphaquant
+    tl.pca
 
 ```
 
