@@ -801,7 +801,7 @@ class TestScaleAndCenter:
 
 
 @pytest.fixture
-def data_test_completeness_filter():
+def data_handle_feature_completeness():
     def make_dummy_data():
         X = pd.DataFrame(
             {
@@ -834,7 +834,7 @@ def data_test_completeness_filter():
 
 
 # test data completeness filtering
-@pytest.mark.parametrize("subset", [False, True])
+@pytest.mark.parametrize("action", ["flag", "drop"])
 @pytest.mark.parametrize(
     ("expected_columns", "expected_rows", "max_missing", "group_column", "groups"),
     [
@@ -973,40 +973,39 @@ def data_test_completeness_filter():
     ],
 )
 def test_handle_feature_completeness(
-    data_test_completeness_filter,
+    data_handle_feature_completeness,
     expected_columns,
     expected_rows,
     max_missing,
     group_column,
     groups,
-    subset,
-    flag_column="completeness_filter_flag",
+    action,
+    new_var_column_name="completeness_filter_flag",
 ):
     # given
-    adata = data_test_completeness_filter.copy()
+    adata = data_handle_feature_completeness.copy()
 
     # when
     adata_result = at.pp.handle_feature_completeness(
         adata=adata.copy(),
         max_missing=max_missing,
-        action="drop",
+        action=action,
         group_column=group_column,
         groups=groups,
-        subset=subset,
-        flag_column=flag_column,
+        new_var_column_name=new_var_column_name,
     )
 
     # then
-    if not subset:
+    if action == "flag":
         # --- flagging mode ---
         # shape unchanged
-        assert adata_result.var.index.to_list() == data_test_completeness_filter.var.index.to_list()
-        assert adata_result.obs.index.to_list() == data_test_completeness_filter.obs.index.to_list()
+        assert adata_result.var.index.to_list() == data_handle_feature_completeness.var.index.to_list()
+        assert adata_result.obs.index.to_list() == data_handle_feature_completeness.obs.index.to_list()
         # new flag column present
-        assert flag_column in adata_result.var.columns
-        assert adata_result.var[flag_column].dtype == bool
+        assert new_var_column_name in adata_result.var.columns
+        assert adata_result.var[new_var_column_name].dtype == bool
     else:
-        # --- subsetting mode ---
+        # --- filtering mode ---
         # shape matches expected columns/rows
         assert adata_result.var.index.to_list() == expected_columns
         assert adata_result.obs.index.to_list() == expected_rows
