@@ -986,7 +986,7 @@ def test_handle_feature_completeness(
     adata = data_test_completeness_filter.copy()
 
     # when
-    adata_result = at.pp.handle_feature_completeness(
+    at.pp.handle_feature_completeness(
         adata=adata,
         max_missing=max_missing,
         action=action,
@@ -999,16 +999,16 @@ def test_handle_feature_completeness(
     if action == "flag":
         # --- flagging mode ---
         # shape unchanged
-        assert adata_result.var.index.to_list() == data_test_completeness_filter.var.index.to_list()
-        assert adata_result.obs.index.to_list() == data_test_completeness_filter.obs.index.to_list()
+        assert adata.var.index.to_list() == data_test_completeness_filter.var.index.to_list()
+        assert adata.obs.index.to_list() == data_test_completeness_filter.obs.index.to_list()
         # new flag column present
-        assert new_var_column_name in adata_result.var.columns
-        assert adata_result.var[new_var_column_name].dtype == bool
+        assert new_var_column_name in adata.var.columns
+        assert adata.var[new_var_column_name].dtype == bool
     else:
         # --- filtering mode ---
         # shape matches expected columns/rows
-        assert adata_result.var.index.to_list() == expected_columns
-        assert adata_result.obs.index.to_list() == expected_rows
+        assert adata.var.index.to_list() == expected_columns
+        assert adata.obs.index.to_list() == expected_rows
 
 
 # test data_column_to_array
