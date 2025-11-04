@@ -972,7 +972,7 @@ def data_test_completeness_filter():
         ),
     ],
 )
-def test_filter_data_completeness(
+def test_handle_feature_completeness(
     data_test_completeness_filter,
     expected_columns,
     expected_rows,
@@ -986,9 +986,10 @@ def test_filter_data_completeness(
     adata = data_test_completeness_filter.copy()
 
     # when
-    adata_result = at.pp.filter_data_completeness(
+    adata_result = at.pp.handle_feature_completeness(
         adata=adata.copy(),
         max_missing=max_missing,
+        action="drop",
         group_column=group_column,
         groups=groups,
         subset=subset,
