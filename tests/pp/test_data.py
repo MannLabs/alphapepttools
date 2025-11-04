@@ -983,7 +983,7 @@ def test_handle_feature_completeness(
     new_var_column_name="completeness_filter_flag",
 ):
     # given
-    adata = data_test_completeness_filter().copy()
+    adata = data_test_completeness_filter.copy()
 
     # when
     adata_result = at.pp.handle_feature_completeness(
