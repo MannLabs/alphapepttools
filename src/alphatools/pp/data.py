@@ -503,17 +503,17 @@ def _validate_args_for_handle_feature_completeness(
 def handle_feature_completeness(  # noqa: C901, PLR0912
     adata: ad.AnnData,
     max_missing: float,
-    missing_value: float = np.nan,
     group_column: str | None = None,
     groups: list[str] | None = None,
     action: str = "flag",
     new_var_column_name: str | None = None,
 ) -> None:
-    """Filter features based on missing values
+    """Filter or flag features based on missing values
 
-    Filters AnnData features (columns) based on the fraction of missing values across different samples.
-    If group_column and groups are provided, the fraction of missing values is calculated out of the specified groups only (rather than all groups combined)
-    This is especially useful for imbalanced classes, where filtering by global missingness may leave too many missing values in the smaller
+    Filters AnnData features (columns) based on the fraction of missing values.
+    If group_column and groups are provided, only missingness of certain metadata
+    levels is considered. This is especially useful for imbalanced classes, where
+    filtering by global missingness may leave too many missing values in the smaller
     class.
 
     (In case rows should be filtered, it is recommended to transpose the adata
@@ -521,17 +521,11 @@ def handle_feature_completeness(  # noqa: C901, PLR0912
 
     Parameters
     ----------
-    adata : ad.AnnData
-        AnnData object with data to filter.
     max_missing : float
         Maximum fraction of missing values allowed. Compared with the fraction of missing values
         in a "greater than" fashion, i.e. if max_missing is 0.6 and the fraction of missing values
-        is 0.6, the feature is kept. Greater than comparison is used here since the
+        is 0.6, the sample or feature is kept. Greater than comparison is used here since the
         missing fraction may be 0.0, in which case the sample or feature should be kept.
-    missing_value: float, optional
-        Value to consider as missing. Default is np.nan, but can be set to any other number.
-        This is useful when reading directLFQ output, where missing values are represented as 0,
-        or when filtering out low abundance noisy features.
     group_column : str, optional
         Column in obs to determine groups for filtering.
     groups : list[str], optional
@@ -540,7 +534,7 @@ def handle_feature_completeness(  # noqa: C901, PLR0912
         groups is considered. If None, all groups are considered.
     action : {"drop", "flag"}, optional
         Action to take on features with the missing values. Must be either "drop" or "flag".
-        If "drop", features with more than max_missing fraction of missing values are dropped.
+        If "drop", features with more than max_missing fraction of missing values are filtered out.
         If "flag", features with more than max_missing fraction of missing values are labeled in a new column in adata.var. Contains
         boolean values indicating whether the feature has missing values above max_missing (True) or nor (False).
         If "flag", the new column is named "flagged_missing" by default, but can be set via the new_var_column_name parameter.
@@ -553,8 +547,7 @@ def handle_feature_completeness(  # noqa: C901, PLR0912
     if max_missing < 0 or max_missing > 1:
         raise ValueError("Threshold must be between 0 and 1.")
 
-    _validate_args_for_handle_feature_completeness(adata, max_missing=max_missing, missing_value=missing_value)
-
+    _validate_args_for_handle_feature_completeness(adata, max_missing=max_missing, missing_value=max_missing)
     # Resolve group indices
     if group_column:
         if group_column not in adata.obs.columns:
@@ -566,35 +559,26 @@ def handle_feature_completeness(  # noqa: C901, PLR0912
         if not selected_groups.issubset(available_groups):
             raise ValueError(f"Some groups in {groups} not found in '{group_column}'.")
 
-        group_indices = {}
-        for group in selected_groups:
-            mask = adata.obs[group_column] == group
-            group_indices[group] = np.where(mask)[0]  # integer positions for NumPy indexing
+        group_indices = {group: adata.obs.index[adata.obs[group_column] == group] for group in selected_groups}
     else:
-        group_indices = {"all": np.arange(adata.n_obs)}
+        group_indices = {"all": adata.obs.index}
 
-    # Copy data and convert missing values
-    data_mat = adata.X.copy().astype(float)
-    if not np.isnan(missing_value):
-        data_mat[data_mat <= missing_value] = np.nan
-
-    # Compute missingness per feature across all selected groups
-    drop_mask = np.zeros(adata.n_vars, dtype=bool)
+    # Calculate missingness for each group
+    drop_mask = np.array([False] * adata.shape[1])
     for indices in group_indices.values():
-        missing_fraction = np.isnan(data_mat[indices, :]).mean(axis=0)
+        missing_fraction = np.isnan(adata[indices, :].X).mean(axis=0)
         drop_mask |= missing_fraction > max_missing
-
-    n_dropped = drop_mask.sum()
+        n_dropped = drop_mask.sum()
 
     # Perform action
     if action == "drop":
         if drop_mask.any():
-            adata = adata[:, ~drop_mask]
+            adata = adata[:, ~drop_mask].copy()
             logging.info(
-                f"Dropped {n_dropped} / {drop_mask.size} features with >{max_missing:.2f} missing in any group."
+                f"pp.filter_data_completeness(): Dropped {n_dropped} / {drop_mask.size} features with >{max_missing:.2f} missing in any group."
             )
         else:
-            logging.info("No features dropped.")
+            logging.info("No features were found below threshold of missing values, no features filtered out.")
     elif action == "flag":
         if new_var_column_name is None:
             new_var_column_name = "passed_missing_filter"
