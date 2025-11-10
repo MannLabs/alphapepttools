@@ -67,6 +67,15 @@
     pl.Plots
     pl.add_lines
     pl.label_plot
+    pl.BaseColormaps
+    pl.BaseColors
+    pl.BasePalettes
+    pl.add_legend_to_axes
+    pl.add_legend_to_axes_from_patches
+    pl.create_figure
+    pl.label_axes
+    pl.save_figure
+
 ```
 
 ## IO
