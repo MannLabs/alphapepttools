@@ -107,10 +107,8 @@ def test_nan_safe_ttest_ind(ab, expected, min_valid_values):
         ),
     ],
 )
-def test_group_ratios_ttest_ind(
-    example_data, example_metadata, between_column, comparison, min_valid_values, expected_output
-):
-    """Test group_ratios_ttest_ind with various scenarios."""
+def test_diff_exp_ttest(example_data, example_metadata, between_column, comparison, min_valid_values, expected_output):
+    """Test diff_exp_ttest with various scenarios."""
 
     adata = ad.AnnData(
         X=example_data,
@@ -179,6 +177,8 @@ def test_group_ratios_ttest_ind(
             "fdr": fdrs,
             "-log10(fdr)": [-np.log10(f) if f != 0 and not np.isnan(f) else np.nan for f in fdrs],
             "method": ["ttest"] * len(deltas),
+            "max_level_1_samples": [5] * len(deltas),
+            "max_level_2_samples": [5] * len(deltas),
         },
         index=example_data.columns,
     )
@@ -285,11 +285,11 @@ def example_adata_ebayes():
                     "fdr": [0.0030228412720276574, 0.00019692512133911947, 0.0030228412720276574],
                     "-log10(fdr)": [2.5195846568222966, 3.7056988782598457, 2.5195846568222966],
                     "method": ["limma_ebayes_inmoose", "limma_ebayes_inmoose", "limma_ebayes_inmoose"],
+                    "max_level_1_samples": [5, 5, 5],
+                    "max_level_2_samples": [5, 5, 5],
                     "stat": [-3.804007666004946, -6.2764817445960475, -3.9999011197249166],
                     "B": [-1.8736068846693623, 2.010219213410613, -1.5373419998901845],
                     "AveExpr": [4.175828737355294, 2.8008384166375, 2.1791061114716954],
-                    "max_level_1_samples": [5, 5, 5],
-                    "max_level_2_samples": [5, 5, 5],
                 },
                 index=["X1", "X2", "X3"],
             ),
@@ -340,6 +340,8 @@ def test_diff_exp_limma(
                     "delta_A_VS_B": [1],
                     "pvalue_A_VS_B": [1],
                     "padj_A_VS_B": [1],
+                    "max_level_1_samples": [5],
+                    "max_level_2_samples": [5],
                 }
             ),
             -0.0,
@@ -381,6 +383,8 @@ def test__standardize_diff_exp_ttest_results(comparison_key, input_df, neg_log_p
                     "log2fc": [1],
                     "p_value": [1],
                     "fdr": [1],
+                    "max_level_1_samples": [5],
+                    "max_level_2_samples": [5],
                     "quality_score": [1],
                 }
             ),
@@ -401,6 +405,8 @@ def test__standardize_diff_exp_ttest_results(comparison_key, input_df, neg_log_p
                     "proteoform_id": ["PF_1"],
                     "peptides": ["PEP1;PEP2"],
                     "num_peptides": [1],
+                    "max_level_1_samples": [5],
+                    "max_level_2_samples": [5],
                     "quality_score": [1],
                 }
             ),
@@ -420,6 +426,8 @@ def test__standardize_diff_exp_ttest_results(comparison_key, input_df, neg_log_p
                     "p_value": [1],
                     "fdr": [1],
                     "sequence": ["SEQ_PEPTIDE_"],
+                    "max_level_1_samples": [5],
+                    "max_level_2_samples": [5],
                     "quality_score": [1],
                 }
             ),

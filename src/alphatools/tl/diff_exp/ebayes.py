@@ -58,7 +58,7 @@ def _standardize_limma_results(
     result_df["-log10(fdr)"] = result_df["fdr"].apply(negative_log10_pvalue)
 
     # Extra columns specific to Limma
-    return_cols = [*diff_exp_columns, "stat", "B", "AveExpr", "max_level_1_samples", "max_level_2_samples"]
+    return_cols = [*diff_exp_columns, "stat", "B", "AveExpr"]
 
     result_df.index.name = None
 
@@ -124,15 +124,15 @@ def diff_exp_ebayes(
     sorted_indices = [pure_patsy_order.index(cond) for cond in condition_order]
     design_colnames = [design_colnames[i] for i in sorted_indices]
 
+    # Format a contrast string, which is required by the Limma differential expression function below
+    contrast_string = f"{design_colnames[0]}-{design_colnames[1]}"
+    logger.info(f"Computing contrast: {contrast_string}")
+
     # Expression matrix: proteins (rows) x samples (columns)
     expr_matrix = adata_subset.X.T
 
     logger.info(f"Design matrix dimensions: {design_matrix.shape[0]} samples x {design_matrix.shape[1]} groups")
     logger.info(f"Expression matrix dimensions: {expr_matrix.shape[0]} proteins x {expr_matrix.shape[1]} samples")
-
-    # Format a contrast string, which is required by the Limma differential expression function below
-    contrast_string = f"{design_colnames[0]}-{design_colnames[1]}"
-    logger.info(f"Computing contrast: {contrast_string}")
 
     # Initial linear fit (lmFit equivalent)
     fit = limma.lmFit(expr_matrix, design_matrix)

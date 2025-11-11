@@ -112,10 +112,7 @@ def _standardize_diff_exp_ttest_results(
         f"pvalue_{comparison_key}": "p_value",
         f"padj_{comparison_key}": "fdr",
     }
-
-    # Select and rename columns
-    columns_to_keep = [col for col in current_column_map if col in result_df.columns]
-    result_df = result_df[columns_to_keep].rename(columns=current_column_map)
+    result_df = result_df.rename(columns=current_column_map)
 
     # Add standard columns
     result_df["condition_pair"] = comparison_key

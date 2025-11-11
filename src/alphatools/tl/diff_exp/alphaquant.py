@@ -7,7 +7,7 @@ import anndata as ad
 import pandas as pd
 
 from alphatools.tl import tl_defaults
-from alphatools.tl.utils import _suppress_plots, negative_log10_pvalue
+from alphatools.tl.utils import _suppress_plots, determine_max_replicates, negative_log10_pvalue
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -109,6 +109,9 @@ def diff_exp_alphaquant(
 
     samplemap = _get_samplemap(adata, between_column, comparison)
 
+    # Record maximum number of replicates per group
+    max_samples_g1, max_samples_g2 = determine_max_replicates(adata, between_column, comparison[0], comparison[1])
+
     # Context manager for AlphaQuant interface
     # For now, run with tempfiles TODO: PR on AlphaQuant for simplified interface
     with tempfile.TemporaryDirectory() as td:
@@ -154,6 +157,8 @@ def diff_exp_alphaquant(
 
         # Standardize the result appearance
         for level, df in results.items():
+            df["max_level_1_samples"] = max_samples_g1
+            df["max_level_2_samples"] = max_samples_g2
             results[level] = _standardize_alphaquant_results(comparison_key, level, df)
 
         return comparison_key, results
