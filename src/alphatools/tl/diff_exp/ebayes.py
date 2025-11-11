@@ -57,7 +57,7 @@ def _standardize_limma_results(
 
     result_df.index.name = None
 
-    return result_df[return_cols].copy()
+    return result_df[return_cols]
 
 
 def diff_exp_ebayes(
@@ -89,9 +89,8 @@ def diff_exp_ebayes(
 
     # Validate inputs
     level_1, level_2 = validate_ttest_inputs(adata, between_column, comparison, min_valid_values)
-    print(f"Comparing levels: {level_1} (treatment) vs {level_2} (control)")
+    logger.info(f"Comparing levels: {level_1} (treatment) vs {level_2} (control)")
 
-    # Drop features with too few valid values
     adata = drop_features_with_too_few_valid_values(
         adata,
         between_column=between_column,
@@ -105,9 +104,7 @@ def diff_exp_ebayes(
     # Report on maximum samples per level
     max_samples_level_1 = adata.obs[adata.obs[between_column] == level_1].shape[0]
     max_samples_level_2 = adata.obs[adata.obs[between_column] == level_2].shape[0]
-
     logger.info(f"Number of samples for {level_1}: {max_samples_level_1}")
-
     logger.info(f"Number of samples for {level_2}: {max_samples_level_2}")
 
     # Create design dataframe with condition as categorical factor
@@ -118,23 +115,20 @@ def diff_exp_ebayes(
     # Create design matrix without intercept (fit means model: ~ 0 + condition)
     design_matrix = patsy.dmatrix("~ 0 + condition", data=design_df)
 
-    # Patsy changes the column names, so the new ones need to be used going forward
-    design_colnames = design_matrix.design_info.column_names
-
     # Patsy insists on changing the column order to alphabetical, so we need to resort them
+    design_colnames = design_matrix.design_info.column_names
     pure_patsy_order = [x.replace("condition[", "").replace("]", "") for x in design_colnames]
     condition_order = [level_1, level_2]
     sorted_indices = [pure_patsy_order.index(cond) for cond in condition_order]
     design_colnames = [design_colnames[i] for i in sorted_indices]
 
     # Expression matrix: proteins (rows) x samples (columns)
-    expr_matrix = adata_subset.X.T  # Transpose so proteins are rows
+    expr_matrix = adata_subset.X.T
 
-    # Report on progress
     logger.info(f"Design matrix dimensions: {design_matrix.shape[0]} samples x {design_matrix.shape[1]} groups")
     logger.info(f"Expression matrix dimensions: {expr_matrix.shape[0]} proteins x {expr_matrix.shape[1]} samples")
 
-    # Format a contrast string for Limma
+    # Format a contrast string, which is required by the Limma differential expression function below
     contrast_string = f"{design_colnames[0]}-{design_colnames[1]}"
     logger.info(f"Computing contrast: {contrast_string}")
 
@@ -153,9 +147,9 @@ def diff_exp_ebayes(
     # Extract results (topTable equivalent)
     contrast_name = fit2.coefficients.columns[0]
 
-    # Toptable seems to be unable to accept sort_by="none", and sort by pvalue by default. We have
+    # Toptable seems to be unable to accept sort_by="none", but sorts by pvalue by default. We have
     # to revert the sort by ordering by numeric feature index after extraction and then reassign the
-    # features.
+    # features. Otherwise, the index will not match the original adata.var_names.
     toptable = limma.topTable(fit2, coef=contrast_name, number=np.inf)
     result_df = pd.DataFrame(toptable).sort_index()
     result_df.index = adata_subset.var_names
