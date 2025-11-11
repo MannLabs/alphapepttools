@@ -8,7 +8,7 @@ import patsy
 from inmoose import limma
 
 from alphatools.tl import tl_defaults
-from alphatools.tl.utils import drop_features_with_too_few_valid_values, validate_ttest_inputs
+from alphatools.tl.utils import drop_features_with_too_few_valid_values, negative_log10_pvalue, validate_ttest_inputs
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -36,28 +36,28 @@ def _standardize_limma_results(
         DataFrame with Limma eBayes differential expression results.
 
     """
-    current_result_df = result_df.copy()
+    result_df = result_df.copy()
     diff_exp_columns = tl_defaults.DIFF_EXP_COLS.copy()
 
     # Map columns from Limma to standard names
     current_column_map = {"log2FoldChange": "log2fc", "pvalue": "p_value", "adj_pvalue": "fdr"}
-    current_result_df = current_result_df.rename(columns=current_column_map)
+    result_df = result_df.rename(columns=current_column_map)
 
     # Add standard columns
-    current_result_df["condition_pair"] = comparison_key
-    current_result_df["protein"] = current_result_df.index
-    current_result_df["method"] = "limma_ebayes_inmoose"
+    result_df["condition_pair"] = comparison_key
+    result_df["protein"] = result_df.index
+    result_df["method"] = "limma_ebayes_inmoose"
 
     # For p-values of exactly 0, use a very large value instead of NaN
-    current_result_df["-log10(p_value)"] = -current_result_df["p_value"].apply(lambda x: 300 if x == 0 else np.log10(x))
-    current_result_df["-log10(fdr)"] = -current_result_df["fdr"].apply(lambda x: 300 if x == 0 else np.log10(x))
+    result_df["-log10(p_value)"] = result_df["p_value"].apply(negative_log10_pvalue)
+    result_df["-log10(fdr)"] = result_df["fdr"].apply(negative_log10_pvalue)
 
     # Extra columns specific to Limma
     return_cols = [*diff_exp_columns, "stat", "B", "AveExpr", "max_level_1_samples", "max_level_2_samples"]
 
-    current_result_df.index.name = None
+    result_df.index.name = None
 
-    return current_result_df[return_cols].copy()
+    return result_df[return_cols].copy()
 
 
 def diff_exp_ebayes(

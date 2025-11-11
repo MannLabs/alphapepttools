@@ -2,6 +2,26 @@ import contextlib
 
 import anndata as ad
 import matplotlib.pyplot as plt
+import numpy as np
+
+
+def negative_log10_pvalue(pvalue: float, ceiling: float = 300) -> float:
+    """Convert p-value to -log10 scale with special handling for zero values.
+
+    Parameters
+    ----------
+    pvalue : float
+        P-value to convert.
+    ceiling : float, optional
+        Value to use when pvalue is exactly 0. Default is 300.
+
+    Returns
+    -------
+    float
+        -log10(pvalue), or ceiling if pvalue is exactly 0.
+
+    """
+    return ceiling if pvalue == 0 else -np.log10(pvalue)
 
 
 # Context manager to suppress plots if needed

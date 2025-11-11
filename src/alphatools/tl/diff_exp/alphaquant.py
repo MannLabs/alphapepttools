@@ -4,11 +4,10 @@ from pathlib import Path
 
 import alphaquant.run_pipeline as aq_pipeline
 import anndata as ad
-import numpy as np
 import pandas as pd
 
 from alphatools.tl import tl_defaults
-from alphatools.tl.utils import _suppress_plots
+from alphatools.tl.utils import _suppress_plots, negative_log10_pvalue
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,7 +19,7 @@ def _standardize_alphaquant_results(
     result_df: pd.DataFrame,
 ) -> pd.DataFrame:
     """Standardize AlphaQuant result columns"""
-    current_result_df = result_df.copy()
+    result_df = result_df.copy()
 
     # Base columns for all levels
     aq_columns = ["quality_score"]
@@ -33,7 +32,7 @@ def _standardize_alphaquant_results(
         diff_exp_columns = [*tl_defaults.DIFF_EXP_COLS, *aq_columns]
 
     elif level == "proteoform":
-        current_result_df["condition_pair"] = comparison_key
+        result_df["condition_pair"] = comparison_key
         pval_column = "proteoform_pval"
         fdr_column = "proteoform_fdr"
         extra_columns = ["proteoform_id", "peptides", "num_peptides"]
@@ -46,24 +45,22 @@ def _standardize_alphaquant_results(
         diff_exp_columns = [*tl_defaults.DIFF_EXP_COLS, *extra_columns, *aq_columns]
 
         # Clean sequence names for peptides
-        current_result_df["sequence"] = (
-            current_result_df["sequence"].str.replace(r"^SEQ_", "", regex=True).str.replace(r"_$", "", regex=True)
+        result_df["sequence"] = (
+            result_df["sequence"].str.replace(r"^SEQ_", "", regex=True).str.replace(r"_$", "", regex=True)
         )
 
     else:
         raise ValueError(f"Unknown level: {level}. Must be 'protein', 'peptide', or 'proteoform'")
 
     # Common standardization logic
-    current_result_df["method"] = "alphaquant"
+    result_df["method"] = "alphaquant"
 
     # For p-values of exactly 0, use a very large value instead of NaN
-    current_result_df["-log10(p_value)"] = -current_result_df[pval_column].apply(
-        lambda x: 300 if x == 0 else np.log10(x)
-    )
-    current_result_df["-log10(fdr)"] = -current_result_df[fdr_column].apply(lambda x: 300 if x == 0 else np.log10(x))
+    result_df["-log10(p_value)"] = result_df[pval_column].apply(negative_log10_pvalue)
+    result_df["-log10(fdr)"] = result_df[fdr_column].apply(negative_log10_pvalue)
 
     # Renaming to common names
-    current_result_df = current_result_df.rename(
+    result_df = result_df.rename(
         columns={
             pval_column: "p_value",
             fdr_column: "fdr",
@@ -71,7 +68,7 @@ def _standardize_alphaquant_results(
     )
 
     # Reorder columns for uniform output
-    return current_result_df[diff_exp_columns].copy()
+    return result_df[diff_exp_columns].copy()
 
 
 def diff_exp_alphaquant(
