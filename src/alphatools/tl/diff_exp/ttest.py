@@ -8,7 +8,7 @@ from scipy.stats import ttest_ind
 from alphatools.pp.data import filter_by_metadata
 from alphatools.tl.defaults import tl_defaults
 from alphatools.tl.stats import nan_safe_bh_correction
-from alphatools.tl.utils import validate_ttest_inputs
+from alphatools.tl.utils import determine_max_replicates, negative_log10_pvalue, validate_ttest_inputs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -104,7 +104,7 @@ def _standardize_diff_exp_ttest_results(
         Standardized DataFrame with columns outlined in the common DIFF_EXP_COLS.
 
     """
-    current_result_df = result_df.copy()
+    result_df = result_df.copy()
 
     # Map columns from ttest output format to standard format
     current_column_map = {
@@ -112,22 +112,19 @@ def _standardize_diff_exp_ttest_results(
         f"pvalue_{comparison_key}": "p_value",
         f"padj_{comparison_key}": "fdr",
     }
-
-    # Select and rename columns
-    columns_to_keep = [col for col in current_column_map if col in current_result_df.columns]
-    current_result_df = current_result_df[columns_to_keep].rename(columns=current_column_map)
+    result_df = result_df.rename(columns=current_column_map)
 
     # Add standard columns
-    current_result_df["condition_pair"] = comparison_key
-    current_result_df["protein"] = current_result_df.index
-    current_result_df["method"] = "ttest"
+    result_df["condition_pair"] = comparison_key
+    result_df["protein"] = result_df.index
+    result_df["method"] = "ttest"
 
     # For p-values of exactly 0, use a very large value instead of NaN
-    current_result_df["-log10(p_value)"] = -current_result_df["p_value"].apply(lambda x: 300 if x == 0 else np.log10(x))
-    current_result_df["-log10(fdr)"] = -current_result_df["fdr"].apply(lambda x: 300 if x == 0 else np.log10(x))
+    result_df["-log10(p_value)"] = result_df["p_value"].apply(negative_log10_pvalue)
+    result_df["-log10(fdr)"] = result_df["fdr"].apply(negative_log10_pvalue)
 
     # Reorder columns to match DIFF_EXP_COLS
-    return current_result_df[tl_defaults.DIFF_EXP_COLS].copy()
+    return result_df[tl_defaults.DIFF_EXP_COLS].copy()
 
 
 def diff_exp_ttest(
@@ -172,6 +169,9 @@ def diff_exp_ttest(
 
     comparison_name = f"{g1}_VS_{g2}"
     features = pd.Series(adata.var_names)
+
+    # Record maximum number of replicates per group
+    max_samples_g1, max_samples_g2 = determine_max_replicates(adata, between_column, g1, g2)
 
     # record number of non-na samples in each group
     g1_n_samples = g1_df.count()
@@ -219,6 +219,8 @@ def diff_exp_ttest(
                 f"padj_{comparison_name}": p_adj,
                 f"n_{g1}": g1_n_samples,
                 f"n_{g2}": g2_n_samples,
+                "max_level_1_samples": max_samples_g1,
+                "max_level_2_samples": max_samples_g2,
             }
         )
         .set_index("id", drop=True)
