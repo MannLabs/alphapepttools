@@ -1,6 +1,6 @@
 import anndata as ad
 
-from alphatools.io.reader_columns import DEFAULT_COLUMNS_DICT
+from alphatools.io.reader_columns import FEATURE_LEVEL_CONFIG
 
 from .anndata_factory import AnnDataFactory
 
@@ -86,8 +86,8 @@ def read_psm_table(
 
     """
     # Determine which columns are not covered by the alphabase PsmDfCols
-    for level_ in DEFAULT_COLUMNS_DICT[search_engine]:
-        covered_columns = set(DEFAULT_COLUMNS_DICT[search_engine][level_].values())
+    for level_ in FEATURE_LEVEL_CONFIG:
+        covered_columns = set(FEATURE_LEVEL_CONFIG[level_].values())
 
     requested_columns = [col for col in [intensity_column, feature_id_column, sample_id_column] if col is not None]
 
