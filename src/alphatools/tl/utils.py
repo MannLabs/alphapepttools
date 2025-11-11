@@ -4,8 +4,10 @@ import anndata as ad
 import matplotlib.pyplot as plt
 import numpy as np
 
+from alphatools.tl.defaults import tl_defaults
 
-def negative_log10_pvalue(pvalue: float, ceiling: float = 300) -> float:
+
+def negative_log10_pvalue(pvalue: float, ceiling: float = tl_defaults.CEILING_NEGATIVE_LOG10_PVALUE) -> float:
     """Convert p-value to -log10 scale with special handling for zero values.
 
     Parameters

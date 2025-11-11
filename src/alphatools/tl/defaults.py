@@ -15,6 +15,8 @@ class TLDefaults:
         "method",
     ]
 
+    CEILING_NEGATIVE_LOG10_PVALUE: ClassVar[float] = 300.0
+
 
 # Create a singleton instance for easy import
 tl_defaults = TLDefaults()
