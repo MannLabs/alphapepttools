@@ -13,7 +13,11 @@ class TLDefaults:
         "fdr",
         "-log10(fdr)",
         "method",
+        "max_level_1_samples",
+        "max_level_2_samples",
     ]
+
+    CEILING_NEGATIVE_LOG10_PVALUE: ClassVar[float] = 300.0
 
 
 # Create a singleton instance for easy import

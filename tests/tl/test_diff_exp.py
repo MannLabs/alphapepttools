@@ -7,6 +7,7 @@ import pytest
 from scipy.stats import ttest_ind
 
 from alphatools import tl
+from alphatools.pp import nanlog
 from alphatools.tl.defaults import tl_defaults
 from alphatools.tl.diff_exp.alphaquant import _standardize_alphaquant_results
 from alphatools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
@@ -106,10 +107,8 @@ def test_nan_safe_ttest_ind(ab, expected, min_valid_values):
         ),
     ],
 )
-def test_group_ratios_ttest_ind(
-    example_data, example_metadata, between_column, comparison, min_valid_values, expected_output
-):
-    """Test group_ratios_ttest_ind with various scenarios."""
+def test_diff_exp_ttest(example_data, example_metadata, between_column, comparison, min_valid_values, expected_output):
+    """Test diff_exp_ttest with various scenarios."""
 
     adata = ad.AnnData(
         X=example_data,
@@ -178,6 +177,8 @@ def test_group_ratios_ttest_ind(
             "fdr": fdrs,
             "-log10(fdr)": [-np.log10(f) if f != 0 and not np.isnan(f) else np.nan for f in fdrs],
             "method": ["ttest"] * len(deltas),
+            "max_level_1_samples": [5] * len(deltas),
+            "max_level_2_samples": [5] * len(deltas),
         },
         index=example_data.columns,
     )
@@ -241,6 +242,93 @@ def test_diff_exp_alphaquant():
         )
 
 
+@pytest.fixture
+def example_adata_ebayes():
+    """AnnData fixture with example data and metadata for eBayes tests."""
+    X = pd.DataFrame(
+        {
+            "X1": [10, 12, 14, 16, 18, 20, 22, 24, 26, 28],
+            "X2": [1, 2, 3, 4, 5, 10, 15, 20, 25, 30],
+            "X3": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            "X4": [1, 2, 3, 4, np.nan, 6, 7, 8, 9, np.nan],
+        },
+        index=[f"cell{i}" for i in range(10)],
+    ).astype(float)
+
+    obs = pd.DataFrame(
+        {
+            "group": ["B", "B", "B", "B", "B", "A", "A", "A", "A", "A"],
+        },
+        index=[f"cell{i}" for i in range(10)],
+    )
+
+    adata = ad.AnnData(X=X, obs=obs)
+
+    # data has to be log-transformed
+    nanlog(adata)
+
+    return adata
+
+
+# Test diff_exp_limma by loading small example datasets
+@pytest.mark.parametrize(
+    ("expected_df", "comparison", "expected_comparison_key", "between_column", "min_valid_values"),
+    [
+        (
+            pd.DataFrame(
+                {
+                    "condition_pair": ["B_VS_A", "B_VS_A", "B_VS_A"],
+                    "protein": ["X1", "X2", "X3"],
+                    "log2fc": [-0.7979892670672148, -2.8389205950315937, -1.5954559846999832],
+                    "p_value": [0.0030228412720276574, 6.564170711303982e-05, 0.002166002226930997],
+                    "-log10(p_value)": [2.5195846568222966, 4.182820132979508, 2.664341101199458],
+                    "fdr": [0.0030228412720276574, 0.00019692512133911947, 0.0030228412720276574],
+                    "-log10(fdr)": [2.5195846568222966, 3.7056988782598457, 2.5195846568222966],
+                    "method": ["limma_ebayes_inmoose", "limma_ebayes_inmoose", "limma_ebayes_inmoose"],
+                    "max_level_1_samples": [5, 5, 5],
+                    "max_level_2_samples": [5, 5, 5],
+                    "stat": [-3.804007666004946, -6.2764817445960475, -3.9999011197249166],
+                    "B": [-1.8736068846693623, 2.010219213410613, -1.5373419998901845],
+                    "AveExpr": [4.175828737355294, 2.8008384166375, 2.1791061114716954],
+                },
+                index=["X1", "X2", "X3"],
+            ),
+            ("B", "A"),  # ensure that patsy's alphabetical ordering is cancelled out correctly
+            "B_VS_A",
+            "group",
+            5,  # Ensure that the feature with insufficient valid values is dropped
+        ),
+    ],
+)
+def test_diff_exp_limma(
+    example_adata_ebayes,
+    comparison,
+    expected_comparison_key,
+    expected_df,
+    between_column,
+    min_valid_values,
+):
+    """Testing function to ascertain stable functionality of diff_exp_limma on a small example dataset."""
+
+    adata = example_adata_ebayes.copy()
+
+    comparison_key, results = tl.diff_exp_ebayes(
+        adata=adata,
+        between_column=between_column,
+        comparison=comparison,
+        min_valid_values=min_valid_values,
+    )
+
+    pd.testing.assert_frame_equal(
+        results,
+        expected_df,
+    )
+
+    assert comparison_key == expected_comparison_key, (
+        f"Expected comparison key {expected_comparison_key}, got {comparison_key}"
+    )
+
+
 # Check standardization of the ttest output
 @pytest.mark.parametrize(
     ("comparison_key", "input_df", "neg_log_pval", "neg_log_fdr"),
@@ -252,6 +340,8 @@ def test_diff_exp_alphaquant():
                     "delta_A_VS_B": [1],
                     "pvalue_A_VS_B": [1],
                     "padj_A_VS_B": [1],
+                    "max_level_1_samples": [5],
+                    "max_level_2_samples": [5],
                 }
             ),
             -0.0,
@@ -293,6 +383,8 @@ def test__standardize_diff_exp_ttest_results(comparison_key, input_df, neg_log_p
                     "log2fc": [1],
                     "p_value": [1],
                     "fdr": [1],
+                    "max_level_1_samples": [5],
+                    "max_level_2_samples": [5],
                     "quality_score": [1],
                 }
             ),
@@ -313,6 +405,8 @@ def test__standardize_diff_exp_ttest_results(comparison_key, input_df, neg_log_p
                     "proteoform_id": ["PF_1"],
                     "peptides": ["PEP1;PEP2"],
                     "num_peptides": [1],
+                    "max_level_1_samples": [5],
+                    "max_level_2_samples": [5],
                     "quality_score": [1],
                 }
             ),
@@ -332,6 +426,8 @@ def test__standardize_diff_exp_ttest_results(comparison_key, input_df, neg_log_p
                     "p_value": [1],
                     "fdr": [1],
                     "sequence": ["SEQ_PEPTIDE_"],
+                    "max_level_1_samples": [5],
+                    "max_level_2_samples": [5],
                     "quality_score": [1],
                 }
             ),

@@ -24,11 +24,11 @@ classifiers = [
 dynamic = [ "version" ]
 
 dependencies = [
-  # this is the 'data_downloader_improvements' branch with all the anndata code
-  "alphabase==1.7.4",    # TODO point to next release
+  "alphabase==1.7.4",
   "alphaquant==0.2",
   "anndata==0.11.1",
   "cmcrameri==1.9",      # TODO: remove this to optional dependencies?
+  "inmoose==0.8.1",
   "matplotlib==3.10",
   "numpy<2",
   "openpyxl>=3.1.3",
