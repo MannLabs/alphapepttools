@@ -8,7 +8,12 @@ import patsy
 from inmoose import limma
 
 from alphatools.tl import tl_defaults
-from alphatools.tl.utils import drop_features_with_too_few_valid_values, negative_log10_pvalue, validate_ttest_inputs
+from alphatools.tl.utils import (
+    determine_max_replicates,
+    drop_features_with_too_few_valid_values,
+    negative_log10_pvalue,
+    validate_ttest_inputs,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -102,10 +107,7 @@ def diff_exp_ebayes(
     adata_subset = adata[adata.obs[between_column].isin([level_1, level_2]), :].copy()
 
     # Report on maximum samples per level
-    max_samples_level_1 = adata.obs[adata.obs[between_column] == level_1].shape[0]
-    max_samples_level_2 = adata.obs[adata.obs[between_column] == level_2].shape[0]
-    logger.info(f"Number of samples for {level_1}: {max_samples_level_1}")
-    logger.info(f"Number of samples for {level_2}: {max_samples_level_2}")
+    max_samples_level_1, max_samples_level_2 = determine_max_replicates(adata, between_column, level_1, level_2)
 
     # Create design dataframe with condition as categorical factor
     design_df = pd.DataFrame(

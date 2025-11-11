@@ -8,7 +8,7 @@ from scipy.stats import ttest_ind
 from alphatools.pp.data import filter_by_metadata
 from alphatools.tl.defaults import tl_defaults
 from alphatools.tl.stats import nan_safe_bh_correction
-from alphatools.tl.utils import negative_log10_pvalue, validate_ttest_inputs
+from alphatools.tl.utils import determine_max_replicates, negative_log10_pvalue, validate_ttest_inputs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -173,6 +173,9 @@ def diff_exp_ttest(
     comparison_name = f"{g1}_VS_{g2}"
     features = pd.Series(adata.var_names)
 
+    # Record maximum number of replicates per group
+    max_samples_g1, max_samples_g2 = determine_max_replicates(adata, between_column, g1, g2)
+
     # record number of non-na samples in each group
     g1_n_samples = g1_df.count()
     g2_n_samples = g2_df.count()
@@ -219,6 +222,8 @@ def diff_exp_ttest(
                 f"padj_{comparison_name}": p_adj,
                 f"n_{g1}": g1_n_samples,
                 f"n_{g2}": g2_n_samples,
+                "max_level_1_samples": max_samples_g1,
+                "max_level_2_samples": max_samples_g2,
             }
         )
         .set_index("id", drop=True)

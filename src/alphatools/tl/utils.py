@@ -1,10 +1,13 @@
 import contextlib
+import logging
 
 import anndata as ad
 import matplotlib.pyplot as plt
 import numpy as np
 
 from alphatools.tl.defaults import tl_defaults
+
+logger = logging.getLogger(__name__)
 
 
 def negative_log10_pvalue(pvalue: float, ceiling: float = tl_defaults.CEILING_NEGATIVE_LOG10_PVALUE) -> float:
@@ -36,6 +39,38 @@ def _suppress_plots():  # noqa: ANN202 # avoid generator return type annotation
         plt.close("all")
     finally:
         plt.show = original_show
+
+
+def determine_max_replicates(
+    adata: ad.AnnData,
+    between_column: str,
+    level_1: str,
+    level_2: str,
+) -> tuple[int, int]:
+    """Determine maximum number of replicates for each level and log the counts.
+
+    Parameters
+    ----------
+    adata : ad.AnnData
+        The AnnData object containing the data.
+    between_column : str
+        The column name in adata.obs to use for grouping.
+    level_1 : str
+        First group/level name.
+    level_2 : str
+        Second group/level name.
+
+    Returns
+    -------
+    tuple[int, int]
+        Number of samples for (level_1, level_2).
+
+    """
+    max_samples_level_1 = adata.obs[adata.obs[between_column] == level_1].shape[0]
+    max_samples_level_2 = adata.obs[adata.obs[between_column] == level_2].shape[0]
+    logger.info(f"Number of samples for {level_1}: {max_samples_level_1}")
+    logger.info(f"Number of samples for {level_2}: {max_samples_level_2}")
+    return max_samples_level_1, max_samples_level_2
 
 
 def drop_features_with_too_few_valid_values(
