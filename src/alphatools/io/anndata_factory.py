@@ -136,6 +136,7 @@ class AnnDataFactory:
         adata = self._add_metadata_from_columns(adata, var_columns, self._feature_id_column, axis=1)
         return self._add_metadata_from_columns(adata, obs_columns, self._sample_id_column, axis=0)
 
+    # TODO: Remove this functionality once alphabase covers all columns in the DEFAULT_COLUMNS_DICT
     @staticmethod
     def _identify_non_alphabase_columns(reader_type: str) -> list[str]:
         """Identify columns from READER_COLUMNS that are not covered by PsmDfCols.

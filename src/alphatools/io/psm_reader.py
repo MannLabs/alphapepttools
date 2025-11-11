@@ -86,8 +86,8 @@ def read_psm_table(
 
     """
     # Determine which columns are not covered by the alphabase PsmDfCols
-    for _level in DEFAULT_COLUMNS_DICT[search_engine]:
-        covered_columns = set(DEFAULT_COLUMNS_DICT[search_engine][_level].values())
+    for level_ in DEFAULT_COLUMNS_DICT[search_engine]:
+        covered_columns = set(DEFAULT_COLUMNS_DICT[search_engine][level_].values())
 
     requested_columns = [x for x in [intensity_column, feature_id_column, sample_id_column] if x is not None]
 

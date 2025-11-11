@@ -26,6 +26,7 @@ DEFAULT_COLUMNS_DICT = {
             "feature_id_column": PsmDfCols.PROTEINS,
             "sample_id_column": PsmDfCols.RAW_NAME,
         },
+        # TODO: Update this to alphadia's precursor intensity column
         "precursors": {
             "intensity_column": None,
             "feature_id_column": None,
