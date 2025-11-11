@@ -19,6 +19,53 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+def _generate_patsy_design_matrix(
+    adata_subset: ad.AnnData,
+    between_column: str,
+    level_1: str,
+    level_2: str,
+) -> tuple:
+    """Generate Patsy design matrix with correct column ordering
+
+    Patsy automatically sorts columns alphabetically, which can cause issues with
+    contrast specifications. This function creates a design matrix and returns
+    the column names in the desired order (level_1, level_2).
+
+    Parameters
+    ----------
+    adata_subset : ad.AnnData
+        AnnData object filtered to only include samples from the comparison
+    between_column : str
+        Column name in adata.obs containing the contrast levels
+    level_1 : str
+        First level (treatment)
+    level_2 : str
+        Second level (control)
+
+    Returns
+    -------
+    tuple
+        Design matrix and ordered column names
+
+    """
+    # Create design dataframe with condition as categorical factor
+    design_df = pd.DataFrame(
+        {"sample": adata_subset.obs_names, "condition": adata_subset.obs[between_column].to_list()}
+    ).set_index("sample")
+
+    # Create design matrix without intercept (fit means model: ~ 0 + condition)
+    design_matrix = patsy.dmatrix("~ 0 + condition", data=design_df)
+
+    # Patsy insists on changing the column order to alphabetical, so we need to resort them
+    design_colnames = design_matrix.design_info.column_names
+    pure_patsy_order = [x.replace("condition[", "").replace("]", "") for x in design_colnames]
+    condition_order = [level_1, level_2]
+    sorted_indices = [pure_patsy_order.index(cond) for cond in condition_order]
+    design_colnames = [design_colnames[i] for i in sorted_indices]
+
+    return design_matrix, design_colnames
+
+
 def _standardize_limma_results(
     comparison_key: str,
     result_df: pd.DataFrame,
@@ -109,20 +156,8 @@ def diff_exp_ebayes(
     # Report on maximum samples per level
     max_samples_level_1, max_samples_level_2 = determine_max_replicates(adata, between_column, level_1, level_2)
 
-    # Create design dataframe with condition as categorical factor
-    design_df = pd.DataFrame(
-        {"sample": adata_subset.obs_names, "condition": adata_subset.obs[between_column].to_list()}
-    ).set_index("sample")
-
-    # Create design matrix without intercept (fit means model: ~ 0 + condition)
-    design_matrix = patsy.dmatrix("~ 0 + condition", data=design_df)
-
-    # Patsy insists on changing the column order to alphabetical, so we need to resort them
-    design_colnames = design_matrix.design_info.column_names
-    pure_patsy_order = [x.replace("condition[", "").replace("]", "") for x in design_colnames]
-    condition_order = [level_1, level_2]
-    sorted_indices = [pure_patsy_order.index(cond) for cond in condition_order]
-    design_colnames = [design_colnames[i] for i in sorted_indices]
+    # Generate design matrix with correct column ordering
+    design_matrix, design_colnames = _generate_patsy_design_matrix(adata_subset, between_column, level_1, level_2)
 
     # Format a contrast string, which is required by the Limma differential expression function below
     contrast_string = f"{design_colnames[0]}-{design_colnames[1]}"
