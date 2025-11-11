@@ -89,7 +89,7 @@ def read_psm_table(
     for level_ in DEFAULT_COLUMNS_DICT[search_engine]:
         covered_columns = set(DEFAULT_COLUMNS_DICT[search_engine][level_].values())
 
-    requested_columns = [x for x in [intensity_column, feature_id_column, sample_id_column] if x is not None]
+    requested_columns = [col for col in [intensity_column, feature_id_column, sample_id_column] if col is not None]
 
     for x in [var_columns, obs_columns]:
         if x is not None:
