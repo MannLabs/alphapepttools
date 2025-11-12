@@ -1,22 +1,35 @@
 import anndata as ad
 
+from alphatools.io.reader_columns import FEATURE_LEVEL_CONFIG
+
 from .anndata_factory import AnnDataFactory
 
 
 def read_psm_table(
     file_paths: str | list[str],
     search_engine: str,
+    level: str = "proteins",
     *,
     intensity_column: str | None = None,
     feature_id_column: str | None = None,
     sample_id_column: str | None = None,
-    **kwargs,
+    var_columns: str | list[str] | None = None,
+    obs_columns: str | list[str] | None = None,
+    **reader_kwargs,
 ) -> ad.AnnData:
     """Read peptide spectrum match tables to the :class:`anndata.AnnData` format
 
     Read peptide spectrum match (PSM) tables from proteomics search engines into
     the :class:`anndata.AnnData` format (observations x features). Per default,
-    raw protein intensities are returned.
+    raw protein intensities are returned. Additionally, custom columns can be selected
+    to be retained in the resulting AnnData object.
+
+    Note: The underlying pivoting function will aggregate metadata in a "first" manner,
+    meaning that if the metadata is finer grained than the feature level, information will
+    be lost. An example for this is setting feature_id_column="protein_ids" and setting
+    "var_columns" to include peptide sequences. This produces a protein-level AnnData
+    object with one peptide sequence per protein, which is likely not desired. Therefore,
+    ensure that the metadata you want to retain is actually applicable to the feature level.
 
     Supported formats include
 
@@ -32,6 +45,8 @@ def read_psm_table(
         Path to peptide spectrum match reports. If a list of reports is passed, all must be from the same search engine.
     search_engine
         Name of search engine that generated the output, pass the method name of the corresponding reader.
+    level
+        Level of quantification to read. One of "proteins", "precursors", or "genes". Defaults to "proteins".
     intensity_column
         Column that holds the quantified intensities in the PSM table. Defaults to the pre-configured protein intensities value
         in `alphabase`.
@@ -41,7 +56,13 @@ def read_psm_table(
     sample_id_column
         Column that holds the sample identifier in the PSM table. Defaults to the pre-configured value
         in `alphabase`.
-    **kwargs
+    var_columns
+        Additional columns to annotate features in the `adata.var` table. Can be a single column name or a list of column names.
+        Defaults to None.
+    obs_columns
+        Additional columns to annotate observations in the `adata.obs` table. Can be a single column name or a list of column names.
+        Defaults to None.
+    **reader_kwargs
         Keyword arguments passed to :meth:`alphabase.psm_reader.psm_reader_provider.get_reader`
 
     Returns
@@ -72,11 +93,34 @@ def read_psm_table(
     :mod:`alphabase.psm_reader`
 
     """
+    # Determine which columns are not covered by the alphabase PsmDfCols
+    for level_ in FEATURE_LEVEL_CONFIG:
+        covered_columns = set(FEATURE_LEVEL_CONFIG[level_].values())
+
+    requested_columns = [col for col in [intensity_column, feature_id_column, sample_id_column] if col is not None]
+
+    for col in [var_columns, obs_columns]:
+        if col is not None:
+            if isinstance(col, list):
+                requested_columns.extend(col)
+            else:
+                requested_columns.append(col)
+
+    additional_columns = [col for col in requested_columns if col not in covered_columns]
+
+    if not additional_columns:
+        additional_columns = None
+
     return AnnDataFactory.from_files(
         file_paths=file_paths,
         reader_type=search_engine,
+        level=level,
         intensity_column=intensity_column,
-        protein_id_column=feature_id_column,
-        raw_name_column=sample_id_column,
-        **kwargs,
-    ).create_anndata()
+        feature_id_column=feature_id_column,
+        sample_id_column=sample_id_column,
+        additional_columns=additional_columns,
+        **reader_kwargs,
+    ).create_anndata(
+        var_columns=var_columns,
+        obs_columns=obs_columns,
+    )

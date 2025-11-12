@@ -20,9 +20,11 @@ class TestReadPsmTable:
         mock_factory_class.from_files.assert_called_once_with(
             file_paths="/path/to/file.txt",
             reader_type="alphadia",
+            level="proteins",
             intensity_column=None,
-            protein_id_column=None,
-            raw_name_column=None,
+            feature_id_column=None,
+            sample_id_column=None,
+            additional_columns=None,
         )
         mock_factory_instance.create_anndata.assert_called_once()
         assert result == mock_anndata
@@ -36,8 +38,9 @@ class TestReadPsmTable:
 
         # Test with all parameters
         read_psm_table(
-            ["/path/to/file1.txt", "/path/to/file2.txt"],
-            "maxquant",
+            file_paths=["/path/to/file1.txt", "/path/to/file2.txt"],
+            search_engine="maxquant",
+            level="precursors",
             intensity_column="custom_intensity",
             feature_id_column="custom_feature",
             sample_id_column="custom_sample",
@@ -47,8 +50,10 @@ class TestReadPsmTable:
         mock_factory_class.from_files.assert_called_once_with(
             file_paths=["/path/to/file1.txt", "/path/to/file2.txt"],
             reader_type="maxquant",
+            level="precursors",
             intensity_column="custom_intensity",
-            protein_id_column="custom_feature",
-            raw_name_column="custom_sample",
+            feature_id_column="custom_feature",
+            sample_id_column="custom_sample",
+            additional_columns=["custom_intensity", "custom_feature", "custom_sample"],
             extra_param="extra_value",
         )
