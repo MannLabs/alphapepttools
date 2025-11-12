@@ -156,6 +156,7 @@ class AnnDataFactory:
         intensity_column: str | None = None,
         feature_id_column: str | None = None,
         sample_id_column: str | None = None,
+        additional_columns: list[str] | None = None,
         **reader_kwargs,
     ) -> "AnnDataFactory":
         """Create AnnDataFactory from PSM files.
@@ -174,6 +175,11 @@ class AnnDataFactory:
             Name of the column storing feature ids. Default is taken from `psm_reader.yaml`
         sample_id_column: str, optional
             Name of the column storing sample ids. Default is taken from `psm_reader.yaml`
+        additional_columns: list[str], optional
+            Names of additional columns from the PSM table to retain for experiment-specific metadata.
+            These columns can be added to the resulting AnnData object as annotations.
+            Note that if a column has a higher cardinality than the `feature_id_column`
+            (i.e., multiple values per feature), only the first value encountered will be kept.
         **reader_kwargs
             Additional arguments passed to PSM reader
 
@@ -187,6 +193,9 @@ class AnnDataFactory:
 
         reader: PSMReaderBase = psm_reader_provider.get_reader(reader_type, **reader_config, **reader_kwargs)
 
+        # Allow users to add custom columns
+        if additional_columns is not None:
+            reader.add_column_mapping({col: col for col in additional_columns})
         psm_df = reader.load(file_paths)
 
         # Get defaults for this reader/level, user input overrides
