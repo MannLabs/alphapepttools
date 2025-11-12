@@ -21,7 +21,15 @@ def read_psm_table(
 
     Read peptide spectrum match (PSM) tables from proteomics search engines into
     the :class:`anndata.AnnData` format (observations x features). Per default,
-    raw protein intensities are returned.
+    raw protein intensities are returned. Additionally, custom columns can be selected
+    to be retained in the resulting AnnData object.
+
+    Note: The underlying pivoting function will aggregate metadata in a "first" manner,
+    meaning that if the metadata is finer grained than the feature level, information will
+    be lost. An example for this is setting feature_id_column="protein_ids" and setting
+    "var_columns" to include peptide sequences. This produces a protein-level AnnData
+    object with one peptide sequence per protein, which is likely not desired. Therefore,
+    ensure that the metadata you want to retain is actually applicable to the feature level.
 
     Supported formats include
 
@@ -91,12 +99,12 @@ def read_psm_table(
 
     requested_columns = [col for col in [intensity_column, feature_id_column, sample_id_column] if col is not None]
 
-    for x in [var_columns, obs_columns]:
-        if x is not None:
-            if isinstance(x, list):
-                requested_columns.extend(x)
+    for col in [var_columns, obs_columns]:
+        if col is not None:
+            if isinstance(col, list):
+                requested_columns.extend(col)
             else:
-                requested_columns.append(x)
+                requested_columns.append(col)
 
     additional_columns = [col for col in requested_columns if col not in covered_columns]
 
