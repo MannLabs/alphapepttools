@@ -5,10 +5,9 @@ from typing import Any
 import anndata as ad
 import pandas as pd
 from alphabase.psm_reader import PSMReaderBase
-from alphabase.psm_reader.keys import PsmDfCols
 from alphabase.psm_reader.psm_reader import psm_reader_provider
 
-from alphatools.io.reader_columns import DEFAULT_COLUMNS_DICT
+from alphatools.io.reader_columns import FEATURE_LEVEL_CONFIG
 from alphatools.pp.data import add_metadata
 
 
@@ -136,35 +135,6 @@ class AnnDataFactory:
         adata = self._add_metadata_from_columns(adata, var_columns, self._feature_id_column, axis=1)
         return self._add_metadata_from_columns(adata, obs_columns, self._sample_id_column, axis=0)
 
-    @staticmethod
-    def _identify_non_alphabase_columns(reader_type: str) -> list[str]:
-        """Identify columns from READER_COLUMNS that are not covered by PsmDfCols.
-
-        Parameters
-        ----------
-        reader_type : str
-            Type of PSM reader
-
-        Returns
-        -------
-        list[str]
-            List of column names that need special retention (not in PsmDfCols)
-        """
-        # Get all required columns from all levels for this reader type from the defaults
-        required_columns = list(
-            {
-                col_value
-                for level_dict in DEFAULT_COLUMNS_DICT.get(reader_type, {}).values()
-                for col_value in level_dict.values()
-            }
-        )
-
-        # Get all PsmDfCols constant values (the actual column name strings)
-        psm_df_cols_values = PsmDfCols.get_values()
-
-        # Return those columns which are required for the current reader but not covered by PsmDfCols yet
-        return [col for col in required_columns if col not in psm_df_cols_values]
-
     @classmethod
     def _get_reader_configuration(cls, reader_type: str) -> dict[str, dict[str, Any]]:
         """Get reader-specific configuration for mapping PSMs to anndata."""
@@ -206,8 +176,10 @@ class AnnDataFactory:
         sample_id_column: str, optional
             Name of the column storing sample ids. Default is taken from `psm_reader.yaml`
         additional_columns: list[str], optional
-            Additional column names to be directly retained from the psm-table in order to enable experiment-specific
-            metadata retention.
+            Names of additional columns from the PSM table to retain for experiment-specific metadata.
+            These columns can be added to the resulting AnnData object as annotations.
+            Note that if a column has a higher cardinality than the `feature_id_column`
+            (i.e., multiple values per feature), only the first value encountered will be kept.
         **reader_kwargs
             Additional arguments passed to PSM reader
 
@@ -221,24 +193,13 @@ class AnnDataFactory:
 
         reader: PSMReaderBase = psm_reader_provider.get_reader(reader_type, **reader_config, **reader_kwargs)
 
-        # Identify the columns we need for this reader, but which are not yet covered by alphabase PsmDfCols
-        # TODO: Once alphabase is updated we don't need this anymore since all columns will be covered by PsmDfCols
-        extra_columns = cls._identify_non_alphabase_columns(reader_type)
-
-        # Add user-specified additional columns which are not in PsmDfCols.get_values()
-        if additional_columns:
-            additional_columns = [col for col in additional_columns if col not in PsmDfCols.get_values()]
-            extra_columns.extend(additional_columns)
-
-        # Add identity mappings for extra columns so they're retained during reading
-        if extra_columns:
-            extra_column_mapping = {col: col for col in extra_columns}
-            reader.add_column_mapping(extra_column_mapping)
-
+        # Allow users to add custom columns
+        if additional_columns is not None:
+            reader.add_column_mapping({col: col for col in additional_columns})
         psm_df = reader.load(file_paths)
 
         # Get defaults for this reader/level, user input overrides
-        defaults = DEFAULT_COLUMNS_DICT.get(reader_type, {}).get(level, {})
+        defaults = FEATURE_LEVEL_CONFIG.get(level, {})
         intensity_column = intensity_column or defaults.get("intensity_column")
         feature_id_column = feature_id_column or defaults.get("feature_id_column")
         sample_id_column = sample_id_column or defaults.get("sample_id_column")
