@@ -457,7 +457,7 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
 
 
 # TODO: Abstract class for validation of AnnData objects?
-def _validate_adata_for_completeness_filter(adata: ad.AnnData, action: str, varm_colname: str) -> None:
+def _validate_adata_for_completeness_filter(adata: ad.AnnData, action: str, var_colname: str) -> None:
     """Validate AnnData object for data completeness filtering"""
     if not isinstance(adata, ad.AnnData):
         raise TypeError("adata must be an AnnData object.")
@@ -474,8 +474,10 @@ def _validate_adata_for_completeness_filter(adata: ad.AnnData, action: str, varm
     if action not in ["flag", "drop"]:
         raise ValueError("pp.filter_data_completeness(): action must be 'flag' or 'drop'.")
 
-    if varm_colname in adata.varm.columns and action == "flag":
-        logging.info(f"pp.filter_data_completeness(): varm column '{varm_colname}' already exists, will overwrite.")
+    if var_colname in adata.var.columns and action == "flag":
+        logging.info(
+            f"pp.filter_data_completeness(): `adata.var` column '{var_colname}' already exists, will overwrite."
+        )
 
 
 def filter_data_completeness(
@@ -484,7 +486,7 @@ def filter_data_completeness(
     group_column: str | None = None,
     groups: list[str] | None = None,
     action: str = "flag",
-    varm_colname: str = "passed_threshold_missing_values",
+    var_colname: str = "passed_threshold_missing_values",
 ) -> ad.AnnData:
     """Filter features based on missing values
 
@@ -511,11 +513,11 @@ def filter_data_completeness(
         ['A', 'B', 'C'], and groups = ['A', 'B'], only missingness of features in these
         groups is considered. If None, all groups are considered.
     action : str, optional
-        Action to perform. can be 'flag' (default) or 'drop'. If 'flag', a boolean varm column
+        Action to perform. can be 'flag' (default) or 'drop'. If 'flag', a boolean column in `adata.var`
         is added to indicate whether the feature passed the missingness threshold. If 'drop',
         features that do not pass the threshold are dropped from the AnnData object.
-    varm_colname : str, optional
-        Name of the varm boolean column to add if action is 'flag'. Default is 'passed_threshold_missing_values'.
+    var_colname : str, optional
+        Name of the `adata.var` boolean column to add if action is 'flag'. Default is 'passed_threshold_missing_values'.
 
     Returns
     -------
@@ -526,7 +528,7 @@ def filter_data_completeness(
     if max_missing < 0 or max_missing > 1:
         raise ValueError("Threshold must be between 0 and 1.")
 
-    _validate_adata_for_completeness_filter(adata, action, varm_colname)
+    _validate_adata_for_completeness_filter(adata, action, var_colname)
 
     # Resolve group indices
     if group_column:
@@ -555,9 +557,9 @@ def filter_data_completeness(
         if drop_mask.any():
             adata = adata[:, ~drop_mask].copy()
     else:
-        adata.varm[varm_colname] = ~drop_mask
+        adata.var[var_colname] = ~drop_mask
 
     logging.info(
-        f"pp.filter_data_completeness(): Flagged {n_dropped} / {drop_mask.size} features with >{max_missing:.2f} missing in any group."
+        f"pp.filter_data_completeness(): {action} {n_dropped} / {drop_mask.size} features with >{max_missing:.2f} missing in any group."
     )
     return adata
