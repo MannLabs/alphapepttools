@@ -201,7 +201,7 @@ class TestDataPreparationFunctions:
     def test_prepare_pca_data_to_plot_custom_embedding(self, sample_adata):
         """Test prepare_pca_data_to_plot with custom embedding name."""
         result = prepare_pca_data_to_plot(
-            sample_adata, pc_x=1, pc_y=2, dim_space="obs", embbedings_name="custom_embedding"
+            sample_adata, pc_x=1, pc_y=2, dim_space="obs", embeddings_name="custom_embedding"
         )
 
         assert isinstance(result, pd.DataFrame)
@@ -224,7 +224,7 @@ class TestDataPreparationFunctions:
 
     def test_prepare_scree_data_to_plot_custom_embedding(self, sample_adata):
         """Test prepare_scree_data_to_plot with custom embedding name."""
-        result = prepare_scree_data_to_plot(sample_adata, n_pcs=3, dim_space="obs", embbedings_name="custom_embedding")
+        result = prepare_scree_data_to_plot(sample_adata, n_pcs=3, dim_space="obs", embeddings_name="custom_embedding")
 
         assert isinstance(result, pd.DataFrame)
 
@@ -256,7 +256,7 @@ class TestDataPreparationFunctions:
     def test_prepare_pca_1d_loadings_data_to_plot_custom_embedding(self, sample_adata):
         """Test prepare_pca_1d_loadings_data_to_plot with custom embedding name."""
         result = prepare_pca_1d_loadings_data_to_plot(
-            sample_adata, dim_space="obs", dim=1, nfeatures=5, embbedings_name="custom_loadings"
+            sample_adata, dim_space="obs", dim=1, nfeatures=5, embeddings_name="custom_loadings"
         )
 
         assert isinstance(result, pd.DataFrame)

@@ -1128,7 +1128,7 @@ class Plots:
         color_map_column: str | None = None,
         color_column: str | None = None,
         dim_space: str = "obs",
-        embbedings_name: str | None = None,
+        embeddings_name: str | None = None,
         # TODO: the below argument is an antipattern resulting from this function doing multiple things. In the future, this should be replaced by a pca-plotting adapter so that pca_plot is no longer needed and scatter can be used instead, followed by label_plot, etc.
         label: bool = False,  # noqa: FBT001, FBT002
         label_column: str | None = None,
@@ -1152,8 +1152,8 @@ class Plots:
             The principal component index to plot on the y axis, by default 2. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
         dim_space : str, optional
             The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
-        embbedings_name : str | None, optional
-            The custom embeddings name used in PCA (given as input for `pca` function in `embbedings_name` ). If None, uses default naming convention. By default None.
+        embeddings_name : str | None, optional
+            The custom embeddings name used in PCA (given as input for `pca` function in `embeddings_name` ). If None, uses default naming convention. By default None.
         label: bool,
             Whether to add labels to the points in the scatter plot. by default False.
         label_column: str | None = None,
@@ -1181,11 +1181,11 @@ class Plots:
         scatter_kwargs = scatter_kwargs or {}
 
         pca_coor_df = prepare_pca_data_to_plot(
-            data, x_column, y_column, dim_space, embbedings_name, color_map_column, label_column, label=label
+            data, x_column, y_column, dim_space, embeddings_name, color_map_column, label_column, label=label
         )
 
         # Check if the variance layer exists in uns
-        variance_key = f"variance_pca_{dim_space}" if embbedings_name is None else embbedings_name
+        variance_key = f"variance_pca_{dim_space}" if embeddings_name is None else embeddings_name
 
         if variance_key not in data.uns:
             raise ValueError(
@@ -1239,7 +1239,7 @@ class Plots:
         n_pcs: int = 20,
         dim_space: str = "obs",
         color: str = "blue",
-        embbedings_name: str | None = None,
+        embeddings_name: str | None = None,
         scatter_kwargs: dict | None = None,
     ) -> None:
         """Plot the eigenvalues of each of the PCs using the scatter method
@@ -1256,7 +1256,7 @@ class Plots:
             The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
         color : str, optional
             Color to use for the scatterplot. By default "blue".
-        embbedings_name : str | None, optional
+        embeddings_name : str | None, optional
             The custom embeddings name used in PCA. If None, uses default naming convention. By default None.
         scatter_kwargs : dict, optional
             Additional keyword arguments for the matplotlib scatter function. By default None.
@@ -1269,7 +1269,7 @@ class Plots:
         scatter_kwargs = scatter_kwargs or {}
 
         # create the dataframe for plotting, X = pcs, y = explained variance
-        values = prepare_scree_data_to_plot(adata, n_pcs, dim_space, embbedings_name)
+        values = prepare_scree_data_to_plot(adata, n_pcs, dim_space, embeddings_name)
 
         cls.scatter(
             data=values,
@@ -1290,7 +1290,7 @@ class Plots:
         data: ad.AnnData | pd.DataFrame,
         ax: plt.Axes,
         dim_space: str = "obs",
-        embbedings_name: str | None = None,
+        embeddings_name: str | None = None,
         dim: int = 1,
         nfeatures: int = 20,
         scatter_kwargs: dict | None = None,
@@ -1305,7 +1305,7 @@ class Plots:
             Matplotlib axes object to plot on.
         dim_space : str, optional
             The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
-        embbedings_name : str | None, optional
+        embeddings_name : str | None, optional
             The custom embeddings name used in PCA. If None, uses default naming convention. By default None.
         dim : int
             The PC number from which to get loadings, by default 1 (1-indexed, i.e. the first PC is 1, not 0).
@@ -1324,7 +1324,7 @@ class Plots:
         top_loadings = prepare_pca_1d_loadings_data_to_plot(
             data=data,
             dim_space=dim_space,
-            embbedings_name=embbedings_name,
+            embeddings_name=embeddings_name,
             dim=dim,
             nfeatures=nfeatures,
         )
@@ -1349,7 +1349,7 @@ class Plots:
         data: ad.AnnData | pd.DataFrame,
         ax: plt.Axes,
         dim_space: str = "obs",
-        embbedings_name: str | None = None,
+        embeddings_name: str | None = None,
         pc_x: int = 1,
         pc_y: int = 2,
         nfeatures: int = 20,
@@ -1368,7 +1368,7 @@ class Plots:
             Matplotlib axes object to plot on.
         dim_space : str, optional
             The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
-        embbedings_name : str | None, optional
+        embeddings_name : str | None, optional
             The custom embeddings name used in PCA. If None, uses default naming convention. By default None.
         pc_x : int
             The PC principal component index to plot on the x axis, by default 1. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
@@ -1391,7 +1391,7 @@ class Plots:
         scatter_kwargs = scatter_kwargs or {}
 
         # Generate the correct loadings key name
-        loadings_key = f"PCs_{dim_space}" if embbedings_name is None else embbedings_name
+        loadings_key = f"PCs_{dim_space}" if embeddings_name is None else embeddings_name
 
         loadings_df = prepare_pca_2d_loadings_data_to_plot(
             data=data, loadings_name=loadings_key, pc_x=pc_x, pc_y=pc_y, nfeatures=nfeatures, dim_space=dim_space

@@ -77,7 +77,7 @@ def test_run_pca_with_layer(toy_adata_with_layers):
 def test_run_pca_with_custom_embeddings_name(toy_adata):
     """Test the pca function with custom embeddings name."""
     custom_name = "my_custom_pca"
-    at.tl.pca(toy_adata, embbedings_name=custom_name)
+    at.tl.pca(toy_adata, embeddings_name=custom_name)
 
     # Check custom naming
     assert custom_name in toy_adata.obsm, f"Custom PCA coordinates not found with name {custom_name}"
