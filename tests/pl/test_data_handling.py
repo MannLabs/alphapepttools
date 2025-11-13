@@ -212,7 +212,7 @@ class TestDataPreparationFunctions:
         result = prepare_scree_data_to_plot(sample_adata, n_pcs=5, dim_space="obs")
 
         assert isinstance(result, pd.DataFrame)
-        assert list(result.columns) == ["PC", "explained_variance"]
+        assert list(result.columns) == ["PC", "explained_variance", "explained_variance_percent"]
         assert list(result["PC"]) == [1, 2, 3, 4, 5]
         assert all(0 <= x <= 1 for x in result["explained_variance"])
 
