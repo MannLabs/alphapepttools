@@ -93,10 +93,7 @@ def read_psm_table(
     :mod:`alphabase.psm_reader`
 
     """
-    # Determine which columns are not covered by the alphabase PsmDfCols
-    for level_ in FEATURE_LEVEL_CONFIG:
-        covered_columns = set(FEATURE_LEVEL_CONFIG[level_].values())
-
+    # Determine which data & metadata columns are requested
     requested_columns = [col for col in [intensity_column, feature_id_column, sample_id_column] if col is not None]
 
     for col in [var_columns, obs_columns]:
@@ -106,6 +103,10 @@ def read_psm_table(
             else:
                 requested_columns.append(col)
 
+    # Determine which of the requested columns are not covered by the alphabase PsmDfCols
+    covered_columns = set()
+    for level_ in FEATURE_LEVEL_CONFIG:
+        covered_columns.update(FEATURE_LEVEL_CONFIG[level_].values())
     additional_columns = [col for col in requested_columns if col not in covered_columns]
 
     if not additional_columns:
