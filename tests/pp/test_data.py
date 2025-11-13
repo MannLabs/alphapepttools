@@ -997,22 +997,14 @@ def data_test_completeness_filter():
     ],
 )
 def test_filter_data_completeness(
-    data_test_completeness_filter,
-    expected_columns,
-    expected_rows,
-    max_missing,
-    group_column,
-    groups,
+    data_test_completeness_filter, expected_columns, expected_rows, max_missing, group_column, groups, action
 ):
     # given
     adata = data_test_completeness_filter.copy()
 
     # when
     adata_filtered = at.pp.filter_data_completeness(
-        adata=adata,
-        max_missing=max_missing,
-        group_column=group_column,
-        groups=groups,
+        adata=adata, max_missing=max_missing, group_column=group_column, groups=groups, action=action
     )
 
     # then

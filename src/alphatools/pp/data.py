@@ -526,7 +526,7 @@ def filter_data_completeness(
     Returns
     -------
     AnnData
-        AnnData object with either a new `.varm` column added (if `flag`)
+        AnnData object with either a new `adata.var` column added (if `flag`)
         or filtered features (if `drop`).
     """
     if max_missing < 0 or max_missing > 1:
