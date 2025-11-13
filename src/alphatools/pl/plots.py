@@ -1274,7 +1274,7 @@ class Plots:
         cls.scatter(
             data=values,
             x_column="PC",
-            y_column="explained_variance",
+            y_column="explained_variance_percent",
             ax=ax,
             scatter_kwargs=scatter_kwargs,
             color=color,

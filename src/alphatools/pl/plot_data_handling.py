@@ -281,6 +281,8 @@ def prepare_scree_data_to_plot(
         {
             "PC": np.arange(n_pcs) + 1,
             "explained_variance": adata.uns[variance_key]["variance_ratio"][:n_pcs],
+            # add the explained variance in percent format
+            "explained_variance_percent": adata.uns[variance_key]["variance_ratio"][:n_pcs] * 100,
         }
     )
 
