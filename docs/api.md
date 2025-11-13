@@ -37,6 +37,7 @@
     tl.diff_exp_ttest
     tl.diff_exp_alphaquant
     tl.pca
+    tl.diff_exp_ebayes
 
 ```
 

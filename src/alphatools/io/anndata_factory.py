@@ -3,52 +3,107 @@
 from typing import Any
 
 import anndata as ad
-import numpy as np
 import pandas as pd
 from alphabase.psm_reader import PSMReaderBase
-from alphabase.psm_reader.keys import PsmDfCols
+from alphabase.psm_reader.psm_reader import psm_reader_provider
+
+from alphatools.io.reader_columns import FEATURE_LEVEL_CONFIG
+from alphatools.pp.data import add_metadata
 
 
 class AnnDataFactory:
     """Factory class to convert AlphaBase PSM DataFrames to AnnData format."""
 
-    def __init__(self, psm_df: pd.DataFrame):
+    def __init__(
+        self,
+        psm_df: pd.DataFrame,
+        intensity_column: str,
+        sample_id_column: str,
+        feature_id_column: str,
+    ):
         """Initialize AnnDataFactory.
+
+        This is a way to process any dataframe with the AnnDataFactory class,
+        however the default use-case is to call it in the context of the psm_reader
+        function, operating on alphabase-standardized column names (handled by from_files).
 
         Parameters
         ----------
-        psm_df : pd.DataFrame
-            AlphaBase PSM DataFrame containing at minimum the columns:
-            - PsmDfCols.RAW_NAME
-            - PsmDfCols.PROTEINS
-            - PsmDfCols.INTENSITY
+        psm_df: pd.DataFrame
+            Dataframe containing precursor intensity, sample_id and feature_id columns in a longtable
+        intensity_column: str
+            Column containing the precursor intensities
+        sample_id_column: str
+            Column containing the sample identifiers
+        feature_id_column: str
+            Column dictating which feature ends up as the AnnData's var_names after the pivoting operation
 
         """
-        required_cols = [PsmDfCols.RAW_NAME, PsmDfCols.PROTEINS, PsmDfCols.INTENSITY]
-        missing_cols = [col for col in required_cols if col not in psm_df.columns]
-        if missing_cols:
-            raise ValueError(f"Missing required columns: {missing_cols}")
-
         self._psm_df = psm_df
+        self._intensity_column = intensity_column
+        self._sample_id_column = sample_id_column
+        self._feature_id_column = feature_id_column
 
-        # # Warn if duplicated features exist which get dropped;
-        # # TODO: This is not relevant for protein-level analysis, since there it is expected to have duplicated features
-        # # (i.e. the same protein id will almost inevitably have more than one precursor per file). However, if the analysis
-        # # level is precursors, we would not expect to see duplicated precursor IDs in the same file. In the future, there should
-        # # be an explicit flag to indicate whether we are analysing proteins or precursors, and whether the warning
-        # # below should be shown
-        # duplicated_features: pd.Series = self._psm_df.groupby(PsmDfCols.RAW_NAME).apply(
-        #     lambda df: df[PsmDfCols.PROTEINS].duplicated().sum(), include_groups=False
-        # )
+    def _add_metadata_from_columns(
+        self,
+        adata: ad.AnnData,
+        columns: str | list[str] | None,
+        index_column: str,
+        axis: int,
+    ) -> ad.AnnData:
+        """Add metadata to AnnData object from specified columns.
 
-        # if any(duplicated_features > 0):
-        #     warnings.warn(
-        #         f"Found {duplicated_features.sum()} duplicated features. Using only first.",
-        #         stacklevel=1,
-        #     )
+        Parameters
+        ----------
+        adata : ad.AnnData
+            AnnData object to add metadata to
+        columns : str | list[str] | None
+            Columns to extract as metadata
+        index_column : str
+            Column to use as index
+        axis : int
+            0 for obs (samples), 1 for var (features)
 
-    def create_anndata(self) -> ad.AnnData:
+        Returns
+        -------
+        ad.AnnData
+            AnnData object with added metadata
+        """
+        if columns is None:
+            return adata
+
+        # Normalize to list and create a copy to avoid mutating caller's input
+        columns = [columns] if isinstance(columns, str) else list(columns)
+
+        if index_column not in columns:
+            columns.append(index_column)
+
+        # Set index first, then drop duplicates based on index only
+        metadata = self._psm_df[columns].set_index(index_column, drop=True)
+        metadata.index.name = None
+        metadata = metadata[~metadata.index.duplicated(keep="first")]
+
+        return add_metadata(
+            adata=adata,
+            incoming_metadata=metadata,
+            axis=axis,
+            keep_data_shape=True,
+            verbose=False,
+        )
+
+    def create_anndata(
+        self,
+        var_columns: str | list[str] | None = None,
+        obs_columns: str | list[str] | None = None,
+    ) -> ad.AnnData:
         """Create AnnData object from PSM DataFrame.
+
+        Parameters
+        ----------
+        var_columns : Union[str, List[str]], optional
+            Additional columns to include in `var` of the AnnData object, by default None
+        obs_columns : Union[str, List[str]], optional
+            Additional columns to include in `obs` of the AnnData object, by default None
 
         Returns
         -------
@@ -62,75 +117,23 @@ class AnnDataFactory:
         # Create pivot table: raw names x proteins with intensity values
         pivot_df = pd.pivot_table(
             self._psm_df,
-            index=PsmDfCols.RAW_NAME,
-            columns=PsmDfCols.PROTEINS,
-            values=PsmDfCols.INTENSITY,
+            index=self._sample_id_column,
+            columns=self._feature_id_column,
+            values=self._intensity_column,
             aggfunc="first",  # DataFrameGroupBy.first -> will skip NA
-            fill_value=np.nan,
             dropna=False,
         )
 
-        return ad.AnnData(
+        # Create Nxp AnnData object where N=raw names and p=features (e.g. proteins)
+        adata = ad.AnnData(
             X=pivot_df.values,
             obs=pd.DataFrame(index=pivot_df.index),
             var=pd.DataFrame(index=pivot_df.columns),
         )
 
-    @classmethod
-    def from_files(
-        cls,
-        file_paths: str | list[str],
-        reader_type: str = "maxquant",
-        *,
-        intensity_column: str | None = None,
-        protein_id_column: str | None = None,
-        raw_name_column: str | None = None,
-        **kwargs,
-    ) -> "AnnDataFactory":
-        """Create AnnDataFactory from PSM files.
-
-        Parameters
-        ----------
-        file_paths : Union[str, List[str]]
-            Path(s) to PSM file(s)
-        reader_type : str, optional
-            Type of PSM reader to use, by default "maxquant"
-        intensity_column: str, optional
-            Name of the column storing intensity data. Default is taken from `psm_reader.yaml`
-        protein_id_column: str, optional
-            Name of the column storing proteins ids. Default is taken from `psm_reader.yaml`
-        raw_name_column: str, optional
-            Name of the column storing raw (or run) name. Default is taken from `psm_reader.yaml`
-        **kwargs
-            Additional arguments passed to PSM reader
-
-        Returns
-        -------
-        AnnDataFactory
-            Initialized AnnDataFactory instance
-
-        """
-        from alphabase.psm_reader.psm_reader import psm_reader_provider
-
-        reader_config = cls._get_reader_configuration(reader_type)
-
-        reader: PSMReaderBase = psm_reader_provider.get_reader(reader_type, **reader_config, **kwargs)
-
-        custom_column_mapping = {
-            k: v
-            for k, v in {
-                PsmDfCols.INTENSITY: intensity_column if intensity_column else None,
-                PsmDfCols.PROTEINS: protein_id_column if protein_id_column else None,
-                PsmDfCols.RAW_NAME: raw_name_column if raw_name_column else None,
-            }.items()
-            if v is not None
-        }
-
-        if custom_column_mapping:
-            reader.add_column_mapping(custom_column_mapping)
-
-        psm_df = reader.load(file_paths)
-        return cls(psm_df)
+        # Extract additional metadata if needed
+        adata = self._add_metadata_from_columns(adata, var_columns, self._feature_id_column, axis=1)
+        return self._add_metadata_from_columns(adata, obs_columns, self._sample_id_column, axis=0)
 
     @classmethod
     def _get_reader_configuration(cls, reader_type: str) -> dict[str, dict[str, Any]]:
@@ -142,3 +145,79 @@ class AnnDataFactory:
             }
         }
         return reader_configs.get(reader_type, {})
+
+    @classmethod
+    def from_files(
+        cls,
+        file_paths: str | list[str],
+        reader_type: str = "maxquant",
+        level: str = "proteins",
+        *,
+        intensity_column: str | None = None,
+        feature_id_column: str | None = None,
+        sample_id_column: str | None = None,
+        additional_columns: list[str] | None = None,
+        **reader_kwargs,
+    ) -> "AnnDataFactory":
+        """Create AnnDataFactory from PSM files.
+
+        Parameters
+        ----------
+        file_paths : Union[str, List[str]]
+            Path(s) to PSM file(s)
+        reader_type : str, optional
+            Type of PSM reader to use, by default "maxquant"
+        level : str, optional
+            Level of quantification to read. One of "proteins", "precursors", or "genes". Defaults to "proteins".
+        intensity_column: str, optional
+            Name of the column storing intensity data. Default is taken from `psm_reader.yaml`
+        feature_id_column: str, optional
+            Name of the column storing feature ids. Default is taken from `psm_reader.yaml`
+        sample_id_column: str, optional
+            Name of the column storing sample ids. Default is taken from `psm_reader.yaml`
+        additional_columns: list[str], optional
+            Names of additional columns from the PSM table to retain for experiment-specific metadata.
+            These columns can be added to the resulting AnnData object as annotations.
+            Note that if a column has a higher cardinality than the `feature_id_column`
+            (i.e., multiple values per feature), only the first value encountered will be kept.
+        **reader_kwargs
+            Additional arguments passed to PSM reader
+
+        Returns
+        -------
+        AnnDataFactory
+            Initialized AnnDataFactory instance
+
+        """
+        reader_config = cls._get_reader_configuration(reader_type)
+
+        reader: PSMReaderBase = psm_reader_provider.get_reader(reader_type, **reader_config, **reader_kwargs)
+
+        # Allow users to add custom columns
+        if additional_columns is not None:
+            reader.add_column_mapping({col: col for col in additional_columns})
+        psm_df = reader.load(file_paths)
+
+        # Get defaults for this reader/level, user input overrides
+        defaults = FEATURE_LEVEL_CONFIG.get(level, {})
+        intensity_column = intensity_column or defaults.get("intensity_column")
+        feature_id_column = feature_id_column or defaults.get("feature_id_column")
+        sample_id_column = sample_id_column or defaults.get("sample_id_column")
+
+        # Validate that all required columns are present
+        if intensity_column is None:
+            msg = f"intensity_column is required but not provided and no default found for reader_type='{reader_type}' and level='{level}'"
+            raise ValueError(msg)
+        if feature_id_column is None:
+            msg = f"feature_id_column is required but not provided and no default found for reader_type='{reader_type}' and level='{level}'"
+            raise ValueError(msg)
+        if sample_id_column is None:
+            msg = f"sample_id_column is required but not provided and no default found for reader_type='{reader_type}' and level='{level}'"
+            raise ValueError(msg)
+
+        return cls(
+            psm_df,
+            intensity_column=intensity_column,
+            feature_id_column=feature_id_column,
+            sample_id_column=sample_id_column,
+        )
