@@ -34,7 +34,7 @@ def toy_adata_with_mask(toy_adata):
 
 def test_run_pca_default(toy_adata):
     """Test the pca function with default parameters (obs space)."""
-    at.pp.pca(toy_adata)
+    at.tl.pca(toy_adata)
 
     # Check default storage locations for obs space PCA
     assert "X_pca_obs" in toy_adata.obsm, "PCA coordinates not found in obsm"
@@ -52,7 +52,7 @@ def test_run_pca_default(toy_adata):
 
 def test_run_pca_var_space(toy_adata):
     """Test the pca function in var space (PCA on genes)."""
-    at.pp.pca(toy_adata, dim_space="var")
+    at.tl.pca(toy_adata, dim_space="var")
 
     # Check storage locations for var space PCA
     assert "X_pca_var" in toy_adata.varm, "PCA coordinates not found in varm"
@@ -66,7 +66,7 @@ def test_run_pca_var_space(toy_adata):
 
 def test_run_pca_with_layer(toy_adata_with_layers):
     """Test the pca function using a specific layer."""
-    at.pp.pca(toy_adata_with_layers, layer="norm")
+    at.tl.pca(toy_adata_with_layers, layer="norm")
 
     # Check that PCA results exist
     assert "X_pca_obs" in toy_adata_with_layers.obsm
@@ -77,7 +77,7 @@ def test_run_pca_with_layer(toy_adata_with_layers):
 def test_run_pca_with_custom_embeddings_name(toy_adata):
     """Test the pca function with custom embeddings name."""
     custom_name = "my_custom_pca"
-    at.pp.pca(toy_adata, embbedings_name=custom_name)
+    at.tl.pca(toy_adata, embeddings_name=custom_name)
 
     # Check custom naming
     assert custom_name in toy_adata.obsm, f"Custom PCA coordinates not found with name {custom_name}"
@@ -87,7 +87,7 @@ def test_run_pca_with_custom_embeddings_name(toy_adata):
 
 def test_run_pca_with_mask(toy_adata_with_mask):
     """Test the pca function with feature mask."""
-    at.pp.pca(toy_adata_with_mask, meta_data_mask_column_name="feature_mask")
+    at.tl.pca(toy_adata_with_mask, meta_data_mask_column_name="feature_mask")
 
     # Check that PCA results exist
     assert "X_pca_obs" in toy_adata_with_mask.obsm
@@ -106,7 +106,7 @@ def test_run_pca_with_mask(toy_adata_with_mask):
 
 def test_run_pca_var_space_with_mask(toy_adata_with_mask):
     """Test the pca function in var space with feature mask."""
-    at.pp.pca(toy_adata_with_mask, dim_space="var", meta_data_mask_column_name="feature_mask")
+    at.tl.pca(toy_adata_with_mask, dim_space="var", meta_data_mask_column_name="feature_mask")
 
     # Check that PCA results exist in correct locations
     assert "X_pca_var" in toy_adata_with_mask.varm
@@ -127,7 +127,7 @@ def test_run_pca_var_space_with_mask(toy_adata_with_mask):
 def test_run_pca_legacy(toy_adata):
     """Test the run_pca function on a toy dataset (legacy test)."""
     toy_adata.layers["norm"] = toy_adata.X.copy()
-    at.pp.pca(toy_adata, layer="norm")
+    at.tl.pca(toy_adata, layer="norm")
 
     # Assertions for Expected Outputs (checking default obs space)
     assert "X_pca_obs" in toy_adata.obsm, "PCA results not found in obsm"

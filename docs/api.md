@@ -16,11 +16,9 @@
     pp.nanlog
     pp.detect_special_values
     pp.normalize
-    pp.pca
     pp.impute_gaussian
     pp.impute_median
     pp.impute_knn
-    pp.add_core_proteome_mask
     pp.scanpy_pycombat
 
 ```
@@ -38,6 +36,7 @@
     tl.nan_safe_ttest_ind
     tl.diff_exp_ttest
     tl.diff_exp_alphaquant
+    tl.pca
     tl.diff_exp_ebayes
 
 ```

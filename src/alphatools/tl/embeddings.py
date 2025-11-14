@@ -47,7 +47,7 @@ def _store_pca_results(
     adata: ad.AnnData,
     pca_res: tuple,
     dim_space: str,
-    embbedings_name: str | None,
+    embeddings_name: str | None,
     meta_data_mask_column_name: str | None,
     logger: logging.Logger,
 ) -> ad.AnnData:
@@ -62,7 +62,7 @@ def _store_pca_results(
         The result from scanpy.pp.pca (coordinates, loadings, variance_ratio, variance).
     dim_space : str
         Either "obs" or "var", indicating the PCA projection space.
-    embbedings_name : str or None
+    embeddings_name : str or None
         Custom key name for storing PCA results. If None, defaults are used.
     meta_data_mask_column_name : str or None
         Column name in adata.var used as a boolean mask for features. If None, all features are used.
@@ -75,14 +75,14 @@ def _store_pca_results(
         The updated AnnData object with PCA results stored.
     """
     # get key names for storing PCA results
-    if embbedings_name is None:
+    if embeddings_name is None:
         pca_coords_key = f"X_pca_{dim_space}"
         loadings_key = f"PCs_{dim_space}"
         variance_key = f"variance_pca_{dim_space}"
     else:
-        pca_coords_key = embbedings_name
-        loadings_key = embbedings_name
-        variance_key = embbedings_name
+        pca_coords_key = embeddings_name
+        loadings_key = embeddings_name
+        variance_key = embeddings_name
 
     # check if PCA was run for all features or only for a subset
     if meta_data_mask_column_name is None:
@@ -136,7 +136,7 @@ def pca(
     adata: ad.AnnData,
     layer: str | None = None,
     dim_space: str = "obs",
-    embbedings_name: str | None = None,
+    embeddings_name: str | None = None,
     n_comps: int | None = None,
     meta_data_mask_column_name: str | None = None,
     **pca_kwargs: dict | None,
@@ -162,13 +162,13 @@ def pca(
     dim_space: str, optional (default: "obs")
         The dimension to project PCA on. Can be either "obs" (default) for
         sample projection or "var" for feature projection.
-    embbedings_name: str, optional (default: None)
+    embeddings_name: str, optional (default: None)
         If provided, this will be used as the key under which to store the PCA results in
         `adata.obsm`, `adata.varm`, and `adata.uns` (see Returns).
         If None, the default keys will be used:
         - For `dim_space='obs'`: `X_pca_obs` for PC coordinates, `PCs_obs` for the feature loadings, `variance_pca_obs` for the variance.
         - For `dim_space='var'`: `X_pca_var` for PC corrdinates, `PCs_var` for the sample loadings, `variance_pca_var` for the variance.
-        If provided, the keys will be `embbedings_name` for all three data frames.
+        If provided, the keys will be `embeddings_name` for all three data frames.
     n_comps: int, optional (default: 50)
         Number of principal components to compute. Defaults to 50, or 1 - minimum
         dimension size of selected representation.
@@ -186,24 +186,24 @@ def pca(
     unless changed in the kwargs passed on to scanpy, an updated `AnnData` object.
     Sets the following fields:
     for `dim_space='obs'` (sample projection):
-    `.obsm['X_pca_obs' | embbedings_name]` : :class:`~scipy.sparse.csr_matrix` | :class:`~scipy.sparse.csc_matrix` | :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
+    `.obsm['X_pca_obs' | embeddings_name]` : :class:`~scipy.sparse.csr_matrix` | :class:`~scipy.sparse.csc_matrix` | :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
         PCA representation of data.
-    `.varm['PCs_obs' | embbedings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
+    `.varm['PCs_obs' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
         The principal components containing the loadings.
-    `.uns['variance_pca_obs' | embbedings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
+    `.uns['variance_pca_obs' | embeddings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
         Ratio of explained variance.
-    `.uns['variance_pca_obs' | embbedings_name]['variance']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
+    `.uns['variance_pca_obs' | embeddings_name]['variance']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
         Explained variance, equivalent to the eigenvalues of the
         covariance matrix.
 
     for `dim_space='var'` (sample projection):
-    `.varm['X_pca_var' | embbedings_name]` : :class:`~scipy.sparse.csr_matrix` | :class:`~scipy.sparse.csc_matrix` | :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
+    `.varm['X_pca_var' | embeddings_name]` : :class:`~scipy.sparse.csr_matrix` | :class:`~scipy.sparse.csc_matrix` | :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
         PCA representation of data.
-    `.obsm['PCs_var' | embbedings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
+    `.obsm['PCs_var' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
         The principal components containing the loadings.
-    `.uns['variance_pca_var' | embbedings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
+    `.uns['variance_pca_var' | embeddings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
         Ratio of explained variance.
-    `.uns['variance_pca_var' | embbedings_name]['variance']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
+    `.uns['variance_pca_var' | embeddings_name]['variance']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
         Explained variance, equivalent to the eigenvalues of the
         covariance matrix.
     """
@@ -224,4 +224,4 @@ def pca(
     # run PCA
     pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, **pca_kwargs)
 
-    return _store_pca_results(adata, pca_res, dim_space, embbedings_name, meta_data_mask_column_name, logger)
+    return _store_pca_results(adata, pca_res, dim_space, embeddings_name, meta_data_mask_column_name, logger)
