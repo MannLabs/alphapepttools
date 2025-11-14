@@ -1442,3 +1442,133 @@ class Plots:
         # set axis labels
         space_suffix = " (samples)" if dim_space == "obs" else " (features)"
         label_axes(ax, xlabel=f"PC{pc_x}{space_suffix}", ylabel=f"PC{pc_y}{space_suffix}")
+
+
+def diff_exp_volcano(  # NOQA: C901
+    ttest_df: pd.DataFrame,
+    x_column: str,
+    y_column: str,
+    ax: plt.Axes | None = None,
+    x_thresholds: tuple = (-1, 1),
+    y_thresholds: float = -np.log10(0.05),
+    layer_dict: dict | None = None,
+    display_id_column: str | None = None,
+    color_dict: dict | None = None,
+    label_layers: list[str] | None = None,
+    max_labels: int | None = None,
+    x_label_anchors: list[float] | None = None,
+    figure_kwargs: dict | None = None,
+    scatter_kwargs: dict | None = None,
+    label_kwargs: dict | None = None,
+    y_padding_factor: float | None = 0.05,
+    xlims: tuple[float, float] | None = None,
+    ylims: tuple[float, float] | None = None,
+) -> None:
+    """Visualize 🅱️olcano plot"""
+    scatter_kwargs = scatter_kwargs or {}
+    label_kwargs = label_kwargs or {}
+    figure_kwargs = figure_kwargs or {"figsize": (6, 4)}
+
+    def _tolist(
+        obj: str | list,
+    ) -> list:
+        return obj if isinstance(obj, list) else [obj]
+
+    X_COLS = ["log2fc"]
+
+    if x_column not in X_COLS:
+        raise ValueError(f"x_column must be one of {X_COLS}")
+
+    # Determine sensible limits
+    valid_x_values = ttest_df.loc[((~ttest_df[x_column].isna()) & (~ttest_df[y_column].isna())), x_column]
+    abs_max_x = max(abs(valid_x_values.min()), abs(valid_x_values.max()))
+    xlims = (-abs_max_x * 1.1, abs_max_x * 1.1) if xlims is None else xlims
+
+    valid_y_values = ttest_df.loc[((~ttest_df[x_column].isna()) & (~ttest_df[y_column].isna())), y_column]
+    ylims = (0, valid_y_values.max() * 1.1) if ylims is None else ylims
+
+    fig = None
+    if ax is None:
+        fig, ax = create_figure(1, 1, **figure_kwargs)
+        ax = ax.next()
+
+    ### Add visualization layers ###
+    glob_spent_idxs = []
+    glob_layer_idxs = []
+    for layer_column, layer_values in layer_dict.items():
+        for value in _tolist(layer_values):
+            layer_colorname = layer_column if isinstance(value, list) else value
+            layer_color = color_dict.get(
+                layer_colorname,
+                BaseColors.get("grey"),
+            )
+            layer_idxs = ttest_df[
+                (ttest_df[layer_column].isin(_tolist(value))) & (~ttest_df.index.isin(glob_spent_idxs))
+            ].index.tolist()
+            glob_layer_idxs.append((layer_idxs, layer_color, layer_column))
+            glob_spent_idxs.extend(layer_idxs)
+
+    if len(glob_spent_idxs) < len(ttest_df):
+        logger.warning(f"{len(set(ttest_df.index) - set(glob_spent_idxs))} indices were not used in the volcano plot.")
+
+    for layer_idxs, layer_color, _ in reversed(glob_layer_idxs):
+        Plots.scatter(
+            ax=ax,
+            data=ttest_df.loc[layer_idxs],
+            x_column=x_column,
+            y_column=y_column,
+            color=layer_color,
+            scatter_kwargs=scatter_kwargs,
+        )
+
+    ### Add border lines ###
+    add_lines(ax=ax, linetype="vline", intercepts=list(x_thresholds))
+    add_lines(ax=ax, linetype="hline", intercepts=[y_thresholds])
+
+    # Label selected ids
+    if label_layers is not None:
+        glob_label_idxs = []
+        for layer_idxs, _, layer_column in glob_layer_idxs:
+            if layer_column in label_layers:
+                glob_label_idxs.extend(layer_idxs)
+
+        label_df = ttest_df.loc[glob_label_idxs].sort_values(by=y_column, ascending=False).copy()
+
+        if max_labels is not None and len(label_df) > max_labels:
+            label_df = label_df.head(max_labels)
+
+        label_plot(
+            ax=ax,
+            x_values=label_df[x_column].tolist(),
+            y_values=label_df[y_column].tolist(),
+            labels=label_df[display_id_column].tolist(),
+            y_display_start=1,
+            x_anchors=x_label_anchors,
+            y_padding_factor=y_padding_factor,
+        )
+
+    # Label axes
+    label_axes(
+        ax=ax,
+        xlabel=x_column,
+        ylabel=y_column,
+        title="Volcano Plot",
+        **label_kwargs,
+    )
+
+    # Add legend from color dict
+    add_legend_to_axes(
+        ax=ax,
+        levels=color_dict,
+    )
+
+    # Set lims
+    if xlims is not None:
+        ax.set_xlim(xlims)
+    if ylims is not None:
+        ax.set_ylim(ylims)
+
+    return (
+        fig,
+        ax,
+    )
