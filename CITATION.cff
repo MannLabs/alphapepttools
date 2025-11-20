@@ -13,24 +13,24 @@ authors:
       email: brennsteiner@biochem.mpg.de
       affiliation: Max Planck Institute of Biochemistry
       orcid: "https://orcid.org/0009-0002-4629-481X"
-    - given-names: Lucas
-      family-names: Diedrich
-      email: diedrich@biochem.mpg.de
-      affiliation: Max Planck Institute of Biochemistry
-      orcid: "https://orcid.org/0009-0007-4884-1422"
-    - given-names: Magnus
-      family-names: Schwörer
-      affiliation: Max Planck Institute of Biochemistry
     - given-names: Shani
       family-names: Ben-Moshe
       orcid: "https://orcid.org/0000-0002-7046-5423"
       email: benmoshe@biochem.mpg.de
       affiliation: Max Planck Institute of Biochemistry
+    - given-names: Lucas
+      family-names: Diedrich
+      email: diedrich@biochem.mpg.de
+      affiliation: Max Planck Institute of Biochemistry
+      orcid: "https://orcid.org/0009-0007-4884-1422"
     - given-names: Matthias
       family-names: Mann
       email: mmann@biochem.mpg.de
       affiliation: Max Planck Institute of Biochemistry
       orcid: "https://orcid.org/0000-0003-1292-4799"
+    - given-names: Magnus
+      family-names: Schwörer
+      affiliation: Max Planck Institute of Biochemistry
 identifiers:
     - type: url
       value: "https://github.com/MannLabs/alphapepttools"
