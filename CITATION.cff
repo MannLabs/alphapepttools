@@ -1,0 +1,49 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: alphapepttools
+message: >-
+    Search- and quantification-engine agnostic biological
+    interpretation of proteomics data
+type: software
+authors:
+    - given-names: Vincenth
+      family-names: Brennsteiner
+      email: brennsteiner@biochem.mpg.de
+      affiliation: Max Planck Institute of Biochemistry
+      orcid: "https://orcid.org/0009-0002-4629-481X"
+    - given-names: Lucas
+      family-names: Diedrich
+      email: diedrich@biochem.mpg.de
+      affiliation: Max Planck Institute of Biochemistry
+      orcid: "https://orcid.org/0009-0007-4884-1422"
+    - given-names: Magnus
+      family-names: Schwörer
+      affiliation: Max Planck Institute of Biochemistry
+    - given-names: Shani
+      family-names: Ben-Moshe
+      orcid: "https://orcid.org/0000-0002-7046-5423"
+      email: benmoshe@biochem.mpg.de
+      affiliation: Max Planck Institute of Biochemistry
+    - given-names: Matthias
+      family-names: Mann
+      email: mmann@biochem.mpg.de
+      affiliation: Max Planck Institute of Biochemistry
+      orcid: "https://orcid.org/0000-0003-1292-4799"
+identifiers:
+    - type: url
+      value: "https://github.com/MannLabs/alphapepttools"
+      description: GitHub Repository
+repository-code: "https://github.com/MannLabs/alphapepttools"
+url: "https://mannlabs.github.io/alphapepttools/"
+abstract: >-
+    alphapepttools provides search- and quantification-engine
+    independent tools for biological interpretation of
+    proteomics data. It standardizes analyses from search
+    engine outputs and, by leveraging the anndata format,
+    allows integration with scVerse ecosystem packages.
+keywords:
+    - proteomics
+    - anndata
+license: Apache-2.0
