@@ -36,4 +36,4 @@ values = ["dev", "final"]
 optional_value = "final"
 
 [[tool.bumpversion.files]]
-filename = "./src/alphatools/__init__.py"
+filename = "./src/alphapepttools/__init__.py"

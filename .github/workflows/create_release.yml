@@ -16,8 +16,8 @@ jobs:
     permissions:
       contents: write
     with:
-      package_name: alphatools
-      src_folder: src/alphatools
+      package_name: alphapepttools
+      src_folder: src/alphapepttools
       commitish_to_release: ${{ inputs.commitish_to_release }}
       build_nodejs_ui: false
       python_version: 3.12

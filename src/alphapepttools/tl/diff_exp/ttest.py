@@ -5,10 +5,10 @@ import numpy as np
 import pandas as pd
 from scipy.stats import ttest_ind
 
-from alphatools.pp.data import filter_by_metadata
-from alphatools.tl.defaults import tl_defaults
-from alphatools.tl.stats import nan_safe_bh_correction
-from alphatools.tl.utils import determine_max_replicates, negative_log10_pvalue, validate_ttest_inputs
+from alphapepttools.pp.data import filter_by_metadata
+from alphapepttools.tl.defaults import tl_defaults
+from alphapepttools.tl.stats import nan_safe_bh_correction
+from alphapepttools.tl.utils import determine_max_replicates, negative_log10_pvalue, validate_ttest_inputs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -50,7 +50,7 @@ def nan_safe_ttest_ind(
     --------
     >>> import pandas as pd
     >>> import numpy as np
-    >>> from alphatools.tl.stats import nan_safe_ttest_ind
+    >>> from alphapepttools.tl.stats import nan_safe_ttest_ind
     >>> a = pd.Series([1, 2, 3, np.nan])
     >>> b = pd.Series([4, 5, 6, 7])
     >>> t_stat, p_val = nan_safe_ttest_ind(a, b)

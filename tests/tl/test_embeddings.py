@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from anndata import AnnData
 
-import alphatools as at
+import alphapepttools as at
 
 
 @pytest.fixture

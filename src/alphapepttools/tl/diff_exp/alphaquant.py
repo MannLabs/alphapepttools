@@ -6,8 +6,8 @@ import alphaquant.run_pipeline as aq_pipeline
 import anndata as ad
 import pandas as pd
 
-from alphatools.tl import tl_defaults
-from alphatools.tl.utils import _suppress_plots, determine_max_replicates, negative_log10_pvalue
+from alphapepttools.tl import tl_defaults
+from alphapepttools.tl.utils import _suppress_plots, determine_max_replicates, negative_log10_pvalue
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

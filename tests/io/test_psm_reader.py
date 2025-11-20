@@ -1,12 +1,12 @@
 from unittest.mock import Mock, patch
 
-from alphatools.io import read_psm_table
+from alphapepttools.io import read_psm_table
 
 
 class TestReadPsmTable:
     """Test suite for read_psm_table function."""
 
-    @patch("alphatools.io.psm_reader.AnnDataFactory")
+    @patch("alphapepttools.io.psm_reader.AnnDataFactory")
     def test_read_psm_table_calls_factory_with_correct_args(self, mock_factory_class):
         """Test that read_psm_table properly delegates to AnnDataFactory with correct arguments."""
         # Setup mock
@@ -29,7 +29,7 @@ class TestReadPsmTable:
         mock_factory_instance.create_anndata.assert_called_once()
         assert result == mock_anndata
 
-    @patch("alphatools.io.psm_reader.AnnDataFactory")
+    @patch("alphapepttools.io.psm_reader.AnnDataFactory")
     def test_read_psm_table_with_all_parameters(self, mock_factory_class):
         """Test that all parameters are correctly passed through to AnnDataFactory."""
         # Setup mock

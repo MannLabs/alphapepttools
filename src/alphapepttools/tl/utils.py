@@ -5,7 +5,7 @@ import anndata as ad
 import matplotlib.pyplot as plt
 import numpy as np
 
-from alphatools.tl.defaults import tl_defaults
+from alphapepttools.tl.defaults import tl_defaults
 
 logger = logging.getLogger(__name__)
 

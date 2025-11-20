@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alphatools.pp import impute_gaussian, impute_knn, impute_median
-from alphatools.pp.impute import _check_all_nan, _impute_knn, _impute_nanmedian
+from alphapepttools.pp import impute_gaussian, impute_knn, impute_median
+from alphapepttools.pp.impute import _check_all_nan, _impute_knn, _impute_nanmedian
 
 
 @pytest.fixture

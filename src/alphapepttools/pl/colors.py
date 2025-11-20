@@ -1,9 +1,9 @@
 # at_colors.py:
 
-# Defines the basic look and color layout of AlphaTools. This includes:
+# Defines the basic look and color layout of alphapepttools. This includes:
 
-# - BaseColors (for getting individual RGBA colors in AlphaTools-style), defining colors based on
-# - BasePalettes (for getting individual discrete palettes in AlphaTools-style), defined as a custom
+# - BaseColors (for getting individual RGBA colors in alphapepttools-style), defining colors based on
+# - BasePalettes (for getting individual discrete palettes in alphapepttools-style), defined as a custom
 #   rearranged version of the spectral colorscale for maximum separation when iterating.
 # - BaseColormaps: Perceptually uniform colormaps (based on the https://github.com/callumrollo/cmcrameri.git)
 
@@ -21,7 +21,7 @@ import pandas as pd
 from matplotlib import colors as mpl_colors
 from matplotlib.colors import Colormap
 
-from alphatools.pl import defaults
+from alphapepttools.pl import defaults
 
 logger = logging.getLogger(__name__)
 
@@ -239,7 +239,7 @@ def _base_binary_colorscale() -> list:
 
 
 class BaseColors:
-    """Base colors for AlphaTools plots"""
+    """Base colors for alphapepttools plots"""
 
     _colorscale = _base_qualitative_colorscale()
     default_colors: ClassVar[dict] = {
@@ -289,7 +289,7 @@ class BaseColors:
 
 
 class BasePalettes:
-    """Base color palettes for AlphaTools plots"""
+    """Base color palettes for alphapepttools plots"""
 
     default_palettes: ClassVar[dict] = {
         "qualitative_spectral": _base_qualitative_colorscale(),
@@ -318,7 +318,7 @@ class BasePalettes:
 
 # TODO: Fix so a defined number of colors can be retrieved with .get, as well as the whole colormap
 class BaseColormaps:
-    """Base colormaps for AlphaTools plots"""
+    """Base colormaps for alphapepttools plots"""
 
     # Use perceptually uniform color palettes to avoid visual distortion (Crameri, F. (2018a), Scientific colour maps. Zenodo. http://doi.org/10.5281/zenodo.1243862)
     default_colormaps: ClassVar[dict] = {

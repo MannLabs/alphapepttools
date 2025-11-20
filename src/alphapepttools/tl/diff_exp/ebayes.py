@@ -7,8 +7,8 @@ import pandas as pd
 import patsy
 from inmoose import limma
 
-from alphatools.tl import tl_defaults
-from alphatools.tl.utils import (
+from alphapepttools.tl import tl_defaults
+from alphapepttools.tl.utils import (
     determine_max_replicates,
     drop_features_with_too_few_valid_values,
     negative_log10_pvalue,

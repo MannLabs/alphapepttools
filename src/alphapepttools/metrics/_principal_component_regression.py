@@ -20,12 +20,12 @@ def _verify_keys__principal_component_regression(
     """
     if pca_key not in adata.obsm:
         raise KeyError(
-            f"Key `pca_key={pca_key}` was not found in `adata.obsm`. Run `alphatools.pp.pca` first or specify correct key."
+            f"Key `pca_key={pca_key}` was not found in `adata.obsm`. Run `alphapepttools.pp.pca` first or specify correct key."
         )
 
     if pca_uns_key not in adata.uns:
         raise KeyError(
-            f"Key `pca_key_uns={pca_uns_key}` was not found in `adata.uns`. Run `alphatools.pp.pca` first or specify correct key."
+            f"Key `pca_key_uns={pca_uns_key}` was not found in `adata.uns`. Run `alphapepttools.pp.pca` first or specify correct key."
         )
 
     if covariate not in adata.obs:
@@ -123,7 +123,7 @@ def principal_component_regression(
 
     .. code-block:: python
 
-        import alphatools as at
+        import alphapepttools as at
 
         at.pp.pca(adata)
         at.metrics.principal_component_regression(adata, covariate="batch")

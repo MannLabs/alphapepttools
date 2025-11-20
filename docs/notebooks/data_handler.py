@@ -7,7 +7,7 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 
-from alphatools.io.anndata_factory import AnnDataFactory
+from alphapepttools.io.anndata_factory import AnnDataFactory
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", message=".*'progressbar' not installed.*")
@@ -89,7 +89,7 @@ class DataHandler:
         if target_folder is None:
             _target_folder = str(REPO_ROOT / "test_data")
         elif target_folder == "HOME":
-            _target_folder = str((Path("~") / "alphatools_test_data").expanduser())
+            _target_folder = str((Path("~") / "alphapepttools_test_data").expanduser())
         else:
             _target_folder = target_folder
 

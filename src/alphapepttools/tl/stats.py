@@ -29,7 +29,7 @@ def nan_safe_bh_correction(
     Examples
     --------
     >>> import numpy as np
-    >>> from alphatools.tl.stats import nan_safe_bh_correction
+    >>> from alphapepttools.tl.stats import nan_safe_bh_correction
     >>> pvals = np.array([0.01, 0.05, np.nan, 0.001, np.nan])
     >>> corrected = nan_safe_bh_correction(pvals)
     >>> # Returns [0.015, 0.05, nan, 0.015, nan] (approximately)

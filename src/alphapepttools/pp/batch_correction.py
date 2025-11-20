@@ -30,7 +30,7 @@ def coerce_nans_to_batch(
     >>> import anndata as ad
     >>> import pandas as pd
     >>> import numpy as np
-    >>> from alphatools.pp.batch_correction import coerce_nans_to_batch
+    >>> from alphapepttools.pp.batch_correction import coerce_nans_to_batch
     >>> # Create a sample AnnData object with NaN values in the batch column
     >>> data = np.random.rand(5, 3)
     >>> obs = pd.DataFrame({"batch": ["A", "B", np.nan, "A", np.nan]})
@@ -80,7 +80,7 @@ def drop_singleton_batches(
     >>> import anndata as ad
     >>> import pandas as pd
     >>> import numpy as np
-    >>> from alphatools.pp.batch_correction import drop_singleton_batches
+    >>> from alphapepttools.pp.batch_correction import drop_singleton_batches
     >>> # Create a sample AnnData object with singleton batches
     >>> data = np.random.rand(5, 3)
     >>> obs = pd.DataFrame({"batch": ["A", "B", "B", "C", "D"]})

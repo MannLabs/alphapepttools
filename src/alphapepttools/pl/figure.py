@@ -12,7 +12,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from alphatools.pl import colors, defaults
+from alphapepttools.pl import colors, defaults
 
 config = defaults.plot_settings.to_dict()
 
@@ -21,7 +21,7 @@ config = defaults.plot_settings.to_dict()
 def stylize(
     ax: plt.Axes,
 ) -> plt.Axes:
-    """Apply AlphaTools style to a matplotlib axes object"""
+    """Apply alphapepttools style to a matplotlib axes object"""
     ax.set_prop_cycle("color", colors.BasePalettes.get("qualitative"))
     ax.grid(visible=True, linewidth=config["linewidths"]["small"])
     ax.xaxis.set_tick_params(width=config["linewidths"]["small"], labelsize=config["axes"]["tick_size"])
