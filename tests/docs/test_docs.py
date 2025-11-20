@@ -42,7 +42,7 @@ def parse_api_md(api_md_path: Path) -> dict[str, set[str]]:
 
     # Find all autosummary blocks
     autosummary_pattern = (
-        r"```\{eval-rst\}.*?.. module:: (alphatools\.\w+).*?.. autosummary::.*?:toctree: generated(.*?)```"
+        r"```\{eval-rst\}.*?.. module:: (alphapepttools\.\w+).*?.. autosummary::.*?:toctree: generated(.*?)```"
     )
 
     matches = re.findall(autosummary_pattern, content, re.DOTALL)
@@ -81,7 +81,7 @@ def test_api_completeness():
     errors = []
 
     for module in modules_to_check:
-        module_name = f"alphatools.{module}"
+        module_name = f"alphapepttools.{module}"
 
         # Get actual public members from the module
         actual_members = get_public_members(module_name)

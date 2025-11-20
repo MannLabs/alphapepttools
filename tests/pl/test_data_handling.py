@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alphatools.pl.plot_data_handling import (
+from alphapepttools.pl.plot_data_handling import (
     _validate_pca_loadings_plot_inputs,
     _validate_pca_plot_input,
     _validate_scree_plot_input,

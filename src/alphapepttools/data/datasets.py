@@ -147,7 +147,7 @@ def available_data() -> StudyCollection:
 
     .. code-block:: python
 
-        alphatools.data.available_data()
+        alphapepttools.data.available_data()
         > Collection of 1 study
             - bader2020_pg_alphadia (pg, alphadia): Study on Cerebral Spinal Fluid of Alzheimer patients by Bader et al.
 

@@ -64,7 +64,7 @@ def _total_median_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarra
 
     See Also
     --------
-    alphatools.pp.norm._total_mean_normalization
+    alphapepttools.pp.norm._total_mean_normalization
     """
     # Compute sample-wise means
     # NaNs are counted as zeros

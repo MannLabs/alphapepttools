@@ -1,6 +1,6 @@
 import anndata as ad
 
-from alphatools.io.reader_columns import FEATURE_LEVEL_CONFIG
+from alphapepttools.io.reader_columns import FEATURE_LEVEL_CONFIG
 
 from .anndata_factory import AnnDataFactory
 
@@ -82,7 +82,7 @@ def read_psm_table(
 
     .. code-block:: python
 
-        import alphatools as at
+        import alphapepttools as at
 
         alphadia_path = ...
         adata = at.io.read_psm_table(alhpadia_path, search_engine="alphadia")

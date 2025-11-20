@@ -1,5 +1,5 @@
 name: Feature request
-description: Propose a new feature for alphatools
+description: Propose a new feature for alphapepttools
 labels: enhancement
 body:
   - type: textarea

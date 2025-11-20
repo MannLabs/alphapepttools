@@ -8,8 +8,8 @@ import pandas as pd
 import pytest
 from alphabase.psm_reader.keys import PsmDfCols
 
-from alphatools.io.anndata_factory import AnnDataFactory
-from alphatools.pp.data import add_metadata
+from alphapepttools.io.anndata_factory import AnnDataFactory
+from alphapepttools.pp.data import add_metadata
 
 
 @pytest.fixture
@@ -229,7 +229,7 @@ def test_create_anndata_with_empty_dataframe():
 
 
 @patch("alphabase.psm_reader.psm_reader.psm_reader_provider.get_reader")
-@patch("alphatools.io.anndata_factory.AnnDataFactory._get_reader_configuration")
+@patch("alphapepttools.io.anndata_factory.AnnDataFactory._get_reader_configuration")
 def test_from_files(mock_get_reader_configuration, mock_reader, test_psm_df, test_protein_anndata):
     mock_reader.return_value.load.return_value = test_psm_df.rename(
         columns={

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 from scipy.stats import false_discovery_control
 
-from alphatools import tl
+from alphapepttools import tl
 
 
 @pytest.mark.parametrize(

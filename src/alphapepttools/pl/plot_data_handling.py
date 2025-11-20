@@ -13,7 +13,7 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 
-from alphatools.pp.data import data_column_to_array
+from alphapepttools.pp.data import data_column_to_array
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)

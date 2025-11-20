@@ -21,16 +21,16 @@ import numpy as np
 import pandas as pd
 from matplotlib.patches import Patch
 
-from alphatools.pl import defaults
-from alphatools.pl.colors import BaseColors, BasePalettes, _get_colors_from_cmap, get_color_mapping
-from alphatools.pl.figure import create_figure, label_axes
-from alphatools.pl.plot_data_handling import (
+from alphapepttools.pl import defaults
+from alphapepttools.pl.colors import BaseColors, BasePalettes, _get_colors_from_cmap, get_color_mapping
+from alphapepttools.pl.figure import create_figure, label_axes
+from alphapepttools.pl.plot_data_handling import (
     prepare_pca_1d_loadings_data_to_plot,
     prepare_pca_2d_loadings_data_to_plot,
     prepare_pca_data_to_plot,
     prepare_scree_data_to_plot,
 )
-from alphatools.pp.data import data_column_to_array
+from alphapepttools.pp.data import data_column_to_array
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -138,7 +138,7 @@ def _extract_groupwise_plotting_data(
     Examples
     --------
     >>> import pandas as pd
-    >>> from alphatools.pl import _extract_groupwise_plotting_data
+    >>> from alphapepttools.pl import _extract_groupwise_plotting_data
     >>> df = pd.DataFrame({
     ...     'group': ['A', 'A', 'B', 'B', 'C'],
     ...     'X1': [1, 2, 3, 4, 5]

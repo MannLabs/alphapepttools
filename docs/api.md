@@ -3,8 +3,8 @@
 ## Preprocessing
 
 ```{eval-rst}
-.. module:: alphatools.pp
-.. currentmodule:: alphatools
+.. module:: alphapepttools.pp
+.. currentmodule:: alphapepttools
 
 .. autosummary::
     :toctree: generated
@@ -26,8 +26,8 @@
 ## Tools
 
 ```{eval-rst}
-.. module:: alphatools.tl
-.. currentmodule:: alphatools
+.. module:: alphapepttools.tl
+.. currentmodule:: alphapepttools
 
 .. autosummary::
     :toctree: generated
@@ -44,8 +44,8 @@
 ## Metrics
 
 ```{eval-rst}
-.. module:: alphatools.metrics
-.. currentmodule:: alphatools
+.. module:: alphapepttools.metrics
+.. currentmodule:: alphapepttools
 
 .. autosummary::
     :toctree: generated
@@ -57,8 +57,8 @@
 ## Plotting
 
 ```{eval-rst}
-.. module:: alphatools.pl
-.. currentmodule:: alphatools
+.. module:: alphapepttools.pl
+.. currentmodule:: alphapepttools
 
 .. autosummary::
     :toctree: generated
@@ -73,8 +73,8 @@
 ### Reader functions
 
 ```{eval-rst}
-.. module:: alphatools.io
-.. currentmodule:: alphatools
+.. module:: alphapepttools.io
+.. currentmodule:: alphapepttools
 
 .. autosummary::
     :toctree: generated
@@ -89,8 +89,8 @@
 Example data that can be accessed with the package.
 
 ```{eval-rst}
-.. module:: alphatools.data
-.. currentmodule:: alphatools
+.. module:: alphapepttools.data
+.. currentmodule:: alphapepttools
 
 .. autosummary::
     :toctree: generated

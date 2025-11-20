@@ -2,7 +2,7 @@ import matplotlib.colors as mpl_colors
 
 
 class PlotSettings:
-    """Default settings for AlphaTools plots."""
+    """Default settings for alphapepttools plots."""
 
     def __init__(self):
         self.font_family = "sans-serif"
