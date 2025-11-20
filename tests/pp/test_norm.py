@@ -2,8 +2,8 @@ import anndata as ad
 import numpy as np
 import pytest
 
-from alphatools.pp import normalize
-from alphatools.pp.norm import _total_mean_normalization, _total_median_normalization, _validate_strategies
+from alphapepttools.pp import normalize
+from alphapepttools.pp.norm import _total_mean_normalization, _total_median_normalization, _validate_strategies
 
 
 class TestDataFactory:

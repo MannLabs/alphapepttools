@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alphatools.pp.transform import detect_special_values, nanlog
+from alphapepttools.pp.transform import detect_special_values, nanlog
 
 # Suppress warnings about conversion to numpy arrays: inputs are ints and get
 # converted to floats by AnnData upon storing the dataframe.

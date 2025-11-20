@@ -3,8 +3,8 @@
 ## Preprocessing
 
 ```{eval-rst}
-.. module:: alphatools.pp
-.. currentmodule:: alphatools
+.. module:: alphapepttools.pp
+.. currentmodule:: alphapepttools
 
 .. autosummary::
     :toctree: generated
@@ -16,11 +16,9 @@
     pp.nanlog
     pp.detect_special_values
     pp.normalize
-    pp.pca
     pp.impute_gaussian
     pp.impute_median
     pp.impute_knn
-    pp.add_core_proteome_mask
     pp.scanpy_pycombat
 
 ```
@@ -28,8 +26,8 @@
 ## Tools
 
 ```{eval-rst}
-.. module:: alphatools.tl
-.. currentmodule:: alphatools
+.. module:: alphapepttools.tl
+.. currentmodule:: alphapepttools
 
 .. autosummary::
     :toctree: generated
@@ -38,6 +36,7 @@
     tl.nan_safe_ttest_ind
     tl.diff_exp_ttest
     tl.diff_exp_alphaquant
+    tl.pca
     tl.diff_exp_ebayes
 
 ```
@@ -45,8 +44,8 @@
 ## Metrics
 
 ```{eval-rst}
-.. module:: alphatools.metrics
-.. currentmodule:: alphatools
+.. module:: alphapepttools.metrics
+.. currentmodule:: alphapepttools
 
 .. autosummary::
     :toctree: generated
@@ -58,8 +57,8 @@
 ## Plotting
 
 ```{eval-rst}
-.. module:: alphatools.pl
-.. currentmodule:: alphatools
+.. module:: alphapepttools.pl
+.. currentmodule:: alphapepttools
 
 .. autosummary::
     :toctree: generated
@@ -83,8 +82,8 @@
 ### Reader functions
 
 ```{eval-rst}
-.. module:: alphatools.io
-.. currentmodule:: alphatools
+.. module:: alphapepttools.io
+.. currentmodule:: alphapepttools
 
 .. autosummary::
     :toctree: generated
@@ -99,8 +98,8 @@
 Example data that can be accessed with the package.
 
 ```{eval-rst}
-.. module:: alphatools.data
-.. currentmodule:: alphatools
+.. module:: alphapepttools.data
+.. currentmodule:: alphapepttools
 
 .. autosummary::
     :toctree: generated

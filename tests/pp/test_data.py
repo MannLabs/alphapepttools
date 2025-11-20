@@ -5,10 +5,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import alphatools as at
+import alphapepttools as at
 
 # import private method to obtain anndata object
-from alphatools.pp.data import _handle_overlapping_columns, _to_anndata, data_column_to_array
+from alphapepttools.pp.data import _handle_overlapping_columns, _to_anndata, data_column_to_array
 
 ### Fixtures ###
 
@@ -766,7 +766,7 @@ class TestScaleAndCenter:
     @pytest.mark.parametrize("layer", [None, "new_layer"])
     @pytest.mark.parametrize("scaler", ["standard", "robust"])
     def test_scale_and_center_inplace(self, anndata_scale_and_center, scaler: str, layer: str) -> None:
-        """Test that alphatools.pp.scale_and_center modifies anndata correctly inplace"""
+        """Test that alphapepttools.pp.scale_and_center modifies anndata correctly inplace"""
         adata, expected = anndata_scale_and_center
 
         return_value = at.pp.scale_and_center(adata, scaler=scaler, layer=layer, copy=False)
@@ -781,7 +781,7 @@ class TestScaleAndCenter:
     @pytest.mark.parametrize("layer", [None, "new_layer"])
     @pytest.mark.parametrize("scaler", ["standard", "robust"])
     def test_scale_and_center_copy(self, anndata_scale_and_center, scaler: str, layer: str) -> None:
-        """Test that alphatools.pp.scale_and_center correctly returns a copy"""
+        """Test that alphapepttools.pp.scale_and_center correctly returns a copy"""
         adata, expected = anndata_scale_and_center
         adata_original = adata.copy()
 
@@ -835,7 +835,7 @@ def data_test_completeness_filter():
 
 # test data completeness filtering
 @pytest.mark.parametrize(
-    ("expected_columns", "expected_rows", "max_missing", "group_column", "groups"),
+    ("expected_columns", "expected_rows", "max_missing", "group_column", "groups", "action"),
     [
         # 1. Check filtering of columns (features)
         # 1.1. Filter columns with 0.5 threshold
@@ -845,6 +845,7 @@ def data_test_completeness_filter():
             0.5,
             None,
             None,
+            "drop",
         ),
         # 1.2. Filter columns with 0.6 threshold so that one value lies exactly on the threshold --> this should be kept since ">" is used
         (
@@ -853,22 +854,34 @@ def data_test_completeness_filter():
             0.6,
             None,
             None,
+            "drop",
         ),
-        # 1.3. Filter columns with 1.0 threshold: keep all columns
+        # 1.3. flag the columns with 0.5 threshold - not to drop them
+        (
+            ["A", "B", "C", "D", "E"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            0.5,
+            None,
+            None,
+            "flag",
+        ),
+        # 1.4. Filter columns with 1.0 threshold: keep all columns
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
             1.0,
             None,
             None,
+            "drop",
         ),
-        # 1.4. Filter columns with 0.0 threshold: remove columns with any missing values
+        # 1.5. Filter columns with 0.0 threshold: remove columns with any missing values
         (
             ["A"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
             0.0,
             None,
             None,
+            "drop",
         ),
         # 2. Group-wise filtering
         # 2.1. Group by 'batch' and filter columns with 0.5 threshold
@@ -878,6 +891,7 @@ def data_test_completeness_filter():
             0.5,
             "batch",
             None,
+            "drop",
         ),
         # 2.2. Group by 'batch' and filter columns with 1.0 threshold: keep all columns
         (
@@ -886,6 +900,7 @@ def data_test_completeness_filter():
             1.0,
             "batch",
             None,
+            "drop",
         ),
         # 2.3. Group by 'batch' and filter columns with 0.0 threshold: remove columns with any missing values in either batch
         (
@@ -894,6 +909,7 @@ def data_test_completeness_filter():
             0.0,
             "batch",
             None,
+            "drop",
         ),
         # 3. Group-wise filtering with specific groups
         # 3.1. Group by 'batch' and filter only batch '2' with 0.5 threshold
@@ -903,6 +919,7 @@ def data_test_completeness_filter():
             0.5,
             "batch",
             ["2"],
+            "drop",
         ),
         # 3.2. Group by 'batch' and filter only batch '2' with 1.0 threshold: keep all columns
         (
@@ -911,6 +928,7 @@ def data_test_completeness_filter():
             1.0,
             "batch",
             ["2"],
+            "drop",
         ),
         # 3.3. Group by 'batch' and filter only batch '2' with 0.0 threshold: remove columns with any missing values in that group
         (
@@ -919,6 +937,7 @@ def data_test_completeness_filter():
             0.0,
             "batch",
             ["2"],
+            "drop",
         ),
         # 3.4. Group by 'batch' and filter only batch '1' with 0.5 threshold
         (
@@ -927,6 +946,7 @@ def data_test_completeness_filter():
             0.5,
             "batch",
             ["1"],
+            "drop",
         ),
         # 3.5. Group by 'batch' and filter only batch '1' with 1.0 threshold: keep all columns
         (
@@ -935,6 +955,7 @@ def data_test_completeness_filter():
             1.0,
             "batch",
             ["1"],
+            "drop",
         ),
         # 3.6. Group by 'batch' and filter only batch '1' with 0.0 threshold: remove columns with any missing values in that group
         (
@@ -943,6 +964,7 @@ def data_test_completeness_filter():
             0.0,
             "batch",
             ["1"],
+            "drop",
         ),
         # 4. Test with two groups specified (should be the same as when only the 'batch' column is specified)
         # 4.1. Group by 'batch' and filter batches '1' and '2' with 0.5 threshold
@@ -952,6 +974,7 @@ def data_test_completeness_filter():
             0.5,
             "batch",
             ["1", "2"],
+            "drop",
         ),
         # 4.2. Group by 'batch' and filter batches '1' and '2' with 1.0 threshold: keep all columns
         (
@@ -960,6 +983,7 @@ def data_test_completeness_filter():
             1.0,
             "batch",
             ["1", "2"],
+            "drop",
         ),
         # 4.3. Group by 'batch' and filter batches '1' and '2' with 0.0 threshold: remove columns with any missing values in that group
         (
@@ -968,26 +992,19 @@ def data_test_completeness_filter():
             0.0,
             "batch",
             ["1", "2"],
+            "drop",
         ),
     ],
 )
 def test_filter_data_completeness(
-    data_test_completeness_filter,
-    expected_columns,
-    expected_rows,
-    max_missing,
-    group_column,
-    groups,
+    data_test_completeness_filter, expected_columns, expected_rows, max_missing, group_column, groups, action
 ):
     # given
     adata = data_test_completeness_filter.copy()
 
     # when
     adata_filtered = at.pp.filter_data_completeness(
-        adata=adata,
-        max_missing=max_missing,
-        group_column=group_column,
-        groups=groups,
+        adata=adata, max_missing=max_missing, group_column=group_column, groups=groups, action=action
     )
 
     # then

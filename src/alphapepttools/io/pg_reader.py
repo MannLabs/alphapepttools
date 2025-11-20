@@ -69,7 +69,7 @@ def read_pg_table(
 
     .. code-block:: python
 
-        from alphatools.io import read_pg_table
+        from alphapepttools.io import read_pg_table
 
         alphadia_path = ...
         adata = read_pg_table(alphadia_path, search_engine="alphadia")

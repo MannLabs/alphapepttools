@@ -4,8 +4,8 @@ import pandas as pd
 import pytest
 import scanpy
 
-from alphatools.pp.batch_correction import coerce_nans_to_batch, drop_singleton_batches, scanpy_pycombat
-from alphatools.pp.impute import impute_gaussian
+from alphapepttools.pp.batch_correction import coerce_nans_to_batch, drop_singleton_batches, scanpy_pycombat
+from alphapepttools.pp.impute import impute_gaussian
 
 
 # Test AnnData wrapper for Scanpy's PyCombat implementation

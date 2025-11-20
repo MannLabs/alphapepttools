@@ -461,9 +461,7 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
 
 
 # TODO: Abstract class for validation of AnnData objects?
-def _validate_adata_for_completeness_filter(
-    adata: ad.AnnData,
-) -> None:
+def _validate_adata_for_completeness_filter(adata: ad.AnnData, action: str, var_colname: str) -> None:
     """Validate AnnData object for data completeness filtering"""
     if not isinstance(adata, ad.AnnData):
         raise TypeError("adata must be an AnnData object.")
@@ -477,12 +475,22 @@ def _validate_adata_for_completeness_filter(
     if any(adata.obs.index.duplicated()):
         raise ValueError("pp.filter_data_completeness(): Duplicated indices in obs")
 
+    if action not in ["flag", "drop"]:
+        raise ValueError("pp.filter_data_completeness(): action must be 'flag' or 'drop'.")
+
+    if var_colname in adata.var.columns and action == "flag":
+        logging.info(
+            f"pp.filter_data_completeness(): `adata.var` column '{var_colname}' already exists, will overwrite."
+        )
+
 
 def filter_data_completeness(
     adata: ad.AnnData,
     max_missing: float,
     group_column: str | None = None,
     groups: list[str] | None = None,
+    action: str = "flag",
+    var_colname: str = "passed_threshold_missing_values",
 ) -> ad.AnnData:
     """Filter features based on missing values
 
@@ -508,12 +516,23 @@ def filter_data_completeness(
         List of levels of the group_column to consider in filtering. E.g. if the column has the levels
         ['A', 'B', 'C'], and groups = ['A', 'B'], only missingness of features in these
         groups is considered. If None, all groups are considered.
+    action : str, optional
+        Action to perform. can be 'flag' (default) or 'drop'. If 'flag', a boolean column in `adata.var`
+        is added to indicate whether the feature passed the missingness threshold. If 'drop',
+        features that do not pass the threshold are dropped from the AnnData object.
+    var_colname : str, optional
+        Name of the `adata.var` boolean column to add if action is 'flag'. Default is 'passed_threshold_missing_values'.
 
+    Returns
+    -------
+    AnnData
+        AnnData object with either a new `adata.var` column added (if `flag`)
+        or filtered features (if `drop`).
     """
     if max_missing < 0 or max_missing > 1:
         raise ValueError("Threshold must be between 0 and 1.")
 
-    _validate_adata_for_completeness_filter(adata)
+    _validate_adata_for_completeness_filter(adata, action, var_colname)
 
     # Resolve group indices
     if group_column:
@@ -531,17 +550,20 @@ def filter_data_completeness(
         group_indices = {"all": adata.obs.index}
 
     # Calculate missingness for each group
-    drop = np.array([False] * adata.shape[1])
+    drop_mask = np.array([False] * adata.shape[1])
     for indices in group_indices.values():
         missing_fraction = np.isnan(adata[indices, :].X).mean(axis=0)
-        drop |= missing_fraction > max_missing
+        drop_mask |= missing_fraction > max_missing
+        n_dropped = drop_mask.sum()
 
-    # Drop columns with too many missing values from data
-    if drop.any():
-        adata = adata[:, ~drop].copy()
-        n_dropped = drop.sum()
-        logging.info(
-            f"pp.filter_data_completeness(): Dropped {n_dropped} / {drop.size} features with >{max_missing:.2f} missing in any group."
-        )
+    # depending on action, either flag or drop features
+    if action == "drop":
+        if drop_mask.any():
+            adata = adata[:, ~drop_mask].copy()
+    else:
+        adata.var[var_colname] = ~drop_mask
 
+    logging.info(
+        f"pp.filter_data_completeness(): {action} {n_dropped} / {drop_mask.size} features with >{max_missing:.2f} missing in any group."
+    )
     return adata

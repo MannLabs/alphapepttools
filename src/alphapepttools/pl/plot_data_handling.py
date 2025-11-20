@@ -13,7 +13,7 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 
-from alphatools.pp.data import data_column_to_array
+from alphapepttools.pp.data import data_column_to_array
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -180,7 +180,7 @@ def prepare_pca_data_to_plot(
     pc_x: int = 1,
     pc_y: int = 2,
     dim_space: str = "obs",
-    embbedings_name: str | None = None,
+    embeddings_name: str | None = None,
     color_map_column: str | None = None,
     label_column: str | None = None,
     *,
@@ -199,7 +199,7 @@ def prepare_pca_data_to_plot(
         Second principal component (1-indexed).
     dim_space : str
         Either "obs" or "var" for observation or variable embeddings space.
-    embbedings_name : str | None
+    embeddings_name : str | None
         Custom embeddings name or None for default.
     color_map_column : str | None
         Column for color mapping.
@@ -213,8 +213,8 @@ def prepare_pca_data_to_plot(
     pd.DataFrame
         DataFrame with PCA coordinates,color data and labels if requested.
     """
-    # Generate the correct key names based on dim_space and embbedings_name
-    pca_coors_key = f"X_pca_{dim_space}" if embbedings_name is None else embbedings_name
+    # Generate the correct key names based on dim_space and embeddings_name
+    pca_coors_key = f"X_pca_{dim_space}" if embeddings_name is None else embeddings_name
 
     # Input checks
     _validate_pca_plot_input(data, pca_coors_key, pc_x, pc_y, dim_space)
@@ -246,7 +246,7 @@ def prepare_pca_data_to_plot(
 
 
 def prepare_scree_data_to_plot(
-    adata: ad.AnnData, n_pcs: int, dim_space: str, embbedings_name: str | None = None
+    adata: ad.AnnData, n_pcs: int, dim_space: str, embeddings_name: str | None = None
 ) -> pd.DataFrame:
     """
     Prepare scree plot data from AnnData object.
@@ -259,7 +259,7 @@ def prepare_scree_data_to_plot(
         Number of principal components to include.
     dim_space : str
         The dimension space used in PCA. Can be either "obs" or "var".
-    embedings_name : str | None
+    embeddings_name : str | None
         Custom embeddings name or None for default.
 
     Returns
@@ -268,7 +268,7 @@ def prepare_scree_data_to_plot(
         DataFrame with PC numbers and explained variance values.
     """
     # Generate the correct variance key name
-    variance_key = f"variance_pca_{dim_space}" if embbedings_name is None else embbedings_name
+    variance_key = f"variance_pca_{dim_space}" if embeddings_name is None else embeddings_name
 
     # Input checks
     _validate_scree_plot_input(adata, n_pcs, dim_space, variance_key)
@@ -281,6 +281,8 @@ def prepare_scree_data_to_plot(
         {
             "PC": np.arange(n_pcs) + 1,
             "explained_variance": adata.uns[variance_key]["variance_ratio"][:n_pcs],
+            # add the explained variance in percent format
+            "explained_variance_percent": adata.uns[variance_key]["variance_ratio"][:n_pcs] * 100,
         }
     )
 
@@ -290,7 +292,7 @@ def prepare_pca_1d_loadings_data_to_plot(
     dim_space: str,
     dim: int,
     nfeatures: int,
-    embbedings_name: str | None = None,
+    embeddings_name: str | None = None,
 ) -> pd.DataFrame:
     """Prepare the gene loadings (1d) of a PC for plotting.
 
@@ -304,7 +306,7 @@ def prepare_pca_1d_loadings_data_to_plot(
         The PC number from which to get loadings (1-indexed, i.e. the first PC is 1, not 0).
     nfeatures : int
         The number of top absolute loadings features to plot.
-    embbedings_name : str | None, optional
+    embeddings_name : str | None, optional
         The custom embeddings name used in PCA. If None, uses default naming convention. By default None.
 
     Returns
@@ -314,7 +316,7 @@ def prepare_pca_1d_loadings_data_to_plot(
 
     """
     # Generate the correct loadings key name
-    loadings_key = f"PCs_{dim_space}" if embbedings_name is None else embbedings_name
+    loadings_key = f"PCs_{dim_space}" if embeddings_name is None else embeddings_name
 
     # Determine which attribute to use for loadings based on dim_space
     loadings_attr = "varm" if dim_space == "obs" else "obsm"

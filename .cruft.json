@@ -4,13 +4,13 @@
   "checkout": null,
   "context": {
     "cookiecutter": {
-      "project_name": "alphatools",
-      "package_name": "alphatools",
+      "project_name": "alphapepttools",
+      "package_name": "alphapepttools",
       "project_description": "Search- and quantification-engine agnostic biological interpretation of proteomics data",
       "author_full_name": "MannLabs",
       "author_email": "brennsteiner@biochem.mpg.de",
       "github_user": "MannLabs",
-      "github_repo": "alphatools",
+      "github_repo": "alphapepttools",
       "license": "Apache License Version 2.0",
       "ide_integration": true,
       "_copy_without_render": [

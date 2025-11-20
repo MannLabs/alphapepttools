@@ -7,8 +7,8 @@ import pandas as pd
 from alphabase.psm_reader import PSMReaderBase
 from alphabase.psm_reader.psm_reader import psm_reader_provider
 
-from alphatools.io.reader_columns import FEATURE_LEVEL_CONFIG
-from alphatools.pp.data import add_metadata
+from alphapepttools.io.reader_columns import FEATURE_LEVEL_CONFIG
+from alphapepttools.pp.data import add_metadata
 
 
 class AnnDataFactory:
