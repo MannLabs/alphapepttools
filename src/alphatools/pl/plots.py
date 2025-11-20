@@ -25,9 +25,9 @@ from alphatools.pl import defaults
 from alphatools.pl.colors import BaseColors, BasePalettes, _get_colors_from_cmap, get_color_mapping
 from alphatools.pl.figure import create_figure, label_axes
 from alphatools.pl.plot_data_handling import (
+    extract_pca_anndata,
     prepare_pca_1d_loadings_data_to_plot,
     prepare_pca_2d_loadings_data_to_plot,
-    prepare_pca_data_to_plot,
     prepare_scree_data_to_plot,
 )
 from alphatools.pp.data import data_column_to_array
@@ -1122,14 +1122,13 @@ class Plots:
     def plot_pca(
         cls,
         data: ad.AnnData,
-        x_column: int = 1,
-        y_column: int = 2,
+        pc_x: int = 1,
+        pc_y: int = 2,
         color: str = "blue",
         color_map_column: str | None = None,
         color_column: str | None = None,
         dim_space: str = "obs",
         embeddings_name: str | None = None,
-        # TODO: the below argument is an antipattern resulting from this function doing multiple things. In the future, this should be replaced by a pca-plotting adapter so that pca_plot is no longer needed and scatter can be used instead, followed by label_plot, etc.
         label: bool = False,  # noqa: FBT001, FBT002
         label_column: str | None = None,
         ax: plt.Axes | None = None,
@@ -1180,34 +1179,25 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        pca_coor_df = prepare_pca_data_to_plot(
-            data, x_column, y_column, dim_space, embeddings_name, color_map_column, label_column, label=label
+        pca_anndata = extract_pca_anndata(
+            data, dim_space=dim_space, embeddings_name=embeddings_name, expression_columns=color_map_column
         )
 
-        # Check if the variance layer exists in uns
-        variance_key = f"variance_pca_{dim_space}" if embeddings_name is None else embeddings_name
-
-        if variance_key not in data.uns:
-            raise ValueError(
-                f"PCA metadata layer '{variance_key}' not found in AnnData object. "
-                f"Found layers: {list(data.uns.keys())}"
-            )
-
         # get the explained variance ratio for the dimensions (for axis labels)
-        var_dim1 = data.uns[variance_key]["variance_ratio"][x_column - 1]
+        var_dim1 = pca_anndata.var["variance_ratio"][str(pc_x)]
         var_dim1 = round(var_dim1 * 100, 2)
-        var_dim2 = data.uns[variance_key]["variance_ratio"][y_column - 1]
+        var_dim2 = pca_anndata.var["variance_ratio"][str(pc_y)]
         var_dim2 = round(var_dim2 * 100, 2)
 
-        # add color column
-        if color_map_column is not None:
-            color_values = data_column_to_array(data, color_map_column)
-            pca_coor_df[color_map_column] = color_values
+        # check pc_x and pc_y are valid
+        n_pcs = pca_anndata.shape[1]
+        if pc_x < 1 or pc_x > n_pcs or pc_y < 1 or pc_y > n_pcs:
+            raise ValueError(f"pc_x and pc_y are out of bounds, must be between 1 and {n_pcs}")
 
         cls.scatter(
-            data=pca_coor_df,
-            x_column="dim1",
-            y_column="dim2",
+            data=pca_anndata,
+            x_column=str(pc_x),
+            y_column=str(pc_y),
             color=color,
             color_column=color_column,
             color_map_column=color_map_column,
@@ -1225,11 +1215,18 @@ class Plots:
                 labels = data.obs.index if label_column is None else data_column_to_array(data, label_column)
             else:  # dim_space == "var"
                 labels = data.var.index if label_column is None else data_column_to_array(data, label_column)
-
-            label_plot(ax=ax, x_values=pca_coor_df["dim1"], y_values=pca_coor_df["dim2"], labels=labels, x_anchors=None)
+            print(labels)
+            print()
+            label_plot(
+                ax=ax,
+                x_values=pca_anndata.X[:, pc_x - 1],
+                y_values=pca_anndata.X[:, pc_y - 1],
+                labels=labels,
+                x_anchors=None,
+            )
 
         # set axislabels
-        label_axes(ax, xlabel=f"PC{x_column} ({var_dim1}%)", ylabel=f"PC{y_column} ({var_dim2}%)")
+        label_axes(ax, xlabel=f"PC{pc_x} ({var_dim1}%)", ylabel=f"PC{pc_y} ({var_dim2}%)")
 
     @classmethod
     def scree_plot(
