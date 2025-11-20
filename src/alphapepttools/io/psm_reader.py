@@ -103,11 +103,11 @@ def read_psm_table(
             else:
                 requested_columns.append(col)
 
-    # Determine which of the requested columns are not covered by the alphabase PsmDfCols
-    covered_columns = set()
-    for level_ in FEATURE_LEVEL_CONFIG:
-        covered_columns.update(FEATURE_LEVEL_CONFIG[level_].values())
-    additional_columns = [col for col in requested_columns if col not in covered_columns]
+    # In case users request columns by their alphabase psm reader name, we skip looking for them in the original dataset
+    alphabase_reader_columns = set()
+    for alphabase_reader_column in FEATURE_LEVEL_CONFIG:
+        alphabase_reader_columns.update(FEATURE_LEVEL_CONFIG[alphabase_reader_column].values())
+    additional_columns = [col for col in requested_columns if col not in alphabase_reader_columns]
 
     if not additional_columns:
         additional_columns = None
