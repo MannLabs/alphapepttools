@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alphatools.metrics import principal_component_regression
+from alphapepttools.metrics import principal_component_regression
 
 
 @pytest.fixture

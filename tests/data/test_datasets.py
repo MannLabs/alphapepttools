@@ -5,7 +5,7 @@ import pandas as pd
 import pytest
 import yaml
 
-from alphatools.data.datasets import StudyCollection, StudyData, available_data, get_data, study_collection
+from alphapepttools.data.datasets import StudyCollection, StudyData, available_data, get_data, study_collection
 
 
 @pytest.fixture
@@ -126,7 +126,7 @@ def test_study_data_download_should_call_datashare_downloader(minimal_study, tmp
     mock_downloader = Mock()
     mock_downloader.download.return_value = expected_result
 
-    with patch("alphatools.data.datasets.DataShareDownloader", return_value=mock_downloader) as mock_class:
+    with patch("alphapepttools.data.datasets.DataShareDownloader", return_value=mock_downloader) as mock_class:
         result = minimal_study.download(output_dir)
 
     mock_class.assert_called_once_with(url="https://example.com/data", output_dir=output_dir)
@@ -204,7 +204,7 @@ def test_get_data_should_download_from_correct_study(tmp_path) -> None:
     mock_downloader.download.return_value = expected_path
 
     # when
-    with patch("alphatools.data.datasets.DataShareDownloader", return_value=mock_downloader):
+    with patch("alphapepttools.data.datasets.DataShareDownloader", return_value=mock_downloader):
         result = get_data(study_name, output_dir)
 
     # then
@@ -251,8 +251,8 @@ def test_study_data_download_should__use_cwd(minimal_study) -> None:
 
     # when
     with (
-        patch("alphatools.data.datasets.DataShareDownloader", return_value=mock_downloader) as mock_class,
-        patch("alphatools.data.datasets.Path.cwd") as mock_cwd,
+        patch("alphapepttools.data.datasets.DataShareDownloader", return_value=mock_downloader) as mock_class,
+        patch("alphapepttools.data.datasets.Path.cwd") as mock_cwd,
     ):
         mock_cwd.return_value = Mock()
         minimal_study.download(output_dir=None)

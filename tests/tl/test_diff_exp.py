@@ -6,11 +6,11 @@ import pandas as pd
 import pytest
 from scipy.stats import ttest_ind
 
-from alphatools import tl
-from alphatools.pp import nanlog
-from alphatools.tl.defaults import tl_defaults
-from alphatools.tl.diff_exp.alphaquant import _standardize_alphaquant_results
-from alphatools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
+from alphapepttools import tl
+from alphapepttools.pp import nanlog
+from alphapepttools.tl.defaults import tl_defaults
+from alphapepttools.tl.diff_exp.alphaquant import _standardize_alphaquant_results
+from alphapepttools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
 
 
 @pytest.fixture
@@ -200,8 +200,8 @@ def test_diff_exp_ttest(example_data, example_metadata, between_column, comparis
 def test_diff_exp_alphaquant():
     """Testing function to ascertain stable functionality of diff_exp_alphaquant on small example datasets.
 
-    The expected data were generated in alphatools/tests/tl/tl_test_data.ipynb and saved
-    as .pkl files in alphatools/tests/tl/tl_test_data.
+    The expected data were generated in alphapepttools/tests/tl/tl_test_data.ipynb and saved
+    as .pkl files in alphapepttools/tests/tl/tl_test_data.
 
     """
 

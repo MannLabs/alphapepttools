@@ -1,6 +1,6 @@
 # Tutorials
 
-Learn about how to use alphatools with the following tutorials.
+Learn about how to use alphapepttools with the following tutorials.
 
 ```{toctree}
 ---

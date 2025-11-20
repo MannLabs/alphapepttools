@@ -3,7 +3,7 @@ build-backend = "hatchling.build"
 requires = [ "hatchling" ]
 
 [project]
-name = "alphatools"
+name = "alphapepttools"
 description = "Search- and quantification-engine agnostic biological interpretation of proteomics data"
 readme = "README.md"
 license = { file = "LICENSE" }
@@ -65,12 +65,12 @@ optional-dependencies.test = [
   "pytest",
 ]
 # https://docs.pypi.org/project_metadata/#project-urls
-urls.Documentation = "https://alphatools.readthedocs.io/"
-urls.Homepage = "https://github.com/MannLabs/alphatools"
-urls.Source = "https://github.com/MannLabs/alphatools"
+urls.Documentation = "https://alphapepttools.readthedocs.io/"
+urls.Homepage = "https://github.com/MannLabs/alphapepttools"
+urls.Source = "https://github.com/MannLabs/alphapepttools"
 
 [tool.hatch.version]
-path = "src/alphatools/__init__.py"
+path = "src/alphapepttools/__init__.py"
 
 [tool.hatch.envs.default]
 installer = "uv"
@@ -169,7 +169,7 @@ addopts = [
 ]
 
 [tool.coverage.run]
-source = [ "alphatools" ]
+source = [ "alphapepttools" ]
 omit = [
   "**/test_*.py",
 ]

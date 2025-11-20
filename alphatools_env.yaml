@@ -1,4 +1,4 @@
-name: alphatools
+name: alphapepttools
 channels:
   - conda-forge
 dependencies:

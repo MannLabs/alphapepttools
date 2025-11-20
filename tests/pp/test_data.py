@@ -5,10 +5,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import alphatools as at
+import alphapepttools as at
 
 # import private method to obtain anndata object
-from alphatools.pp.data import _handle_overlapping_columns, _to_anndata, data_column_to_array
+from alphapepttools.pp.data import _handle_overlapping_columns, _to_anndata, data_column_to_array
 
 ### Fixtures ###
 
@@ -766,7 +766,7 @@ class TestScaleAndCenter:
     @pytest.mark.parametrize("layer", [None, "new_layer"])
     @pytest.mark.parametrize("scaler", ["standard", "robust"])
     def test_scale_and_center_inplace(self, anndata_scale_and_center, scaler: str, layer: str) -> None:
-        """Test that alphatools.pp.scale_and_center modifies anndata correctly inplace"""
+        """Test that alphapepttools.pp.scale_and_center modifies anndata correctly inplace"""
         adata, expected = anndata_scale_and_center
 
         return_value = at.pp.scale_and_center(adata, scaler=scaler, layer=layer, copy=False)
@@ -781,7 +781,7 @@ class TestScaleAndCenter:
     @pytest.mark.parametrize("layer", [None, "new_layer"])
     @pytest.mark.parametrize("scaler", ["standard", "robust"])
     def test_scale_and_center_copy(self, anndata_scale_and_center, scaler: str, layer: str) -> None:
-        """Test that alphatools.pp.scale_and_center correctly returns a copy"""
+        """Test that alphapepttools.pp.scale_and_center correctly returns a copy"""
         adata, expected = anndata_scale_and_center
         adata_original = adata.copy()
 
