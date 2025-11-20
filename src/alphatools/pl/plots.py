@@ -24,13 +24,13 @@ from matplotlib.patches import Patch
 from alphatools.pl import defaults
 from alphatools.pl.colors import BaseColors, BasePalettes, _get_colors_from_cmap, get_color_mapping
 from alphatools.pl.figure import create_figure, label_axes
-from alphatools.pl.plot_data_handling import (
+from alphatools.pp.data import data_column_to_array
+from alphatools.tl.plot_data_handling import (
     extract_pca_anndata,
     prepare_pca_1d_loadings_data_to_plot,
     prepare_pca_2d_loadings_data_to_plot,
     prepare_scree_data_to_plot,
 )
-from alphatools.pp.data import data_column_to_array
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
