@@ -6,7 +6,7 @@ from alphabase.pg_reader import pg_reader_provider
 from alphabase.psm_reader import psm_reader_provider
 
 
-def available_reader(reader_type: Literal["psm_reader", "pg_reader"] = "pg_reader") -> list[str]:
+def list_available_reader(reader_type: Literal["psm_reader", "pg_reader"] = "pg_reader") -> list[str]:
     """Get a list of all available readers, as provided by alphabase
 
     Parameters
