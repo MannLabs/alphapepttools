@@ -15,9 +15,10 @@ jobs:
     with:
       # see the documentation of the workflow for more information on the parameters
       package_name: alphapepttools
+      src_folder: src/alphapepttools
       tag_to_release: ${{ inputs.tag_to_release }}
       python_version: 3.12
       test_stable: true
     secrets:
-      test_pypi_api_token: ${{ secrets.TEST_PYPI_ALPHATOOLS_API_TOKEN }}
-      pypi_api_token: ${{ secrets.PYPI_ALPHATOOLS_API_TOKEN }}
+      test_pypi_api_token: ${{ secrets.TEST_PYPI_API_TOKEN }}
+      pypi_api_token: ${{ secrets.PYPI_API_TOKEN }}
