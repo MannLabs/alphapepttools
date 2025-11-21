@@ -4,7 +4,7 @@
 [![Documentation][badge-docs]][documentation]
 
 [badge-tests]: https://img.shields.io/github/actions/workflow/status/MannLabs/alphapepttools/test.yaml?branch=main
-[badge-docs]: https://img.shields.io/readthedocs/alphapepttools
+[badge-docs]: https://github.com/MannLabs/alphapepttools/actions/workflows/docs.yaml/badge.svg
 
 Search- and quantification-engine agnostic downstream processing of proteomics data
 
