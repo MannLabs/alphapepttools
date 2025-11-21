@@ -29,7 +29,7 @@ hatch run docs:build  # defined in the table [tool.hatch.envs.docs]
 If you prefer managing environments manually, you can use `pip`:
 
 ```bash
-cd alphatools
+cd alphapepttools
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev,test,doc]"
@@ -42,15 +42,15 @@ pip install -e ".[dev,test,doc]"
 
 ## Handling anndata objects
 
-The central data structure of `alphatools` is the `anndata.AnnData` object. All functions should be compatible with `anndata.AnnData`.
+The central data structure of `alphapepttools` is the `anndata.AnnData` object. All functions should be compatible with `anndata.AnnData`.
 
 Functions that act on the omics data in the anndata object (typically in the `.pp` and `.tl` modules) should generally follow the following call signature
 
 ```python
-alphatools.pp.func(adata: ad.AnnData, ..., layer: str | None = None, copy: bool = False) -> None | ad.AnnData:
+alphapepttools.pp.func(adata: ad.AnnData, ..., layer: str | None = None, copy: bool = False) -> None | ad.AnnData:
 ...
 
-alphatools.tl.func(adata: ad.AnnData, ..., layer: str | None = None, copy: bool = False) -> None | ad.AnnData:
+alphapepttools.tl.func(adata: ad.AnnData, ..., layer: str | None = None, copy: bool = False) -> None | ad.AnnData:
 
 ```
 
@@ -67,7 +67,7 @@ Default behaviour:
 ```python
 adata.layers["original"] = adata.X.copy()
 
-return_value = alphatools.pp.func(adata)
+return_value = alphapepttools.pp.func(adata)
 assert return_value is None
 assert not np.array_equal(adata.X, adata.layers["original"])
 ```
@@ -78,7 +78,7 @@ Act on a specific layer
 adata.layers["original"] = adata.X.copy()
 adata.layers["new_layer"] = adata.X.copy()
 
-return_value = alphatools.pp.func(adata, layer="new_layer")
+return_value = alphapepttools.pp.func(adata, layer="new_layer")
 assert return_value is None
 
 # adata.X is unchanged
@@ -92,7 +92,7 @@ Return an updated copy
 
 ```python
 adata_original = adata.copy()
-adata_new = alphatools.pp.func(adata, copy=True)
+adata_new = alphapepttools.pp.func(adata, copy=True)
 # Returns an updated anndata object
 assert not np.array_equal(adata.X, adata_new.X)
 

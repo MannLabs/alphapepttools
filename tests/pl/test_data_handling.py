@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alphatools.pl.plot_data_handling import (
+from alphapepttools.pl.plot_data_handling import (
     _validate_pca_loadings_plot_inputs,
     _validate_pca_plot_input,
     _validate_scree_plot_input,
@@ -201,7 +201,7 @@ class TestDataPreparationFunctions:
     def test_prepare_pca_data_to_plot_custom_embedding(self, sample_adata):
         """Test prepare_pca_data_to_plot with custom embedding name."""
         result = prepare_pca_data_to_plot(
-            sample_adata, pc_x=1, pc_y=2, dim_space="obs", embbedings_name="custom_embedding"
+            sample_adata, pc_x=1, pc_y=2, dim_space="obs", embeddings_name="custom_embedding"
         )
 
         assert isinstance(result, pd.DataFrame)
@@ -212,7 +212,7 @@ class TestDataPreparationFunctions:
         result = prepare_scree_data_to_plot(sample_adata, n_pcs=5, dim_space="obs")
 
         assert isinstance(result, pd.DataFrame)
-        assert list(result.columns) == ["PC", "explained_variance"]
+        assert list(result.columns) == ["PC", "explained_variance", "explained_variance_percent"]
         assert list(result["PC"]) == [1, 2, 3, 4, 5]
         assert all(0 <= x <= 1 for x in result["explained_variance"])
 
@@ -224,7 +224,7 @@ class TestDataPreparationFunctions:
 
     def test_prepare_scree_data_to_plot_custom_embedding(self, sample_adata):
         """Test prepare_scree_data_to_plot with custom embedding name."""
-        result = prepare_scree_data_to_plot(sample_adata, n_pcs=3, dim_space="obs", embbedings_name="custom_embedding")
+        result = prepare_scree_data_to_plot(sample_adata, n_pcs=3, dim_space="obs", embeddings_name="custom_embedding")
 
         assert isinstance(result, pd.DataFrame)
 
@@ -256,7 +256,7 @@ class TestDataPreparationFunctions:
     def test_prepare_pca_1d_loadings_data_to_plot_custom_embedding(self, sample_adata):
         """Test prepare_pca_1d_loadings_data_to_plot with custom embedding name."""
         result = prepare_pca_1d_loadings_data_to_plot(
-            sample_adata, dim_space="obs", dim=1, nfeatures=5, embbedings_name="custom_loadings"
+            sample_adata, dim_space="obs", dim=1, nfeatures=5, embeddings_name="custom_loadings"
         )
 
         assert isinstance(result, pd.DataFrame)

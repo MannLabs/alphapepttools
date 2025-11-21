@@ -1,5 +1,5 @@
 [tool.bumpversion]
-current_version = "0.0.1-dev0"
+current_version = "0.0.2-dev0"
 parse = """(?x)
     (?P<major>0|[1-9]\\d*)\\.
     (?P<minor>0|[1-9]\\d*)\\.
@@ -36,4 +36,4 @@ values = ["dev", "final"]
 optional_value = "final"
 
 [[tool.bumpversion.files]]
-filename = "./src/alphatools/__init__.py"
+filename = "./src/alphapepttools/__init__.py"

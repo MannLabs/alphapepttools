@@ -2,8 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 
-from alphatools.pl import defaults
-from alphatools.pl.colors import BaseColormaps, BaseColors, get_color_mapping
+from alphapepttools.pl import defaults
+from alphapepttools.pl.colors import BaseColormaps, BaseColors, get_color_mapping
 
 config = defaults.plot_settings.to_dict()
 
@@ -96,7 +96,7 @@ def test_get_color_mapping(input_values, palette, expected_dict):
 )
 def test_get_colors_from_cmap(input_values, palette, expected_array):
     """Test _get_colors_from_cmap with various input types and edge cases."""
-    from alphatools.pl.colors import _get_colors_from_cmap
+    from alphapepttools.pl.colors import _get_colors_from_cmap
 
     if expected_array is None:
         with pytest.raises((ValueError, TypeError)):

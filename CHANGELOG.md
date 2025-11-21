@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to this project will be documented on the
-[https://github.com/MannLabs/alphatools/releases](GitHub Releases pages).
+[https://github.com/MannLabs/alphapepttools/releases](GitHub Releases pages).
 
 The format is based on [Keep a Changelog][],
 and this project adheres to [Semantic Versioning][].

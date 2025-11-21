@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alphatools.metrics import pooled_median_absolute_deviation
-from alphatools.metrics._pmad import _pmad, _set_nested_dict
+from alphapepttools.metrics import pooled_median_absolute_deviation
+from alphapepttools.metrics._pmad import _pmad, _set_nested_dict
 
 
 @pytest.fixture

@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alphatools.pl.figure import create_figure
-from alphatools.pl.plots import _extract_columns_to_df, _extract_groupwise_plotting_data, label_plot
+from alphapepttools.pl.figure import create_figure
+from alphapepttools.pl.plots import _extract_columns_to_df, _extract_groupwise_plotting_data, label_plot
 
 
 # Fixtures
@@ -44,7 +44,7 @@ def example_ax():
     return make_dummy_data()
 
 
-# Test the labelling function of alphatools: correctly spaced and ordered labels
+# Test the labelling function of alphapepttools: correctly spaced and ordered labels
 def extract_label_plot_data(ax):
     """Extract line and label data from an axes after label_plot has been called."""
     lines = ax.get_lines()
@@ -125,7 +125,7 @@ def extract_label_plot_data(ax):
 def test_label_plot(example_ax, x, y, labels, anchors, expected_lines):
     _, ax = example_ax
 
-    # Empirical parameters to handle default alphatools font size
+    # Empirical parameters to handle default alphapepttools font size
     A_DISPLAY_START = 3.20
     Y_PADDING_FACTOR = 10
 

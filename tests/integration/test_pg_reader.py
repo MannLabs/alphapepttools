@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alphatools.io import read_pg_table
+from alphapepttools.io import read_pg_table
 
 current_file_directory = Path(__file__).resolve().parent
 test_data_path = Path(f"{current_file_directory}/reference_data")

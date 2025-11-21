@@ -3,8 +3,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alphatools.tl.tools import get_id2gene_map, map_genes_to_protein_groups
-from alphatools.tl.utils import drop_features_with_too_few_valid_values
+from alphapepttools.tl.tools import get_id2gene_map, map_genes_to_protein_groups
+from alphapepttools.tl.utils import drop_features_with_too_few_valid_values
 
 DUMMY_FASTA = """>tr|ID0|ID0_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN0 PE=1 SV=1
 PEPTIDEKPEPTIDEK
