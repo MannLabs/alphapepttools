@@ -6,7 +6,7 @@ from alphabase.pg_reader import pg_reader_provider
 from alphabase.psm_reader import psm_reader_provider
 
 
-def available_reader(reader_type: Literal["psm_reader", "pg_reader"] = "psm_reader") -> list[str]:
+def available_reader(reader_type: Literal["psm_reader", "pg_reader"] = "pg_reader") -> list[str]:
     """Get a list of all available readers, as provided by alphabase
 
     Parameters
@@ -14,6 +14,15 @@ def available_reader(reader_type: Literal["psm_reader", "pg_reader"] = "psm_read
     reader_type
         Whether to return readers for peptice spectrum matches (`psm_reader`) or protein group
         intensities (`pg_reader`)
+
+    Example
+    -------
+
+    .. code-block:: python
+
+        at.io.available_reader(reader_type="pg_reader")
+        > ['alphadia', 'alphapept', ...]
+
     """
     if reader_type == "psm_reader":
         return sorted(psm_reader_provider.reader_dict.keys())
