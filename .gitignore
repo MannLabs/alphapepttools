@@ -24,4 +24,5 @@ __pycache__/
 /docs/notebooks/example_outputs
 /assets/at_pitch_slide_VB.pptx
 
+.vscode/
 .idea/
