@@ -91,7 +91,7 @@
     io.read_psm_table
     io.read_pg_table
     io.AnnDataFactory
-    io.available_reader
+    io.list_available_reader
 ```
 
 ## Data
