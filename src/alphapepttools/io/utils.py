@@ -15,6 +15,11 @@ def available_reader(reader_type: Literal["psm_reader", "pg_reader"] = "pg_reade
         Whether to return readers for peptice spectrum matches (`psm_reader`) or protein group
         intensities (`pg_reader`)
 
+    Returns
+    -------
+    list[str]
+        A list of all available readers that are accepted by the respective io function
+
     Example
     -------
 
