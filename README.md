@@ -38,15 +38,15 @@ If you don't have Python installed, we recommend installing [Mambaforge][].
 
 There are several alternative options to install alphapepttools:
 
-<!--
-1) Install the latest release of `alphapepttools` from [PyPI][]:
+1. Install the latest release of `alphapepttools` from [PyPI](https://pypi.org/project/alphapepttools/):
 
 ```bash
 pip install alphapepttools
 ```
--->
 
-1. Install the latest development version:
+As the package is still under development, consider installing the latest development version:
+
+2. Development version
 
 ```bash
 git clone git+https://github.com/MannLabs/alphapepttools.git@main && cd alphapepttools
