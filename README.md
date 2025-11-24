@@ -1,5 +1,6 @@
-# `alphapepttools`
+# alphapepttools
 
+![PyPI - Version](https://img.shields.io/pypi/v/alphapepttools)
 [![Tests][badge-tests]][tests]
 [![Documentation][badge-docs]][documentation]
 
