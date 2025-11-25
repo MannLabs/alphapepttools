@@ -59,7 +59,7 @@
   url: https://datashare.biochem.mpg.de/s/NGxD86CQSbRWmzw
   search_engine: DiaNN
   data_type: pg
-  description: HeLa QC protein group matrix from DIANN (report.pg_matrix.tsv)
+  description: HeLa QC protein group matrix from DiaNN (report.pg_matrix.tsv)
 
 - name: hela_metadata
   url: https://datashare.biochem.mpg.de/s/sSYkOj22kM5AJ4O
