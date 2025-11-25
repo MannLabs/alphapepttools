@@ -44,7 +44,7 @@
   search_engine: DiaNN
   citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
   data_type: psm
-  description: Full DIANN report.parquet for the Bader et al. Alzheimer CSF study
+  description: Full DiaNN report.parquet for the Bader et al. Alzheimer CSF study
 
 # Bader2020 sample metadata
 - name: bader2020_metadata
