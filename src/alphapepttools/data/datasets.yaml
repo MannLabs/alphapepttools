@@ -73,7 +73,7 @@
   search_engine: DiaNN
   citation: "Li, Kejia, et al. A peptide-centric local stability assay enables proteome-scale identification of the protein targets and binding regions of diverse ligands. Nature Methods 22.2 (2025): 278-282."
   data_type: psm
-  description: PELSA Staurosporine study DIANN report for differential expression analysis
+  description: PELSA Staurosporine study DiaNN report for differential expression analysis
 
 - name: pelsa_metadata
   url: https://datashare.biochem.mpg.de/s/NGof744gWw66Mc8
