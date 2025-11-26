@@ -37,3 +37,79 @@
   search_engine: spectronaut
   data_type: study_psm
   description: An example spectronaut report
+
+# Bader2020 full DIANN report (PSM-level) for workflow tutorials
+- name: bader2020_full_diann
+  url: https://datashare.biochem.mpg.de/s/zNtxEQJTdqQYLd4
+  search_engine: DiaNN
+  citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
+  data_type: psm
+  description: Full DiaNN report.parquet for the Bader et al. Alzheimer CSF study
+
+# Bader2020 sample metadata
+- name: bader2020_metadata
+  url: https://datashare.biochem.mpg.de/s/iSgdPnHgczbcktF
+  search_engine: none
+  data_type: metadata
+  citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
+  description: Sample metadata for the Bader et al. Alzheimer CSF study
+
+# HeLa QC dataset for PCA workflow tutorial
+- name: hela_pg_diann
+  url: https://datashare.biochem.mpg.de/s/XDi34GJpGHBgm5x
+  search_engine: DiaNN
+  data_type: pg
+  description: HeLa QC protein group matrix from DiaNN (report.pg_matrix.tsv)
+
+- name: hela_metadata
+  url: https://datashare.biochem.mpg.de/s/aHpXSLX9RxbYPzp
+  search_engine: none
+  data_type: metadata
+  description: HeLa QC sample metadata (simple_metadata.csv)
+
+# PELSA study datasets for differential expression tutorial
+- name: pelsa_report_diann
+  url: https://datashare.biochem.mpg.de/s/6piDQGm2yAEdtKQ
+  search_engine: DiaNN
+  citation: "Li, Kejia, et al. A peptide-centric local stability assay enables proteome-scale identification of the protein targets and binding regions of diverse ligands. Nature Methods 22.2 (2025): 278-282."
+  data_type: psm
+  description: PELSA Staurosporine study DiaNN report for differential expression analysis
+
+- name: pelsa_metadata
+  url: https://datashare.biochem.mpg.de/s/NGof744gWw66Mc8
+  search_engine: none
+  data_type: metadata
+  citation: "Li, Kejia, et al. A peptide-centric local stability assay enables proteome-scale identification of the protein targets and binding regions of diverse ligands. Nature Methods 22.2 (2025): 278-282."
+  description: Sample metadata for the PELSA Staurosporine study
+
+- name: kinase_table
+  url: https://datashare.biochem.mpg.de/s/DnNe8EFSQyqy5pb
+  search_engine: none
+  data_type: annotation
+  citation: "Manning, Gerard, et al. The protein kinase complement of the human genome. Science 298.5600 (2002): 1912-1934."
+  description: Human kinase annotation table from kinhub.org
+
+# Small example reports for PSM reader tutorial
+- name: alphadia_1.8.1_psm_report
+  url: https://datashare.biochem.mpg.de/s/ZBAGvQb4j2Lh0fo
+  search_engine: alphadia
+  data_type: psm
+  description: Small example reports for testing PSM readers (AlphaDIA 1.8.1)
+
+- name: alphadia_2.0.0_psm_report
+  url: https://datashare.biochem.mpg.de/s/FoTMb5Gmk9qgZtr
+  search_engine: alphadia
+  data_type: psm
+  description: Small example reports for testing PSM readers (AlphaDIA 2.0.0, parquet)
+
+- name: diann_1.8.1_psm_report
+  url: https://datashare.biochem.mpg.de/s/DQeP6FYDFYcXadd
+  search_engine: diann
+  data_type: psm
+  description: Small example reports for testing PSM readers (DiaNN 1.8.1)
+
+- name: diann_1.9.0_psm_report
+  url: https://datashare.biochem.mpg.de/s/N65ZsaaX74eesx7
+  search_engine: diann
+  data_type: psm
+  description: Small example reports for testing PSM readers (DiaNN 1.9.0, parquet)
