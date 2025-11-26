@@ -12,19 +12,13 @@ from alphapepttools.metrics._feature_level import _cv
 def example_data():
     """Example data with ground truth"""
     data = np.array(
-        [
-            [1, 1, np.nan, 1],
-            [1, 2, np.nan, 2],
-            [1, 1, np.nan, 1],
-            [1, 2, 1, 2],
-            [1, np.nan, 1, 1.5],
-        ]
+        [[1, 1, np.nan, 1, 0], [1, 2, np.nan, 2, 0], [1, 1, np.nan, 1, 0], [1, 2, 1, 2, 0], [1, np.nan, 1, 1.5, 0]]
     )
 
     cv = {
-        3: np.array([0, 0.3333, np.nan, 0.2981]),
-        4: np.array([0, 0.3333, np.nan, 0.2981]),
-        5: np.array([0, np.nan, np.nan, 0.2981]),
+        3: np.array([0, 0.3333, np.nan, 0.2981, np.nan]),
+        4: np.array([0, 0.3333, np.nan, 0.2981, np.nan]),
+        5: np.array([0, np.nan, np.nan, 0.2981, np.nan]),
     }
 
     return data, cv
