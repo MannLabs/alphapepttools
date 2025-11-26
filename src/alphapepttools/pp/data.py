@@ -338,7 +338,9 @@ def _raise_nonoverlapping_indices(
         shared_idx_len = len(data.columns.intersection(metadata.index))
 
     if shared_idx_len == 0:
-        raise ValueError(f"No matching fields found between data and metadata (axis = {axis}).")
+        raise ValueError(
+            f"No matching fields found between data ({data.shape}) and metadata ({metadata.shape}) on axis = {axis}."
+        )
 
 
 # TODO: Add test for this function or refactor to handle indices with suffixes
