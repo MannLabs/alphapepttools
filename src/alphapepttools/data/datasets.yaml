@@ -90,8 +90,26 @@
   description: Human kinase annotation table from kinhub.org
 
 # Small example reports for PSM reader tutorial
-- name: psm_reader_examples
-  url: https://datashare.biochem.mpg.de/s/Hk41INtwBvBl0kP
-  search_engine: multiple
+- name: alphadia_1.8.1_psm_report
+  url: https://datashare.biochem.mpg.de/s/ZBAGvQb4j2Lh0fo
+  search_engine: alphadia
   data_type: psm
-  description: Small example reports for testing PSM readers (AlphaDIA 1.8.1 and DIANN 1.9.0)
+  description: Small example reports for testing PSM readers (AlphaDIA 1.8.1)
+
+- name: alphadia_2.0.0_psm_report
+  url: https://datashare.biochem.mpg.de/s/FoTMb5Gmk9qgZtr
+  search_engine: alphadia
+  data_type: psm
+  description: Small example reports for testing PSM readers (AlphaDIA 2.0.0, parquet)
+
+- name: diann_1.8.1_psm_report
+  url: https://datashare.biochem.mpg.de/s/DQeP6FYDFYcXadd
+  search_engine: diann
+  data_type: psm
+  description: Small example reports for testing PSM readers (DiaNN 1.8.1)
+
+- name: diann_1.9.0_psm_report
+  url: https://datashare.biochem.mpg.de/s/N65ZsaaX74eesx7
+  search_engine: diann
+  data_type: psm
+  description: Small example reports for testing PSM readers (DiaNN 1.9.0, parquet)
