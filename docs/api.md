@@ -50,6 +50,7 @@
 .. autosummary::
     :toctree: generated
 
+    metrics.coefficient_of_variation
     metrics.principal_component_regression
     metrics.pooled_median_absolute_deviation
 ```
