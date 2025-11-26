@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alphapepttools.metrics import pooled_median_absolute_deviation
-from alphapepttools.metrics._group_level import _pmad, _set_nested_dict
+from alphapepttools.metrics import pooled_coefficient_of_variation, pooled_median_absolute_deviation
+from alphapepttools.metrics._group_level import _pcv, _pmad, _set_nested_dict
 
 
 class TestSetNestedDict:
@@ -86,3 +86,63 @@ class TestPoooledMedianAbsoluteDeviation:
         pooled_median_absolute_deviation(adata, group_key=adata_pmad["group_key"], layer=layer, inplace=True)
 
         assert adata.uns.get("metrics").get("pmad") == reference
+
+
+@pytest.fixture
+def count_data_pcv() -> tuple[np.ndarray, float]:
+    """Generate count data with known PCV"""
+    # STD: 0.5, MEAN: 0.5, 1.5, 2.5, 3.5
+    # CVs: 1, 1/3, 1/5, 1/7
+    # mean feature-wise CV: (1 + 1/3 + 1/5 + 1/7)/4
+    X = np.array([[0, 1, 2, 3], [1, 2, 3, 4], [0, 1, 2, 3], [1, 2, 3, 4]])
+    return X, 0.419047
+
+
+class TestPcv:
+    def test__pcv(self, count_data_pcv) -> None:
+        X, pcv = count_data_pcv
+
+        result = _pcv(x=X, min_valid=3)
+        assert np.allclose(result, pcv, atol=1e-4)
+
+
+class TestPooledCoefficientOfVariation:
+    @pytest.fixture
+    def adata_pcv(self, count_data_pcv) -> tuple[np.ndarray, float]:
+        """Generate count data with known PCV"""
+        # Concatenate the same count matrix with known PMADs for 3 different sample groups
+        X, pcv = count_data_pcv
+        n_obs = X.shape[0]
+
+        sample_types = ["A"] * n_obs + ["B"] * n_obs + ["C"] * n_obs
+        X = np.concatenate([X for _ in range(3)], axis=0)
+
+        adata = ad.AnnData(X=X, layers={"layer": X}, obs=pd.DataFrame({"sample_type": sample_types}))
+
+        return {"adata": adata, "pcv": {"A": pcv, "B": pcv, "C": pcv}, "group_key": "sample_type"}
+
+    @pytest.mark.parametrize("layer", [None, "layer"])
+    def test_pooled_coefficient_of_variation_return(self, adata_pcv: ad.AnnData, layer: str | None) -> None:
+        """Test if `pooled_median_absolute_deviation` computes group-wise PMAD correctly"""
+        reference = pd.DataFrame.from_dict(adata_pcv["pcv"], orient="index", columns=["pcv"])
+
+        pcv = pooled_coefficient_of_variation(
+            adata_pcv["adata"], group_key=adata_pcv["group_key"], layer=layer, inplace=False
+        )
+
+        pd.testing.assert_frame_equal(pcv, reference, atol=1e-4)
+
+    @pytest.mark.parametrize("layer", [None, "layer"])
+    def test_pooled_coefficient_of_variation_inplace(self, adata_pcv: ad.AnnData, layer: str | None) -> None:
+        """Test if `pooled_median_absolute_deviation` sets PMAD correctly in anndata object"""
+        reference = adata_pcv["pcv"]
+        adata = adata_pcv["adata"].copy()
+
+        pooled_coefficient_of_variation(adata, group_key=adata_pcv["group_key"], layer=layer, inplace=True)
+        result = adata.uns.get("metrics").get("pcv")
+
+        assert all(key == ref_key for key, ref_key in zip(result.keys(), reference.keys(), strict=True))
+        assert all(
+            np.isclose(value, ref_value, atol=1e-4)
+            for value, ref_value in zip(result.values(), reference.values(), strict=True)
+        )
