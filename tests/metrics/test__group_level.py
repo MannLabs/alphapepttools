@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from alphapepttools.metrics import pooled_median_absolute_deviation
-from alphapepttools.metrics._pmad import _pmad, _set_nested_dict
+from alphapepttools.metrics._group_level import _pmad, _set_nested_dict
 
 
 @pytest.fixture
