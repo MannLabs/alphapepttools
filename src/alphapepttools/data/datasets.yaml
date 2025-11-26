@@ -44,7 +44,7 @@
   search_engine: DiaNN
   citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
   data_type: psm
-  description: Full DIANN report.parquet for the Bader et al. Alzheimer CSF study
+  description: Full DiaNN report.parquet for the Bader et al. Alzheimer CSF study
 
 # Bader2020 sample metadata
 - name: bader2020_metadata
@@ -59,7 +59,7 @@
   url: https://datashare.biochem.mpg.de/s/XDi34GJpGHBgm5x
   search_engine: DiaNN
   data_type: pg
-  description: HeLa QC protein group matrix from DIANN (report.pg_matrix.tsv)
+  description: HeLa QC protein group matrix from DiaNN (report.pg_matrix.tsv)
 
 - name: hela_metadata
   url: https://datashare.biochem.mpg.de/s/aHpXSLX9RxbYPzp
@@ -73,7 +73,7 @@
   search_engine: DiaNN
   citation: "Li, Kejia, et al. A peptide-centric local stability assay enables proteome-scale identification of the protein targets and binding regions of diverse ligands. Nature Methods 22.2 (2025): 278-282."
   data_type: psm
-  description: PELSA Staurosporine study DIANN report for differential expression analysis
+  description: PELSA Staurosporine study DiaNN report for differential expression analysis
 
 - name: pelsa_metadata
   url: https://datashare.biochem.mpg.de/s/NGof744gWw66Mc8
