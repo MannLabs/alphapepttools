@@ -22,7 +22,9 @@ def _cv(data: np.ndarray, *, min_valid: int = 3, axis: int = 0) -> np.ndarray:
        1D Array with length of axis with computed CVs and `nan` where the
        number of non-na values is smaller than min_valid.
     """
-    cv = np.nanstd(data, axis=axis) / np.nanmean(data, axis=axis)
+    std = np.nanstd(data, axis=axis)
+    mean = np.nanmean(data, axis=axis)
+    cv = std / np.where(mean == 0, np.nan, mean)
     valid_count = np.sum(~np.isnan(data), axis=axis)
     cv[valid_count < min_valid] = np.nan
     return cv
@@ -74,7 +76,7 @@ def coefficient_of_variation(
     Returns
     -------
     None | anndata.AnnData
-        AnnData object with imputed values in layer.
+        AnnData object with computed CVs added to `adata.var[key_added]`.
         If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
         returns a modified copy.
 
