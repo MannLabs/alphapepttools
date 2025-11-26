@@ -9,13 +9,6 @@ from alphapepttools.metrics import pooled_median_absolute_deviation
 from alphapepttools.metrics._group_level import _pmad, _set_nested_dict
 
 
-@pytest.fixture
-def count_data_pmad() -> tuple[np.ndarray, float]:
-    """Generate count data with known PMAD"""
-    X = np.arange(0, 9, 1).reshape(3, 3)
-    return X, 3.0
-
-
 class TestSetNestedDict:
     @pytest.mark.parametrize(
         ("dictionary", "keys", "value", "reference"),
@@ -42,6 +35,13 @@ class TestSetNestedDict:
         result = _set_nested_dict(dictionary=dictionary, keys=keys, value=value)
 
         assert result == reference
+
+
+@pytest.fixture
+def count_data_pmad() -> tuple[np.ndarray, float]:
+    """Generate count data with known PMAD"""
+    X = np.arange(0, 9, 1).reshape(3, 3)
+    return X, 3.0
 
 
 class TestPmad:
@@ -75,7 +75,7 @@ class TestPoooledMedianAbsoluteDeviation:
             adata_pmad["adata"], group_key=adata_pmad["group_key"], layer=layer, inplace=False
         )
 
-        assert pmad.equals(reference)
+        pd.testing.assert_frame_equal(pmad, reference)
 
     @pytest.mark.parametrize("layer", [None, "layer"])
     def test_pooled_median_absolute_deviation_inplace(self, adata_pmad: ad.AnnData, layer: str | None) -> None:
