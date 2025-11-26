@@ -56,13 +56,13 @@
 
 # HeLa QC dataset for PCA workflow tutorial
 - name: hela_pg_diann
-  url: https://datashare.biochem.mpg.de/s/NGxD86CQSbRWmzw
+  url: https://datashare.biochem.mpg.de/s/XDi34GJpGHBgm5x
   search_engine: DiaNN
   data_type: pg
   description: HeLa QC protein group matrix from DIANN (report.pg_matrix.tsv)
 
 - name: hela_metadata
-  url: https://datashare.biochem.mpg.de/s/sSYkOj22kM5AJ4O
+  url: https://datashare.biochem.mpg.de/s/aHpXSLX9RxbYPzp
   search_engine: none
   data_type: metadata
   description: HeLa QC sample metadata (simple_metadata.csv)
