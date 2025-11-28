@@ -213,10 +213,14 @@ def extract_pca_anndata(
     pca_anndata.var = var_df
 
     if expression_columns is not None:
+        expression_columns = (
+            expression_columns if isinstance(expression_columns, (list, tuple, np.ndarray)) else [expression_columns]
+        )
         # Subset the data to only include the specified expression columns
-        if dim_space == "obs" and len(list(set(expression_columns) & set(data.var_names))) > 0:
+        if dim_space == "obs" and len(data.var_names.intersection(expression_columns)) > 0:
             expr_cols = list(set(expression_columns) & set(data.var_names))
             expr_data = pd.DataFrame(data[:, expr_cols].X)
+            expr_data = expr_data.apply(pd.to_numeric, errors="coerce")
             # set colnames and indices of the data
             expr_data = expr_data.set_axis(expr_cols, axis=1)
             expr_data.index = data.obs_names
@@ -224,11 +228,14 @@ def extract_pca_anndata(
 
         elif dim_space == "var" and len(list(set(expression_columns) & set(data.obs_names))) > 0:
             expr_rows = list(set(expression_columns) & set(data.obs_names))
-            expr_data = pd.DataFrame(data[expr_rows, :].X.T)
+            expr_data = pd.DataFrame(data[:, expr_cols].X.T)
+            expr_data = expr_data.apply(pd.to_numeric, errors="coerce")
+
             expr_data = expr_data.set_axis(expr_rows, axis=1)
             expr_data.index = data.var_names
             pca_anndata.obs = pca_anndata.obs.join(expr_data)
         else:
+            print("here")
             logging.warning(
                 f"No matching expression columns found in the data.X for the specified PCA dim_space '{dim_space}' and {expression_columns}."
             )

@@ -1215,8 +1215,6 @@ class Plots:
                 labels = data.obs.index if label_column is None else data_column_to_array(data, label_column)
             else:  # dim_space == "var"
                 labels = data.var.index if label_column is None else data_column_to_array(data, label_column)
-            print(labels)
-            print()
             label_plot(
                 ax=ax,
                 x_values=pca_anndata.X[:, pc_x - 1],
