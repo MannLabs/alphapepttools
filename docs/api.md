@@ -38,6 +38,7 @@
     tl.diff_exp_alphaquant
     tl.pca
     tl.diff_exp_ebayes
+    tl.extract_pca_anndata
 
 ```
 
