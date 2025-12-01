@@ -316,7 +316,6 @@ def test_diff_exp_ebayes(
         adata=adata,
         between_column=between_column,
         comparison=comparison,
-        min_valid_values=min_valid_values,
     )
 
     pd.testing.assert_frame_equal(
