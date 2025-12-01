@@ -300,7 +300,7 @@ def example_adata_ebayes():
         ),
     ],
 )
-def test_diff_exp_limma(
+def test_diff_exp_ebayes(
     example_adata_ebayes,
     comparison,
     expected_comparison_key,
