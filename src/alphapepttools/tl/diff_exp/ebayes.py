@@ -158,7 +158,7 @@ def diff_exp_ebayes(
     complete_features = ~pd.isna(adata_subset.X).any(axis=0)
     n_removed = (~complete_features).sum()
     if n_removed > 0:
-        logger.info(f"Removing {n_removed} features with missing values")
+        logger.warning(f"Removing {n_removed} features with missing values")
     adata_subset = adata_subset[:, complete_features].copy()
 
     # Report on maximum samples per level

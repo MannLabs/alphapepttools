@@ -272,7 +272,7 @@ def example_adata_ebayes():
 
 # Test diff_exp_limma by loading small example datasets
 @pytest.mark.parametrize(
-    ("expected_df", "comparison", "expected_comparison_key", "between_column", "min_valid_values"),
+    ("expected_df", "comparison", "expected_comparison_key", "between_column"),
     [
         (
             pd.DataFrame(
@@ -296,7 +296,6 @@ def example_adata_ebayes():
             ("B", "A"),  # ensure that patsy's alphabetical ordering is cancelled out correctly
             "B_VS_A",
             "group",
-            5,  # Ensure that the feature with insufficient valid values is dropped
         ),
     ],
 )
@@ -306,7 +305,6 @@ def test_diff_exp_ebayes(
     expected_comparison_key,
     expected_df,
     between_column,
-    min_valid_values,
 ):
     """Testing function to ascertain stable functionality of diff_exp_limma on a small example dataset."""
 
