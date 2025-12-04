@@ -509,7 +509,7 @@ def filter_data_completeness(
         Maximum fraction of missing values allowed. Compared with the fraction of missing values
         in a "greater than" fashion, i.e. if max_missing is 0.6 and the fraction of missing values
         is 0.6, the sample or feature is kept. Greater than comparison is used here since the
-        missing fraction may be 0.0, in which case the sample or feature should be kept.
+        missing fraction may be 0.0, which equals filtering for 100 % data completeness.
     group_column : str, optional
         Column in obs to determine groups for filtering.
     groups : list[str], optional

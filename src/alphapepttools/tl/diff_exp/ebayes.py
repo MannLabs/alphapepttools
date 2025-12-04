@@ -7,6 +7,7 @@ import pandas as pd
 import patsy
 from inmoose import limma
 
+from alphapepttools.pp.data import filter_data_completeness
 from alphapepttools.tl import tl_defaults
 from alphapepttools.tl.utils import (
     determine_max_replicates,
@@ -150,19 +151,19 @@ def diff_exp_ebayes(
 
     logger.info(f"Comparing levels: {level_1} (treatment) vs {level_2} (control)")
 
+    # Report on maximum samples per level
+    max_samples_level_1, max_samples_level_2 = determine_max_replicates(adata, between_column, level_1, level_2)
+
     # Filter adata to only include samples from the comparison
     adata_subset = adata[adata.obs[between_column].isin([level_1, level_2]), :].copy()
 
     # Remove proteins/peptides with any missing values (as per standard practice)
-    # This ensures compatibility with inmoose which cannot handle NaN values
-    complete_features = ~pd.isna(adata_subset.X).any(axis=0)
-    n_removed = (~complete_features).sum()
-    if n_removed > 0:
-        logger.warning(f"Removing {n_removed} features with missing values")
-    adata_subset = adata_subset[:, complete_features].copy()
-
-    # Report on maximum samples per level
-    max_samples_level_1, max_samples_level_2 = determine_max_replicates(adata, between_column, level_1, level_2)
+    # This ensures compatibility with inmoose's lmFit which cannot handle NaN values
+    adata_subset = filter_data_completeness(
+        adata_subset,
+        max_missing=0,
+        action="drop",
+    )
 
     # Generate design matrix with correct column ordering
     design_matrix, design_colnames = _generate_patsy_design_matrix(adata_subset, between_column, level_1, level_2)
