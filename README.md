@@ -50,7 +50,7 @@ As the package is still under development, consider installing the latest develo
 2. Development version
 
 ```bash
-git clone git+https://github.com/MannLabs/alphapepttools.git@main && cd alphapepttools
+git clone https://github.com/MannLabs/alphapepttools.git@main && cd alphapepttools
 pip install -e .
 ```
 
