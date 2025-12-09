@@ -189,9 +189,13 @@ class AnnDataFactory:
             Initialized AnnDataFactory instance
 
         """
+        # Set default configurations if they are not passed to the function
         reader_config = cls._get_reader_configuration(reader_type)
+        for key, value in reader_config.items():
+            if key not in reader_kwargs:
+                reader_kwargs[key] = value
 
-        reader: PSMReaderBase = psm_reader_provider.get_reader(reader_type, **reader_config, **reader_kwargs)
+        reader: PSMReaderBase = psm_reader_provider.get_reader(reader_type, **reader_kwargs)
 
         # Allow users to add custom columns
         if additional_columns is not None:
