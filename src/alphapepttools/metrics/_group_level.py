@@ -65,7 +65,7 @@ def _compute_groupwise_metric(
     func
         Function that computes aggregated metric on data
             - Should expect a numpy array of shape (observations, features) as single argument
-            - Should return a single aggregation metric as float
+            - Should return a single aggregation metric as numeric value (float, int)
     group_key
         Column in `adata.obs`
     layer
@@ -81,16 +81,16 @@ def _compute_groupwise_metric(
     groups = adata.obs.groupby(group_key)
     data = adata.X if layer is None else adata.layers[layer]
 
-    metric = {}
+    metrics = {}
     for group_name, indices in groups.indices.items():
-        metric = func(data[indices, :], **kwargs)
+        result = func(data[indices, :], **kwargs)
 
-        if not isinstance(metric, float):
-            raise TypeError(f"`func` needs to return a float value, but returned {type(metric)}")
+        if not isinstance(result, (float, int)):
+            raise TypeError(f"`func` needs to return a numeric value (float, int), but returned {type(result)}")
 
-        metric[group_name] = metric
+        metrics[group_name] = result
 
-    return metric
+    return metrics
 
 
 def _pmad(x: np.ndarray) -> float:
