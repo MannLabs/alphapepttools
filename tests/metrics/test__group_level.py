@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from alphapepttools.metrics import pooled_coefficient_of_variation, pooled_median_absolute_deviation
-from alphapepttools.metrics._group_level import _pcv, _pmad, _set_nested_dict
+from alphapepttools.metrics._group_level import _compute_groupwise_metric, _pcv, _pmad, _set_nested_dict
 
 
 class TestSetNestedDict:
@@ -35,6 +35,40 @@ class TestSetNestedDict:
         result = _set_nested_dict(dictionary=dictionary, keys=keys, value=value)
 
         assert result == reference
+
+
+class TestComputeGroupWiseMetric:
+    """Test that aggregation function returns correct values"""
+
+    @pytest.fixture
+    def adata_grouped(self) -> ad.AnnData:
+        """AnnData with two groups, each with distinct values"""
+        X = np.array([[1.0, 2.0], [3.0, 4.0], [10.0, 20.0], [30.0, 40.0]])
+        obs = pd.DataFrame({"group": ["A", "A", "B", "B"]})
+        return ad.AnnData(X=X, layers={"layer": X * 2}, obs=obs)
+
+    def test__compute_groupwise_metric(self, adata_grouped: ad.AnnData) -> None:
+        """Test groupwise metric computation with a simple mean function"""
+        result = _compute_groupwise_metric(adata_grouped, func=lambda x: np.mean(x), group_key="group")
+        # Group A: mean([[1,2],[3,4]]) = 2.5, Group B: mean([[10,20],[30,40]]) = 25.0
+        assert result == {"A": 2.5, "B": 25.0}
+
+    def test__compute_groupwise_metric_layer(self, adata_grouped: ad.AnnData) -> None:
+        """Test groupwise metric computation using a layer"""
+        result = _compute_groupwise_metric(adata_grouped, func=lambda x: np.mean(x), group_key="group", layer="layer")
+        assert result == {"A": 5.0, "B": 50.0}
+
+    def test__compute_groupwise_metric_kwargs(self, adata_grouped: ad.AnnData) -> None:
+        """Test that kwargs are passed to the aggregation function"""
+        result = _compute_groupwise_metric(
+            adata_grouped, func=lambda _, return_value: return_value, group_key="group", return_value=10.0
+        )
+        assert result == {"A": 10.0, "B": 10.0}
+
+    def test__compute_groupwise_metric_invalid_return_type(self, adata_grouped: ad.AnnData) -> None:
+        """Test that non-float return raises TypeError"""
+        with pytest.raises(TypeError, match="needs to return a numeric value"):
+            _compute_groupwise_metric(adata_grouped, func=lambda _: "not a number", group_key="group")
 
 
 @pytest.fixture
