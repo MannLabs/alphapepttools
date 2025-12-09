@@ -65,7 +65,7 @@ def _compute_groupwise_metric(
     func
         Function that computes aggregated metric on data
             - Should expect a numpy array of shape (observations, features) as single argument
-            - Should return a single aggregation metric as flaot
+            - Should return a single aggregation metric as float
     group_key
         Column in `adata.obs`
     layer
@@ -83,7 +83,12 @@ def _compute_groupwise_metric(
 
     metric = {}
     for group_name, indices in groups.indices.items():
-        metric[group_name] = func(data[indices, :], **kwargs)
+        metric = func(data[indices, :], **kwargs)
+
+        if not isinstance(metric, float):
+            raise TypeError(f"`func` needs to return a float value, but returned {type(metric)}")
+
+        metric[group_name] = metric
 
     return metric
 
