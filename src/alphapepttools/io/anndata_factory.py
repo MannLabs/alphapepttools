@@ -140,6 +140,8 @@ class AnnDataFactory:
         """Get reader-specific configuration for mapping PSMs to anndata."""
         reader_configs = {
             "diann": {
+                # Stringent filtering.
+                # Defaults to filters by Q value, Library Q value, Global Q value if MBR is active
                 "filter_first_search_fdr": True,
                 "filter_second_search_fdr": True,
             }
