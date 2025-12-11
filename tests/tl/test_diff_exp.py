@@ -270,40 +270,40 @@ def example_adata_ebayes():
     return adata
 
 
+@pytest.fixture
+def expected_ebayes_base_df():
+    """Base expected dataframe for eBayes tests with B_VS_A comparison."""
+    return pd.DataFrame(
+        {
+            "protein": ["X1", "X2", "X3"],
+            "log2fc": [-0.7979892670672148, -2.8389205950315937, -1.5954559846999832],
+            "p_value": [0.0030228412720276574, 6.564170711303982e-05, 0.002166002226930997],
+            "-log10(p_value)": [2.5195846568222966, 4.182820132979508, 2.664341101199458],
+            "fdr": [0.0030228412720276574, 0.00019692512133911947, 0.0030228412720276574],
+            "-log10(fdr)": [2.5195846568222966, 3.7056988782598457, 2.5195846568222966],
+            "method": ["limma_ebayes_inmoose", "limma_ebayes_inmoose", "limma_ebayes_inmoose"],
+            "max_level_1_samples": [5, 5, 5],
+            "max_level_2_samples": [5, 5, 5],
+            "stat": [-3.804007666004946, -6.2764817445960475, -3.9999011197249166],
+            "B": [-1.8736068846693623, 2.010219213410613, -1.5373419998901845],
+            "AveExpr": [4.175828737355294, 2.8008384166375, 2.1791061114716954],
+        },
+        index=["X1", "X2", "X3"],
+    )
+
+
 # Test diff_exp_limma by loading small example datasets
 @pytest.mark.parametrize(
-    ("expected_df", "comparison", "expected_comparison_key", "between_column"),
+    ("comparison", "expected_comparison_key", "between_column"),
     [
-        (
-            pd.DataFrame(
-                {
-                    "condition_pair": ["B_VS_A", "B_VS_A", "B_VS_A"],
-                    "protein": ["X1", "X2", "X3"],
-                    "log2fc": [-0.7979892670672148, -2.8389205950315937, -1.5954559846999832],
-                    "p_value": [0.0030228412720276574, 6.564170711303982e-05, 0.002166002226930997],
-                    "-log10(p_value)": [2.5195846568222966, 4.182820132979508, 2.664341101199458],
-                    "fdr": [0.0030228412720276574, 0.00019692512133911947, 0.0030228412720276574],
-                    "-log10(fdr)": [2.5195846568222966, 3.7056988782598457, 2.5195846568222966],
-                    "method": ["limma_ebayes_inmoose", "limma_ebayes_inmoose", "limma_ebayes_inmoose"],
-                    "max_level_1_samples": [5, 5, 5],
-                    "max_level_2_samples": [5, 5, 5],
-                    "stat": [-3.804007666004946, -6.2764817445960475, -3.9999011197249166],
-                    "B": [-1.8736068846693623, 2.010219213410613, -1.5373419998901845],
-                    "AveExpr": [4.175828737355294, 2.8008384166375, 2.1791061114716954],
-                },
-                index=["X1", "X2", "X3"],
-            ),
-            ("B", "A"),  # ensure that patsy's alphabetical ordering is cancelled out correctly
-            "B_VS_A",
-            "group",
-        ),
+        (("B", "A"), "B_VS_A", "group"),  # ensure that patsy's alphabetical ordering is cancelled out correctly
     ],
 )
 def test_diff_exp_ebayes(
     example_adata_ebayes,
+    expected_ebayes_base_df,
     comparison,
     expected_comparison_key,
-    expected_df,
     between_column,
 ):
     """Testing function to ascertain stable functionality of diff_exp_limma on a small example dataset."""
@@ -315,6 +315,10 @@ def test_diff_exp_ebayes(
         between_column=between_column,
         comparison=comparison,
     )
+
+    # Add the condition_pair column to the expected dataframe
+    expected_df = expected_ebayes_base_df.copy()
+    expected_df.insert(0, "condition_pair", [expected_comparison_key] * len(expected_df))
 
     pd.testing.assert_frame_equal(
         results,
