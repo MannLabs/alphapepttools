@@ -8,9 +8,13 @@ maxdepth: 1
 ---
 notebooks/00_data_sources.ipynb
 notebooks/01_basic_workflow.ipynb
+notebooks/01_plotting.ipynb
+notebooks/02_basic_analysis.ipynb
 notebooks/02_plotting.ipynb
 notebooks/04_basic_PCA_workflow.ipynb
+notebooks/04_differential_expression.ipynb
 notebooks/05_pycombat.ipynb
 notebooks/A01_load_psm_tables.ipynb
 notebooks/A01_plotting.ipynb
+notebooks/A02_filtering_demo.ipynb
 ```
