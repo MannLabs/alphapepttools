@@ -1,4 +1,3 @@
-# TODO: move this submodule to tl module
 """
 Auxiliary functions for handling data and formatting for PCA plot input.
 
@@ -12,8 +11,6 @@ import logging
 import anndata as ad
 import numpy as np
 import pandas as pd
-
-from alphapepttools.pp.data import data_column_to_array
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -49,8 +46,7 @@ def _validate_adata_and_dim_space(data, dim_space: str) -> None:  # noqa: ANN001
 def _validate_pca_plot_input(
     data: ad.AnnData,
     pca_embeddings_layer_name: str,
-    pc_x: int,
-    pc_y: int,
+    pca_var_key: str,
     dim_space: str,
 ) -> None:
     """
@@ -62,10 +58,8 @@ def _validate_pca_plot_input(
         AnnData object to be validated.
     pca_embeddings_layer_name:
         Name of the PCA layer to be checked.
-    pc_x:
-        First PCA dimension to be validated (1-indexed, i.e. the first PC is 1, not 0).
-    pc_y:
-        Second PCA dimension to be validated (1-indexed, i.e. the first PC is 1, not 0).
+    pca_var_key:
+        Name of the PCA variance metadata layer to be checked, stored in `data.uns`.
     dim_space:
         The dimension space used in PCA. Can be either "obs" or "var".
     """
@@ -82,10 +76,11 @@ def _validate_pca_plot_input(
             f"Found layers: {available_layers}"
         )
 
-    # Check PC dimensions
-    n_pcs = getattr(data, pca_coors_attr)[pca_embeddings_layer_name].shape[1]
-    if not (1 <= pc_x <= n_pcs) or not (1 <= pc_y <= n_pcs):
-        raise ValueError(f"pc_x and pc_y must be between 1 and {n_pcs} (inclusive). Got {pc_x=}, {pc_y=}")
+    # Check if the variance layer exists in uns
+    if pca_var_key not in data.uns:
+        raise ValueError(
+            f"PCA metadata layer '{pca_var_key}' not found in AnnData object. Found layers: {list(data.uns.keys())}"
+        )
 
 
 def _validate_scree_plot_input(
@@ -175,17 +170,12 @@ def _validate_pca_loadings_plot_inputs(
 ## Functions to prepare data frames for plotting using the scatter method
 
 
-def prepare_pca_data_to_plot(
+def extract_pca_anndata(
     data: ad.AnnData,
-    pc_x: int = 1,
-    pc_y: int = 2,
     dim_space: str = "obs",
     embeddings_name: str | None = None,
-    color_map_column: str | None = None,
-    label_column: str | None = None,
-    *,
-    label: bool = False,
-) -> pd.DataFrame:
+    expression_columns: list[str] | None = None,
+) -> ad.AnnData:
     """
     Fetched PCA data required from PCA plotting from AnnData object (as returned by `pca` function).
 
@@ -193,56 +183,64 @@ def prepare_pca_data_to_plot(
     ----------
     data : ad.AnnData
         AnnData object containing PCA results.
-    pc_x : int
-        First principal component (1-indexed).
-    pc_y : int
-        Second principal component (1-indexed).
     dim_space : str
         Either "obs" or "var" for observation or variable embeddings space.
     embeddings_name : str | None
         Custom embeddings name or None for default.
-    color_map_column : str | None
-        Column for color mapping.
-    label_column : str | None
-        Column for labeling points.
-    label : bool
-        Whether labels are requested.
+    expression_columns : str | None
+        a list of `var_names` (if `dim_space = obs`) or `obs_names` (if `dim_space = var`).
 
     Returns
     -------
-    pd.DataFrame
-        DataFrame with PCA coordinates,color data and labels if requested.
+    ad.AnnData
+        AnnData object containing PCA coordinates, color mapping, and labels.
     """
     # Generate the correct key names based on dim_space and embeddings_name
     pca_coors_key = f"X_pca_{dim_space}" if embeddings_name is None else embeddings_name
+    pca_var_key = f"variance_pca_{dim_space}" if embeddings_name is None else embeddings_name
 
     # Input checks
-    _validate_pca_plot_input(data, pca_coors_key, pc_x, pc_y, dim_space)
-
-    # Create the dataframe for plotting
-    dim1_z = pc_x - 1  # to account for 0 indexing
-    dim2_z = pc_y - 1  # to account for 0 indexing
+    _validate_pca_plot_input(data, pca_coors_key, pca_var_key, dim_space)
 
     # Get PCA coordinates from the correct attribute
     pca_coordinates = data.obsm[pca_coors_key] if dim_space == "obs" else data.varm[pca_coors_key]
+    obs_df = data.obs if dim_space == "obs" else data.var
+    var_df = pd.DataFrame(data.uns[pca_var_key])
 
-    pca_coor_df = pd.DataFrame(pca_coordinates[:, [dim1_z, dim2_z]], columns=["dim1", "dim2"])
+    adata_pca = ad.AnnData(X=pca_coordinates)
 
-    # Add color column if specified
-    if color_map_column is not None:
-        color_values = data_column_to_array(data, color_map_column)
-        pca_coor_df[color_map_column] = color_values
+    adata_pca.obs = obs_df
+    adata_pca.var = var_df
 
-    # Prepare labels if requested
-    labels = None
-    if label:
-        if dim_space == "obs":
-            labels = data.obs.index if label_column is None else data_column_to_array(data, label_column)
-        else:  # dim_space == "var"
-            labels = data.var.index if label_column is None else data_column_to_array(data, label_column)
-        pca_coor_df["labels"] = labels
+    if expression_columns is not None:
+        expression_columns = (
+            expression_columns if isinstance(expression_columns, (list, tuple, np.ndarray)) else [expression_columns]
+        )
+        # Subset the data to only include the specified expression columns
+        if dim_space == "obs" and len(data.var_names.intersection(expression_columns)) > 0:
+            expr_cols = list(set(expression_columns) & set(data.var_names))
+            expr_data = pd.DataFrame(data[:, expr_cols].X)
+            expr_data = expr_data.apply(pd.to_numeric, errors="coerce")
+            # set colnames and indices of the data
+            expr_data = expr_data.set_axis(expr_cols, axis=1)
+            expr_data.index = data.obs_names
+            adata_pca.obs = adata_pca.obs.join(expr_data)
 
-    return pca_coor_df
+        elif dim_space == "var" and len(list(set(expression_columns) & set(data.obs_names))) > 0:
+            expr_rows = list(set(expression_columns) & set(data.obs_names))
+            expr_data = pd.DataFrame(data[:, expr_cols].X.T)
+            expr_data = expr_data.apply(pd.to_numeric, errors="coerce")
+
+            expr_data = expr_data.set_axis(expr_rows, axis=1)
+            expr_data.index = data.var_names
+            adata_pca.obs = adata_pca.obs.join(expr_data)
+        else:
+            logging.warning(
+                f"No matching expression columns found in the data.X for the specified PCA dim_space '{dim_space}' and {expression_columns}."
+            )
+
+    adata_pca.var_names = [f"pc_{i + 1}" for i in range(adata_pca.X.shape[1])]
+    return adata_pca
 
 
 def prepare_scree_data_to_plot(
