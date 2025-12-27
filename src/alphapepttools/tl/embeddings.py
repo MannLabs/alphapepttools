@@ -3,9 +3,13 @@ import logging
 import anndata as ad
 import numpy as np
 import scanpy as sc
+from bpca import BPCA
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+BPCA_DEFAULT_NAME = "BPCA"
 
 
 def _check_inputs_for_dim_reduction(
@@ -225,3 +229,114 @@ def pca(
     pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, **pca_kwargs)
 
     return _store_pca_results(adata, pca_res, dim_space, embeddings_name, meta_data_mask_column_name, logger)
+
+
+def bpca(
+    adata: ad.AnnData,
+    layer: str | None = None,
+    dim_space: str = "obs",
+    embeddings_name: str | None = None,
+    n_comps: int = 50,
+    meta_data_mask_column_name: str | None = None,
+    **bpca_kwargs,
+) -> ad.AnnData | np.ndarray:
+    """Bayesian Principal component analysis.
+
+    Bayesian implementation of PCA that supports missing values. Computes latent space coordinates, loadings and variance decomposition.
+
+    Depending on the `dim_space` parameter, the PCA result is dimensional reduction projection of samples (`obs`) or of features (`var`).
+    The updated adata object will include `adata.obsm` layer for the PCA coordinates,`adata.varm` layer (for PCA feature loadings),
+    and `adata.uns` layer (for PCA variance decomposition) for PCA done on the feature space.
+    For PCA done on the sample space, the BPCA coordinates will be stored in `adata.varm`, the BPCA loadings in `adata.obsm`, and the variance decomposition in `adata.uns`.
+
+    Parameters
+    ----------
+    adata: ad.AnnData
+        The (annotated) data matrix of shape `n_obs` X `n_vars`.
+        Rows correspond to cells and columns to genes.
+    layer: str, optional (default: None)
+        If provided, which element of layers to use for PCA.
+        If None, the `.X` attribute of `adata` is used.
+    dim_space: str, optional (default: "obs")
+        The dimension to project PCA on. Can be either "obs" (default) for
+        sample projection or "var" for feature projection.
+    embeddings_name: str, optional (default: None)
+        If provided, this will be used as the key under which to store the PCA results in
+        `adata.obsm`, `adata.varm`, and `adata.uns` (see Returns).
+        If None, the default keys will be used:
+        - For `dim_space='obs'`: `X_pca_obs` for PC coordinates, `PCs_obs` for the feature loadings, `variance_pca_obs` for the variance.
+        - For `dim_space='var'`: `X_pca_var` for PC corrdinates, `PCs_var` for the sample loadings, `variance_pca_var` for the variance.
+        If provided, the keys will be `embeddings_name` for all three data frames.
+    n_comps: int, optional (default: 50)
+        Number of principal components to compute. Defaults to `min(50, n_obs, n_var)`
+    meta_data_mask_column_name: str, optional (default: None)
+        If provided, the colname in `adata.var` to use as a mask for
+        the features to be used in PCA. This is useful for running PCA with the
+        core proteome as "mask_var" to remove nan values. Must be of boolean dtype.
+        If None, all features are used (data should not include NaNs!).
+    **pca_kwargs: dict, optional
+        Additional keyword arguments for the :class:`bpca.BPCA`. By default None.
+
+    Returns
+    -------
+    Sets the following fields:
+    for `dim_space='obs'` (sample projection):
+    `.obsm['X_pca_obs' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
+        PCA representation of data.
+    `.varm['PCs_obs' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
+        The principal components containing the loadings.
+    `.uns['variance_pca_obs' | embeddings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
+        Ratio of explained variance.
+
+    for `dim_space='var'` (feature projection):
+    `.varm['X_pca_var' | embeddings_name]` : :class:`~scipy.sparse.csr_matrix` | :class:`~scipy.sparse.csc_matrix` | :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
+        PCA representation of data.
+    `.obsm['PCs_var' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
+        The principal components containing the loadings.
+    `.uns['variance_pca_var' | embeddings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
+        Ratio of explained variance.
+
+    Notes
+    -----
+    For complete data, the BPCA procedure will converge to the standard PCA results. However, the fitting procedure will take significantly longer than for standard PCA.
+    For data with missing values, the BPCA model assumes a constant noise model, which might not be completely truthfull for biological data.
+
+    References
+    ----------
+    - :cite:p:`Oba.2003`
+    - :cite:p:`Bishop.1998`
+
+    See Also
+    --------
+    :class:`bpca.BPCA`
+    """
+    _check_inputs_for_dim_reduction(
+        adata=adata, layer=layer, dim_space=dim_space, meta_data_mask_column_name=meta_data_mask_column_name
+    )
+
+    # get the matrix to run PCA on
+    adata_sub = adata[:, adata.var[meta_data_mask_column_name]] if meta_data_mask_column_name is not None else adata
+    data_for_pca = adata_sub.layers[layer].copy() if layer is not None else adata_sub.X.copy()
+    data_for_pca = (
+        data_for_pca.T if dim_space == "var" else data_for_pca
+    )  # transpose if PCA is done on the feature space
+
+    # run PCA
+    bpca = BPCA(n_components=n_comps, **bpca_kwargs)
+    usage = bpca.fit_transform(data_for_pca)
+    loadings = bpca.components_
+    explained_variance_ratio = bpca.explained_variance_ratio_
+
+    # BPCA does not order the dimensions on variance explained - sort manually
+    order = np.argsort(explained_variance_ratio)[::-1]
+
+    pca_res = (usage[:, order], loadings[order, :], explained_variance_ratio[order], np.array([]))
+
+    return _store_pca_results(
+        adata=adata,
+        pca_res=pca_res,
+        dim_space=dim_space,
+        embeddings_name=BPCA_DEFAULT_NAME,
+        meta_data_mask_column_name=meta_data_mask_column_name,
+        logger=logger,
+    )
