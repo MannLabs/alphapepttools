@@ -107,7 +107,7 @@ def impute_gaussian(
     adata: ad.AnnData,
     group_column: str | None = None,
     layer: str | None = None,
-    std_offset: float = 3,
+    std_offset: float = 1.8,
     std_factor: float = 0.3,
     random_state: int = 42,
     *,

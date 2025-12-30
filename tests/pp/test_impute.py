@@ -72,7 +72,7 @@ def gaussian_imputation_dummy_data(imputation_dummy_data) -> tuple[np.ndarray, n
     """Test data and reference for gaussian imputation"""
     RANDOM_STATE = 42
     STD_FACTOR = 0.3
-    STD_OFFSET = 3
+    STD_OFFSET = 1.8
 
     X = imputation_dummy_data.copy()
     rng = np.random.default_rng(RANDOM_STATE)
@@ -152,7 +152,7 @@ class TestImputeGaussianAnnData:
         # Generate grouped reference data
         RANDOM_STATE = 42
         STD_FACTOR = 0.3
-        STD_OFFSET = 3
+        STD_OFFSET = 1.8
 
         X_ref_grouped = X.copy()
         rng = np.random.default_rng(RANDOM_STATE)
