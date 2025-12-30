@@ -8,13 +8,50 @@ import numpy as np
 import pandas as pd
 from sklearn.impute import KNNImputer
 
-# logging configuration
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+def _check_for_complete_data(
+    data: np.ndarray,
+) -> bool:
+    """Check if data contains any missing values
+
+    Parameters
+    ----------
+    data
+        Samples x Features array
+
+    Returns
+    -------
+    bool
+        True if data contains no missing values, False otherwise
+    """
+    return not np.any(np.isnan(data))
+
+
+def _raise_on_all_nan_values(data: np.ndarray) -> None:
+    """Check if a feature contains all nan
+
+    Parameters
+    ----------
+    data
+        Samples x Features array
+
+    Raises
+    ------
+    ValueError
+        If any feature contains only NaNs
+    """
+    all_nan_features = np.isnan(data).all(axis=0)
+    if any(all_nan_features):
+        raise ValueError(
+            f"Features with index {list(np.where(all_nan_features)[0])} contain all nan values. Drop these features beforehand."
+        )
 
 
 def _impute_gaussian(
     data: np.ndarray,
-    std_offset: float = 3,
+    std_offset: float = 1.8,
     std_factor: float = 0.3,
     random_state: int = 42,
 ) -> np.ndarray:
@@ -22,6 +59,10 @@ def _impute_gaussian(
 
     The distribution is centered at std_offset * feature standard deviation below the
     feature mean and has a standard deviation of std_factor * feature standard deviation.
+
+    The default values are set to mirror Perseus-style imputation: multiply the feature's
+    standard deviation by 0.3 and shift the mean down by 1.8 standard deviations, then sample
+    from the resulting distribution.
 
     Parameters
     ----------
@@ -41,11 +82,11 @@ def _impute_gaussian(
     np.ndarray
         Imputed data array
     """
-    rng = np.random.default_rng(random_state)
-    na_col_idxs = np.where(np.isnan(data).sum(axis=0) > 0)[0]
-
-    if len(na_col_idxs) == 0:
+    if _check_for_complete_data(data):
+        logger.info("Data contains no missing values. Skipping imputation.")
         return data
+
+    rng = np.random.default_rng(random_state)
 
     # generate corresponding downshifted features
     stds = np.nanstd(data, axis=0)
@@ -54,6 +95,7 @@ def _impute_gaussian(
     shifted_stds = stds * std_factor
 
     # iterate over nan-containing columns and impute from corresponding gaussian
+    na_col_idxs = np.where(np.isnan(data).sum(axis=0) > 0)[0]
     for i in na_col_idxs:
         na_row_idxs = np.where(np.isnan(data[:, i]))[0]
         data[na_row_idxs, i] = rng.normal(shifted_means[i], shifted_stds[i], len(na_row_idxs))
@@ -149,19 +191,19 @@ def impute_gaussian(
     data = adata.X if layer is None else adata.layers[layer]
 
     if group_column is None:
-        _check_all_nan(data)
+        _raise_on_all_nan_values(data)
         data = _impute_gaussian(data, std_offset=std_offset, std_factor=std_factor, random_state=random_state)
     else:
         if pd.isna(adata.obs[group_column]).any():
             raise ValueError(
-                f"`group_column` {group_column} contains nans. The respective observations will be dropped and not get imputed.",
+                f"`group_column` {group_column} contains nans. Cannot impute groups with missing values.",
             )
 
         groups = adata.obs.groupby(group_column, dropna=True).indices
 
         for group_indices in groups.values():
             group = data[group_indices]
-            _check_all_nan(group)
+            _raise_on_all_nan_values(group)
             data[group_indices, :] = _impute_gaussian(
                 group, std_offset=std_offset, std_factor=std_factor, random_state=random_state
             )
@@ -174,26 +216,6 @@ def impute_gaussian(
     return adata if copy else None
 
 
-def _check_all_nan(data: np.ndarray) -> None:
-    """Check if a feature contains all nan
-
-    Parameters
-    ----------
-    data
-        Samples x Features array
-
-    Raises
-    ------
-    ValueError
-        If any feature contains only NaNs
-    """
-    all_nan_features = np.isnan(data).all(axis=0)
-    if any(all_nan_features):
-        raise ValueError(
-            f"Features with index {list(np.where(all_nan_features)[0])} contain all nan values. Drop these features beforehand."
-        )
-
-
 def _impute_nanmedian(data: np.ndarray) -> np.ndarray:
     """Impute nan values in array with column-wise nanmedian
 
@@ -202,12 +224,11 @@ def _impute_nanmedian(data: np.ndarray) -> np.ndarray:
     data
         Samples x Features array
     """
+    if _check_for_complete_data(data):
+        logger.info("Data contains no missing values. Skipping imputation.")
+        return data
+
     return np.where(np.isnan(data), np.nanmedian(data, axis=0), data)
-
-
-def _impute_knn(data: np.ndarray, **kwargs) -> np.ndarray:
-    imputer = KNNImputer(**kwargs)
-    return imputer.fit_transform(data)
 
 
 def impute_median(
@@ -281,7 +302,7 @@ def impute_median(
     data = adata.X if layer is None else adata.layers[layer]
 
     if group_column is None:
-        _check_all_nan(data)
+        _raise_on_all_nan_values(data)
         data = _impute_nanmedian(data)
     else:
         if pd.isna(adata.obs[group_column]).any():
@@ -293,7 +314,7 @@ def impute_median(
 
         for group_indices in groups.values():
             group = data[group_indices]
-            _check_all_nan(group)
+            _raise_on_all_nan_values(group)
             data[group_indices, :] = _impute_nanmedian(group)
 
     if layer is None:
@@ -302,6 +323,16 @@ def impute_median(
         adata.layers[layer] = data
 
     return adata if copy else None
+
+
+def _impute_knn(data: np.ndarray, **kwargs) -> np.ndarray:
+    """Impute missing values using kNN imputation"""
+    if _check_for_complete_data(data):
+        logger.info("Data contains no missing values. Skipping imputation.")
+        return data
+
+    imputer = KNNImputer(**kwargs)
+    return imputer.fit_transform(data)
 
 
 def _validate_knn_grouping(groups: dict, n_neighbors: int) -> None:
@@ -406,7 +437,7 @@ def impute_knn(
     data = adata.X if layer is None else adata.layers[layer]
 
     if group_column is None:
-        _check_all_nan(data)
+        _raise_on_all_nan_values(data)
         data = _impute_knn(data, n_neighbors=n_neighbors, weights=weights, **kwargs)
     else:
         groups = adata.obs.groupby(group_column, dropna=True).indices
@@ -414,7 +445,7 @@ def impute_knn(
 
         for group_indices in groups.values():
             group = data[group_indices]
-            _check_all_nan(group)
+            _raise_on_all_nan_values(group)
             data[group_indices, :] = _impute_knn(group, n_neighbors=n_neighbors, weights=weights, **kwargs)
 
     if layer is None:
