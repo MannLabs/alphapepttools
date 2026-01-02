@@ -247,34 +247,34 @@ def bpca(
     The dimensionality-reduced representation can be computed either for samples (`dim_space="obs"`) or for features (`dim_space="var"`).
     Depending on the chosen `dim_space`, the BPCA results are stored in different AnnData containers.
 
-    - For BPCA computed in feature space (`dim_space='var'`), the low-dimensional coordinates are stored in `adata.obsm`,
-    the feature loadings in `adata.varm`, and the variance decomposition in `adata.uns`.
-    - For BPCA computed in sample space (`dim_space='obs'`), the coordinates are stored in `adata.varm`,
-    the loadings in `adata.obsm`, and the variance decomposition in `adata.uns`.
+    - For BPCA computed in feature space (`dim_space='var'`)
+      The low-dimensional coordinates are stored in `adata.obsm`, the feature loadings in `adata.varm`, and the variance decomposition in `adata.uns`.
+    - For BPCA computed in sample space (`dim_space='obs'`)
+      The coordinates are stored in `adata.varm`, the loadings in `adata.obsm`, and the variance decomposition in `adata.uns`.
 
     Parameters
     ----------
-    adata: ad.AnnData
+    adata
         The (annotated) data matrix of shape `n_obs` X `n_vars`.
         Rows correspond to samples and columns to features.
-    layer: str, optional (default: None)
+    layer
         If provided, which element of layers to use for PCA.
         If None, the `.X` attribute of `adata` is used.
-    dim_space: str, optional (default: "obs")
+    dim_space
         The dimension to project PCA on. Can be either "obs" (default) for
         sample projection or "var" for feature projection.
-    embeddings_name: str, optional (default: None)
+    embeddings_name
         If provided, this will be used as the key under which to store the PCA results in
         `adata.obsm`, `adata.varm`, and `adata.uns` (see Returns).
         If None, the default key `"BPCA"` is used for storing results in `adata.obsm`, `adata.varm`, and `adata.uns`.
-    n_comps: int, optional (default: 50)
+    n_comps
         Number of principal components to compute. Defaults to `min(50, n_obs, n_var)`
-    meta_data_mask_column_name: str, optional (default: None)
+    meta_data_mask_column_name
         If provided, the colname in `adata.var` to use as a mask for
         the features to be used in PCA. This is useful for running PCA with the
         core proteome as "mask_var" to remove nan values. Must be of boolean dtype.
-    **bpca_kwargs: dict, optional
-        Additional keyword arguments for the :class:`bpca.BPCA`. By default None.
+    **bpca_kwargs
+        Additional keyword arguments to :class:`bpca.BPCA`. By default None.
 
     Returns
     -------
