@@ -1,10 +1,12 @@
+from typing import Any
+
 import anndata as ad
 import numpy as np
 import pandas as pd
 import pytest
 
-from alphapepttools.pp import impute_gaussian, impute_knn, impute_median
-from alphapepttools.pp.impute import _check_all_nan, _impute_knn, _impute_nanmedian
+from alphapepttools.pp import impute_bpca, impute_gaussian, impute_knn, impute_median
+from alphapepttools.pp.impute import _check_all_nan, _impute_bpca, _impute_knn, _impute_nanmedian
 
 
 @pytest.fixture
@@ -67,6 +69,22 @@ def knn_imputation_dummy_data(imputation_dummy_data) -> tuple[np.ndarray, np.nda
     return imputation_dummy_data, X_ref, kwargs
 
 
+@pytest.fixture
+def bpca_imputation_dummy_data(imputation_dummy_data: np.ndarray) -> tuple[np.ndarray, np.ndarray, dict[str, str]]:
+    """Test data for median imputation"""
+    X_ref = np.array(
+        [
+            [0.0, 0.0, 2.0, 0.94077611, 0.0],
+            [1.0, 1.0, 3.0, 1.0, 10.0],
+            [0.0, 2.0, 4.0, 3.03508935, 20.0],
+            [0.33059225, 3.0, 5.0, 3.0, 18.02331366],
+        ]
+    )
+    kwargs = {"n_components": 1}
+
+    return imputation_dummy_data, X_ref, kwargs
+
+
 def test___check_all_nan(dummy_data_all_nan) -> None:
     with pytest.raises(ValueError, match=r"Features with index \[4\]"):
         _check_all_nan(dummy_data_all_nan)
@@ -88,6 +106,15 @@ def test__impute_knn(knn_imputation_dummy_data) -> None:
     X_imputed = _impute_knn(X, **kwargs)
 
     assert np.all(np.isclose(X_imputed, X_ref, equal_nan=True))
+
+
+def test__impute_bpca(bpca_imputation_dummy_data: tuple[np.ndarray, np.ndarray, dict[str, Any]]) -> None:
+    """Test knn imputation for data with nan values"""
+    X, X_ref, kwargs = bpca_imputation_dummy_data
+
+    X_imputed = _impute_bpca(X, **kwargs)
+
+    assert np.allclose(X_imputed, X_ref, equal_nan=False)
 
 
 class TestImputeGaussian:
@@ -357,3 +384,93 @@ class TestImputeKNNAnnData:
 
         with pytest.raises(KeyError):
             _ = impute_knn(adata, layer="non_existent_layer", copy=True)
+
+
+class TestImputeBPCAAnnData:
+    @pytest.fixture
+    def bpca_imputation_dummy_anndata(
+        self,
+        bpca_imputation_dummy_data,
+    ) -> tuple[ad.AnnData, np.ndarray, np.ndarray, dict[str, Any]]:
+        """Test data for BPCA imputation"""
+        obs = pd.DataFrame(
+            {
+                "sample_id": ["A", "B", "C", "D"],
+                "sample_group": ["A", "A", "B", "B"],
+                "sample_group_with_nan": ["A", "A", np.nan, np.nan],
+            }
+        )
+
+        X, X_ref, kwargs = bpca_imputation_dummy_data
+        # Reference for grouped imputation (computed separately per group with n_components=1)
+        X_ref_grouped = np.array(
+            [
+                [0.0, 0.0, 2.0, 1.0, 0.0],
+                [1.0, 1.0, 3.0, 1.0, 10.0],
+                [0.0, 2.0, 4.0, 3.0, 20.0],
+                [0.0, 3.0, 5.0, 3.0, 20.0],
+            ]
+        )
+
+        return ad.AnnData(X, obs=obs, layers={"layer2": X.copy()}), X_ref, X_ref_grouped, kwargs
+
+    @pytest.fixture
+    def bpca_imputation_dummy_anndata_all_nan(self, dummy_data_all_nan: np.ndarray) -> ad.AnnData:
+        """AnnData object with a feature that contains only NaNs"""
+
+        obs = pd.DataFrame(
+            {
+                "sample_id": ["A", "B", "C", "D"],
+                "sample_group": ["A", "A", "B", "B"],
+                "sample_group_with_nan": ["A", "A", np.nan, np.nan],
+            }
+        )
+
+        return ad.AnnData(X=dummy_data_all_nan, obs=obs)
+
+    @pytest.mark.parametrize("copy", [True, False])
+    @pytest.mark.parametrize("layer", [None, "layer2"])
+    def test_impute_bpca(self, bpca_imputation_dummy_anndata, layer: str, *, copy: bool) -> None:
+        """Test BPCA imputation for data with nan values"""
+        adata, X_ref, _, kwargs = bpca_imputation_dummy_anndata
+
+        result = impute_bpca(adata, layer=layer, **kwargs, copy=copy)
+
+        if copy:
+            assert isinstance(result, ad.AnnData)
+            adata_imputed = result
+        else:
+            assert result is None
+            adata_imputed = adata
+
+        X_imputed = adata_imputed.X if layer is None else adata_imputed.layers[layer]
+
+        assert np.allclose(X_imputed, X_ref, equal_nan=False)
+
+    @pytest.mark.parametrize("group_column", [None, "sample_group"])
+    def test_impute_bpca__feature_all_nan(self, bpca_imputation_dummy_anndata_all_nan, group_column: str) -> None:
+        """Test BPCA imputation raises if a feature contains all nan"""
+        adata = bpca_imputation_dummy_anndata_all_nan
+
+        with pytest.raises(ValueError, match=r"Features with index"):
+            _ = impute_bpca(adata, n_components=1, group_column=group_column)
+
+    def test_impute_bpca__missing_group_column(
+        self,
+        bpca_imputation_dummy_anndata,
+    ) -> None:
+        """Test that KeyError is raised if `group_column` does not exist in `adata.obs`"""
+        adata, _, _, kwargs = bpca_imputation_dummy_anndata
+
+        with pytest.raises(KeyError):
+            impute_bpca(adata, group_column="non_existent_column", **kwargs)
+
+    def test_impute_bpca__missing_layer(
+        self,
+        bpca_imputation_dummy_anndata,
+    ) -> None:
+        """Test that KeyError is raised if `layer` does not exist in `adata`"""
+        adata, _, _, kwargs = bpca_imputation_dummy_anndata
+
+        with pytest.raises(KeyError):
+            impute_bpca(adata, layer="non_existent_layer", **kwargs)
