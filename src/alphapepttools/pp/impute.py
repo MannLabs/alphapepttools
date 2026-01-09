@@ -399,7 +399,7 @@ def impute_bpca(
         AnnData object.
     n_components
         Number of components to use for the model fit. The more components are used, the more granular the model
-        fits the data. This might increase model accuracy but also introduces more measurement noise in the
+        fits the data. This might increase model accuracy but also propagates more measurement noise in the
         data reconstruction.
     layer
         Layer to use for imputation. The data should be log transformed to match the noise model of the BPCA method.
