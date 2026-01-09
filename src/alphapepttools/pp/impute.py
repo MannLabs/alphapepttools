@@ -434,7 +434,7 @@ def impute_bpca(
 
     .. code-block:: python
 
-        # Make sure that the data is log-transformed
+        # Log transform data
         at.pp.nanlog(adata)
 
         # Imputes .X inplace
