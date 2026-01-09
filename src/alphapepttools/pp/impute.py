@@ -398,7 +398,7 @@ def impute_bpca(
     adata
         AnnData object.
     n_components
-        Number of components to use for the model fit. The more components are used, the granular the model
+        Number of components to use for the model fit. The more components are used, the more granular the model
         fits the data. This might increase model accuracy but also introduces more measurement noise in the
         data reconstruction.
     layer
