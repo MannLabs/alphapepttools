@@ -403,6 +403,7 @@ def impute_bpca(
         data reconstruction.
     layer
         Layer to use for imputation. The data should be log transformed to match the noise model of the BPCA method.
+        If `None`, uses the `adata.X` attribute.
     group_column
         Column name in `adata.obs` defining groups for group-wise imputation.
             - `None` (default, recommended), imputes all samples.
