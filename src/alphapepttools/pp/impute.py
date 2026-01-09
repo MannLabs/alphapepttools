@@ -381,7 +381,7 @@ def impute_bpca(
     copy: bool = False,
     **kwargs,
 ) -> ad.AnnData | None:
-    r"""Impute missing values using Bayesian Principal Component Analysis
+    r"""Impute missing values using Bayesian Principal Component Analysis (BPCA)
 
     Estimates the latent covariance structure of the log-transformed data via Bayesian Principal Component Analysis. The imputation method uses the obtained
     principal component usages :math:`U` and components :math:`L` to reconstruct the full log-transformed data matrix
