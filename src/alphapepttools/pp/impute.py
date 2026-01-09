@@ -355,7 +355,7 @@ def _impute_bpca(data: np.ndarray, n_components: int, **kwargs) -> np.ndarray:
 
     .. :math:
 
-        X_{estimated} \overline{X} + \approx U\times L
+        X_{estimated} = \approx U\times L + \overline{X}
 
     References
     ----------
@@ -367,7 +367,7 @@ def _impute_bpca(data: np.ndarray, n_components: int, **kwargs) -> np.ndarray:
     loadings = bpca.components_
     mean = np.nanmean(data, axis=0)
 
-    X_reconstructed = mean + usage @ loadings
+    X_reconstructed = usage @ loadings + mean
 
     return np.where(np.isnan(data), X_reconstructed, data)
 
@@ -388,7 +388,7 @@ def impute_bpca(
 
     .. :math:
 
-        X_{estimated} \overline{X} + \approx U\times L
+        X_{estimated} = \approx U\times L + \overline{X}
 
     Where :math:`\overline{X}` is the mean of the data. Missing values are replaced with the estimated values from
     this procedure.
