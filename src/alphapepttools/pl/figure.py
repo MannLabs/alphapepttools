@@ -238,7 +238,6 @@ def create_figure(
     plt.rcParams.update(
         {
             "svg.fonttype": "none",
-            "font.sans-serif": config["default_font"],
             "pdf.fonttype": 42,
             "ps.fonttype": 42,
         }
