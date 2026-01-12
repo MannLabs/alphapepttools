@@ -189,6 +189,7 @@ def _extract_expression_df(
     pandas.DataFrame
         Numeric expression DataFrame with proper index and columns (obs x selected var_names).
     """
+    print("this is the new extract expression function")
     # Normalize input to a list
     if isinstance(names, str):
         names = [names]
