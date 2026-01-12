@@ -234,6 +234,7 @@ def impute_median(
     data = adata.X if layer is None else adata.layers[layer]
 
     if group_column is None:
+        _warn_too_many_missing(data)
         _check_all_nan(data)
         data = _impute_nanmedian(data)
     else:
@@ -246,6 +247,7 @@ def impute_median(
 
         for group_indices in groups.values():
             group = data[group_indices]
+            _warn_too_many_missing(group)
             _check_all_nan(group)
             data[group_indices, :] = _impute_nanmedian(group)
 
@@ -359,6 +361,7 @@ def impute_knn(
     data = adata.X if layer is None else adata.layers[layer]
 
     if group_column is None:
+        _warn_too_many_missing(data)
         _check_all_nan(data)
         data = _impute_knn(data, n_neighbors=n_neighbors, weights=weights, **kwargs)
     else:
@@ -367,6 +370,7 @@ def impute_knn(
 
         for group_indices in groups.values():
             group = data[group_indices]
+            _warn_too_many_missing(group)
             _check_all_nan(group)
             data[group_indices, :] = _impute_knn(group, n_neighbors=n_neighbors, weights=weights, **kwargs)
 
