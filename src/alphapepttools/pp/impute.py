@@ -12,35 +12,6 @@ from sklearn.impute import KNNImputer
 logging.basicConfig(level=logging.INFO)
 
 
-def _warn_too_many_missing(
-    data: np.ndarray,
-    threshold: float = 0.5,
-) -> None:
-    """Warn users if they are about to impute data with too many missing values.
-
-    While publications differ on the exact threshold (e.g., 30-80% missing), we decide to inform users if
-    the majority of values for a given feature or sample are missing, which could lead
-    to a situation where imputed values dominate the actual data.
-
-    Parameters
-    ----------
-    data : np.ndarray
-        Data array containing the data to be checked.
-    threshold : float
-        Proportion of missing values above which a warning is raised.
-
-    """
-    # Check features (columns)
-    missing_proportions_features = np.isnan(data).mean(axis=0)
-    too_many_missing_features = np.where(missing_proportions_features > threshold)[0]
-
-    if len(too_many_missing_features) > 0:
-        logging.warning(
-            f" impute: Warning - {len(too_many_missing_features)} features have more than {threshold * 100}% missing values. "
-            "Proceed with caution when interpreting imputed results."
-        )
-
-
 def impute_gaussian(
     adata: ad.AnnData,
     std_offset: float = 3,
@@ -144,6 +115,35 @@ def _check_all_nan(data: np.ndarray) -> None:
     if any(all_nan_features):
         raise ValueError(
             f"Features with index {list(np.where(all_nan_features)[0])} contain all nan values. Drop these features beforehand."
+        )
+
+
+def _warn_too_many_missing(
+    data: np.ndarray,
+    threshold: float = 0.5,
+) -> None:
+    """Warn users if they are about to impute data with too many missing values.
+
+    While publications differ on the exact threshold (e.g., 30-80% missing), we decide to inform users if
+    the majority of values for a given feature or sample are missing, which could lead
+    to a situation where imputed values dominate the actual data.
+
+    Parameters
+    ----------
+    data : np.ndarray
+        Data array containing the data to be checked.
+    threshold : float
+        Proportion of missing values above which a warning is raised.
+
+    """
+    # Check features (columns)
+    missing_proportions_features = np.isnan(data).mean(axis=0)
+    too_many_missing_features = np.where(missing_proportions_features > threshold)[0]
+
+    if len(too_many_missing_features) > 0:
+        logging.warning(
+            f" impute: Warning - {len(too_many_missing_features)} features have more than {threshold * 100}% missing values. "
+            "Proceed with caution when interpreting imputed results."
         )
 
 
