@@ -189,7 +189,6 @@ def _extract_expression_df(
     pandas.DataFrame
         Numeric expression DataFrame with proper index and columns (obs x selected var_names).
     """
-    print("this is the new extract expression function")
     # Normalize input to a list
     if isinstance(names, str):
         names = [names]
@@ -359,7 +358,7 @@ def prepare_pca_1d_loadings_data_to_plot(
     loadings_attr = "varm" if dim_space == "obs" else "obsm"
 
     _validate_pca_loadings_plot_inputs(
-        data=data, loadings_name=loadings_key, dim=dim, dim2=None, nfeatures=nfeatures, dim_space=dim_space
+        adata=data, loadings_name=loadings_key, dim=dim, dim2=None, nfeatures=nfeatures, dim_space=dim_space
     )
 
     # create the dataframe for plotting
@@ -414,7 +413,7 @@ def prepare_pca_2d_loadings_data_to_plot(
         indicating if a feature was used in PCA and whether it is among the top features in either dimension.
     """
     _validate_pca_loadings_plot_inputs(
-        data=data, loadings_name=loadings_name, dim=pc_x, dim2=pc_y, nfeatures=nfeatures, dim_space=dim_space
+        adata=data, loadings_name=loadings_name, dim=pc_x, dim2=pc_y, nfeatures=nfeatures, dim_space=dim_space
     )
 
     dim1_z = pc_x - 1  # convert to 0-based index
