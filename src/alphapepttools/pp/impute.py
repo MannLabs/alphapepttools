@@ -55,9 +55,9 @@ def _warn_too_many_missing(
 ) -> None:
     """Warn users if they are about to impute data with too many missing values.
 
-    While publications differ on the exact threshold (e.g., 30-80% missing), we decide to inform users if
-    the majority of values for a given feature or sample are missing, which could lead
-    to a situation where imputed values dominate the actual data.
+    While publications differ on the exact threshold of permissible % missing data for imputation,
+    we decide to inform users if the majority of values for a given feature or sample are missing,
+    which could lead to a situation where imputed values dominate the actual data.
 
     Parameters
     ----------
