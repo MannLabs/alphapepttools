@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from alphapepttools.pp import impute_gaussian, impute_knn, impute_median
-from alphapepttools.pp.impute import _check_all_nan, _impute_knn, _impute_nanmedian
+from alphapepttools.pp.impute import _check_all_nan, _impute_knn, _impute_nanmedian, _warn_too_many_missing
 
 
 @pytest.fixture
@@ -88,6 +88,69 @@ def test__impute_knn(knn_imputation_dummy_data) -> None:
     X_imputed = _impute_knn(X, **kwargs)
 
     assert np.all(np.isclose(X_imputed, X_ref, equal_nan=True))
+
+
+class TestWarnTooManyMissing:
+    """Test the _warn_too_many_missing function"""
+
+    @pytest.fixture
+    def missing_data_fixture(self) -> ad.AnnData:
+        """Create a 4x4 AnnData with features having 0, 1, 2, and 3 missing values"""
+        data = np.array(
+            [[1.0, 2.0, np.nan, np.nan], [3.0, np.nan, 4.0, np.nan], [5.0, 6.0, np.nan, np.nan], [7.0, 8.0, 9.0, 10.0]]
+        )
+
+        return ad.AnnData(data, layers={"layer": data})
+
+    @pytest.mark.parametrize(
+        ("threshold", "expected_warning_count"),
+        [
+            (0.25, 2),  # Features 3 and 4 should trigger warnings
+            (0.5, 1),  # Only feature 4 should trigger warning
+            (0.75, 0),  # No features should trigger warnings
+        ],
+    )
+    def test_warn_too_many_missing_x(self, missing_data_fixture, threshold, expected_warning_count, caplog):
+        """Test warning triggers for different thresholds on X matrix"""
+        import logging
+
+        adata = missing_data_fixture
+
+        with caplog.at_level(logging.WARNING):
+            _warn_too_many_missing(adata.X, threshold=threshold)
+
+        warning_records = [r for r in caplog.records if r.levelname == "WARNING"]
+
+        if expected_warning_count > 0:
+            assert len(warning_records) == 1
+            assert f"{expected_warning_count} features have more than {threshold * 100}%" in warning_records[0].message
+        else:
+            assert len(warning_records) == 0
+
+    @pytest.mark.parametrize(
+        ("threshold", "expected_warning_count"),
+        [
+            (0.25, 2),  # Features 3 and 4 should trigger warnings
+            (0.5, 1),  # Only feature 4 should trigger warning
+            (0.75, 0),  # No features should trigger warnings
+        ],
+    )
+    def test_warn_too_many_missing_layer(self, missing_data_fixture, threshold, expected_warning_count, caplog):
+        """Test warning triggers for different thresholds on layer"""
+        import logging
+
+        adata = missing_data_fixture
+
+        with caplog.at_level(logging.WARNING):
+            _warn_too_many_missing(adata.layers["layer"], threshold=threshold)
+
+        warning_records = [r for r in caplog.records if r.levelname == "WARNING"]
+
+        if expected_warning_count > 0:
+            assert len(warning_records) == 1
+            assert f"{expected_warning_count} features have more than {threshold * 100}%" in warning_records[0].message
+        else:
+            assert len(warning_records) == 0
 
 
 class TestImputeGaussian:
