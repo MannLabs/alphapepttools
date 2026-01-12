@@ -18,13 +18,13 @@ logging.basicConfig(level=logging.INFO)
 ## Helper function to validate plots inputs
 
 
-def _validate_adata_and_dim_space(data, dim_space: str) -> None:  # noqa: ANN001
+def _validate_adata_and_dim_space(adata, dim_space: str) -> None:  # noqa: ANN001
     """
     Validate that data is an AnnData object and dim_space is either 'obs' or 'var'.
 
     Parameters
     ----------
-    data : object
+    adata : object
         The object to check for AnnData type.
     dim_space : str
         The dimension space, must be 'obs' or 'var'.
@@ -32,11 +32,11 @@ def _validate_adata_and_dim_space(data, dim_space: str) -> None:  # noqa: ANN001
     Raises
     ------
     TypeError
-        If data is not an AnnData object.
+        If adata is not an AnnData object.
     ValueError
         If dim_space is not 'obs' or 'var'.
     """
-    if not isinstance(data, ad.AnnData):
+    if not isinstance(adata, ad.AnnData):
         raise TypeError("data must be an AnnData object")
 
     if dim_space not in ["obs", "var"]:
@@ -44,7 +44,7 @@ def _validate_adata_and_dim_space(data, dim_space: str) -> None:  # noqa: ANN001
 
 
 def _validate_pca_plot_input(
-    data: ad.AnnData,
+    adata: ad.AnnData,
     pca_embeddings_layer_name: str,
     pca_var_key: str,
     dim_space: str,
@@ -54,7 +54,7 @@ def _validate_pca_plot_input(
 
     Parameters
     ----------
-    data:
+    adata:
         AnnData object to be validated.
     pca_embeddings_layer_name:
         Name of the PCA layer to be checked.
@@ -63,28 +63,28 @@ def _validate_pca_plot_input(
     dim_space:
         The dimension space used in PCA. Can be either "obs" or "var".
     """
-    _validate_adata_and_dim_space(data, dim_space)
+    _validate_adata_and_dim_space(adata, dim_space)
 
     # Determine which attribute to check based on dim_space
     pca_coors_attr = "obsm" if dim_space == "obs" else "varm"
 
     # Check if the PCA embeddings layer exists in the correct attribute
-    if pca_embeddings_layer_name not in getattr(data, pca_coors_attr):
-        available_layers = list(getattr(data, pca_coors_attr).keys())
+    if pca_embeddings_layer_name not in getattr(adata, pca_coors_attr):
+        available_layers = list(getattr(adata, pca_coors_attr).keys())
         raise ValueError(
             f"PCA embeddings layer '{pca_embeddings_layer_name}' not found in data.{pca_coors_attr}"
             f"Found layers: {available_layers}"
         )
 
     # Check if the variance layer exists in uns
-    if pca_var_key not in data.uns:
+    if pca_var_key not in adata.uns:
         raise ValueError(
-            f"PCA metadata layer '{pca_var_key}' not found in AnnData object. Found layers: {list(data.uns.keys())}"
+            f"PCA metadata layer '{pca_var_key}' not found in AnnData object. Found layers: {list(adata.uns.keys())}"
         )
 
 
 def _validate_scree_plot_input(
-    data: ad.AnnData,
+    adata: ad.AnnData,
     n_pcs: int,
     dim_space: str,
     pca_variance_layer_name: str,
@@ -94,7 +94,7 @@ def _validate_scree_plot_input(
 
     Parameters
     ----------
-    data : anndata.AnnData
+    adata : anndata.AnnData
         The AnnData object containing PCA results.
     n_pcs : int
         The number of principal components requested for plotting.
@@ -105,15 +105,15 @@ def _validate_scree_plot_input(
 
 
     """
-    _validate_adata_and_dim_space(data, dim_space)
+    _validate_adata_and_dim_space(adata, dim_space)
 
-    if pca_variance_layer_name not in data.uns:
+    if pca_variance_layer_name not in adata.uns:
         raise ValueError(
             f"PCA metadata layer '{pca_variance_layer_name}' not found in AnnData object. "
-            f"Found layers: {list(data.uns.keys())}"
+            f"Found layers: {list(adata.uns.keys())}"
         )
 
-    n_pcs_avail = len(data.uns[pca_variance_layer_name]["variance_ratio"])
+    n_pcs_avail = len(adata.uns[pca_variance_layer_name]["variance_ratio"])
     if n_pcs > n_pcs_avail:
         logging.warning(
             f"Requested {n_pcs} PCs, but only {n_pcs_avail} PCs are available. Plotting only the available PCs"
@@ -121,14 +121,14 @@ def _validate_scree_plot_input(
 
 
 def _validate_pca_loadings_plot_inputs(
-    data: ad.AnnData, loadings_name: str, dim: int, dim2: int | None, nfeatures: int, dim_space: str
+    adata: ad.AnnData, loadings_name: str, dim: int, dim2: int | None, nfeatures: int, dim_space: str
 ) -> None:
     """
     Validate inputs for accessing PCA feature loadings from an AnnData object.
 
     Parameters
     ----------
-    data : anndata.AnnData
+    adata : anndata.AnnData
         The AnnData object containing PCA loadings data.
     loadings_name : str
         The key that stores PCA feature loadings (e.g., "PCs").
@@ -141,28 +141,28 @@ def _validate_pca_loadings_plot_inputs(
     dim_space : str
         The dimension space used in PCA. Can be either "obs" or "var".
     """
-    _validate_adata_and_dim_space(data, dim_space)
+    _validate_adata_and_dim_space(adata, dim_space)
 
     # Determine which attribute to check based on dim_space
     loadings_attr = "varm" if dim_space == "obs" else "obsm"
 
     # Check if the loadings layer exists in the correct attribute
-    if loadings_name not in getattr(data, loadings_attr):
-        available_layers = list(getattr(data, loadings_attr).keys())
+    if loadings_name not in getattr(adata, loadings_attr):
+        available_layers = list(getattr(adata, loadings_attr).keys())
         raise ValueError(
-            f"PCA feature loadings layer '{loadings_name}' not found in data.{loadings_attr} "
+            f"PCA feature loadings layer '{loadings_name}' not found in adata.{loadings_attr} "
             f"Found layers: {available_layers}"
         )
 
     # Check PC dimensions
-    n_pcs = getattr(data, loadings_attr)[loadings_name].shape[1]
+    n_pcs = getattr(adata, loadings_attr)[loadings_name].shape[1]
     if not (1 <= dim <= n_pcs):
         raise ValueError(f"PC must be between 1 and {n_pcs} (inclusive). Got {dim=}")
     if dim2 is not None and not (1 <= dim2 <= n_pcs):
         raise ValueError(f"second PC must be between 1 and {n_pcs} (inclusive). Got pc_y={dim2}")
 
     # Check number of features
-    n_features = getattr(data, loadings_attr)[loadings_name].shape[0]
+    n_features = getattr(adata, loadings_attr)[loadings_name].shape[0]
     if not (1 <= nfeatures <= n_features):
         raise ValueError(f"Number of features must be between 1 and {n_features} (inclusive). Got {nfeatures=}")
 
@@ -170,76 +170,114 @@ def _validate_pca_loadings_plot_inputs(
 ## Functions to prepare data frames for plotting using the scatter method
 
 
+def _extract_expression_df(
+    adata: ad.AnnData,
+    names: list[str] | str | None,
+) -> pd.DataFrame:
+    """
+    Extract expression data from an AnnData object as a numeric DataFrame.
+
+    Parameters
+    ----------
+    adata : ad.AnnData
+        Source AnnData object.
+    names : list of str
+        Variable names to extract.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Numeric expression DataFrame with proper index and columns (obs x selected var_names).
+    """
+    # Normalize input to a list
+    if isinstance(names, str):
+        names = [names]
+
+    # Keep only names that exist in adata.var_names
+    valid_names = [n for n in names if n in adata.var_names]
+
+    # Return empty DataFrame if nothing matches
+    if not valid_names:
+        return pd.DataFrame()
+
+    # Extract the data
+    expr = pd.DataFrame(adata[:, valid_names].X)
+    expr.index = adata.obs_names
+    expr.columns = valid_names
+
+    # Ensure numeric
+    return expr.apply(pd.to_numeric, errors="coerce")
+
+
 def extract_pca_anndata(
-    data: ad.AnnData,
+    adata: ad.AnnData,
     dim_space: str = "obs",
     embeddings_name: str | None = None,
     expression_columns: list[str] | None = None,
 ) -> ad.AnnData:
     """
-    Fetched PCA data required from PCA plotting from AnnData object (as returned by `pca` function).
+    Extract PCA data required for PCA plotting from an AnnData object.
 
     Parameters
     ----------
     data : ad.AnnData
         AnnData object containing PCA results.
     dim_space : str
-        Either "obs" or "var" for observation or variable embeddings space.
-    embeddings_name : str | None
-        Custom embeddings name or None for default.
-    expression_columns : str | None
-        a list of `var_names` (if `dim_space = obs`) or `obs_names` (if `dim_space = var`).
+        Either "obs" or "var", indicating the PCA projection space.
+    embeddings_name : str or None
+        Custom embeddings name or None to use the default naming scheme.
+    expression_columns : list of str or None
+        List of `var_names` to include as additional numerical column(s) in
+        the returned AnnData's `.obs` for coloring PCA plots by expression.
+        Note that this is only applicable when `dim_space="obs"`, as there's no
+        equivalent in observations when projecting in feature space (`dim_space="var"`).
 
     Returns
     -------
     ad.AnnData
-        AnnData object containing PCA coordinates, color mapping, and labels.
+        An AnnData object containing the PCA results.
+        - `.X` stores the PCA embeddings:
+            - shape (observations x components) if `dim_space="obs"`
+            - shape (variables x components) if `dim_space="var"`
+        - `.var` contains the PCA variance information
+        - `.obs` contains the corresponding metadata, and, if specified,
+          additional expression values for coloring plots.
+        - PCA dimensions in `.var_names` are named as `pc_1`, `pc_2`, etc.
     """
-    # Generate the correct key names based on dim_space and embeddings_name
+    # Resolve PCA keys
     pca_coors_key = f"X_pca_{dim_space}" if embeddings_name is None else embeddings_name
     pca_var_key = f"variance_pca_{dim_space}" if embeddings_name is None else embeddings_name
 
-    # Input checks
-    _validate_pca_plot_input(data, pca_coors_key, pca_var_key, dim_space)
+    # Validate inputs
+    _validate_pca_plot_input(adata, pca_coors_key, pca_var_key, dim_space)
 
-    # Get PCA coordinates from the correct attribute
-    pca_coordinates = data.obsm[pca_coors_key] if dim_space == "obs" else data.varm[pca_coors_key]
-    obs_df = data.obs if dim_space == "obs" else data.var
-    var_df = pd.DataFrame(data.uns[pca_var_key])
+    # Select PCA coordinates and metadata
+    if dim_space == "obs":
+        pca_coordinates = adata.obsm[pca_coors_key]
+        obs_df = adata.obs
 
-    adata_pca = ad.AnnData(X=pca_coordinates)
-
-    adata_pca.obs = obs_df
-    adata_pca.var = var_df
-
-    if expression_columns is not None:
-        expression_columns = (
-            expression_columns if isinstance(expression_columns, (list, tuple, np.ndarray)) else [expression_columns]
-        )
-        # Subset the data to only include the specified expression columns
-        if dim_space == "obs" and len(data.var_names.intersection(expression_columns)) > 0:
-            expr_cols = list(set(expression_columns) & set(data.var_names))
-            expr_data = pd.DataFrame(data[:, expr_cols].X)
-            expr_data = expr_data.apply(pd.to_numeric, errors="coerce")
-            # set colnames and indices of the data
-            expr_data = expr_data.set_axis(expr_cols, axis=1)
-            expr_data.index = data.obs_names
-            adata_pca.obs = adata_pca.obs.join(expr_data)
-
-        elif dim_space == "var" and len(list(set(expression_columns) & set(data.obs_names))) > 0:
-            expr_rows = list(set(expression_columns) & set(data.obs_names))
-            expr_data = pd.DataFrame(data[:, expr_cols].X.T)
-            expr_data = expr_data.apply(pd.to_numeric, errors="coerce")
-
-            expr_data = expr_data.set_axis(expr_rows, axis=1)
-            expr_data.index = data.var_names
-            adata_pca.obs = adata_pca.obs.join(expr_data)
-        else:
-            logging.warning(
-                f"No matching expression columns found in the data.X for the specified PCA dim_space '{dim_space}' and {expression_columns}."
+        # Add expression columns if provided
+        if expression_columns is not None:
+            expr_data = _extract_expression_df(
+                adata=adata,
+                names=expression_columns,
             )
+            obs_df = obs_df.join(expr_data)
 
+    else:  # dim_space == "var":
+        pca_coordinates = adata.varm[pca_coors_key]
+        obs_df = adata.var
+
+    var_df = pd.DataFrame(adata.uns[pca_var_key])
+
+    # Initialize PCA AnnData
+    adata_pca = ad.AnnData(X=pca_coordinates)
+    adata_pca.obs = obs_df.copy()
+    adata_pca.var = var_df.copy()
+
+    # Name PCA dimensions
     adata_pca.var_names = [f"pc_{i + 1}" for i in range(adata_pca.X.shape[1])]
+
     return adata_pca
 
 
