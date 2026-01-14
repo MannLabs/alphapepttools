@@ -113,8 +113,9 @@ def _check_all_nan(data: np.ndarray) -> None:
     """
     all_nan_features = np.isnan(data).all(axis=0)
     if any(all_nan_features):
+        all_nan_feature_indices = [int(idx) for idx in np.where(all_nan_features)[0]]
         raise ValueError(
-            f"Features with index {list(np.where(all_nan_features)[0])} contain all nan values. Drop these features beforehand."
+            f"Features with index {all_nan_feature_indices} contain all nan values. Drop these features beforehand."
         )
 
 
