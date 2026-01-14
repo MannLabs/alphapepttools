@@ -32,6 +32,7 @@ def _is_data_complete(
 def _raise_on_nan_values(
     data: np.ndarray | pd.DataFrame | pd.Series,
     mode: Literal["any", "all"] = "any",
+    custom_message: str | None = None,
 ) -> None:
     """Check if data contains nan values
 
@@ -55,16 +56,20 @@ def _raise_on_nan_values(
     if mode == "any":
         has_nans = pd.isna(data).any().any() if isinstance(data, (pd.DataFrame, pd.Series)) else np.isnan(data).any()
         if has_nans:
-            raise ValueError("Data contains nan values.")
+            raise ValueError(f"Data contains nan values. {custom_message or ''}")
     elif mode == "all":
         if isinstance(data, (pd.DataFrame, pd.Series)):
             all_nan_columns = pd.isna(data).all()
             if any(all_nan_columns):
-                raise ValueError(f"Columns with index {all_nan_columns.index.tolist()} contain all nan values.")
+                raise ValueError(
+                    f"Columns with index {all_nan_columns.index.tolist()} contain all nan values. {custom_message or ''}"
+                )
         else:
             all_nan_features = np.isnan(data).all(axis=0)
             if any(all_nan_features):
-                raise ValueError(f"Features with index {list(np.where(all_nan_features)[0])} contain all nan values.")
+                raise ValueError(
+                    f"Features with index {list(np.where(all_nan_features)[0])} contain all nan values. {custom_message or ''}"
+                )
     else:
         raise ValueError("Mode must be either 'any' or 'all'.")
 
@@ -214,11 +219,11 @@ def impute_gaussian(
         _raise_on_nan_values(data, mode="all")
         data = _impute_gaussian(data, std_offset=std_offset, std_factor=std_factor, random_state=random_state)
     else:
-        if pd.isna(adata.obs[group_column]).any():
-            raise ValueError(
-                f"`group_column` {group_column} contains nans. Cannot impute groups with missing values.",
-            )
-
+        _raise_on_nan_values(
+            adata.obs[group_column],
+            mode="any",
+            custom_message=f"`group_column` {group_column} contains nans. Cannot impute groups with missing values, please drop these observations prior to imputation.",
+        )
         groups = adata.obs.groupby(group_column, dropna=True).indices
 
         for group_indices in groups.values():
