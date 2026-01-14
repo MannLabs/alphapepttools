@@ -38,6 +38,7 @@ def read_psm_table(
         - DIANN (`diann`)
         - MaxQuant (`maxquant`)
         - Spectronaut (`spectronaut`, parquet + tsv)
+        -
 
     Parameters
     ----------

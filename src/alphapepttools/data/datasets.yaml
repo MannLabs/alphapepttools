@@ -89,6 +89,28 @@
   citation: "Manning, Gerard, et al. The protein kinase complement of the human genome. Science 298.5600 (2002): 1912-1934."
   description: Human kinase annotation table from kinhub.org
 
+# Immunopeptidomics datasets for immunopeptidomics study notebook
+- name: immunopeptidomics_proteomics_diann
+  url: https://datashare.biochem.mpg.de/s/NLFjrDECHBmR2ab
+  search_engine: DiaNN
+  citation: 'Venafra, Veronica, et al. "Targeting Kinases to Reshape the Immunopeptidome landscape in Chronic Myeloid Leukemia." bioRxiv (2025): 2025-10.'
+  data_type: psm
+  description: Immunopeptidomics dataset from Venafra et al. for expression proteomics (DiaNN report)
+
+- name: immunopeptidomics_hla_spectronaut
+  url: https://datashare.biochem.mpg.de/s/y5jYZT7pdCBeNYc
+  search_engine: spectronaut
+  citation: 'Venafra, Veronica, et al. "Targeting Kinases to Reshape the Immunopeptidome landscape in Chronic Myeloid Leukemia." bioRxiv (2025): 2025-10.'
+  data_type: psm
+  description: Immunopeptidomics HLA peptides dataset from Venafra et al. (Spectronaut report)
+
+- name: immunopeptidomics_phospho_spectronaut
+  url: https://datashare.biochem.mpg.de/s/Lnpc3egqbT2XC6o
+  search_engine: spectronaut
+  citation: 'Venafra, Veronica, et al. "Targeting Kinases to Reshape the Immunopeptidome landscape in Chronic Myeloid Leukemia." bioRxiv (2025): 2025-10.'
+  data_type: psm
+  description: Immunopeptidomics phospho peptides dataset from Venafra et al. (Spectronaut report)
+
 # Small example reports for PSM reader tutorial
 - name: alphadia_1.8.1_psm_report
   url: https://datashare.biochem.mpg.de/s/ZBAGvQb4j2Lh0fo
