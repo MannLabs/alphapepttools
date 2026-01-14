@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from alphapepttools.pp import impute_gaussian, impute_knn, impute_median
-from alphapepttools.pp.impute import _impute_gaussian, _impute_knn, _impute_nanmedian, _raise_on_all_nan_values
+from alphapepttools.pp.impute import _impute_gaussian, _impute_knn, _impute_nanmedian, _raise_on_nan_values
 
 
 @pytest.fixture
@@ -102,7 +102,7 @@ def gaussian_imputation_dummy_data(imputation_dummy_data) -> tuple[np.ndarray, n
 
 def test___check_all_nan(dummy_data_all_nan) -> None:
     with pytest.raises(ValueError, match=r"Features with index \[4\]"):
-        _raise_on_all_nan_values(dummy_data_all_nan)
+        _raise_on_nan_values(dummy_data_all_nan, mode="all")
 
 
 def test__impute_nanmedian(median_imputation_dummy_data) -> None:

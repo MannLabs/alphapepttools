@@ -11,7 +11,7 @@ from sklearn.impute import KNNImputer
 logger = logging.getLogger(__name__)
 
 
-def _check_for_complete_data(
+def _is_data_complete(
     data: np.ndarray,
 ) -> bool:
     """Check if data contains any missing values
@@ -29,24 +29,44 @@ def _check_for_complete_data(
     return not np.any(np.isnan(data))
 
 
-def _raise_on_all_nan_values(data: np.ndarray) -> None:
-    """Check if a feature contains all nan
+def _raise_on_nan_values(
+    data: np.ndarray | pd.DataFrame | pd.Series,
+    mode: Literal["any", "all"] = "any",
+) -> None:
+    """Check if data contains nan values
+
+    Toggle the mode to raise on any or all nan values. If checking for any nan values, columns are checked in the case of
+    DataFrames/Series. If checking for all nan values, the entire DataFrame/Series/array is checked.
 
     Parameters
     ----------
     data
         Samples x Features array
+    mode
+        "any": Raise if any nan value is present
+        "all": Raise if all values are nans
 
     Raises
     ------
     ValueError
-        If any feature contains only NaNs
+        If data contains nan values based on the specified mode
+
     """
-    all_nan_features = np.isnan(data).all(axis=0)
-    if any(all_nan_features):
-        raise ValueError(
-            f"Features with index {list(np.where(all_nan_features)[0])} contain all nan values. Drop these features beforehand."
-        )
+    if mode == "any":
+        has_nans = pd.isna(data).any().any() if isinstance(data, (pd.DataFrame, pd.Series)) else np.isnan(data).any()
+        if has_nans:
+            raise ValueError("Data contains nan values.")
+    elif mode == "all":
+        if isinstance(data, (pd.DataFrame, pd.Series)):
+            all_nan_columns = pd.isna(data).all()
+            if any(all_nan_columns):
+                raise ValueError(f"Columns with index {all_nan_columns.index.tolist()} contain all nan values.")
+        else:
+            all_nan_features = np.isnan(data).all(axis=0)
+            if any(all_nan_features):
+                raise ValueError(f"Features with index {list(np.where(all_nan_features)[0])} contain all nan values.")
+    else:
+        raise ValueError("Mode must be either 'any' or 'all'.")
 
 
 def _impute_gaussian(
@@ -82,7 +102,7 @@ def _impute_gaussian(
     np.ndarray
         Imputed data array
     """
-    if _check_for_complete_data(data):
+    if _is_data_complete(data):
         logger.info("Data contains no missing values. Skipping imputation.")
         return data
 
@@ -191,7 +211,7 @@ def impute_gaussian(
     data = adata.X if layer is None else adata.layers[layer]
 
     if group_column is None:
-        _raise_on_all_nan_values(data)
+        _raise_on_nan_values(data, mode="all")
         data = _impute_gaussian(data, std_offset=std_offset, std_factor=std_factor, random_state=random_state)
     else:
         if pd.isna(adata.obs[group_column]).any():
@@ -203,7 +223,7 @@ def impute_gaussian(
 
         for group_indices in groups.values():
             group = data[group_indices]
-            _raise_on_all_nan_values(group)
+            _raise_on_nan_values(group, mode="all")
             data[group_indices, :] = _impute_gaussian(
                 group, std_offset=std_offset, std_factor=std_factor, random_state=random_state
             )
@@ -224,7 +244,7 @@ def _impute_nanmedian(data: np.ndarray) -> np.ndarray:
     data
         Samples x Features array
     """
-    if _check_for_complete_data(data):
+    if _is_data_complete(data):
         logger.info("Data contains no missing values. Skipping imputation.")
         return data
 
@@ -302,7 +322,7 @@ def impute_median(
     data = adata.X if layer is None else adata.layers[layer]
 
     if group_column is None:
-        _raise_on_all_nan_values(data)
+        _raise_on_nan_values(data, mode="all")
         data = _impute_nanmedian(data)
     else:
         if pd.isna(adata.obs[group_column]).any():
@@ -314,7 +334,7 @@ def impute_median(
 
         for group_indices in groups.values():
             group = data[group_indices]
-            _raise_on_all_nan_values(group)
+            _raise_on_nan_values(group, mode="all")
             data[group_indices, :] = _impute_nanmedian(group)
 
     if layer is None:
@@ -327,7 +347,7 @@ def impute_median(
 
 def _impute_knn(data: np.ndarray, **kwargs) -> np.ndarray:
     """Impute missing values using kNN imputation"""
-    if _check_for_complete_data(data):
+    if _is_data_complete(data):
         logger.info("Data contains no missing values. Skipping imputation.")
         return data
 
@@ -437,7 +457,7 @@ def impute_knn(
     data = adata.X if layer is None else adata.layers[layer]
 
     if group_column is None:
-        _raise_on_all_nan_values(data)
+        _raise_on_nan_values(data, mode="all")
         data = _impute_knn(data, n_neighbors=n_neighbors, weights=weights, **kwargs)
     else:
         groups = adata.obs.groupby(group_column, dropna=True).indices
@@ -445,7 +465,7 @@ def impute_knn(
 
         for group_indices in groups.values():
             group = data[group_indices]
-            _raise_on_all_nan_values(group)
+            _raise_on_nan_values(group, mode="all")
             data[group_indices, :] = _impute_knn(group, n_neighbors=n_neighbors, weights=weights, **kwargs)
 
     if layer is None:
