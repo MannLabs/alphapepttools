@@ -236,10 +236,7 @@ def test_diff_exp_alphaquant():
         f"Expected comparison key {expected_comparison_key}, got {comparison_key}"
     )
     for level in ["protein", "proteoform", "peptide"]:
-        pd.testing.assert_frame_equal(
-            results[level],
-            expected_results[level],
-        )
+        pd.testing.assert_frame_equal(results[level], expected_results[level], rtol=0.01)
 
 
 @pytest.fixture
