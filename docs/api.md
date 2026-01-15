@@ -32,6 +32,8 @@
 .. autosummary::
     :toctree: generated
 
+    tl.get_id2gene_map
+    tl.map_genes_to_protein_groups
     tl.nan_safe_bh_correction
     tl.nan_safe_ttest_ind
     tl.diff_exp_ttest
@@ -50,7 +52,9 @@
 .. autosummary::
     :toctree: generated
 
+    metrics.coefficient_of_variation
     metrics.principal_component_regression
+    metrics.pooled_coefficient_of_variation
     metrics.pooled_median_absolute_deviation
 ```
 
@@ -66,6 +70,15 @@
     pl.Plots
     pl.add_lines
     pl.label_plot
+    pl.BaseColormaps
+    pl.BaseColors
+    pl.BasePalettes
+    pl.add_legend_to_axes
+    pl.add_legend_to_axes_from_patches
+    pl.create_figure
+    pl.label_axes
+    pl.save_figure
+
 ```
 
 ## IO
@@ -82,6 +95,7 @@
     io.read_psm_table
     io.read_pg_table
     io.AnnDataFactory
+    io.list_available_reader
 ```
 
 ## Data

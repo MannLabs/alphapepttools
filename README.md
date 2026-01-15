@@ -1,10 +1,11 @@
-# `alphapepttools`
+# alphapepttools
 
+![PyPI - Version](https://img.shields.io/pypi/v/alphapepttools)
 [![Tests][badge-tests]][tests]
 [![Documentation][badge-docs]][documentation]
 
 [badge-tests]: https://img.shields.io/github/actions/workflow/status/MannLabs/alphapepttools/test.yaml?branch=main
-[badge-docs]: https://img.shields.io/readthedocs/alphapepttools
+[badge-docs]: https://github.com/MannLabs/alphapepttools/actions/workflows/docs.yaml/badge.svg
 
 Search- and quantification-engine agnostic downstream processing of proteomics data
 
@@ -38,18 +39,18 @@ If you don't have Python installed, we recommend installing [Mambaforge][].
 
 There are several alternative options to install alphapepttools:
 
-<!--
-1) Install the latest release of `alphapepttools` from [PyPI][]:
+1. Install the latest release of `alphapepttools` from [PyPI](https://pypi.org/project/alphapepttools/):
 
 ```bash
 pip install alphapepttools
 ```
--->
 
-1. Install the latest development version:
+As the package is still under development, consider installing the latest development version:
+
+2. Development version
 
 ```bash
-git clone git+https://github.com/MannLabs/alphapepttools.git@main && cd alphapepttools
+git clone https://github.com/MannLabs/alphapepttools.git@main && cd alphapepttools
 pip install -e .
 ```
 

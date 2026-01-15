@@ -7,12 +7,11 @@ import pandas as pd
 import patsy
 from inmoose import limma
 
+from alphapepttools.pp.data import filter_data_completeness
 from alphapepttools.tl import tl_defaults
 from alphapepttools.tl.utils import (
     determine_max_replicates,
-    drop_features_with_too_few_valid_values,
     negative_log10_pvalue,
-    validate_ttest_inputs,
 )
 
 logger = logging.getLogger(__name__)
@@ -116,7 +115,6 @@ def diff_exp_ebayes(
     adata: ad.AnnData,
     between_column: str,
     comparison: tuple[str, str],
-    min_valid_values: int = 2,
 ) -> tuple[str, pd.DataFrame]:
     """Run Limma eBayes moderated ttest for differential expression
 
@@ -128,33 +126,44 @@ def diff_exp_ebayes(
         Column name in adata.obs containing the contrast levels
     comparison : tuple
         Two levels to compare, meant to follow the convention (treatment, control)
-    min_valid_values : int, optional
-        Minimum number of valid (non-missing) values required in at least one group. By default 2.
 
     Returns
     -------
     pd.DataFrame | None
         DataFrame with Limma eBayes differential expression results.
 
+    Notes
+    -----
+    This implementation removes all features with any missing values to ensure
+    compatibility with the inmoose Limma implementation. If features with missing
+    values should be retained, their missing values must be imputed prior to running
+    this function.
+
     """
     logger.info("Running Limma eBayes differential expression analysis via inmoose")
 
-    # Validate inputs
-    level_1, level_2 = validate_ttest_inputs(adata, between_column, comparison, min_valid_values)
+    # Validate inputs (simplified without min_valid_values)
+    level_1, level_2 = comparison
+    if level_1 not in adata.obs[between_column].to_list():
+        raise ValueError(f"Level {level_1} not found in {between_column}")
+    if level_2 not in adata.obs[between_column].to_list():
+        raise ValueError(f"Level {level_2} not found in {between_column}")
+
     logger.info(f"Comparing levels: {level_1} (treatment) vs {level_2} (control)")
 
-    adata = drop_features_with_too_few_valid_values(
-        adata,
-        between_column=between_column,
-        comparison=comparison,
-        min_valid_values=min_valid_values,
-    )
+    # Report on maximum samples per level
+    max_samples_level_1, max_samples_level_2 = determine_max_replicates(adata, between_column, level_1, level_2)
 
     # Filter adata to only include samples from the comparison
     adata_subset = adata[adata.obs[between_column].isin([level_1, level_2]), :].copy()
 
-    # Report on maximum samples per level
-    max_samples_level_1, max_samples_level_2 = determine_max_replicates(adata, between_column, level_1, level_2)
+    # Remove proteins/peptides with any missing values (as per standard practice)
+    # This ensures compatibility with inmoose's lmFit which cannot handle NaN values
+    adata_subset = filter_data_completeness(
+        adata_subset,
+        max_missing=0,
+        action="drop",
+    )
 
     # Generate design matrix with correct column ordering
     design_matrix, design_colnames = _generate_patsy_design_matrix(adata_subset, between_column, level_1, level_2)
