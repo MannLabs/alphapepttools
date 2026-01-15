@@ -18,7 +18,7 @@ logging.basicConfig(level=logging.INFO)
 ## Helper function to validate plots inputs
 
 
-def _validate_adata_and_dim_space(adata, dim_space: str) -> None:  # noqa: ANN001
+def _validate_adata_and_dim_space(adata: ad.AnnData, dim_space: str) -> None:
     """
     Validate that data is an AnnData object and dim_space is either 'obs' or 'var'.
 
