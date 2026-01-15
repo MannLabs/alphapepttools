@@ -347,16 +347,13 @@ def bpca(
         data_for_pca.T if dim_space == "var" else data_for_pca
     )  # transpose if PCA is done on the feature space
 
-    # run PCA
-    bpca = BPCA(n_components=n_comps, **bpca_kwargs)
+    # run BPCA
+    bpca = BPCA(n_components=n_comps, sort_components=True, **bpca_kwargs)
     usage = bpca.fit_transform(data_for_pca)
     loadings = bpca.components_
     explained_variance_ratio = bpca.explained_variance_ratio_
 
-    # BPCA does not order the dimensions on variance explained - sort manually
-    order = np.argsort(explained_variance_ratio)[::-1]
-
-    pca_res = (usage[:, order], loadings[order, :], explained_variance_ratio[order], np.array([]))
+    pca_res = (usage, loadings, explained_variance_ratio, np.array([]))
 
     return _store_pca_results(
         adata=adata,
