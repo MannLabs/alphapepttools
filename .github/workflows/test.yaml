@@ -25,8 +25,18 @@ jobs:
         include:
           - os: ubuntu-latest
             python: "3.10"
+            name: LOOSE
           - os: ubuntu-latest
             python: "3.12"
+            name: LOOSE
+          - os: ubuntu-latest
+            python: "3.10"
+            extras: "stable"
+            name: STABLE
+          - os: ubuntu-latest
+            python: "3.12"
+            extras: "stable"
+            name: STABLE
           - os: ubuntu-latest
             python: "3.12"
             pip-flags: "--pre"
@@ -52,7 +62,12 @@ jobs:
           python -m pip install --upgrade pip wheel
       - name: Install dependencies
         run: |
-          pip install ${{ matrix.pip-flags }} ".[dev,test]"
+          if [ -n "${{ matrix.extras }}" ]; then
+            pip install ${{ matrix.pip-flags }} ".[dev,test,${{ matrix.extras }}]"
+          else
+            pip install ${{ matrix.pip-flags }} ".[dev,test]"
+          fi
+
       - name: Test
         env:
           MPLBACKEND: agg
