@@ -30,7 +30,7 @@ from alphapepttools.pl.plot_data_handling import (
     prepare_pca_data_to_plot,
     prepare_scree_data_to_plot,
 )
-from alphapepttools.pp.data import data_column_to_array
+from alphapepttools.pp.data import data_column_to_array, data_index_to_array, subset_data
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -368,15 +368,107 @@ def add_legend_to_axes(
         logging.warning("No valid 'legend' parameter provided. Skipping legend creation.")
 
 
-def _drop_nans_from_plot_arrays(
+def drop_nan_coordinate_points(
     x_values: np.ndarray,
     y_values: np.ndarray,
     labels: np.ndarray | list[str],
-) -> tuple:
-    # Missing x or y values are breaking and should be dropped
-    keep_mask = ~np.logical_or(pd.isna(x_values), pd.isna(y_values))
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Remove NaN values from plotting arrays.
 
+    Filters out instances where either x or y values are NaN, ensuring all three arrays
+    (x, y, labels) remain synchronized. This is essential for plotting functions as
+    matplotlib cannot handle NaN coordinates. Note that nans in the labels do not cause
+    dropping of the respective row, since labels can be strings and missing labels are valid.
+
+    Parameters
+    ----------
+    x_values : np.ndarray
+        X-coordinates for plotting.
+    y_values : np.ndarray
+        Y-coordinates for plotting.
+    labels : np.ndarray | list[str]
+        Labels corresponding to each (x, y) point.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray, np.ndarray]
+        Filtered arrays (x_values, y_values, labels) with NaN rows removed.
+        All three arrays maintain the same length and element correspondence.
+
+    Examples
+    --------
+    >>> x = np.array([1.0, 2.0, np.nan, 4.0])
+    >>> y = np.array([5.0, np.nan, 7.0, 8.0])
+    >>> labels = np.array(["a", "b", "c", "d"])
+    >>> x_clean, y_clean, labels_clean = _drop_nans_from_plot_arrays(x, y, labels)
+    >>> x_clean
+    array([1., 4.])
+    >>> y_clean
+    array([5., 8.])
+    >>> labels_clean
+    array(['a', 'd'], dtype='<U1')
+
+    Notes
+    -----
+    Uses pandas.isna() to handle both NaN and None values correctly.
+    """
+    keep_mask = ~(pd.isna(x_values) | pd.isna(y_values))
     return x_values[keep_mask], y_values[keep_mask], labels[keep_mask]
+
+
+def _get_plot_lims(
+    values: np.ndarray,
+    padding_factor: float,
+    sym: str | None = None,
+    set_left: float | None = None,
+    set_right: float | None = None,
+) -> tuple[float, float]:
+    """Calculate plot limits with optional symmetry and padding.
+
+    Parameters
+    ----------
+    values : np.ndarray
+        Array of values to calculate limits from.
+    padding_factor : float
+        Factor to multiply the limits by for padding (e.g., 1.1 for 10% padding).
+    sym : str | None, optional
+        If "max", creates symmetric limits around 0 using the absolute max value.
+        If None, uses min and max of values. By default None.
+    set_left : float | None, optional
+        If provided, overrides the calculated left limit with this value. By default None.
+    set_right : float | None, optional
+        If provided, overrides the calculated right limit with this value. By default None.
+
+    Returns
+    -------
+    tuple[float, float]
+        Tuple of (left_limit, right_limit).
+
+    Examples
+    --------
+    >>> values = np.array([1, 2, 3, -2, -1])
+    >>> _get_plot_lims(values, 1.1, sym="max")
+    (-3.3, 3.3)
+    >>> _get_plot_lims(values, 1.1, set_left=0)
+    (0, 3.3)
+    """
+    series = pd.Series(values)
+
+    if sym == "max":
+        abs_max = max(abs(series.min()), abs(series.max()))
+        left = -abs_max * padding_factor
+        right = abs_max * padding_factor
+    else:
+        left = series.min() * padding_factor
+        right = series.max() * padding_factor
+
+    # Override with set values if provided
+    if set_left is not None:
+        left = set_left
+    if set_right is not None:
+        right = set_right
+
+    return (left, right)
 
 
 def _assign_nearest_anchor_position_to_values(
@@ -457,7 +549,7 @@ def label_plot(
     labels = np.array(labels)[y_value_order]
 
     # convert to numpy arrays for consistency & remove any nans
-    x_values, y_values, labels = _drop_nans_from_plot_arrays(np.array(x_values), np.array(y_values), np.array(labels))
+    x_values, y_values, labels = drop_nan_coordinate_points(np.array(x_values), np.array(y_values), np.array(labels))
 
     # determine label positions based on optional x_anchors
     if x_anchors is not None:
@@ -1444,12 +1536,12 @@ class Plots:
         label_axes(ax, xlabel=f"PC{pc_x}{space_suffix}", ylabel=f"PC{pc_y}{space_suffix}")
 
 
-def diff_exp_volcano(  # NOQA: C901
-    ttest_df: pd.DataFrame,
+def volcano(  # NOQA: C901, PLR0915, PLR0912
+    data: ad.AnnData | pd.DataFrame,
     x_column: str,
     y_column: str,
     ax: plt.Axes | None = None,
-    x_thresholds: tuple = (-1, 1),
+    x_thresholds: tuple | None = None,
     y_thresholds: float = -np.log10(0.05),
     layer_dict: dict | None = None,
     display_id_column: str | None = None,
@@ -1460,66 +1552,181 @@ def diff_exp_volcano(  # NOQA: C901
     figure_kwargs: dict | None = None,
     scatter_kwargs: dict | None = None,
     label_kwargs: dict | None = None,
+    y_display_start: float | None = 1,
     y_padding_factor: float | None = 0.05,
     xlims: tuple[float, float] | None = None,
     ylims: tuple[float, float] | None = None,
 ) -> None:
-    """Visualize 🅱️olcano plot"""
+    """Volcanoplot
+
+    In order to visualize differential expression results, a summary function of several plot elements is
+    provided here. Importantly, this is not a separate plot type, but rather a convenience function that
+    combines several plotting elements:
+
+    - Scatter plot of all points, with data-dependent coloring (Plots.scatter)
+    - Vertical and horizontal lines to indicate points passing thresholds (add_lines)
+    - Optional labeling of selected points (label_plot)
+    - Legend indicating the color scheme (add_legend_to_axes)
+
+    A particular consideration for volcanoplots is the differential coloring of various points of interest,
+    e.g. significantly regulated, manually selected or belonging to a certain group of interest. The current
+    solution uses a `layer_dict` to define the hierarchy of visualization layers. Users define the hierarchy
+    of visualization through a `layer_dict`. For example, consider this color_dict:
+
+    ```
+    color_dict = {
+        "upregulated": BaseColors.get("orange"),
+        "downregulated": BaseColors.get("green"),
+        "unchanged": BaseColors.get("lightgrey"),
+        "Genes": BaseColors.get("black"),
+    }
+    ```
+
+    Combined with this layer_dict:
+
+    ```
+    layer_dict = {
+        "Genes": [genes_of_interest],
+        "diff_exp_status": ["upregulated", "downregulated", "unchanged"],
+        # there could be an arbitrary number of layers here
+    }
+    ```
+
+    --> A consideration for the layer dict is that when the values are lists, we try to look for the corresponding
+    key in the color_dict. If the value is a single string, we look directly for that string in the color_dict.
+
+    Here, the top layer is "Genes", which means that irrespective of their diff_exp_status, genes of interest in
+    the "Genes" column will always be colored black based on the color dict. The second layer is "diff_exp_status",
+    which means that all remaining genes (not already colored by the top layer) will be either orange, green or
+    lightgrey depending on their status in the "diff_exp_status" column.
+
+    The purpose of this implementation is to 1.) allow for complex coloring schemes in volcanoplots and 2.) ensure
+    that points of interest are plotted exactly once and not overplotted by other layers, which may lead to artifacts
+    in the visualization.
+
+    Parameters
+    ----------
+    data : ad.AnnData | pd.DataFrame
+        Data containing the values to plot.
+    x_column : str
+        Column name for the x-axis (log2 fold change).
+    y_column : str
+        Column name for the y-axis (-log10 p-value).
+    ax : plt.Axes | None, optional
+        Matplotlib axes object to plot on. If None, a new figure and axes are created. By default None.
+    x_thresholds : tuple | None, optional
+        Tuple of x-axis thresholds for vertical lines. By default None.
+    y_thresholds : float, optional
+        Y-axis threshold for horizontal line. By default -log10(0.05).
+    layer_dict : dict | None, optional
+        Dictionary defining the layers for coloring. Keys are column names, values are lists of values
+        in those columns to color. By default None.
+    display_id_column : str | None, optional
+        Column name for the labels to display. If None, uses the DataFrame index. By default None.
+    color_dict : dict | None, optional
+        Dictionary mapping layer values to colors. By default None.
+    label_layers : list[str] | None, optional
+        List of layer column names for which to add labels. By default None.
+    max_labels : int | None, optional
+        Maximum number of labels to add. If None, all points in label_layers are labeled. By default None.
+    x_label_anchors : list[float] | None, optional
+        X positions for label anchors. If None, labels are centered above points. By default None.
+    figure_kwargs : dict | None, optional
+        Additional keyword arguments for figure creation. By default None.
+    scatter_kwargs : dict | None, optional
+        Additional keyword arguments for the scatter plot. By default None.
+    label_kwargs : dict | None, optional
+        Additional keyword arguments for axis labeling. By default None.
+    y_display_start : float | None, optional
+        Starting y position for labels. By default 1. This controls the vertical position of the first label in figure
+        coordinates (1 = top, 0 = bottom).
+    y_padding_factor : float | None, optional
+        Padding factor for y-axis labels. By default 0.05. This controls the vertical distance between stacked labels.
+    xlims : tuple[float, float] | None, optional
+        X-axis limits. If None, determined automatically. By default None.
+    ylims : tuple[float, float] | None, optional
+        Y-axis limits. If None, determined automatically. By default None.
+
+    Returns
+    -------
+    fig : plt.Figure | None
+        Matplotlib figure object if a new figure was created, else None.
+    ax : plt.Axes
+        Matplotlib axes object with the volcano plot.
+
+    """
     scatter_kwargs = scatter_kwargs or {}
     label_kwargs = label_kwargs or {}
     figure_kwargs = figure_kwargs or {"figsize": (6, 4)}
+
+    lim_padding_factor = 1.1
 
     def _tolist(
         obj: str | list,
     ) -> list:
         return obj if isinstance(obj, list) else [obj]
 
-    X_COLS = ["log2fc"]
+    x_columns = ["log2fc"]
 
-    if x_column not in X_COLS:
-        raise ValueError(f"x_column must be one of {X_COLS}")
+    if x_column not in x_columns:
+        raise ValueError(f"x_column must be one of {x_columns}")
+
+    # Extract main data values
+    x_values = data_column_to_array(data, x_column)
+    y_values = data_column_to_array(data, y_column)
 
     # Determine sensible limits
-    valid_x_values = ttest_df.loc[((~ttest_df[x_column].isna()) & (~ttest_df[y_column].isna())), x_column]
-    abs_max_x = max(abs(valid_x_values.min()), abs(valid_x_values.max()))
-    xlims = (-abs_max_x * 1.1, abs_max_x * 1.1) if xlims is None else xlims
-
-    valid_y_values = ttest_df.loc[((~ttest_df[x_column].isna()) & (~ttest_df[y_column].isna())), y_column]
-    ylims = (0, valid_y_values.max() * 1.1) if ylims is None else ylims
+    xlims = xlims or _get_plot_lims(x_values, lim_padding_factor, sym="max")
+    ylims = ylims or _get_plot_lims(y_values, lim_padding_factor, set_left=0)
 
     fig = None
     if ax is None:
-        fig, ax = create_figure(1, 1, **figure_kwargs)
-        ax = ax.next()
+        fig, axm = create_figure(1, 1, **figure_kwargs)
+        ax = axm.next()
 
     ### Add visualization layers ###
+    # Get all indices as an array
+    indices = np.arange(len(data))
+
     glob_spent_idxs = []
     glob_layer_idxs = []
     for layer_column, layer_values in layer_dict.items():
+        # Extract the layer column as an array
+        layer_column_array = data_column_to_array(data, layer_column)
+
         for value in _tolist(layer_values):
+            # If value is a list, we assume that all of them should be colored by the same color, which is assigned
+            # to the layer_column name in the color_dict. If the value is a single string, we look directly for that
+            # string in the color_dict.
             layer_colorname = layer_column if isinstance(value, list) else value
             layer_color = color_dict.get(
                 layer_colorname,
                 BaseColors.get("grey"),
             )
-            layer_idxs = ttest_df[
-                (ttest_df[layer_column].isin(_tolist(value))) & (~ttest_df.index.isin(glob_spent_idxs))
-            ].index.tolist()
+
+            # Create boolean mask for this layer
+            in_layer = np.isin(layer_column_array, _tolist(value))
+            not_spent = ~np.isin(indices, glob_spent_idxs)
+            mask = in_layer & not_spent
+
+            # Get the indices that match
+            layer_idxs = indices[mask].tolist()
             glob_layer_idxs.append((layer_idxs, layer_color, layer_column))
             glob_spent_idxs.extend(layer_idxs)
 
-    if len(glob_spent_idxs) < len(ttest_df):
-        logger.warning(f"{len(set(ttest_df.index) - set(glob_spent_idxs))} indices were not used in the volcano plot.")
+    if len(glob_spent_idxs) < len(data):
+        logger.warning(f"{len(data) - len(glob_spent_idxs)} indices were not used in the volcano plot.")
 
     for layer_idxs, layer_color, _ in reversed(glob_layer_idxs):
-        Plots.scatter(
-            ax=ax,
-            data=ttest_df.loc[layer_idxs],
-            x_column=x_column,
-            y_column=y_column,
-            color=layer_color,
-            scatter_kwargs=scatter_kwargs,
-        )
+        if len(layer_idxs) > 0:
+            Plots.scatter(
+                ax=ax,
+                data=subset_data(data, layer_idxs),
+                x_column=x_column,
+                y_column=y_column,
+                color=layer_color,
+                scatter_kwargs=scatter_kwargs,
+            )
 
     ### Add border lines ###
     add_lines(ax=ax, linetype="vline", intercepts=list(x_thresholds))
@@ -1532,20 +1739,39 @@ def diff_exp_volcano(  # NOQA: C901
             if layer_column in label_layers:
                 glob_label_idxs.extend(layer_idxs)
 
-        label_df = ttest_df.loc[glob_label_idxs].sort_values(by=y_column, ascending=False).copy()
+        if glob_label_idxs:
+            # Extract arrays for the label indices
+            label_y_values = y_values[glob_label_idxs]
+            label_x_values = x_values[glob_label_idxs]
 
-        if max_labels is not None and len(label_df) > max_labels:
-            label_df = label_df.head(max_labels)
+            # Get display labels, fall back to index if no display_id_column is provided
+            if display_id_column is None:
+                all_labels = data_index_to_array(data, "var")
+            else:
+                all_labels = data_column_to_array(data, display_id_column)
+            display_labels = all_labels[glob_label_idxs]
 
-        label_plot(
-            ax=ax,
-            x_values=label_df[x_column].tolist(),
-            y_values=label_df[y_column].tolist(),
-            labels=label_df[display_id_column].tolist(),
-            y_display_start=1,
-            x_anchors=x_label_anchors,
-            y_padding_factor=y_padding_factor,
-        )
+            # Sort by y values (descending) to minimize crossing lines between labels and points
+            sort_order = np.argsort(label_y_values)[::-1]
+            label_y_values = label_y_values[sort_order]
+            label_x_values = label_x_values[sort_order]
+            display_labels = display_labels[sort_order]
+
+            # Apply max_labels if specified
+            if max_labels is not None and len(display_labels) > max_labels:
+                label_y_values = label_y_values[:max_labels]
+                label_x_values = label_x_values[:max_labels]
+                display_labels = display_labels[:max_labels]
+
+            label_plot(
+                ax=ax,
+                x_values=label_x_values,
+                y_values=label_y_values,
+                labels=display_labels,
+                y_display_start=y_display_start,
+                x_anchors=x_label_anchors,
+                y_padding_factor=y_padding_factor,
+            )
 
     # Label axes
     label_axes(

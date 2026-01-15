@@ -413,6 +413,99 @@ def data_column_to_array(
     raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
 
 
+def data_index_to_array(
+    data: pd.DataFrame | ad.AnnData,
+    dim_space: str = "obs",
+) -> np.ndarray:
+    """Get indices from a DataFrame or an AnnData object
+
+    Parameters
+    ----------
+    data : pd.DataFrame | ad.AnnData
+        Data to extract indices from.
+    dim_space : str, optional
+        Dimension space to extract indices from. Either "obs" for observation/row indices
+        or "var" for variable/column indices. By default "obs".
+
+    Returns
+    -------
+    np.ndarray
+        The indices as a numpy array
+
+    Raises
+    ------
+    ValueError
+        If dim_space is not "obs" or "var"
+    TypeError
+        If data is not a DataFrame or AnnData object
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import anndata as ad
+    >>> import numpy as np
+    >>>
+    >>> # DataFrame example
+    >>> df = pd.DataFrame({"A": [1, 2, 3]}, index=["row1", "row2", "row3"])
+    >>> data_index_to_array(df, "obs")
+    array(['row1', 'row2', 'row3'], dtype=object)
+    >>> data_index_to_array(df, "var")
+    array(['A'], dtype=object)
+    >>>
+    >>> # AnnData example
+    >>> adata = ad.AnnData(np.random.rand(3, 2))
+    >>> adata.obs_names = ["cell1", "cell2", "cell3"]
+    >>> adata.var_names = ["gene1", "gene2"]
+    >>> data_index_to_array(adata, "obs")
+    array(['cell1', 'cell2', 'cell3'], dtype=object)
+    >>> data_index_to_array(adata, "var")
+    array(['gene1', 'gene2'], dtype=object)
+    """
+    if dim_space not in ["obs", "var"]:
+        raise ValueError(f"dim_space must be 'obs' or 'var', got '{dim_space}'")
+
+    if isinstance(data, pd.DataFrame):
+        if dim_space == "obs":
+            return data.index.to_numpy()
+        # dim_space == "var"
+        return data.columns.to_numpy()
+
+    if isinstance(data, ad.AnnData):
+        if dim_space == "obs":
+            return data.obs_names.to_numpy()
+        # dim_space == "var"
+        return data.var_names.to_numpy()
+
+    raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
+
+
+def subset_data(
+    data: pd.DataFrame | ad.AnnData,
+    idxs: pd.Index | list[int],
+) -> pd.DataFrame | ad.AnnData:
+    """Subset data based on indices
+
+    filtering data based on provided indices, handle both pd.DataFrame and AnnData objects.
+
+    Parameters
+    ----------
+    data : pd.DataFrame | ad.AnnData
+        Data to subset.
+    idxs : pd.Index | list[int]
+        Indices to subset the data.
+
+    Returns
+    -------
+    pd.DataFrame | ad.AnnData
+        Subsetted data.
+
+    """
+    if isinstance(data, pd.DataFrame):
+        return data.iloc[idxs]
+    # AnnData
+    return data[idxs]
+
+
 def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     adata: ad.AnnData, scaler: str = "standard", layer: str | None = None, *, copy: bool = False
 ) -> None | ad.AnnData:
