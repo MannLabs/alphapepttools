@@ -59,7 +59,7 @@ optional-dependencies.doc = [
   "sphinxcontrib-bibtex>=1",
   "sphinxext-opengraph",
 ]
-optional-dependencies.strict = [
+optional-dependencies.stable = [
   "alphabase==1.7.4",
   "alphaquant==0.2",
   "anndata==0.11.1",
