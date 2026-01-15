@@ -24,10 +24,11 @@ from matplotlib.patches import Patch
 from alphapepttools.pl import defaults
 from alphapepttools.pl.colors import BaseColors, BasePalettes, _get_colors_from_cmap, get_color_mapping
 from alphapepttools.pl.figure import create_figure, label_axes
-from alphapepttools.pl.plot_data_handling import (
+from alphapepttools.pp.data import data_column_to_array
+from alphapepttools.tl.plot_data_handling import (
+    extract_pca_anndata,
     prepare_pca_1d_loadings_data_to_plot,
     prepare_pca_2d_loadings_data_to_plot,
-    prepare_pca_data_to_plot,
     prepare_scree_data_to_plot,
 )
 from alphapepttools.pp.data import data_column_to_array, data_index_to_array, subset_data
@@ -1221,7 +1222,6 @@ class Plots:
         color_column: str | None = None,
         dim_space: str = "obs",
         embeddings_name: str | None = None,
-        # TODO: the below argument is an antipattern resulting from this function doing multiple things. In the future, this should be replaced by a pca-plotting adapter so that pca_plot is no longer needed and scatter can be used instead, followed by label_plot, etc.
         label: bool = False,  # noqa: FBT001, FBT002
         label_column: str | None = None,
         ax: plt.Axes | None = None,
@@ -1238,9 +1238,9 @@ class Plots:
             AnnData to plot.
         ax : plt.Axes
             Matplotlib axes object to plot on.
-        pc_x : int
+        x_column : int
             The PC principal component index to plot on the x axis, by default 1. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
-        pc_y : int
+        y_column : int
             The principal component index to plot on the y axis, by default 2. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
         dim_space : str, optional
             The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
@@ -1272,34 +1272,25 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
 
-        pca_coor_df = prepare_pca_data_to_plot(
-            data, x_column, y_column, dim_space, embeddings_name, color_map_column, label_column, label=label
+        adata_pca = extract_pca_anndata(
+            data, dim_space=dim_space, embeddings_name=embeddings_name, expression_columns=color_map_column
         )
 
-        # Check if the variance layer exists in uns
-        variance_key = f"variance_pca_{dim_space}" if embeddings_name is None else embeddings_name
-
-        if variance_key not in data.uns:
-            raise ValueError(
-                f"PCA metadata layer '{variance_key}' not found in AnnData object. "
-                f"Found layers: {list(data.uns.keys())}"
-            )
-
         # get the explained variance ratio for the dimensions (for axis labels)
-        var_dim1 = data.uns[variance_key]["variance_ratio"][x_column - 1]
+        var_dim1 = adata_pca.var["variance_ratio"][f"pc_{x_column}"]
         var_dim1 = round(var_dim1 * 100, 2)
-        var_dim2 = data.uns[variance_key]["variance_ratio"][y_column - 1]
+        var_dim2 = adata_pca.var["variance_ratio"][f"pc_{y_column}"]
         var_dim2 = round(var_dim2 * 100, 2)
 
-        # add color column
-        if color_map_column is not None:
-            color_values = data_column_to_array(data, color_map_column)
-            pca_coor_df[color_map_column] = color_values
+        # check pc_x and pc_y are valid
+        n_pcs = adata_pca.shape[1]
+        if x_column < 1 or x_column > n_pcs or y_column < 1 or y_column > n_pcs:
+            raise ValueError(f"pc_x and pc_y are out of bounds, must be between 1 and {n_pcs}")
 
         cls.scatter(
-            data=pca_coor_df,
-            x_column="dim1",
-            y_column="dim2",
+            data=adata_pca,
+            x_column=f"pc_{x_column}",
+            y_column=f"pc_{y_column}",
             color=color,
             color_column=color_column,
             color_map_column=color_map_column,
@@ -1317,8 +1308,13 @@ class Plots:
                 labels = data.obs.index if label_column is None else data_column_to_array(data, label_column)
             else:  # dim_space == "var"
                 labels = data.var.index if label_column is None else data_column_to_array(data, label_column)
-
-            label_plot(ax=ax, x_values=pca_coor_df["dim1"], y_values=pca_coor_df["dim2"], labels=labels, x_anchors=None)
+            label_plot(
+                ax=ax,
+                x_values=adata_pca.X[:, x_column - 1],
+                y_values=adata_pca.X[:, y_column - 1],
+                labels=labels,
+                x_anchors=None,
+            )
 
         # set axislabels
         label_axes(ax, xlabel=f"PC{x_column} ({var_dim1}%)", ylabel=f"PC{y_column} ({var_dim2}%)")
