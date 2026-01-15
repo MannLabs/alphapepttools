@@ -1,6 +1,7 @@
 # Tools for data processing
 
 import logging
+from collections.abc import Iterable
 from io import StringIO
 from pathlib import Path
 
@@ -19,7 +20,8 @@ def get_id2gene_map(
     r"""Reannotate protein groups with gene names from a FASTA input.
 
     The function tries to extract UniProt IDs from the second position in a standard fasta header (see example below),
-    and match the gene name based on whatever comes after the 'GN=' tag in the header (matching via regex r"GN=([^\s]+)").
+    and match the gene name based on whatever comes after the `'GN='` tag in the header (matching via regex `r"GN=([^\s]+)"`).
+    The fasta file typically corresponds to the file that was used during the search step.
 
     Parameters
     ----------
@@ -30,17 +32,26 @@ def get_id2gene_map(
         Specifies the source type of the FASTA input, either 'file' or 'string'.
         Defaults to 'file'.
 
-    Example for string FASTA input:
-    ">tr|ID0|ID0_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN0 PE=1 SV=1
-    PEPTIDEKPEPTIDEK
-    >tr|ID1|ID1_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN1 PE=1 SV=1
-    PEPTIDEKPEPTIDEK"
-
     Returns
     -------
-    dict
-        A dictionary mapping UniProt IDs to gene names. If no gene name is found,
-        the UniProt ID is used as fallback.
+    A dictionary mapping UniProt IDs to gene names. If no gene name is found,
+    the UniProt ID is used as fallback.
+
+    Examples
+    --------
+    Example for string FASTA input:
+
+    .. code-block:: python
+
+        fasta_string = '''\
+        >tr|ID0|ID0_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN0 PE=1 SV=1
+        PEPTIDEKPEPTIDEK
+        >tr|ID1|ID1_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN1 PE=1 SV=1
+        PEPTIDEKPEPTIDEK
+        '''
+
+        alphatools.tools.get_id2gene_map(fasta_string, source_type="string")
+        > {'ID0': 'GN0', 'ID1': 'GN1'}
     """
     id2gene = {}
     GENE_PATTERN = re.compile(r"GN=([^\s]+)")
@@ -72,13 +83,13 @@ def get_id2gene_map(
 
 def map_genes_to_protein_groups(
     id2gene_map: dict,
-    protein_groups: list[str],
+    protein_groups: Iterable[str],
     delimiter: str = ";",
 ) -> list[str]:
-    """Map gene names to protein groups based
+    r"""Map gene names to protein groups using the provided id2gene_map mapping
 
     Protein groups may consist of multiple UniProt IDs, separated by a delimiter.
-    This function maps iterates each protein group and assigns the corresponding unique
+    This function iterates over each protein group and assigns the corresponding unique
     genes to the protein group.
 
     Parameters
@@ -92,17 +103,46 @@ def map_genes_to_protein_groups(
 
     Examples
     --------
-    >>> id2gene_map = {"ID0": "GN0", "ID1": "GN1", "ID2": "GN1", "ID3": "GN3", "ID4": "GN4"}
-    >>> protein_groups = ["ID0", "ID1;ID2", "ID3;ID4"]
-    >>> map_genes2pg(id2gene_map, protein_groups, delimiter=";")
-    ["GN0", "GN1", "GN3;GN4"]
+    You can map a list of uniprot IDs to gene names
 
+    .. code-block:: python
+
+        id2gene_map = {"ID0": "GN0", "ID1": "GN1", "ID2": "GN1", "ID3": "GN3", "ID4": "GN4"}
+        protein_groups = ["ID0", "ID1;ID2", "ID3;ID4"]
+        map_genes_to_protein_groups(id2gene_map, protein_groups, delimiter=";")
+        > ["GN0", "GN1", "GN3;GN4"]
+
+    To map gene names to an AnnData object, you can use the :func:`get_id2gene_map` function
+    to create a mapping from a FASTA file or string and subsequently assign the extracted gene
+    names to the `adata.var` attribute
+
+    .. code-block:: python
+
+        from alphapepttools.tl.tools import get_id2gene_map, map_genes_to_protein_groups
+
+        fasta = '''\
+        >tr|ID0|ID0_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN0 PE=1 SV=1
+        PEPTIDEKPEPTIDEK
+        >tr|ID1|ID1_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN1 PE=1 SV=1
+        PEPTIDEKPEPTIDEK
+        '''
+        mapping = get_id2gene_map(fasta, source_type="string")
+        mapping
+        # {'ID0': 'GN0', 'ID1': 'GN1'}
+
+        adata.var
+        # Empty DataFrame
+        # Columns: []
+        # Index: [ID0, ID1]
+
+        adata.var["gene_id"] = map_genes_to_protein_groups(
+            id2gene_map=mapping, protein_groups=adata.var_names
+        )
 
     Returns
     -------
-    list
-        List of gene names corresponding to each protein group identifier.
-        If no gene name could be found, "NA" is returned.
+    List of gene names corresponding to each protein group identifier.
+    If no gene name could be found, "NA" is returned.
 
     """
     out_gene_names = []
