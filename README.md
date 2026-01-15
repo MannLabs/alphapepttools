@@ -54,11 +54,10 @@ git clone https://github.com/MannLabs/alphapepttools.git@main && cd alphapepttoo
 pip install -e .
 ```
 
-If you want to use strict dependencies:
+If you want to use stable dependencies:
 
 ```bash
-git clone https://github.com/MannLabs/alphapepttools.git@main && cd alphapepttools
-pip install -e ".[strict]"
+pip install "alphapepttools[stable]"
 ```
 
 For development purposes, install the optional development dependencies:
