@@ -25,7 +25,7 @@ dynamic = [ "version" ]
 
 dependencies = [
   "alphabase",
-  "alphaquant==0.2",
+  "alphaquant==0.2", # TODO [AX-1020]: Remove alphaquant version fix.
   "anndata",
   "cmcrameri",       # TODO: remove this to optional dependencies?
   "inmoose",
