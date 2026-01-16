@@ -365,7 +365,7 @@ def _impute_bpca(data: np.ndarray, n_components: int, **kwargs) -> np.ndarray:
 
     usage = bpca.fit_transform(data)
     loadings = bpca.components_
-    mean = np.nanmean(data, axis=0)
+    mean = bpca.mu
 
     X_reconstructed = usage @ loadings + mean
 
