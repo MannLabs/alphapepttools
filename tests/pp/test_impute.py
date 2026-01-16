@@ -71,7 +71,7 @@ def knn_imputation_dummy_data(imputation_dummy_data) -> tuple[np.ndarray, np.nda
 
 @pytest.fixture
 def bpca_imputation_dummy_data(imputation_dummy_data: np.ndarray) -> tuple[np.ndarray, np.ndarray, dict[str, str]]:
-    """Test data for median imputation"""
+    """Test data for BPCA imputation"""
     X_ref = np.array(
         [
             [0.0, 0.0, 2.0, 0.94077611, 0.0],
