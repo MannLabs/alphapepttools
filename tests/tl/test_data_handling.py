@@ -5,13 +5,13 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alphapepttools.pl.plot_data_handling import (
+from alphapepttools.tl.plot_data_handling import (
     _validate_pca_loadings_plot_inputs,
     _validate_pca_plot_input,
     _validate_scree_plot_input,
+    extract_pca_anndata,
     prepare_pca_1d_loadings_data_to_plot,
     prepare_pca_2d_loadings_data_to_plot,
-    prepare_pca_data_to_plot,
     prepare_scree_data_to_plot,
 )
 
@@ -58,32 +58,24 @@ class TestValidationFunctions:
     def test_validate_pca_plot_input_valid(self, sample_adata):
         """Test _validate_pca_plot_input with valid inputs."""
         # Should not raise any errors
-        _validate_pca_plot_input(sample_adata, "X_pca_obs", 1, 2, "obs")
-        _validate_pca_plot_input(sample_adata, "X_pca_var", 1, 2, "var")
-        _validate_pca_plot_input(sample_adata, "custom_embedding", 1, 2, "obs")
+        _validate_pca_plot_input(sample_adata, "X_pca_obs", "variance_pca_obs", "obs")
+        _validate_pca_plot_input(sample_adata, "X_pca_var", "variance_pca_var", "var")
+        _validate_pca_plot_input(sample_adata, "custom_embedding", "custom_embedding", "obs")
 
     def test_validate_pca_plot_input_invalid_data_type(self):
         """Test _validate_pca_plot_input with invalid data type."""
         with pytest.raises(TypeError, match="data must be an AnnData object"):
-            _validate_pca_plot_input("not_anndata", "X_pca_obs", 1, 2, "obs")
+            _validate_pca_plot_input("not_anndata", "X_pca_obs", "variance_pca_obs", "obs")
 
     def test_validate_pca_plot_input_invalid_dim_space(self, sample_adata):
         """Test _validate_pca_plot_input with invalid dim_space."""
         with pytest.raises(ValueError, match="dim_space must be either 'obs' or 'var'"):
-            _validate_pca_plot_input(sample_adata, "X_pca_obs", 1, 2, "invalid")
+            _validate_pca_plot_input(sample_adata, "X_pca_obs", "variance_pca_obs", "invalid")
 
     def test_validate_pca_plot_input_missing_layer(self, sample_adata):
         """Test _validate_pca_plot_input with missing PCA layer."""
         with pytest.raises(ValueError, match="PCA embeddings layer 'missing_layer' not found"):
-            _validate_pca_plot_input(sample_adata, "missing_layer", 1, 2, "obs")
-
-    def test_validate_pca_plot_input_invalid_pc_dimensions(self, sample_adata):
-        """Test _validate_pca_plot_input with invalid PC dimensions."""
-        with pytest.raises(ValueError, match="pc_x and pc_y must be between 1 and 10"):
-            _validate_pca_plot_input(sample_adata, "X_pca_obs", 0, 2, "obs")
-
-        with pytest.raises(ValueError, match="pc_x and pc_y must be between 1 and 10"):
-            _validate_pca_plot_input(sample_adata, "X_pca_obs", 1, 15, "obs")
+            _validate_pca_plot_input(sample_adata, "missing_layer", "variance_pca_obs", "obs")
 
     def test_validate_scree_plot_input_valid(self, sample_adata):
         """Test _validate_scree_plot_input with valid inputs."""
@@ -150,63 +142,6 @@ class TestValidationFunctions:
 
 
 class TestDataPreparationFunctions:
-    """Test data preparation functions for plotting."""
-
-    N_OBS = 100  # Number of observations used in sample_adata
-    N_VARS = 50  # Number of variables used in sample_adata
-
-    def test_prepare_pca_data_to_plot_basic(self, sample_adata):
-        """Test prepare_pca_data_to_plot with basic parameters."""
-        result = prepare_pca_data_to_plot(sample_adata, pc_x=1, pc_y=2, dim_space="obs")
-
-        assert isinstance(result, pd.DataFrame)
-        assert list(result.columns) == ["dim1", "dim2"]
-        assert len(result) == self.N_OBS  # n_obs
-        assert result["dim1"].dtype == float
-        assert result["dim2"].dtype == float
-
-    def test_prepare_pca_data_to_plot_with_color_column(self, sample_adata):
-        """Test prepare_pca_data_to_plot with color mapping column."""
-        result = prepare_pca_data_to_plot(sample_adata, pc_x=1, pc_y=2, dim_space="obs", color_map_column="condition")
-
-        assert isinstance(result, pd.DataFrame)
-        assert "condition" in result.columns
-        assert set(result["condition"]) == {"A", "B", "C"}
-
-    def test_prepare_pca_data_to_plot_with_labels(self, sample_adata):
-        """Test prepare_pca_data_to_plot with labels."""
-        result = prepare_pca_data_to_plot(sample_adata, pc_x=1, pc_y=2, dim_space="obs", label=True)
-
-        assert isinstance(result, pd.DataFrame)
-        assert "labels" in result.columns
-        assert len(result["labels"]) == self.N_OBS
-
-    def test_prepare_pca_data_to_plot_with_custom_label_column(self, sample_adata):
-        """Test prepare_pca_data_to_plot with custom label column."""
-        result = prepare_pca_data_to_plot(
-            sample_adata, pc_x=1, pc_y=2, dim_space="obs", label=True, label_column="condition"
-        )
-
-        assert isinstance(result, pd.DataFrame)
-        assert "labels" in result.columns
-        assert set(result["labels"]) == {"A", "B", "C"}
-
-    def test_prepare_pca_data_to_plot_var_space(self, sample_adata):
-        """Test prepare_pca_data_to_plot with var space."""
-        result = prepare_pca_data_to_plot(sample_adata, pc_x=1, pc_y=2, dim_space="var")
-
-        assert isinstance(result, pd.DataFrame)
-        assert len(result) == self.N_VARS
-
-    def test_prepare_pca_data_to_plot_custom_embedding(self, sample_adata):
-        """Test prepare_pca_data_to_plot with custom embedding name."""
-        result = prepare_pca_data_to_plot(
-            sample_adata, pc_x=1, pc_y=2, dim_space="obs", embeddings_name="custom_embedding"
-        )
-
-        assert isinstance(result, pd.DataFrame)
-        assert len(result) == self.N_OBS
-
     def test_prepare_scree_data_to_plot_basic(self, sample_adata):
         """Test prepare_scree_data_to_plot with basic parameters."""
         result = prepare_scree_data_to_plot(sample_adata, n_pcs=5, dim_space="obs")
@@ -311,10 +246,6 @@ class TestEdgeCases:
             "variance": np.random.rand(n_pcs) * 100,
         }
 
-        # Test that functions handle NaN values appropriately
-        result = prepare_pca_data_to_plot(adata, color_map_column="condition")
-        assert isinstance(result, pd.DataFrame)
-
         # Test loadings with NaN values
         result = prepare_pca_2d_loadings_data_to_plot(adata, "PCs_obs", 1, 2, 3, "obs")
         # Should filter out features with all-NaN loadings
@@ -361,22 +292,6 @@ class TestEdgeCases:
         assert isinstance(result, pd.DataFrame)
 
 
-@pytest.mark.parametrize("dim_space", ["obs", "var"])
-@pytest.mark.parametrize(("pc_x", "pc_y"), [(1, 2), (2, 3), (1, 5)])
-def test_parametrized_pca_data_preparation(sample_adata, dim_space, pc_x, pc_y):
-    """Parametrized test for PCA data preparation with different spaces and PC combinations."""
-    if pc_x > 10 or pc_y > 10:  # noqa: PLR2004
-        # Skip invalid PC combinations for this test dataset
-        pytest.skip("PC combination exceeds available PCs in test dataset")
-
-    result = prepare_pca_data_to_plot(sample_adata, pc_x=pc_x, pc_y=pc_y, dim_space=dim_space)
-
-    assert isinstance(result, pd.DataFrame)
-    assert list(result.columns) == ["dim1", "dim2"]
-    expected_length = 100 if dim_space == "obs" else 50
-    assert len(result) == expected_length
-
-
 @pytest.mark.parametrize("nfeatures", [1, 5, 10, 20])
 def test_parametrized_loadings_nfeatures(sample_adata, nfeatures):
     """Parametrized test for different numbers of features in loadings plots."""
@@ -385,3 +300,73 @@ def test_parametrized_loadings_nfeatures(sample_adata, nfeatures):
     assert isinstance(result, pd.DataFrame)
     assert len(result) == min(nfeatures, 50)  # Limited by available features
     assert list(result["index_int"]) == list(range(min(nfeatures, 50), 0, -1))
+
+
+def make_basic_anndata(n_obs=100, n_vars=200, n_pcs=2):
+    X = np.arange(n_obs * n_vars, dtype=float).reshape(n_obs, n_vars)
+    obs = pd.DataFrame({"sample": [f"s{i}" for i in range(n_obs)]}, index=[f"s{i}" for i in range(n_obs)])
+    var = pd.DataFrame({"feature": [f"g{i}" for i in range(n_vars)]}, index=[f"g{i}" for i in range(n_vars)])
+    adata = ad.AnnData(X=X, obs=obs, var=var)
+    # default PCA embeddings for obs and var
+    adata.obsm["X_pca_obs"] = np.linspace(0, 1, n_obs * n_pcs).reshape(n_obs, n_pcs)
+    adata.varm["X_pca_var"] = np.linspace(0, 1, n_vars * n_pcs).reshape(n_vars, n_pcs)
+    # variance metadata
+    adata.uns["variance_pca_obs"] = {"variance_ratio": np.array([0.7, 0.3])}
+    adata.uns["variance_pca_var"] = {"variance_ratio": np.array([0.5, 0.5])}
+
+    # costom embeddings names
+    adata.obsm["custom_emb"] = np.ones((n_obs, n_pcs))
+    adata.uns["custom_emb"] = {"variance_ratio": np.array([0.6, 0.4])}
+    return adata
+
+
+def test_extract_pca_anndata_obs_basic():
+    adata = make_basic_anndata(n_obs=100, n_vars=200, n_pcs=2)
+    out = extract_pca_anndata(adata, dim_space="obs")
+    # X should be the obs PCA coordinates
+    assert out.X.shape == (adata.n_obs, 2)
+    # obs should be same as original obs
+    assert out.obs.reset_index(drop=True).equals(adata.obs.reset_index(drop=True))
+    # var should be a DataFrame built from uns variance metadata
+    assert "variance_ratio" in out.var.columns
+    # var_names should be stringified PC indices
+    assert out.var_names.tolist() == ["pc_1", "pc_2"]
+
+
+def test_extract_pca_anndata_var_basic():
+    adata = make_basic_anndata(n_obs=5, n_vars=3, n_pcs=2)
+    out = extract_pca_anndata(adata, dim_space="var")
+    # X should be the var PCA coordinates (n_vars x n_pcs)
+    assert out.X.shape == (adata.n_vars, 2)
+    # obs in returned AnnData should equal original var (since dim_space='var')
+    assert out.obs.reset_index(drop=True).equals(adata.var.reset_index(drop=True))
+    # var should contain variance metadata produced from uns
+    assert "variance_ratio" in out.var.columns
+    assert out.var_names.tolist() == ["pc_1", "pc_2"]
+
+
+def test_extract_pca_anndata_with_expression_columns_obs():
+    adata = make_basic_anndata(n_obs=4, n_vars=4, n_pcs=2)
+    # choose a subset of var_names to attach as expression columns
+    expr_cols = [adata.var_names[0], adata.var_names[2]]
+    out = extract_pca_anndata(adata, dim_space="obs", expression_columns=expr_cols)
+    # returned.obs should include the expression columns
+    for c in expr_cols:
+        assert c in out.obs.columns
+        # values should be numeric
+        assert np.issubdtype(out.obs[c].dtype, np.number)
+
+
+def test_extract_pca_anndata_missing_embeddings_raises():
+    adata = make_basic_anndata()
+    # remove embedding to trigger validation error
+    adata.obsm.pop("X_pca_obs", None)
+    with pytest.raises(ValueError):
+        extract_pca_anndata(adata, dim_space="obs")
+
+
+def test_extract_pca_anndata_custom_embeddings_name():
+    adata = make_basic_anndata(n_obs=3, n_vars=3, n_pcs=2)
+    out = extract_pca_anndata(adata, dim_space="obs", embeddings_name="custom_emb")
+    assert out.X.shape == (adata.n_obs, 2)
+    assert out.var_names.tolist() == ["pc_1", "pc_2"]
