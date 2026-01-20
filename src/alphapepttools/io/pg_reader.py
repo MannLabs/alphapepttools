@@ -30,6 +30,8 @@ def read_pg_table(
         - DIANN (`diann`)
         - MaxQuant (`maxquant`)
         - Spectronaut (`spectronaut`, parquet + tsv)
+        - PEAKS (`peaks_proteins`, csv)
+        - PEAKS peptides (`peaks_peptides`, csv)
 
     See `alphabase.pg_reader` module for more information
 
