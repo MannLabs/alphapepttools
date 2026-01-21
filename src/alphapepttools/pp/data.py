@@ -379,6 +379,8 @@ def data_column_to_array(
         first for the column names. If the column is not found in var_names, the columns
         of data.obs are considered. If the column is not found in either, a ValueError
         is raised.
+        Passing 'obs_index' will return the obs index of an AnnData object as a numpy array (i.e. row index for a DataFrame).
+        Passing 'var_index' will return the var index of an AnnData object as a numpy array (i.e. column index for a DataFrame).
 
     Returns
     -------
