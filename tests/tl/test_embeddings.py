@@ -171,48 +171,51 @@ def test_bpca_default(toy_adata):
     """Test the bpca function with default parameters (obs space)."""
     at.tl.bpca(toy_adata, n_comps=5)
 
-    assert "BPCA" in toy_adata.obsm, "BPCA coordinates not found in obsm"
-    assert "BPCA" in toy_adata.varm, "BPCA loadings not found in varm"
-    assert "BPCA" in toy_adata.uns, "BPCA variance not found in uns"
+    assert "X_bpca_obs" in toy_adata.obsm, "BPCA coordinates not found in obsm"
+    assert "PCs_bpca_obs" in toy_adata.varm, "BPCA loadings not found in varm"
+    assert "variance_bpca_obs" in toy_adata.uns, "BPCA variance not found in uns"
 
-    assert toy_adata.obsm["BPCA"].shape == (toy_adata.n_obs, 5)
-    assert toy_adata.varm["BPCA"].shape == (toy_adata.n_vars, 5)
+    assert toy_adata.obsm["X_bpca_obs"].shape == (toy_adata.n_obs, 5)
+    assert toy_adata.varm["PCs_bpca_obs"].shape == (toy_adata.n_vars, 5)
 
-    assert "variance_ratio" in toy_adata.uns["BPCA"]
-    assert len(toy_adata.uns["BPCA"]["variance_ratio"]) == 5  # noqa: PLR2004
+    assert "variance_ratio" in toy_adata.uns["variance_bpca_obs"]
+    assert len(toy_adata.uns["variance_bpca_obs"]["variance_ratio"]) == 5  # noqa: PLR2004
 
 
 def test_bpca__var_space(toy_adata):
     """Test the bpca function in var space (BPCA on genes)."""
     at.tl.bpca(toy_adata, dim_space="var", n_comps=5)
 
-    assert "BPCA" in toy_adata.varm, "BPCA coordinates not found in varm"
-    assert "BPCA" in toy_adata.obsm, "BPCA loadings not found in obsm"
-    assert "BPCA" in toy_adata.uns, "BPCA variance not found in uns"
+    assert "PCs_bpca_var" in toy_adata.obsm, "BPCA coordinates not found in obsm"
+    assert "X_bpca_var" in toy_adata.varm, "BPCA loadings not found in varm"
+    assert "variance_bpca_var" in toy_adata.uns, "BPCA variance not found in uns"
 
-    assert toy_adata.varm["BPCA"].shape == (toy_adata.n_vars, 5)
-    assert toy_adata.obsm["BPCA"].shape == (toy_adata.n_obs, 5)
+    assert toy_adata.obsm["PCs_bpca_var"].shape == (toy_adata.n_obs, 5)
+    assert toy_adata.varm["X_bpca_var"].shape == (toy_adata.n_vars, 5)
 
 
 def test_bpca__with_layer(toy_adata_with_layers):
     """Test the bpca function using a specific layer."""
     at.tl.bpca(toy_adata_with_layers, layer="norm", n_comps=5)
 
-    assert "BPCA" in toy_adata_with_layers.obsm
-    assert "BPCA" in toy_adata_with_layers.varm
-    assert "BPCA" in toy_adata_with_layers.uns
+    assert "PCs_bpca_obs" in toy_adata_with_layers.varm, "BPCA coordinates not found in varm"
+    assert "X_bpca_obs" in toy_adata_with_layers.obsm, "BPCA loadings not found in obsm"
+    assert "variance_bpca_obs" in toy_adata_with_layers.uns, "BPCA variance not found in uns"
+
+    assert toy_adata_with_layers.varm["PCs_bpca_obs"].shape == (toy_adata_with_layers.n_vars, 5)
+    assert toy_adata_with_layers.obsm["X_bpca_obs"].shape == (toy_adata_with_layers.n_obs, 5)
 
 
 def test_bpca__with_mask(toy_adata_with_mask):
     """Test the bpca function with feature mask."""
     at.tl.bpca(toy_adata_with_mask, meta_data_mask_column_name="feature_mask", n_comps=5)
 
-    assert "BPCA" in toy_adata_with_mask.obsm
-    assert "BPCA" in toy_adata_with_mask.varm
-    assert "BPCA" in toy_adata_with_mask.uns
+    assert "X_bpca_obs" in toy_adata_with_mask.obsm
+    assert "PCs_bpca_obs" in toy_adata_with_mask.varm
+    assert "variance_bpca_obs" in toy_adata_with_mask.uns
 
     # Check that loadings have NaN for masked features
-    loadings = toy_adata_with_mask.varm["BPCA"]
+    loadings = toy_adata_with_mask.varm["PCs_bpca_obs"]
     mask = toy_adata_with_mask.var["feature_mask"].values
 
     # Features not in mask should have NaN loadings
@@ -226,12 +229,12 @@ def test_bpca__var_space_with_mask(toy_adata_with_mask):
     at.tl.bpca(toy_adata_with_mask, dim_space="var", meta_data_mask_column_name="feature_mask", n_comps=5)
 
     # Assert - Check that BPCA results exist in correct locations
-    assert "BPCA" in toy_adata_with_mask.varm
-    assert "BPCA" in toy_adata_with_mask.obsm
-    assert "BPCA" in toy_adata_with_mask.uns
+    assert "PCs_bpca_var" in toy_adata_with_mask.obsm
+    assert "X_bpca_var" in toy_adata_with_mask.varm
+    assert "variance_bpca_var" in toy_adata_with_mask.uns
 
     # Check that coordinates have NaN for masked features
-    coordinates = toy_adata_with_mask.varm["BPCA"]
+    coordinates = toy_adata_with_mask.varm["X_bpca_var"]
     mask = toy_adata_with_mask.var["feature_mask"].values
 
     # Features not in mask should have NaN coordinates
@@ -249,17 +252,18 @@ def test_bpca__with_missing_values(toy_adata_with_missing_values):
 
     at.tl.bpca(adata, n_comps=n_latent)
 
-    assert "BPCA" in adata.obsm, "BPCA coordinates not found in obsm"
-    assert "BPCA" in adata.varm, "BPCA loadings not found in varm"
-    assert "BPCA" in adata.uns, "BPCA variance not found in uns"
+    # Assert - Check that BPCA results exist in correct locations
+    assert "X_bpca_obs" in adata.obsm
+    assert "PCs_bpca_obs" in adata.varm
+    assert "variance_bpca_obs" in adata.uns
 
     # Check shapes
-    assert adata.obsm["BPCA"].shape == (n_obs, n_latent)
-    assert adata.varm["BPCA"].shape == (n_var, n_latent)
+    assert adata.obsm["X_bpca_obs"].shape == (n_obs, n_latent)
+    assert adata.varm["PCs_bpca_obs"].shape == (n_var, n_latent)
 
     # Check that BPCA output does not contain NaN values (BPCA should handle missing data)
-    assert not np.isnan(adata.obsm["BPCA"]).any(), "BPCA coordinates should not contain NaN"
-    assert not np.isnan(adata.varm["BPCA"]).any(), "BPCA loadings should not contain NaN"
+    assert not np.isnan(adata.obsm["X_bpca_obs"]).any(), "BPCA coordinates should not contain NaN"
+    assert not np.isnan(adata.varm["PCs_bpca_obs"]).any(), "BPCA loadings should not contain NaN"
 
 
 def test_bpca__with_missing_values_var_space(toy_adata_with_missing_values):
@@ -270,13 +274,13 @@ def test_bpca__with_missing_values_var_space(toy_adata_with_missing_values):
     at.tl.bpca(adata, dim_space="var", n_comps=n_latent)
 
     # Assert - Check that BPCA results exist in correct locations
-    assert "BPCA" in adata.varm, "BPCA coordinates not found in varm"
-    assert "BPCA" in adata.obsm, "BPCA loadings not found in obsm"
-    assert "BPCA" in adata.uns, "BPCA variance not found in uns"
+    assert "PCs_bpca_var" in adata.obsm
+    assert "X_bpca_var" in adata.varm
+    assert "variance_bpca_var" in adata.uns
 
     # Check that BPCA output does not contain NaN values
-    assert not np.isnan(adata.varm["BPCA"]).any(), "BPCA coordinates should not contain NaN"
-    assert not np.isnan(adata.obsm["BPCA"]).any(), "BPCA loadings should not contain NaN"
+    assert not np.isnan(adata.varm["X_bpca_var"]).any(), "BPCA coordinates should not contain NaN"
+    assert not np.isnan(adata.obsm["PCs_bpca_var"]).any(), "BPCA loadings should not contain NaN"
 
 
 @pytest.mark.parametrize("dim_space", ["obs", "var"])
@@ -287,7 +291,7 @@ def test_bpca__returns_variance_ratio(toy_adata_with_missing_values, dim_space):
 
     at.tl.bpca(adata, dim_space=dim_space, n_comps=n_latent)
 
-    variance_ratio = adata.uns["BPCA"]["variance_ratio"]
+    variance_ratio = adata.uns[f"variance_bpca_{dim_space}"]["variance_ratio"]
     assert len(variance_ratio) == n_latent, f"Should have {n_latent} variance ratio values"
     assert not np.isnan(variance_ratio).any(), "Variance ratios should not contain NaN"
 
@@ -300,6 +304,6 @@ def test_bpca__components_ordered_by_variance(toy_adata_with_missing_values, dim
 
     at.tl.bpca(adata, dim_space=dim_space, n_comps=n_latent)
 
-    variance_ratio = adata.uns["BPCA"]["variance_ratio"]
+    variance_ratio = adata.uns[f"variance_bpca_{dim_space}"]["variance_ratio"]
     # Check that absolute variance ratios are in descending order
     assert np.all(np.diff(variance_ratio) <= 0), "Absolute variance ratios should be in descending order"
