@@ -75,15 +75,15 @@ def nanlog(
     detailed summary of which values were replaced is provided.
 
     Current invalid values include:
-    - NaN values
-    - Zero values
-    - Negative values
-    - Positive infinity
-    - Negative infinity
+        - NaN values
+        - Zero values
+        - Negative values
+        - Positive infinity
+        - Negative infinity
 
     Parameters
     ----------
-    x : anndata.AnnData
+    data
         Input data; negatives and/or zeros are converted to np.nan
     base : int
         Base of the logarithm. Defaults to 2 (log2).
@@ -97,10 +97,25 @@ def nanlog(
 
     Returns
     -------
-    None | anndata.AnnData
-        Log-transformed data with invalid values replaced by np.nan.
-        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
-        returns a modified copy.
+    Log-transformed data with invalid values replaced by np.nan.
+    If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
+    returns a modified copy.
+
+
+    Examples
+    --------
+    The function can act on anndata objects inplace or return copies:
+
+    .. code-block:: python
+
+        at.pp.nanlog(adata, layer=None, copy=False)
+        # will update adata.X and modify the object inplace
+
+        at.pp.nanlog(adata, layer=None, copy=True)
+        # will update adata.X and return a new object
+
+        at.pp.nanlog(adata, layer="layer", copy=False)
+        # will update "layer" in adata.layers and modify the object inplace
 
     """
     if not isinstance(data, ad.AnnData):
