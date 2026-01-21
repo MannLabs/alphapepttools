@@ -11,9 +11,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-BPCA_DEFAULT_NAME = "BPCA"
-
-
 def _check_inputs_for_dim_reduction(
     adata: ad.AnnData, layer: str | None, dim_space: str, meta_data_mask_column_name: str | None
 ) -> None:
@@ -88,6 +85,9 @@ def _store_pca_results(
     dim_space: str,
     embeddings_name: str | None,
     meta_data_mask_column_name: str | None,
+    default_coords_key: str,
+    default_loadings_key: str,
+    default_uns_key: str,
     logger: logging.Logger,
 ) -> ad.AnnData:
     """
@@ -106,6 +106,12 @@ def _store_pca_results(
         Custom key name for storing PCA results. If None, defaults are used.
     meta_data_mask_column_name : str or None
         Column name in adata.var used as a boolean mask for features. If None, all features are used.
+    default_coords_key
+        Name of coordinates (observations) in `adata.obsm`
+    default_loadings_key
+        Name of loadings (features) in `adata.varm`
+    default_uns_key
+        Name of metadata in `adata.uns`
     logger : logging.Logger
         Logger for warning messages.
 
@@ -116,9 +122,9 @@ def _store_pca_results(
     """
     # get key names for storing PCA results
     if embeddings_name is None:
-        pca_coords_key = f"X_pca_{dim_space}"
-        loadings_key = f"PCs_{dim_space}"
-        variance_key = f"variance_pca_{dim_space}"
+        pca_coords_key = f"{default_coords_key}_{dim_space}"
+        loadings_key = f"{default_loadings_key}_{dim_space}"
+        variance_key = f"{default_uns_key}_{dim_space}"
     else:
         pca_coords_key = embeddings_name
         loadings_key = embeddings_name
@@ -259,7 +265,17 @@ def pca(
     # run PCA
     pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, **pca_kwargs)
 
-    return _store_pca_results(adata, pca_res, dim_space, embeddings_name, meta_data_mask_column_name, logger)
+    return _store_pca_results(
+        adata=adata,
+        pca_res=pca_res,
+        dim_space=dim_space,
+        embeddings_name=embeddings_name,
+        meta_data_mask_column_name=meta_data_mask_column_name,
+        default_coords_key="X_pca",
+        default_loadings_key="PCs",
+        default_uns_key="variance_pca",
+        logger=logger,
+    )
 
 
 def _run_bpca(
@@ -399,8 +415,6 @@ def bpca(
         adata=adata, layer=layer, dim_space=dim_space, meta_data_mask_column_name=meta_data_mask_column_name
     )
 
-    embeddings_name = BPCA_DEFAULT_NAME if embeddings_name is None else embeddings_name
-
     var_mask = adata.var[meta_data_mask_column_name] if meta_data_mask_column_name is not None else None
     data_for_bpca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask, dim_space=dim_space)
 
@@ -412,5 +426,8 @@ def bpca(
         dim_space=dim_space,
         embeddings_name=embeddings_name,
         meta_data_mask_column_name=meta_data_mask_column_name,
+        default_coords_key="X_bpca",
+        default_loadings_key="PCs_bpca",
+        default_uns_key="variance_bpca",
         logger=logger,
     )
