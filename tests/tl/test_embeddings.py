@@ -167,7 +167,7 @@ def toy_adata_with_missing_values() -> dict[str, Any]:
     }
 
 
-def test_run_bpca_default(toy_adata):
+def test_bpca_default(toy_adata):
     """Test the bpca function with default parameters (obs space)."""
     at.tl.bpca(toy_adata, n_comps=5)
 
@@ -182,7 +182,7 @@ def test_run_bpca_default(toy_adata):
     assert len(toy_adata.uns["BPCA"]["variance_ratio"]) == 5  # noqa: PLR2004
 
 
-def test_run_bpca_var_space(toy_adata):
+def test_bpca__var_space(toy_adata):
     """Test the bpca function in var space (BPCA on genes)."""
     at.tl.bpca(toy_adata, dim_space="var", n_comps=5)
 
@@ -194,7 +194,7 @@ def test_run_bpca_var_space(toy_adata):
     assert toy_adata.obsm["BPCA"].shape == (toy_adata.n_obs, 5)
 
 
-def test_run_bpca_with_layer(toy_adata_with_layers):
+def test_bpca__with_layer(toy_adata_with_layers):
     """Test the bpca function using a specific layer."""
     at.tl.bpca(toy_adata_with_layers, layer="norm", n_comps=5)
 
@@ -203,7 +203,7 @@ def test_run_bpca_with_layer(toy_adata_with_layers):
     assert "BPCA" in toy_adata_with_layers.uns
 
 
-def test_run_bpca_with_mask(toy_adata_with_mask):
+def test_bpca__with_mask(toy_adata_with_mask):
     """Test the bpca function with feature mask."""
     at.tl.bpca(toy_adata_with_mask, meta_data_mask_column_name="feature_mask", n_comps=5)
 
@@ -221,7 +221,7 @@ def test_run_bpca_with_mask(toy_adata_with_mask):
     assert not np.isnan(loadings[mask, :]).any(), "Unmasked features should not have NaN loadings"
 
 
-def test_run_bpca_var_space_with_mask(toy_adata_with_mask):
+def test_bpca__var_space_with_mask(toy_adata_with_mask):
     """Test the bpca function in var space with feature mask."""
     at.tl.bpca(toy_adata_with_mask, dim_space="var", meta_data_mask_column_name="feature_mask", n_comps=5)
 
@@ -240,7 +240,7 @@ def test_run_bpca_var_space_with_mask(toy_adata_with_mask):
     assert not np.isnan(coordinates[mask, :]).any(), "Unmasked features should not have NaN coordinates"
 
 
-def test_run_bpca_with_missing_values(toy_adata_with_missing_values):
+def test_bpca__with_missing_values(toy_adata_with_missing_values):
     """Test the bpca function with data containing missing values."""
     adata = toy_adata_with_missing_values["adata"]
     n_obs = toy_adata_with_missing_values["n_obs"]
@@ -262,7 +262,7 @@ def test_run_bpca_with_missing_values(toy_adata_with_missing_values):
     assert not np.isnan(adata.varm["BPCA"]).any(), "BPCA loadings should not contain NaN"
 
 
-def test_run_bpca_with_missing_values_var_space(toy_adata_with_missing_values):
+def test_bpca__with_missing_values_var_space(toy_adata_with_missing_values):
     """Test the bpca function in var space with data containing missing values."""
     adata = toy_adata_with_missing_values["adata"]
     n_latent = toy_adata_with_missing_values["n_latent"]
@@ -280,7 +280,7 @@ def test_run_bpca_with_missing_values_var_space(toy_adata_with_missing_values):
 
 
 @pytest.mark.parametrize("dim_space", ["obs", "var"])
-def test_run_bpca_returns_variance_ratio(toy_adata_with_missing_values, dim_space):
+def test_bpca__returns_variance_ratio(toy_adata_with_missing_values, dim_space):
     """Test that BPCA returns variance ratio information."""
     adata = toy_adata_with_missing_values["adata"]
     n_latent = toy_adata_with_missing_values["n_latent"]
@@ -293,7 +293,7 @@ def test_run_bpca_returns_variance_ratio(toy_adata_with_missing_values, dim_spac
 
 
 @pytest.mark.parametrize("dim_space", ["obs", "var"])
-def test_run_bpca_components_ordered_by_variance(toy_adata_with_missing_values, dim_space):
+def test_bpca__components_ordered_by_variance(toy_adata_with_missing_values, dim_space):
     """Test that BPCA components are ordered by decreasing absolute variance explained."""
     adata = toy_adata_with_missing_values["adata"]
     n_latent = toy_adata_with_missing_values["n_latent"]
