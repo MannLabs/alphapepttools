@@ -1034,6 +1034,12 @@ def test_filter_data_completeness(
             "batch",
             False,
         ),
+        # 1.3. Extract index (default parameter)
+        (
+            np.array(["cell1", "cell2", "cell3"]),
+            "_index",
+            False,
+        ),
         # 2. Transposed adata, as if to access rows
         # 2.1. Column is in original obs_names
         (
@@ -1045,6 +1051,12 @@ def test_filter_data_completeness(
         (
             np.array(["gene1", "gene2", "gene3"]),
             "gene_name",
+            True,
+        ),
+        # 2.3. Extract index from transposed adata
+        (
+            np.array(["G1", "G2", "G3"]),
+            "_index",
             True,
         ),
     ],

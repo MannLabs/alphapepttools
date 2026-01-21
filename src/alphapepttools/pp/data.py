@@ -366,7 +366,7 @@ def _handle_overlapping_columns(
 
 def data_column_to_array(
     data: pd.DataFrame | ad.AnnData,
-    column: str,
+    column: str = "_index",
 ) -> np.ndarray:
     """Get a column from a DataFrame or an AnnData object
 
@@ -374,13 +374,13 @@ def data_column_to_array(
     ----------
     data : pd.DataFrame | ad.AnnData
         Data to extract the column from.
-    column : str
-        Column name to extract. If data is of type ad.AnnData, var_names is considered
-        first for the column names. If the column is not found in var_names, the columns
-        of data.obs are considered. If the column is not found in either, a ValueError
-        is raised.
-        Passing 'obs_index' will return the obs index of an AnnData object as a numpy array (i.e. row index for a DataFrame).
-        Passing 'var_index' will return the var index of an AnnData object as a numpy array (i.e. column index for a DataFrame).
+    column : str, default '_index'
+        Column to extract. If data is of type ad.AnnData, the hierarchy to match fields is
+        - var_names first
+        - obs columns
+        - var columns
+        If the column is not found in either, a ValueError is raised.
+        Passing '_index' will return the obs index of an AnnData object as a numpy array (i.e. row index for a DataFrame).
 
     Returns
     -------
@@ -389,12 +389,18 @@ def data_column_to_array(
 
     """
     if isinstance(data, pd.DataFrame):
+        if column == "_index":
+            return data.index.to_numpy()
+
         if column not in data.columns:
             raise ValueError(f"Column {column} not found in DataFrame.")
+
         return data[column].to_numpy()
 
     if isinstance(data, ad.AnnData):
-        # prioritize var_names, i.e. numeric data from X
+        if column == "_index":
+            return data.obs.index.to_numpy()
+
         if column in data.var_names:
             col_idx = data.var_names.get_loc(column)
             logging.info(f"Column '{column}' found in: data.var_names. Using that")
