@@ -366,7 +366,7 @@ def _handle_overlapping_columns(
 
 def data_column_to_array(
     data: pd.DataFrame | ad.AnnData,
-    column: str = "_index",
+    column: str,
 ) -> np.ndarray:
     """Get a column from a DataFrame or an AnnData object
 
@@ -374,13 +374,12 @@ def data_column_to_array(
     ----------
     data : pd.DataFrame | ad.AnnData
         Data to extract the column from.
-    column : str, default '_index'
+    column : str
         Column to extract. If data is of type ad.AnnData, the hierarchy to match fields is
         - var_names first
         - obs columns
         - var columns
         If the column is not found in either, a ValueError is raised.
-        Passing '_index' will return the obs index of an AnnData object as a numpy array (i.e. row index for a DataFrame).
 
     Returns
     -------
@@ -389,18 +388,12 @@ def data_column_to_array(
 
     """
     if isinstance(data, pd.DataFrame):
-        if column == "_index":
-            return data.index.to_numpy()
-
         if column not in data.columns:
             raise ValueError(f"Column {column} not found in DataFrame.")
 
         return data[column].to_numpy()
 
     if isinstance(data, ad.AnnData):
-        if column == "_index":
-            return data.obs.index.to_numpy()
-
         if column in data.var_names:
             col_idx = data.var_names.get_loc(column)
             logging.info(f"Column '{column}' found in: data.var_names. Using that")
@@ -485,6 +478,12 @@ def data_index_to_array(
         return data.var_names.to_numpy()
 
     raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
+
+
+def _tolist(
+    obj: str | list,
+) -> list:
+    return obj if isinstance(obj, list) else [obj]
 
 
 def subset_data(

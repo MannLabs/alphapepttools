@@ -24,7 +24,7 @@ from matplotlib.patches import Patch
 from alphapepttools.pl import defaults
 from alphapepttools.pl.colors import BaseColors, BasePalettes, _get_colors_from_cmap, get_color_mapping
 from alphapepttools.pl.figure import create_figure, label_axes
-from alphapepttools.pp.data import data_column_to_array, data_index_to_array, subset_data
+from alphapepttools.pp.data import _tolist, data_column_to_array, data_index_to_array, subset_data
 from alphapepttools.tl.plot_data_handling import (
     extract_pca_anndata,
     prepare_pca_1d_loadings_data_to_plot,
@@ -528,9 +528,7 @@ def label_plot(
         labels from a computation-context to presentation context, e.g. a column
         like upregulated_proteins could be shown as "Upregulated Proteins" in the plot.
     y_display_start : float, optional
-        Starting point for the y-coordinates of the labels, by default 1. This is used to determine the spacing between labels.
-        The y-coordinates of the labels are adjusted to be evenly spaced between the min and max y-coordinates at that anchor.
-        This is useful for avoiding label overlap.
+        Starting point for the y-coordinates of the labels, by default 1.
     y_padding_factor: float, optional
         Factor to increase or decrease how far apart labels are spread in the y-direction when stacked into a column over x-anchors
 
@@ -753,7 +751,7 @@ class Plots:
     @classmethod
     def scatter(
         cls,
-        data: pd.DataFrame | ad.AnnData,
+        data: ad.AnnData | pd.DataFrame,
         x_column: str,
         y_column: str,
         color: str | None = None,
@@ -765,8 +763,11 @@ class Plots:
         legend: str | mpl.legend.Legend | None = None,
         scatter_kwargs: dict | None = None,
         legend_kwargs: dict | None = None,
-        xlim: tuple[float, float] | None = None,
-        ylim: tuple[float, float] | None = None,
+        figure_kwargs: dict | None = None,
+        xlims: tuple[float, float] | None = None,
+        ylims: tuple[float, float] | None = None,
+        lim_padding_factor: float = 1.2,
+        default_group: str = "__data",
     ) -> None:
         """Plot a scatterplot from a DataFrame or AnnData object
 
@@ -818,6 +819,8 @@ class Plots:
             Additional keyword arguments for the matplotlib scatter function. By default None.
         legend_kwargs : dict, optional
             Additional keyword arguments for the matplotlib legend function. By default None.
+        figure_kwargs : dict | None, optional
+            Additional keyword arguments for figure creation. By default None.
         xlim : tuple[float, float], optional
             Limits for the x-axis. By default None.
         ylim : tuple[float, float], optional
@@ -830,11 +833,12 @@ class Plots:
         """
         scatter_kwargs = scatter_kwargs or {}
         legend_kwargs = legend_kwargs or {}
-        DEFAULT_GROUP = "data"
-        DEFAULT_COLOR = BaseColors.get("blue")
+        figure_kwargs = figure_kwargs or {"figsize": (3, 3)}
+
+        default_color = BaseColors.get("blue")
 
         if ax is None:
-            _, axm = create_figure()
+            _, axm = create_figure(**figure_kwargs)
             ax = axm.next()
 
         # Directly use colors from the color_column
@@ -864,8 +868,8 @@ class Plots:
 
                 color_values = np.array([color_dict[level] for level in color_map_column_array], dtype=object)
         else:
-            color_dict = {DEFAULT_GROUP: color or DEFAULT_COLOR}
-            color_values = np.array([color_dict[DEFAULT_GROUP]] * len(data))
+            color_dict = {default_group: color or default_color}
+            color_values = np.array([color_dict[default_group]] * len(data))
 
         # Handle ordering of plotting arrays by string: order by the frequency of the color column
         counts = Counter([str(cv) for cv in color_values])
@@ -889,10 +893,11 @@ class Plots:
                 **legend_kwargs,
             )
 
-        if xlim:
-            ax.set_xlim(xlim)
-        if ylim:
-            ax.set_ylim(ylim)
+        xlims = xlims or _get_plot_lims(x_values, lim_padding_factor, sym="max")
+        ylims = ylims or _get_plot_lims(y_values, lim_padding_factor, set_left=0)
+
+        ax.set_xlim(xlims)
+        ax.set_ylim(ylims)
 
     @classmethod
     def barplot(
@@ -1532,24 +1537,32 @@ class Plots:
 
     @classmethod
     def volcano(  # NOQA: C901, PLR0915, PLR0912
+        # scatter parameters
         cls,
         data: ad.AnnData | pd.DataFrame,
         x_column: str,
         y_column: str,
         ax: plt.Axes | None = None,
+        color_dict: dict[str, str | tuple] | None = None,
+        legend: str | mpl.legend.Legend | None = None,
+        scatter_kwargs: dict | None = None,
+        legend_kwargs: dict | None = None,
+        lim_padding_factor: float = 1.2,
+        default_group: str = "__data",
+        default_color: tuple = BaseColors.get("blue"),
+        # volcano specific parameters
         x_thresholds: tuple | None = (-1, 1),
         y_thresholds: float = -np.log10(0.05),
-        layer_dict: dict | None = None,
+        plot_layers: list[tuple] | None = None,
         display_id_column: str | None = None,
-        color_dict: dict | None = None,
         label_layers: list[str] | None = None,
         max_labels: int | None = None,
         x_label_anchors: list[float] | None = None,
         figure_kwargs: dict | None = None,
-        scatter_kwargs: dict | None = None,
         label_kwargs: dict | None = None,
+        line_kwargs: dict | None = None,
         y_display_start: float | None = 1,
-        y_padding_factor: float | None = 0.05,
+        y_padding_factor: float | None = 4,
         xlims: tuple[float, float] | None = None,
         ylims: tuple[float, float] | None = None,
     ) -> None:
@@ -1566,71 +1579,93 @@ class Plots:
 
         A particular consideration for volcanoplots is the differential coloring of various points of interest,
         e.g. significantly regulated, manually selected or belonging to a certain group of interest. The current
-        solution uses a `layer_dict` to define the hierarchy of visualization layers. Users define the hierarchy
-        of visualization through a `layer_dict`. For example, consider this color_dict:
+        solution uses `plot_layers` to define the hierarchy of visualization layers. `plot_layers` is a list of
+        tuples, where each tuple contains
+
+        layer_column, color_key, layer_val
+
+        - a `layer_column` from `data`
+        - a `color_key` to retrieve a color from the `color_dict`
+        - a `layer_val` to match in the `layer_column`, either a single value or a list of values
+
+        For example, given this plot_layers definition:
 
         ```
-        color_dict = {
-            "upregulated": BaseColors.get("orange"),
-            "downregulated": BaseColors.get("green"),
-            "unchanged": BaseColors.get("lightgrey"),
-            "Genes": BaseColors.get("black"),
-        }
+        pois = ["P10291", "P10292", "P10293", "P10294", "P10295"]
+        plot_layers = [
+            # look for all points in the "id" column that are in the pois list and color them according to the "POI_hypothesis" color in the color_dict
+            ("id", "POI_hypothesis", pois),
+            # look for all points that have "POI" in the "label" column and color them according to the "POI" color in the color_dict
+            ("label", "POI", "POI"),  # in the second layer, plot all points where the label is "POI"
+            # similar for regulation status
+            ("diff_exp_status", "upregulated", "upregulated"),
+            ("diff_exp_status", "downregulated", "downregulated"),
+            ("diff_exp_status", "unchanged", "unchanged"),
+        ]
         ```
+
+        Importantly, order matters: these plot_layers ensure that the 'pois' are on top, then the points labeled as 'POI',
+        then the upregulated, downregulated and unchanged points in the background.
 
         Combined with this layer_dict:
 
         ```
-        layer_dict = {
-            "Genes": [genes_of_interest],
-            "diff_exp_status": ["upregulated", "downregulated", "unchanged"],
-            # there could be an arbitrary number of layers here
-        }
+        label_layers = [
+            "POI",  # label all points where the label is "POI"
+            "POI_hypothesis",  # label all points in the pois list
+        ]
         ```
-
-        --> A consideration for the layer dict is that when the values are lists, we try to look for the corresponding
-        key in the color_dict. If the value is a single string, we look directly for that string in the color_dict.
-
-        Here, the top layer is "Genes", which means that irrespective of their diff_exp_status, genes of interest in
-        the "Genes" column will always be colored black based on the color dict. The second layer is "diff_exp_status",
-        which means that all remaining genes (not already colored by the top layer) will be either orange, green or
-        lightgrey depending on their status in the "diff_exp_status" column.
-
-        The purpose of this implementation is to 1.) allow for complex coloring schemes in volcanoplots and 2.) ensure
-        that points of interest are plotted exactly once and not overplotted by other layers, which may lead to artifacts
-        in the visualization.
 
         Parameters
         ----------
-        data : ad.AnnData | pd.DataFrame
-            Data containing the values to plot.
+        data : pd.DataFrame | ad.AnnData
+            Data to plot, must contain the x_column and y_column and optionally the color_column or color_map_column.
         x_column : str
-            Column name for the x-axis (log2 fold change).
+            Column in data to plot on the x-axis. Must contain numeric data.
         y_column : str
-            Column name for the y-axis (-log10 p-value).
-        ax : plt.Axes | None, optional
-            Matplotlib axes object to plot on. If None, a new figure and axes are created. By default None.
+            Column in data to plot on the y-axis. Must contain numeric data.
+        color : str, optional
+            Color to use for the scatterplot. By default "blue".
+        color_map_column : str, optional
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by a default filler string. Overrides color parameter. By default None.
+        color_column : str, optional
+            Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
+        ax : plt.Axes, optional
+            Matplotlib axes object to plot on, if None a new figure is created. By default None.
+        palette : list[str | tuple] | matplotlib.colors.Colormap, optional
+            List of colors to use for color encoding, if None a default palette is used. By default None.
+        color_dict: dict[str, str | tuple], optional
+            Supercedes palette, a dictionary mapping levels to colors. By default None. If provided, palette is ignored.
+        legend : str | mpl.legend.Legend, optional
+            Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
+        scatter_kwargs : dict, optional
+            Additional keyword arguments for the matplotlib scatter function. By default None.
+        legend_kwargs : dict, optional
+            Additional keyword arguments for the matplotlib legend function. By default None.
+        figure_kwargs : dict | None, optional
+            Additional keyword arguments for figure creation. By default None.
+        xlim : tuple[float, float], optional
+            Limits for the x-axis. By default None.
+        ylim : tuple[float, float], optional
+            Limits for the y-axis. By default None.
+
         x_thresholds : tuple | None, optional
             Tuple of x-axis thresholds for vertical lines. By default None.
         y_thresholds : float, optional
             Y-axis threshold for horizontal line. By default -log10(0.05).
-        layer_dict : dict | None, optional
-            Dictionary defining the layers for coloring. Keys are column names, values are lists of values
+        plot_layers : list[tuple] | None, optional
+            List of tuples defining the layers for coloring. The first entry of each tuple is the column name, the second entry
+            a value or a list of values to match in that column. Points matching those values are colored according to the color_dict.
+            The order of the list defines the plotting order, i.e. the first layer is plotted on top.
             in those columns to color. By default None.
         display_id_column : str | None, optional
             Column name for the labels to display. If None, uses the DataFrame index. By default None.
-        color_dict : dict | None, optional
-            Dictionary mapping layer values to colors. By default None.
         label_layers : list[str] | None, optional
             List of layer column names for which to add labels. By default None.
         max_labels : int | None, optional
             Maximum number of labels to add. If None, all points in label_layers are labeled. By default None.
         x_label_anchors : list[float] | None, optional
             X positions for label anchors. If None, labels are centered above points. By default None.
-        figure_kwargs : dict | None, optional
-            Additional keyword arguments for figure creation. By default None.
-        scatter_kwargs : dict | None, optional
-            Additional keyword arguments for the scatter plot. By default None.
         label_kwargs : dict | None, optional
             Additional keyword arguments for axis labeling. By default None.
         y_display_start : float | None, optional
@@ -1651,89 +1686,99 @@ class Plots:
             Matplotlib axes object with the volcano plot.
 
         """
+        data = data.copy()
+
         scatter_kwargs = scatter_kwargs or {}
         label_kwargs = label_kwargs or {}
-        figure_kwargs = figure_kwargs or {"figsize": (6, 4)}
-        layer_dict = layer_dict or {}
+        figure_kwargs = figure_kwargs or {"figsize": (3, 3)}
+        legend_kwargs = legend_kwargs or {}
 
-        lim_padding_factor = 1.1
+        color_dict = color_dict or {default_group: default_color}
 
-        def _tolist(
-            obj: str | list,
-        ) -> list:
-            return obj if isinstance(obj, list) else [obj]
+        # By default, all datapoints are in the default layer
+        if plot_layers is None:
+            data[default_group] = data_index_to_array(data, "obs")
 
-        x_columns = ["log2fc"]
+        plot_layers = plot_layers or [(default_group, _tolist(data[default_group].tolist()))]
 
-        if x_column not in x_columns:
-            raise ValueError(f"x_column must be one of {x_columns}")
-
-        # Extract main data values
         x_values = data_column_to_array(data, x_column)
         y_values = data_column_to_array(data, y_column)
 
-        # Determine sensible limits
-        xlims = xlims or _get_plot_lims(x_values, lim_padding_factor, sym="max")
-        ylims = ylims or _get_plot_lims(y_values, lim_padding_factor, set_left=0)
-
+        # Initialize alphapepttools style figure and axes if not provided
         fig = None
         if ax is None:
-            fig, axm = create_figure(1, 1, **figure_kwargs)
+            fig, axm = create_figure(**figure_kwargs)
             ax = axm.next()
 
-        ### Add visualization layers ###
-        # Get all indices as an array
-        indices = np.arange(len(data))
+        # Lims should be symmetric (x) and adapt to the data with some padding
+        xlims = xlims or _get_plot_lims(x_values, lim_padding_factor, sym="max")
+        ylims = ylims or _get_plot_lims(y_values, lim_padding_factor, set_left=0)
+        ax.set_xlim(xlims)
+        ax.set_ylim(ylims)
 
+        # Add visualization layers: Iterate through layer dict and plot each layer so that the first layer is on top.
         glob_spent_idxs = []
         glob_layer_idxs = []
-        for layer_column, layer_values in layer_dict.items():
-            # Extract the layer column as an array
+        entry_indices = np.arange(len(data))
+        for layer_specs in plot_layers:
+            layer_column, color_key, layer_val = layer_specs
+
+            if (
+                not isinstance(layer_column, str)
+                or not isinstance(color_key, str)
+                or not isinstance(layer_val, (str, int, list))
+            ):
+                raise TypeError(f"Layer specifications must be tuples of (str, str, str|int|list), got {layer_specs}")
+
             layer_column_array = data_column_to_array(data, layer_column)
+            layer_color = color_dict.get(color_key, default_color)
+            current_layer_mask = np.isin(layer_column_array, _tolist(layer_val))
 
-            for value in _tolist(layer_values):
-                # If value is a list, we assume that all of them should be colored by the same color, which is assigned
-                # to the layer_column name in the color_dict. If the value is a single string, we look directly for that
-                # string in the color_dict.
-                layer_colorname = layer_column if isinstance(value, list) else value
-                layer_color = color_dict.get(
-                    layer_colorname,
-                    BaseColors.get("grey"),
-                )
+            # Update the current layer mask to exclude points already assigned to previous layers
+            not_spent = ~np.isin(entry_indices, glob_spent_idxs)
+            current_layer_mask = current_layer_mask & not_spent
 
-                # Create boolean mask for this layer
-                in_layer = np.isin(layer_column_array, _tolist(value))
-                not_spent = ~np.isin(indices, glob_spent_idxs)
-                mask = in_layer & not_spent
+            # Save indices and lookup value to color current layer
+            layer_idxs = entry_indices[current_layer_mask].tolist()
+            glob_layer_idxs.append((layer_idxs, layer_color, color_key))
 
-                # Get the indices that match
-                layer_idxs = indices[mask].tolist()
-                glob_layer_idxs.append((layer_idxs, layer_color, layer_column))
-                glob_spent_idxs.extend(layer_idxs)
+            # Update spent indices so they are not assigned again
+            glob_spent_idxs.extend(layer_idxs)
 
+        # If any indices are not spent, assign them to the default layer
         if len(glob_spent_idxs) < len(data):
-            logger.warning(f"{len(data) - len(glob_spent_idxs)} indices were not used in the volcano plot.")
+            remaining_idxs = list(set(entry_indices) - set(glob_spent_idxs))
+            glob_layer_idxs.append((remaining_idxs, color_dict.get(default_group, default_color), default_group))
+            glob_spent_idxs.extend(remaining_idxs)
 
+        # Check that no points were left unassigned
+        if len(glob_spent_idxs) != len(data):
+            raise ValueError("Some data points were not assigned to any layer in the volcano plot.")
+
+        # Plot each layer in reverse order so that the first layer is on top
         for layer_idxs, layer_color, _ in reversed(glob_layer_idxs):
             if len(layer_idxs) > 0:
                 Plots.scatter(
-                    ax=ax,
                     data=subset_data(data, layer_idxs),
                     x_column=x_column,
                     y_column=y_column,
                     color=layer_color,
+                    ax=ax,
                     scatter_kwargs=scatter_kwargs,
                 )
 
-        ### Add border lines ###
-        add_lines(ax=ax, linetype="vline", intercepts=list(x_thresholds))
-        add_lines(ax=ax, linetype="hline", intercepts=[y_thresholds])
+        # Add decoration to volcanoplot
+        add_lines(ax=ax, linetype="vline", intercepts=list(x_thresholds), line_kwargs=line_kwargs)
+        add_lines(ax=ax, linetype="hline", intercepts=[y_thresholds], line_kwargs=line_kwargs)
 
-        # Label selected ids
+        ax.set_xlim(xlims)
+        ax.set_ylim(ylims)
+
+        # Label IDs per label_layers: only layers specified in label_layers are considered for labeling
         if label_layers is not None:
             glob_label_idxs = []
-            for layer_idxs, _, layer_column in glob_layer_idxs:
-                if layer_column in label_layers:
+            for layer_idxs, _, layer_label_key in glob_layer_idxs:
+                if layer_label_key in label_layers:
                     glob_label_idxs.extend(layer_idxs)
 
             if glob_label_idxs:
@@ -1743,7 +1788,7 @@ class Plots:
 
                 # Get display labels, fall back to index if no display_id_column is provided
                 if display_id_column is None:
-                    all_labels = data_index_to_array(data, "var")
+                    all_labels = data_index_to_array(data, "obs")
                 else:
                     all_labels = data_column_to_array(data, display_id_column)
                 display_labels = all_labels[glob_label_idxs]
@@ -1780,18 +1825,9 @@ class Plots:
         )
 
         # Add legend from color dict
-        add_legend_to_axes(
-            ax=ax,
-            levels=color_dict,
-        )
-
-        # Set lims
-        if xlims is not None:
-            ax.set_xlim(xlims)
-        if ylims is not None:
-            ax.set_ylim(ylims)
-
-        return (
-            fig,
-            ax,
-        )
+        if legend is not None and color_dict is not None:
+            add_legend_to_axes(
+                ax=ax,
+                levels=color_dict,
+                **legend_kwargs,
+            )
