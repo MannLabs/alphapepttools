@@ -34,7 +34,7 @@ def toy_adata_with_mask(toy_adata):
     return toy_adata
 
 
-def test_run_pca_default(toy_adata):
+def test_pca__default(toy_adata):
     """Test the pca function with default parameters (obs space)."""
     at.tl.pca(toy_adata)
 
@@ -52,7 +52,7 @@ def test_run_pca_default(toy_adata):
     assert "variance" in toy_adata.uns["variance_pca_obs"]
 
 
-def test_run_pca_var_space(toy_adata):
+def test_pca__var_space(toy_adata):
     """Test the pca function in var space (PCA on genes)."""
     at.tl.pca(toy_adata, dim_space="var")
 
@@ -66,7 +66,7 @@ def test_run_pca_var_space(toy_adata):
     assert toy_adata.obsm["PCs_var"].shape[0] == toy_adata.n_obs
 
 
-def test_run_pca_with_layer(toy_adata_with_layers):
+def test_pca__with_layer(toy_adata_with_layers):
     """Test the pca function using a specific layer."""
     at.tl.pca(toy_adata_with_layers, layer="norm")
 
@@ -76,7 +76,7 @@ def test_run_pca_with_layer(toy_adata_with_layers):
     assert "variance_pca_obs" in toy_adata_with_layers.uns
 
 
-def test_run_pca_with_custom_embeddings_name(toy_adata):
+def test_pca__with_custom_embeddings_name(toy_adata):
     """Test the pca function with custom embeddings name."""
     custom_name = "my_custom_pca"
     at.tl.pca(toy_adata, embeddings_name=custom_name)
@@ -87,7 +87,7 @@ def test_run_pca_with_custom_embeddings_name(toy_adata):
     assert custom_name in toy_adata.uns, f"Custom PCA variance not found with name {custom_name}"
 
 
-def test_run_pca_with_mask(toy_adata_with_mask):
+def test_pca__with_mask(toy_adata_with_mask):
     """Test the pca function with feature mask."""
     at.tl.pca(toy_adata_with_mask, meta_data_mask_column_name="feature_mask")
 
@@ -106,7 +106,7 @@ def test_run_pca_with_mask(toy_adata_with_mask):
     assert not np.isnan(loadings[mask, :]).any(), "Unmasked features should not have NaN loadings"
 
 
-def test_run_pca_var_space_with_mask(toy_adata_with_mask):
+def test_pca__var_space_with_mask(toy_adata_with_mask):
     """Test the pca function in var space with feature mask."""
     at.tl.pca(toy_adata_with_mask, dim_space="var", meta_data_mask_column_name="feature_mask")
 
@@ -126,7 +126,7 @@ def test_run_pca_var_space_with_mask(toy_adata_with_mask):
 
 
 # Legacy test for backward compatibility
-def test_run_pca_legacy(toy_adata):
+def test_pca__legacy(toy_adata):
     """Test the run_pca function on a toy dataset (legacy test)."""
     toy_adata.layers["norm"] = toy_adata.X.copy()
     at.tl.pca(toy_adata, layer="norm")
@@ -167,7 +167,7 @@ def toy_adata_with_missing_values() -> dict[str, Any]:
     }
 
 
-def test_bpca_default(toy_adata):
+def test_bpca__default(toy_adata):
     """Test the bpca function with default parameters (obs space)."""
     at.tl.bpca(toy_adata, n_comps=5)
 
