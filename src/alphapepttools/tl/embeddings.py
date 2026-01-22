@@ -67,10 +67,9 @@ def _prepare_pca_data(
 
     Returns
     -------
-    If dim_space="obs": Array with dimensions (obs, var) where var dimension includes all features
-    for which `var_mask` is True
-    If dim_space="var": Array with dimensions (var, obs) where var dimension includes all features
-    for which `var_mask` is True
+    Array with dimensions `(obs, var)` if `dim_space == "obs"`, or `(var, obs)` if
+    `dim_space == "var"`. The var dimension includes only features for which `var_mask`
+    is True.
     """
     adata_sub = adata[:, var_mask] if var_mask is not None else adata
     data_for_pca = adata_sub.layers[layer].copy() if layer is not None else adata_sub.X.copy()
@@ -110,7 +109,7 @@ def _store_pca_results(
     dim_space
         Either "obs" or "var", indicating the PCA projection space.
     embeddings_name
-        Custom key name for storing PCA results, used in all attributes. If `None`, keys are {default_<>_prefix}
+        Custom key name for storing PCA results, used in all attributes. If `None`, keys are {default_<>_prefix}_{dim_space}
     meta_data_mask_column_name
         Column name in adata.var used as a boolean mask for features. If None, all features are used.
 
@@ -295,7 +294,7 @@ def _run_bpca(
         - usage: BPCA factor usage (dim0, n_components)
         - loadings: BPCA factor loadings (n_components, dim1)
         - variance_ratio: Fraction of variance explained (n_components,)
-        - eigenvalues: None as `BPCA` does not compute the eigenvalues of the covariance matrix. Returned for compatibility with :func:`alphatools.tl.pca`.
+        - eigenvalues: None as `BPCA` does not compute the eigenvalues of the covariance matrix. Returned for compatibility with :func:`alphapepttools.tl.pca`.
     """
     bpca = BPCA(n_components=n_components, sort_components=True, **bpca_kwargs)
     usage = bpca.fit_transform(data_for_bpca)
