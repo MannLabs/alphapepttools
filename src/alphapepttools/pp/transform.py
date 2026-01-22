@@ -66,7 +66,7 @@ def detect_special_values(
 
 
 def nanlog(
-    data: ad.AnnData, base: int = 2, verbosity: int = 1, layer: str | None = None, *, copy: bool = False
+    adata: ad.AnnData, base: int = 2, verbosity: int = 1, layer: str | None = None, *, copy: bool = False
 ) -> ad.AnnData:
     """Logarithmize a data matrix.
 
@@ -83,7 +83,7 @@ def nanlog(
 
     Parameters
     ----------
-    data
+    adata
         Input data; negatives and/or zeros are converted to np.nan
     base : int
         Base of the logarithm. Defaults to 2 (log2).
@@ -118,13 +118,13 @@ def nanlog(
         # will update "layer" in adata.layers and modify the object inplace
 
     """
-    if not isinstance(data, ad.AnnData):
+    if not isinstance(adata, ad.AnnData):
         raise TypeError("Input must be a anndata.AnnData.")
 
     if base in {0, 1} or base < 0:
         raise ValueError("Base cannot be 0 (divide by -Inf) or 1 (divide by 0) or negative (invalid log).")
 
-    data = data.copy() if copy else data
+    adata = adata.copy() if copy else adata
 
     def _log_func(
         x: np.ndarray | pd.DataFrame | pd.Series,
@@ -137,13 +137,14 @@ def nanlog(
             return np.log10(x)
         return np.log(x) / np.log(base)
 
+    input_data = adata.X if layer is None else adata.layers[layer]
+
     # Handle subtleties with filtering and assignment of different datatypes
-    special_values_mask = detect_special_values(data.X, verbosity)
+    special_values_mask = detect_special_values(input_data, verbosity)
 
-    input_data = data.X if layer is None else data.layers[layer]
     if layer is None:
-        data.X = _log_func(np.where(~special_values_mask, input_data, np.nan), base)
+        adata.X = _log_func(np.where(~special_values_mask, input_data, np.nan), base)
     else:
-        data.layers[layer] = _log_func(np.where(~special_values_mask, input_data, np.nan), base)
+        adata.layers[layer] = _log_func(np.where(~special_values_mask, input_data, np.nan), base)
 
-    return data if copy else None
+    return adata if copy else None
