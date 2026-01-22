@@ -82,9 +82,9 @@ def _prepare_pca_data(
 def _store_pca_results(
     adata: ad.AnnData,
     pca_res: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None],
-    default_coords_key: str,
-    default_loadings_key: str,
-    default_uns_key: str,
+    default_coords_prefix: str,
+    default_loadings_prefix: str,
+    default_uns_prefix: str,
     dim_space: Literal["obs", "var"],
     embeddings_name: str | None,
     meta_data_mask_column_name: str | None,
@@ -93,7 +93,7 @@ def _store_pca_results(
 
     Per default, keys are generated in the form `{default_<>_key}_{dim_space}` and added to the respective
     anndata attributes. `embeddings_name` overwrites the defaults in which case all added keys will be called
-    `embeddings_name`
+    `embeddings_name`.
 
     Parameters
     ----------
@@ -101,16 +101,16 @@ def _store_pca_results(
         The AnnData object to update.
     pca_res
         PCA result tuple (coordinates, loadings, variance_ratio, variance).
-    default_coords_key
-        Prefix of coordinates. Overwritten by `embeddings_name`
-    default_loadings_key
-        Prefix of loadings. Overwritten by `embeddings_name`
-    default_uns_key
-        Name of metadata in `adata.uns`. Overwritten by `embeddings_name`
+    default_coords_prefix
+        Default prefix of coordinates. Overwritten by `embeddings_name`
+    default_loadings_prefix
+        Default prefix of loadings. Overwritten by `embeddings_name`
+    default_uns_prefix
+        Default prefix of metadata in `adata.uns`. Overwritten by `embeddings_name`
     dim_space
         Either "obs" or "var", indicating the PCA projection space.
     embeddings_name
-        Custom key name for storing PCA results. If None, defaults are used.
+        Custom key name for storing PCA results, used in all attributes. If `None`, keys are {default_<>_prefix}
     meta_data_mask_column_name
         Column name in adata.var used as a boolean mask for features. If None, all features are used.
 
@@ -120,9 +120,9 @@ def _store_pca_results(
     """
     # get key names for storing PCA results
     if embeddings_name is None:
-        pca_coords_key = f"{default_coords_key}_{dim_space}"
-        loadings_key = f"{default_loadings_key}_{dim_space}"
-        variance_key = f"{default_uns_key}_{dim_space}"
+        pca_coords_key = f"{default_coords_prefix}_{dim_space}"
+        loadings_key = f"{default_loadings_prefix}_{dim_space}"
+        variance_key = f"{default_uns_prefix}_{dim_space}"
     else:
         pca_coords_key = embeddings_name
         loadings_key = embeddings_name
@@ -269,9 +269,9 @@ def pca(
         dim_space=dim_space,
         embeddings_name=embeddings_name,
         meta_data_mask_column_name=meta_data_mask_column_name,
-        default_coords_key="X_pca",
-        default_loadings_key="PCs",
-        default_uns_key="variance_pca",
+        default_coords_prefix="X_pca",
+        default_loadings_prefix="PCs",
+        default_uns_prefix="variance_pca",
     )
 
 
@@ -423,7 +423,7 @@ def bpca(
         dim_space=dim_space,
         embeddings_name=embeddings_name,
         meta_data_mask_column_name=meta_data_mask_column_name,
-        default_coords_key="X_bpca",
-        default_loadings_key="PCs_bpca",
-        default_uns_key="variance_bpca",
+        default_coords_prefix="X_bpca",
+        default_loadings_prefix="PCs_bpca",
+        default_uns_prefix="variance_bpca",
     )
