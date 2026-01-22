@@ -82,43 +82,41 @@ def _prepare_pca_data(
 def _store_pca_results(
     adata: ad.AnnData,
     pca_res: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None],
-    dim_space: str,
-    embeddings_name: str | None,
-    meta_data_mask_column_name: str | None,
     default_coords_key: str,
     default_loadings_key: str,
     default_uns_key: str,
-    logger: logging.Logger,
+    dim_space: Literal["obs", "var"],
+    embeddings_name: str | None,
+    meta_data_mask_column_name: str | None,
 ) -> ad.AnnData:
-    """
-    Store PCA results (coordinates, loadings, and variance) in the appropriate AnnData attributes.
+    """Store PCA results (coordinates, loadings, and variance) in the appropriate AnnData attributes (.obsm, .varm, .uns)
+
+    Per default, keys are generated in the form `{default_<>_key}_{dim_space}` and added to the respective
+    anndata attributes. `embeddings_name` overwrites the defaults in which case all added keys will be called
+    `embeddings_name`
 
     Parameters
     ----------
-    adata : ad.AnnData
+    adata
         The AnnData object to update.
-    pca_res : tuple
-        The result from scanpy.pp.pca (coordinates, loadings, variance_ratio, variance).
-        Variance is optional as it is not computed by BPCA
-    dim_space : str
-        Either "obs" or "var", indicating the PCA projection space.
-    embeddings_name : str or None
-        Custom key name for storing PCA results. If None, defaults are used.
-    meta_data_mask_column_name : str or None
-        Column name in adata.var used as a boolean mask for features. If None, all features are used.
+    pca_res
+        PCA result tuple (coordinates, loadings, variance_ratio, variance).
     default_coords_key
-        Name of coordinates (observations) in `adata.obsm`
+        Prefix of coordinates. Overwritten by `embeddings_name`
     default_loadings_key
-        Name of loadings (features) in `adata.varm`
+        Prefix of loadings. Overwritten by `embeddings_name`
     default_uns_key
-        Name of metadata in `adata.uns`
-    logger : logging.Logger
-        Logger for warning messages.
+        Name of metadata in `adata.uns`. Overwritten by `embeddings_name`
+    dim_space
+        Either "obs" or "var", indicating the PCA projection space.
+    embeddings_name
+        Custom key name for storing PCA results. If None, defaults are used.
+    meta_data_mask_column_name
+        Column name in adata.var used as a boolean mask for features. If None, all features are used.
 
     Returns
     -------
-    ad.AnnData
-        The updated AnnData object with PCA results stored.
+    The updated AnnData object with PCA results added to `adata.obsm`, `adata.varm`, and `adata.uns` attributes
     """
     # get key names for storing PCA results
     if embeddings_name is None:
@@ -274,7 +272,6 @@ def pca(
         default_coords_key="X_pca",
         default_loadings_key="PCs",
         default_uns_key="variance_pca",
-        logger=logger,
     )
 
 
@@ -429,5 +426,4 @@ def bpca(
         default_coords_key="X_bpca",
         default_loadings_key="PCs_bpca",
         default_uns_key="variance_bpca",
-        logger=logger,
     )
