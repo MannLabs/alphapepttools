@@ -11,9 +11,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-BPCA_DEFAULT_NAME = "BPCA"
-
-
 def _check_inputs_for_dim_reduction(
     adata: ad.AnnData, layer: str | None, dim_space: str, meta_data_mask_column_name: str | None
 ) -> None:
@@ -85,40 +82,47 @@ def _prepare_pca_data(
 def _store_pca_results(
     adata: ad.AnnData,
     pca_res: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None],
-    dim_space: str,
+    default_coords_prefix: str,
+    default_loadings_prefix: str,
+    default_uns_prefix: str,
+    dim_space: Literal["obs", "var"],
     embeddings_name: str | None,
     meta_data_mask_column_name: str | None,
-    logger: logging.Logger,
 ) -> ad.AnnData:
-    """
-    Store PCA results (coordinates, loadings, and variance) in the appropriate AnnData attributes.
+    """Store PCA results (coordinates, loadings, and variance) in the appropriate AnnData attributes (.obsm, .varm, .uns)
+
+    Per default, keys are generated in the form `{default_<>_key}_{dim_space}` and added to the respective
+    anndata attributes. `embeddings_name` overwrites the defaults in which case all added keys will be called
+    `embeddings_name`.
 
     Parameters
     ----------
-    adata : ad.AnnData
+    adata
         The AnnData object to update.
-    pca_res : tuple
-        The result from scanpy.pp.pca (coordinates, loadings, variance_ratio, variance).
-        Variance is optional as it is not computed by BPCA
-    dim_space : str
+    pca_res
+        PCA result tuple (coordinates, loadings, variance_ratio, variance).
+    default_coords_prefix
+        Default prefix of coordinates. Overwritten by `embeddings_name`
+    default_loadings_prefix
+        Default prefix of loadings. Overwritten by `embeddings_name`
+    default_uns_prefix
+        Default prefix of metadata in `adata.uns`. Overwritten by `embeddings_name`
+    dim_space
         Either "obs" or "var", indicating the PCA projection space.
-    embeddings_name : str or None
-        Custom key name for storing PCA results. If None, defaults are used.
-    meta_data_mask_column_name : str or None
+    embeddings_name
+        Custom key name for storing PCA results, used in all attributes. If `None`, keys are {default_<>_prefix}
+    meta_data_mask_column_name
         Column name in adata.var used as a boolean mask for features. If None, all features are used.
-    logger : logging.Logger
-        Logger for warning messages.
 
     Returns
     -------
-    ad.AnnData
-        The updated AnnData object with PCA results stored.
+    The updated AnnData object with PCA results added to `adata.obsm`, `adata.varm`, and `adata.uns` attributes
     """
     # get key names for storing PCA results
     if embeddings_name is None:
-        pca_coords_key = f"X_pca_{dim_space}"
-        loadings_key = f"PCs_{dim_space}"
-        variance_key = f"variance_pca_{dim_space}"
+        pca_coords_key = f"{default_coords_prefix}_{dim_space}"
+        loadings_key = f"{default_loadings_prefix}_{dim_space}"
+        variance_key = f"{default_uns_prefix}_{dim_space}"
     else:
         pca_coords_key = embeddings_name
         loadings_key = embeddings_name
@@ -259,7 +263,16 @@ def pca(
     # run PCA
     pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, **pca_kwargs)
 
-    return _store_pca_results(adata, pca_res, dim_space, embeddings_name, meta_data_mask_column_name, logger)
+    return _store_pca_results(
+        adata=adata,
+        pca_res=pca_res,
+        dim_space=dim_space,
+        embeddings_name=embeddings_name,
+        meta_data_mask_column_name=meta_data_mask_column_name,
+        default_coords_prefix="X_pca",
+        default_loadings_prefix="PCs",
+        default_uns_prefix="variance_pca",
+    )
 
 
 def _run_bpca(
@@ -399,8 +412,6 @@ def bpca(
         adata=adata, layer=layer, dim_space=dim_space, meta_data_mask_column_name=meta_data_mask_column_name
     )
 
-    embeddings_name = BPCA_DEFAULT_NAME if embeddings_name is None else embeddings_name
-
     var_mask = adata.var[meta_data_mask_column_name] if meta_data_mask_column_name is not None else None
     data_for_bpca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask, dim_space=dim_space)
 
@@ -412,5 +423,7 @@ def bpca(
         dim_space=dim_space,
         embeddings_name=embeddings_name,
         meta_data_mask_column_name=meta_data_mask_column_name,
-        logger=logger,
+        default_coords_prefix="X_bpca",
+        default_loadings_prefix="PCs_bpca",
+        default_uns_prefix="variance_bpca",
     )
