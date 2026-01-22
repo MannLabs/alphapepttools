@@ -1,4 +1,6 @@
 import logging
+from collections.abc import Iterable
+from typing import Literal
 
 import anndata as ad
 import numpy as np
@@ -7,9 +9,6 @@ from bpca import BPCA
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
-BPCA_DEFAULT_NAME = "BPCA"
 
 
 def _check_inputs_for_dim_reduction(
@@ -47,42 +46,82 @@ def _check_inputs_for_dim_reduction(
             )
 
 
-def _store_pca_results(
+def _prepare_pca_data(
     adata: ad.AnnData,
-    pca_res: tuple,
-    dim_space: str,
-    embeddings_name: str | None,
-    meta_data_mask_column_name: str | None,
-    logger: logging.Logger,
-) -> ad.AnnData:
-    """
-    Store PCA results (coordinates, loadings, and variance) in the appropriate AnnData attributes.
+    layer: str | None = None,
+    var_mask: Iterable[bool] | None = None,
+    dim_space: Literal["obs", "var"] = "obs",
+) -> np.ndarray:
+    """Extract data for PCA in correct orientation
 
     Parameters
     ----------
-    adata : ad.AnnData
-        The AnnData object to update.
-    pca_res : tuple
-        The result from scanpy.pp.pca (coordinates, loadings, variance_ratio, variance).
-    dim_space : str
-        Either "obs" or "var", indicating the PCA projection space.
-    embeddings_name : str or None
-        Custom key name for storing PCA results. If None, defaults are used.
-    meta_data_mask_column_name : str or None
-        Column name in adata.var used as a boolean mask for features. If None, all features are used.
-    logger : logging.Logger
-        Logger for warning messages.
+    adata
+        AnnData object (obs x var)
+    layer
+        Layer in anndata object to consider. If `None` uses `adata.X`.
+    var_mask
+        Boolean mask indicating whether feature should be considered for PCA or not
+    dim_space
+        PCA projection space. Either "obs" (project observations) or "var" (project features).
 
     Returns
     -------
-    ad.AnnData
-        The updated AnnData object with PCA results stored.
+    Array with dimensions `(obs, var)` if `dim_space == "obs"`, or `(var, obs)` if
+    `dim_space == "var"`. The var dimension includes only features for which `var_mask`
+    is True.
+    """
+    adata_sub = adata[:, var_mask] if var_mask is not None else adata
+    data_for_pca = adata_sub.layers[layer].copy() if layer is not None else adata_sub.X.copy()
+
+    # Transpose if PCA is done on the feature space
+    return data_for_pca.T if dim_space == "var" else data_for_pca
+
+
+def _store_pca_results(
+    adata: ad.AnnData,
+    pca_res: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None],
+    default_coords_prefix: str,
+    default_loadings_prefix: str,
+    default_uns_prefix: str,
+    dim_space: Literal["obs", "var"],
+    embeddings_name: str | None,
+    meta_data_mask_column_name: str | None,
+) -> ad.AnnData:
+    """Store PCA results (coordinates, loadings, and variance) in the appropriate AnnData attributes (.obsm, .varm, .uns)
+
+    Per default, keys are generated in the form `{default_<>_key}_{dim_space}` and added to the respective
+    anndata attributes. `embeddings_name` overwrites the defaults in which case all added keys will be called
+    `embeddings_name`.
+
+    Parameters
+    ----------
+    adata
+        The AnnData object to update.
+    pca_res
+        PCA result tuple (coordinates, loadings, variance_ratio, variance).
+    default_coords_prefix
+        Default prefix of coordinates. Overwritten by `embeddings_name`
+    default_loadings_prefix
+        Default prefix of loadings. Overwritten by `embeddings_name`
+    default_uns_prefix
+        Default prefix of metadata in `adata.uns`. Overwritten by `embeddings_name`
+    dim_space
+        Either "obs" or "var", indicating the PCA projection space.
+    embeddings_name
+        Custom key name for storing PCA results, used in all attributes. If `None`, keys are {default_<>_prefix}_{dim_space}
+    meta_data_mask_column_name
+        Column name in adata.var used as a boolean mask for features. If None, all features are used.
+
+    Returns
+    -------
+    The updated AnnData object with PCA results added to `adata.obsm`, `adata.varm`, and `adata.uns` attributes
     """
     # get key names for storing PCA results
     if embeddings_name is None:
-        pca_coords_key = f"X_pca_{dim_space}"
-        loadings_key = f"PCs_{dim_space}"
-        variance_key = f"variance_pca_{dim_space}"
+        pca_coords_key = f"{default_coords_prefix}_{dim_space}"
+        loadings_key = f"{default_loadings_prefix}_{dim_space}"
+        variance_key = f"{default_uns_prefix}_{dim_space}"
     else:
         pca_coords_key = embeddings_name
         loadings_key = embeddings_name
@@ -130,7 +169,7 @@ def _store_pca_results(
     loadings_dict[loadings_key] = loadings_mat
     adata.uns[variance_key] = {
         "variance_ratio": pca_res[2].copy(),  # Ratio of explained variance (n_comp)
-        "variance": pca_res[3].copy(),  # Explained variance (n_comp)
+        "variance": pca_res[3].copy() if pca_res[3] is not None else None,  # Explained variance (n_comp)
     }
 
     return adata
@@ -212,23 +251,57 @@ def pca(
         covariance matrix.
     """
     logger.info("computing PCA")
-    pca_kwargs = pca_kwargs or {}
 
     _check_inputs_for_dim_reduction(
         adata=adata, layer=layer, dim_space=dim_space, meta_data_mask_column_name=meta_data_mask_column_name
     )
 
-    # get the matrix to run PCA on
-    adata_sub = adata[:, adata.var[meta_data_mask_column_name]] if meta_data_mask_column_name is not None else adata
-    data_for_pca = adata_sub.layers[layer].copy() if layer is not None else adata_sub.X.copy()
-    data_for_pca = (
-        data_for_pca.T if dim_space == "var" else data_for_pca
-    )  # transpose if PCA is done on the feature space
+    var_mask = adata.var[meta_data_mask_column_name] if meta_data_mask_column_name is not None else None
+    data_for_pca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask, dim_space=dim_space)
 
     # run PCA
     pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, **pca_kwargs)
 
-    return _store_pca_results(adata, pca_res, dim_space, embeddings_name, meta_data_mask_column_name, logger)
+    return _store_pca_results(
+        adata=adata,
+        pca_res=pca_res,
+        dim_space=dim_space,
+        embeddings_name=embeddings_name,
+        meta_data_mask_column_name=meta_data_mask_column_name,
+        default_coords_prefix="X_pca",
+        default_loadings_prefix="PCs",
+        default_uns_prefix="variance_pca",
+    )
+
+
+def _run_bpca(
+    data_for_bpca: np.ndarray, n_components: int, **bpca_kwargs
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, None]:
+    """Run Bayesian Principal Component Analysis
+
+    Parameters
+    ----------
+    data_for_bpca
+        Data of shape (dim0, dim1)
+    n_components
+        Number of components
+    **bpca_kwargs
+        Passed to :class:`BPCA`
+
+    Returns
+    -------
+    Tuple of numpy arrays
+        - usage: BPCA factor usage (dim0, n_components)
+        - loadings: BPCA factor loadings (n_components, dim1)
+        - variance_ratio: Fraction of variance explained (n_components,)
+        - eigenvalues: None as `BPCA` does not compute the eigenvalues of the covariance matrix. Returned for compatibility with :func:`alphapepttools.tl.pca`.
+    """
+    bpca = BPCA(n_components=n_components, sort_components=True, **bpca_kwargs)
+    usage = bpca.fit_transform(data_for_bpca)
+    loadings = bpca.components_
+    explained_variance_ratio = bpca.explained_variance_ratio_
+
+    return (usage, loadings, explained_variance_ratio, None)
 
 
 def bpca(
@@ -338,25 +411,10 @@ def bpca(
         adata=adata, layer=layer, dim_space=dim_space, meta_data_mask_column_name=meta_data_mask_column_name
     )
 
-    embeddings_name = BPCA_DEFAULT_NAME if embeddings_name is None else embeddings_name
+    var_mask = adata.var[meta_data_mask_column_name] if meta_data_mask_column_name is not None else None
+    data_for_bpca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask, dim_space=dim_space)
 
-    # get the matrix to run PCA on
-    adata_sub = adata[:, adata.var[meta_data_mask_column_name]] if meta_data_mask_column_name is not None else adata
-    data_for_pca = adata_sub.layers[layer].copy() if layer is not None else adata_sub.X.copy()
-    data_for_pca = (
-        data_for_pca.T if dim_space == "var" else data_for_pca
-    )  # transpose if PCA is done on the feature space
-
-    # run PCA
-    bpca = BPCA(n_components=n_comps, **bpca_kwargs)
-    usage = bpca.fit_transform(data_for_pca)
-    loadings = bpca.components_
-    explained_variance_ratio = bpca.explained_variance_ratio_
-
-    # BPCA does not order the dimensions on variance explained - sort manually
-    order = np.argsort(explained_variance_ratio)[::-1]
-
-    pca_res = (usage[:, order], loadings[order, :], explained_variance_ratio[order], np.array([]))
+    pca_res = _run_bpca(data_for_bpca=data_for_bpca, n_components=n_comps, **bpca_kwargs)
 
     return _store_pca_results(
         adata=adata,
@@ -364,5 +422,7 @@ def bpca(
         dim_space=dim_space,
         embeddings_name=embeddings_name,
         meta_data_mask_column_name=meta_data_mask_column_name,
-        logger=logger,
+        default_coords_prefix="X_bpca",
+        default_loadings_prefix="PCs_bpca",
+        default_uns_prefix="variance_bpca",
     )
