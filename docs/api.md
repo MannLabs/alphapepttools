@@ -19,6 +19,7 @@
     pp.impute_gaussian
     pp.impute_median
     pp.impute_knn
+    pp.impute_bpca
     pp.scanpy_pycombat
 
 ```
