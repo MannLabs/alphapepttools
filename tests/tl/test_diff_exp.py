@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import anndata as ad
 import numpy as np
@@ -196,15 +197,14 @@ def test_diff_exp_ttest(example_data, example_metadata, between_column, comparis
 
 
 # Test diff_exp_alphaquant by loading small example datasets
-# TODO: Mock alphaquant itself to avoid dependency on it for testing diff_exp_alphaquant; this might depend on implementing an AlphaQuant API to avoid the temp-file construct currently required
+# Uses mocking to avoid dependency on AlphaQuant's numerical results
 def test_diff_exp_alphaquant():
     """Testing function to ascertain stable functionality of diff_exp_alphaquant on small example datasets.
 
-    The expected data were generated in alphapepttools/tests/tl/tl_test_data.ipynb and saved
-    as .pkl files in alphapepttools/tests/tl/tl_test_data.
+    This test mocks the AlphaQuant pipeline to test input handling and result standardization
+    without depending on the numerical results of AlphaQuant itself.
 
     """
-
     test_data_dir = Path(__file__).parent / "tl_test_data"
     report = pd.read_csv(test_data_dir / "example_dataset_mouse_sn_top20peptides.tsv", sep="\t")
     samplemap = pd.read_csv(test_data_dir / "samplemap_200.tsv", sep="\t")
@@ -214,22 +214,118 @@ def test_diff_exp_alphaquant():
         obs=samplemap.set_index("sample"),
     )
 
-    comparison_key, results = tl.diff_exp_alphaquant(
-        adata=adata,
-        report=report,
-        between_column="condition",
-        comparison=("brain", "kidney"),
-        min_valid_values=2,
-        valid_values_filter_mode="either",
-        plots="hide",
+    # Mock raw AlphaQuant output (pre-standardization columns)
+    mock_protein_df = pd.DataFrame(
+        {
+            "condition_pair": ["brain_VS_kidney", "brain_VS_kidney"],
+            "protein": ["PROT1", "PROT2"],
+            "log2fc": [1.0, -0.5],
+            "p_value": [0.01, 0.05],
+            "fdr": [0.02, 0.08],
+            "quality_score": [0.9, 0.8],
+        }
+    )
+    mock_proteoform_df = pd.DataFrame(
+        {
+            "protein": ["PROT1", "PROT2"],
+            "log2fc": [1.0, -0.5],
+            "proteoform_pval": [0.01, 0.05],
+            "proteoform_fdr": [0.02, 0.08],
+            "proteoform_id": ["PF1", "PF2"],
+            "peptides": ["PEP1;PEP2", "PEP3"],
+            "num_peptides": [2, 1],
+            "quality_score": [0.9, 0.8],
+        }
+    )
+    mock_peptide_df = pd.DataFrame(
+        {
+            "condition_pair": ["brain_VS_kidney", "brain_VS_kidney"],
+            "protein": ["PROT1", "PROT2"],
+            "log2fc": [1.0, -0.5],
+            "p_value": [0.01, 0.05],
+            "fdr": [0.02, 0.08],
+            "sequence": ["SEQ_PEPTIDE1_", "SEQ_PEPTIDE2_"],
+            "quality_score": [0.9, 0.8],
+        }
     )
 
-    # Load expected results
+    def read_csv_side_effect(path, **kwargs):
+        """Return appropriate mock DataFrame based on filename."""
+        path_str = str(path)
+        if path_str.endswith(".results.tsv"):
+            return mock_protein_df.copy()
+        if "proteoforms.tsv" in path_str:
+            return mock_proteoform_df.copy()
+        if "results.seq.tsv" in path_str:
+            return mock_peptide_df.copy()
+        raise ValueError(f"Unexpected path: {path}")
+
+    with (
+        patch("alphapepttools.tl.diff_exp.alphaquant.aq_pipeline.run_pipeline"),
+        patch("alphapepttools.tl.diff_exp.alphaquant.pd.read_csv", side_effect=read_csv_side_effect),
+    ):
+        comparison_key, results = tl.diff_exp_alphaquant(
+            adata=adata,
+            report=report,
+            between_column="condition",
+            comparison=("brain", "kidney"),
+            min_valid_values=2,
+            valid_values_filter_mode="either",
+            plots="hide",
+        )
+
+    # Build expected results (after standardization)
     expected_comparison_key = "brain_VS_kidney"
     expected_results = {
-        "protein": pd.read_pickle(test_data_dir / "alphaquant_protein_diffexp.pkl"),
-        "proteoform": pd.read_pickle(test_data_dir / "alphaquant_proteoform_diffexp.pkl"),
-        "peptide": pd.read_pickle(test_data_dir / "alphaquant_peptide_diffexp.pkl"),
+        "protein": pd.DataFrame(
+            {
+                "condition_pair": ["brain_VS_kidney", "brain_VS_kidney"],
+                "protein": ["PROT1", "PROT2"],
+                "log2fc": [1.0, -0.5],
+                "p_value": [0.01, 0.05],
+                "-log10(p_value)": [2.0, 1.3010299956639813],
+                "fdr": [0.02, 0.08],
+                "-log10(fdr)": [1.6989700043360187, 1.0969100130080565],
+                "method": ["alphaquant", "alphaquant"],
+                "max_level_1_samples": [10, 10],
+                "max_level_2_samples": [10, 10],
+                "quality_score": [0.9, 0.8],
+            }
+        ),
+        "proteoform": pd.DataFrame(
+            {
+                "condition_pair": ["brain_VS_kidney", "brain_VS_kidney"],
+                "protein": ["PROT1", "PROT2"],
+                "log2fc": [1.0, -0.5],
+                "p_value": [0.01, 0.05],
+                "-log10(p_value)": [2.0, 1.3010299956639813],
+                "fdr": [0.02, 0.08],
+                "-log10(fdr)": [1.6989700043360187, 1.0969100130080565],
+                "method": ["alphaquant", "alphaquant"],
+                "max_level_1_samples": [10, 10],
+                "max_level_2_samples": [10, 10],
+                "proteoform_id": ["PF1", "PF2"],
+                "peptides": ["PEP1;PEP2", "PEP3"],
+                "num_peptides": [2, 1],
+                "quality_score": [0.9, 0.8],
+            }
+        ),
+        "peptide": pd.DataFrame(
+            {
+                "condition_pair": ["brain_VS_kidney", "brain_VS_kidney"],
+                "protein": ["PROT1", "PROT2"],
+                "log2fc": [1.0, -0.5],
+                "p_value": [0.01, 0.05],
+                "-log10(p_value)": [2.0, 1.3010299956639813],
+                "fdr": [0.02, 0.08],
+                "-log10(fdr)": [1.6989700043360187, 1.0969100130080565],
+                "method": ["alphaquant", "alphaquant"],
+                "max_level_1_samples": [10, 10],
+                "max_level_2_samples": [10, 10],
+                "sequence": ["PEPTIDE1", "PEPTIDE2"],
+                "quality_score": [0.9, 0.8],
+            }
+        ),
     }
 
     assert comparison_key == expected_comparison_key, (
