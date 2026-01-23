@@ -1,4 +1,5 @@
 from pathlib import Path
+from unittest.mock import patch
 
 import anndata as ad
 import numpy as np
@@ -214,27 +215,122 @@ def test_diff_exp_alphaquant():
         obs=samplemap.set_index("sample"),
     )
 
-    comparison_key, results = tl.diff_exp_alphaquant(
-        adata=adata,
-        report=report,
-        between_column="condition",
-        comparison=("brain", "kidney"),
-        min_valid_values=2,
-        valid_values_filter_mode="either",
-        plots="hide",
+    # Mock raw AlphaQuant output (pre-standardization columns)
+    mock_protein_df = pd.DataFrame(
+        {
+            "condition_pair": ["brain_VS_kidney", "brain_VS_kidney"],
+            "protein": ["PROT1", "PROT2"],
+            "log2fc": [1.0, -0.5],
+            "p_value": [0.01, 0.05],
+            "fdr": [0.02, 0.08],
+            "quality_score": [0.9, 0.8],
+        }
+    )
+    mock_proteoform_df = pd.DataFrame(
+        {
+            "protein": ["PROT1", "PROT2"],
+            "log2fc": [1.0, -0.5],
+            "proteoform_pval": [0.01, 0.05],
+            "proteoform_fdr": [0.02, 0.08],
+            "proteoform_id": ["PF1", "PF2"],
+            "peptides": ["PEP1;PEP2", "PEP3"],
+            "num_peptides": [2, 1],
+            "quality_score": [0.9, 0.8],
+        }
+    )
+    mock_peptide_df = pd.DataFrame(
+        {
+            "condition_pair": ["brain_VS_kidney", "brain_VS_kidney"],
+            "protein": ["PROT1", "PROT2"],
+            "log2fc": [1.0, -0.5],
+            "p_value": [0.01, 0.05],
+            "fdr": [0.02, 0.08],
+            "sequence": ["SEQ_PEPTIDE1_", "SEQ_PEPTIDE2_"],
+            "quality_score": [0.9, 0.8],
+        }
     )
 
-    # Load expected results
+    # Build expected results (after standardization)
     expected_comparison_key = "brain_VS_kidney"
     expected_results = {
-        "protein": pd.read_pickle(test_data_dir / "alphaquant_protein_diffexp.pkl"),
-        "proteoform": pd.read_pickle(test_data_dir / "alphaquant_proteoform_diffexp.pkl"),
-        "peptide": pd.read_pickle(test_data_dir / "alphaquant_peptide_diffexp.pkl"),
+        "protein": pd.DataFrame(
+            {
+                "condition_pair": ["brain_VS_kidney", "brain_VS_kidney"],
+                "protein": ["PROT1", "PROT2"],
+                "log2fc": [1.0, -0.5],
+                "p_value": [0.01, 0.05],
+                "-log10(p_value)": [-np.log10(0.01), -np.log10(0.05)],  # Added by standardization
+                "fdr": [0.02, 0.08],
+                "-log10(fdr)": [-np.log10(0.02), -np.log10(0.08)],  # Added by standardization
+                "method": ["alphaquant", "alphaquant"],  # Added by standardization
+                "max_level_1_samples": [10, 10],  # Added by standardization
+                "max_level_2_samples": [10, 10],  # Added by standardization
+                "quality_score": [0.9, 0.8],
+            }
+        ),
+        "proteoform": pd.DataFrame(
+            {
+                "condition_pair": ["brain_VS_kidney", "brain_VS_kidney"],
+                "protein": ["PROT1", "PROT2"],
+                "log2fc": [1.0, -0.5],
+                "p_value": [0.01, 0.05],
+                "-log10(p_value)": [-np.log10(0.01), -np.log10(0.05)],  # Added by standardization
+                "fdr": [0.02, 0.08],
+                "-log10(fdr)": [-np.log10(0.02), -np.log10(0.08)],  # Added by standardization
+                "method": ["alphaquant", "alphaquant"],  # Added by standardization
+                "max_level_1_samples": [10, 10],  # Added by standardization
+                "max_level_2_samples": [10, 10],  # Added by standardization
+                "proteoform_id": ["PF1", "PF2"],
+                "peptides": ["PEP1;PEP2", "PEP3"],
+                "num_peptides": [2, 1],
+                "quality_score": [0.9, 0.8],
+            }
+        ),
+        "peptide": pd.DataFrame(
+            {
+                "condition_pair": ["brain_VS_kidney", "brain_VS_kidney"],
+                "protein": ["PROT1", "PROT2"],
+                "log2fc": [1.0, -0.5],
+                "p_value": [0.01, 0.05],
+                "-log10(p_value)": [-np.log10(0.01), -np.log10(0.05)],  # Added by standardization
+                "fdr": [0.02, 0.08],
+                "-log10(fdr)": [-np.log10(0.02), -np.log10(0.08)],  # Added by standardization
+                "method": ["alphaquant", "alphaquant"],  # Added by standardization
+                "max_level_1_samples": [10, 10],  # Added by standardization
+                "max_level_2_samples": [10, 10],  # Added by standardization
+                "sequence": ["PEPTIDE1", "PEPTIDE2"],
+                "quality_score": [0.9, 0.8],
+            }
+        ),
     }
 
-    assert comparison_key == expected_comparison_key, (
-        f"Expected comparison key {expected_comparison_key}, got {comparison_key}"
-    )
+    def read_csv_side_effect(path, **kwargs):
+        """Return appropriate mock DataFrame based on filename."""
+        path_str = str(path)
+        if path_str.endswith(".results.tsv"):
+            return mock_protein_df.copy()
+        if path_str.endswith("proteoforms.tsv"):
+            return mock_proteoform_df.copy()
+        if path_str.endswith("results.seq.tsv"):
+            return mock_peptide_df.copy()
+        raise ValueError(f"Unexpected path: {path}")
+
+    with (
+        patch("alphapepttools.tl.diff_exp.alphaquant.aq_pipeline.run_pipeline"),
+        patch("alphapepttools.tl.diff_exp.alphaquant.pd.read_csv", side_effect=read_csv_side_effect),
+    ):
+        comparison_key, results = tl.diff_exp_alphaquant(
+            adata=adata,
+            report=report,
+            between_column="condition",
+            comparison=("brain", "kidney"),
+            min_valid_values=2,
+            valid_values_filter_mode="either",
+            plots="hide",
+        )
+
+    assert comparison_key == expected_comparison_key
+
     for level in ["protein", "proteoform", "peptide"]:
         pd.testing.assert_frame_equal(results[level], expected_results[level])
 
