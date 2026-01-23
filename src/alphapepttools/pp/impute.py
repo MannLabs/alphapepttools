@@ -6,6 +6,7 @@ from typing import Literal
 import anndata as ad
 import numpy as np
 import pandas as pd
+from bpca import BPCA
 from sklearn.impute import KNNImputer
 
 logger = logging.getLogger(__name__)
@@ -137,7 +138,7 @@ def impute_gaussian(
     random_state: int = 42,
     *,
     copy: bool = False,
-) -> ad.AnnData:
+) -> ad.AnnData | None:
     """Impute missing values in each column by random sampling from a gaussian distribution.
 
     The distribution is centered at std_offset * feature standard deviation below the
@@ -380,7 +381,7 @@ def impute_knn(
     *,
     copy: bool = False,
     **kwargs,
-) -> ad.AnnData:
+) -> ad.AnnData | None:
     """Impute missing values using median imputation
 
     Replace missing (NaN) values for each feature in the data matrix with the estimate based on non-missing
@@ -472,6 +473,130 @@ def impute_knn(
             group = data[group_indices]
             _raise_on_nan_values(group, mode="all")
             data[group_indices, :] = _impute_knn(group, n_neighbors=n_neighbors, weights=weights, **kwargs)
+
+    if layer is None:
+        adata.X = data
+    else:
+        adata.layers[layer] = data
+
+    return adata if copy else None
+
+
+def _impute_bpca(data: np.ndarray, n_components: int, **kwargs) -> np.ndarray:
+    r"""Imputes missing data with Bayesian Principal Component Analysis
+
+    .. :math:
+
+        X_{estimated} = \approx U\times L + \overline{X}
+
+    References
+    ----------
+    - :cite:p:`Stacklies.2007`
+    """
+    bpca = BPCA(n_components=n_components, **kwargs)
+
+    usage = bpca.fit_transform(data)
+    loadings = bpca.components_
+    mean = bpca.mu
+
+    X_reconstructed = usage @ loadings + mean
+
+    return np.where(np.isnan(data), X_reconstructed, data)
+
+
+def impute_bpca(
+    adata: ad.AnnData,
+    *,
+    n_components: int = 50,
+    layer: str | None = None,
+    group_column: str | None = None,
+    copy: bool = False,
+    **kwargs,
+) -> ad.AnnData | None:
+    r"""Impute missing values using Bayesian Principal Component Analysis (BPCA)
+
+    Estimates the latent covariance structure of the log-transformed data via Bayesian Principal Component Analysis. The imputation method uses the obtained
+    principal component usages :math:`U` and components :math:`L` to reconstruct the full log-transformed data matrix
+
+    .. :math:
+
+        X_{estimated} = \approx U\times L + \overline{X}
+
+    Where :math:`\overline{X}` is the mean of the data. Missing values are replaced with the estimated values from
+    this procedure.
+
+    Parameters
+    ----------
+    adata
+        AnnData object.
+    n_components
+        Number of components to use for the model fit. The more components are used, the more granular the model
+        fits the data. This might increase model accuracy but also propagates more measurement noise in the
+        data reconstruction.
+    layer
+        Layer to use for imputation. The data should be log transformed to match the noise model of the BPCA method.
+        If `None`, uses the `adata.X` attribute.
+    group_column
+        Column name in `adata.obs` defining groups for group-wise imputation.
+            - `None` (default, recommended), imputes all samples.
+            - `str` Computes median separately for each group
+        If `group_column` contains NaNs, the respective observations are ignored.
+    copy
+        Whether to return a modified copy (True) of the anndata object. If False (default)
+        modifies the object inplace
+    **kwargs
+        Passed to :class:`bpca.BPCA`
+
+    Returns
+    -------
+    None | anndata.AnnData
+        AnnData object with imputed values in layer.
+        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
+        returns a modified copy.
+
+    Raises
+    ------
+    Warning
+        If `group_column` contains NaNs
+    Warning
+        If a feature contains only NaNs
+
+    Example
+    -------
+
+    .. code-block:: python
+
+        # Log transform data
+        at.pp.nanlog(adata)
+
+        # Imputes .X inplace
+        at.pp.impute_bpca(adata, n_components=50, layer=None)
+
+        # Returns a new anndata object with imputed .X layer
+        adata_new = at.pp.impute_bpca(adata, n_components=50, layer=None, copy=True)
+
+    References
+    ----------
+    This implementation follows the reference implementation in :cite:p:`Stacklies.2007`
+
+    See Also
+    --------
+    :class:`bpca.BPCA`
+    """
+    adata = adata.copy() if copy else adata
+
+    data = adata.X if layer is None else adata.layers[layer]
+
+    if group_column is None:
+        _raise_on_nan_values(data, mode="all")
+        data = _impute_bpca(data, n_components=n_components, **kwargs)
+    else:
+        groups = adata.obs.groupby(group_column, dropna=True).indices
+
+        for group_indices in groups.values():
+            group = data[group_indices]
+            _raise_on_nan_values(group, mode="all")
+            data[group_indices, :] = _impute_bpca(group, n_components=n_components, **kwargs)
 
     if layer is None:
         adata.X = data
