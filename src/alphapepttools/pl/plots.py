@@ -11,6 +11,7 @@
 import logging
 from collections import Counter
 from collections.abc import Callable
+from dataclasses import asdict, dataclass
 from typing import Any
 
 import anndata as ad
@@ -623,6 +624,46 @@ def _dict_keys_to_str(
 ) -> dict[str, Any]:
     """Convert the keys of a dictionary to strings."""
     return {str(k): v for k, v in dictionary.items()}
+
+
+# Immutable dataclass to hold scatterplot default parameters, meant to be called with plot config factory
+@dataclass(frozen=True)
+class ScatterConfig:
+    """Immutable configuration for scatterplots"""
+
+    # Required args
+    data: ad.AnnData | pd.DataFrame
+    x_column: str
+    y_column: str
+
+    # Optional with defaults
+    color: str | tuple | None = None
+    color_column: str | None = None
+    color_map_column: str | None = None
+    scatter_kwargs: dict | None = None
+
+    def to_kwargs(self) -> dict:
+        """Convert ScatterConfig to a dictionary of keyword arguments."""
+        return {k: v for k, v in asdict(self).items() if v is not None}
+
+
+class PlotConfig:
+    """Factory for plot configuration dataclasses"""
+
+    @staticmethod
+    def scatter(
+        **kwargs,
+    ) -> ScatterConfig:
+        """Create a ScatterConfig dataclass from keyword arguments."""
+        return ScatterConfig(**kwargs)
+
+
+# Separate class to handle plotting layers: each layer can use the default config and also get custom inputs
+def plot_layers(
+    ax: plt.Axes,
+    plot_layers: list[tuple] | None = None,
+) -> None:
+    """Plot multiple layers with defined hierarchy and withoud datapoint reuse."""
 
 
 class Plots:
