@@ -45,7 +45,7 @@ There are several alternative options to install alphapepttools:
 pip install alphapepttools
 ```
 
-As the package is still under development, consider installing the latest development version:
+As the package is still under development, consider installing the latest development version with the latest changes, features, and bug fixes:
 
 2. Development version
 
@@ -54,9 +54,20 @@ git clone https://github.com/MannLabs/alphapepttools.git@main && cd alphapepttoo
 pip install -e .
 ```
 
-or with more dependencies:
+### Installation extras
+
+Depending on your use case, you might want to install specific versions of packages or additional dependencies.
+
+If you want to use `alphapepttools` in an isolated environment and enforce stringent dependencies, you can install the stable version:
 
 ```bash
+pip install "alphapepttools[stable]"
+```
+
+For development purposes like running tests, pre-commit hooks, and building the documentation locally, install the optional development dependencies:
+
+```bash
+git clone https://github.com/MannLabs/alphapepttools.git@main && cd alphapepttools
 pip install -e ".[test, dev]"
 ```
 

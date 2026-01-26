@@ -202,7 +202,7 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
     values = pd.unique(values.astype(str))
 
     # Set missing values aside for later addition with default NA-color
-    na_values = np.array([v for v in values if v in config["na_identifiers"]])
+    na_values = [v for v in values if v in config["na_identifiers"]]
     na_dict = dict(zip(na_values, [config["na_color"]] * len(na_values), strict=True))
 
     # Continue with non-missing values only
@@ -223,7 +223,7 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
     result_dict = dict(zip(values, _palette, strict=True))
 
     # Add missing values to the mapping with the default na color
-    if na_values:
+    if len(na_values) > 0:
         result_dict.update(na_dict)
 
     return result_dict
