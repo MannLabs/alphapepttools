@@ -1552,7 +1552,7 @@ class Plots:
         default_color: tuple = BaseColors.get("blue"),
         # volcano specific parameters
         x_thresholds: tuple | None = (-1, 1),
-        y_thresholds: float = -np.log10(0.05),
+        y_thresholds: tuple | None = (-np.log10(0.05),),
         plot_layers: list[tuple] | None = None,
         display_id_column: str | None = None,
         label_layers: list[str] | None = None,
@@ -1698,6 +1698,8 @@ class Plots:
         label_kwargs = label_kwargs or {}
         figure_kwargs = figure_kwargs or {"figsize": (3, 3)}
         legend_kwargs = legend_kwargs or {}
+        x_thresholds = x_thresholds or ()
+        y_thresholds = y_thresholds or ()
 
         color_dict = color_dict or {default_group: default_color}
 
@@ -1775,7 +1777,7 @@ class Plots:
 
         # Add decoration to volcanoplot
         add_lines(ax=ax, linetype="vline", intercepts=list(x_thresholds), line_kwargs=line_kwargs)
-        add_lines(ax=ax, linetype="hline", intercepts=[y_thresholds], line_kwargs=line_kwargs)
+        add_lines(ax=ax, linetype="hline", intercepts=list(y_thresholds), line_kwargs=line_kwargs)
 
         ax.set_xlim(xlims)
         ax.set_ylim(ylims)
