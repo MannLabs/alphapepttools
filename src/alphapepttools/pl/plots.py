@@ -45,55 +45,52 @@ def _extract_groupwise_plotting_data(
     value_column: str | None = None,
     direct_columns: list[str] | None = None,
 ) -> tuple[list[list], list[str], list[int]]:
-    """Extract data for group-wise plotting (violin, bar, box plots).
+    """Extract data for group-wise plotting (violin, bar, box plots)
 
     Transforms long-format data into the list-of-lists format required by
     matplotlib's violin, bar, and box plot functions. Each sublist contains
-    the values for one group. Using direct_columns makes each of its columns
-    directly correspond to a group.
+    the values for one group.
 
     Parameters
     ----------
-    data : ad.AnnData | pd.DataFrame
+    data
         Data containing grouping and value columns
-    grouping_column : str
+    grouping_column
         Column containing the groups to compare
-    value_column : str
+    value_column
         Column whose values should be plotted
-    direct_columns: list[str] | None
-        Overrides grouping_column and value_column: This argument allows for extraction of
-        actual columns directly into data_lists, labels and positions.
+    direct_columns
+        Alternative to grouping/value columns: treat each column as a separate group
 
     Returns
     -------
     tuple[list[list], list[str], list[int]]
-        Tuple of (data_lists, labels, positions) for plotting
+        (data_lists, labels, positions) for plotting
 
     Examples
     --------
-    >>> import pandas as pd
-    >>> from alphapepttools.pl import _extract_groupwise_plotting_data
-    >>> df = pd.DataFrame({
-    ...     'group': ['A', 'A', 'B', 'B', 'C'],
-    ...     'X1': [1, 2, 3, 4, 5]
-    ...     'X2': [5, 4, 3, 2, 1]
-    ...     'X3': [1, 2, 3, 4, 5]
-    ... })
+    Group by categorical column:
 
-    >>> # Use grouping column
-    >>> data_lists, labels, positions = _extract_groupwise_plotting_data(df, "group", "X1")
-    >>> print(data_lists)  # [[1, 2], [3, 4], [5]]
-    >>> print(labels)  # ['A', 'B', 'C']
-    >>> print(positions)  # [1, 2, 3]
+    .. code-block:: python
 
-    >>> # Use columns directly
-    >>> data_lists, labels, positions = _extract_groupwise_plotting_data(
-    ...     df, "group", "X1", direct_columns=["X1", "X2", "X3"]
-    ... )
-    >>> print(data_lists)  # [[1, 2, 5], [3, 4, 3], [5, 1, 5]]
-    >>> print(labels)  # ['X1', 'X2', 'X3']
-    >>> print(positions)  # [1, 2, 3]
+        df = pd.DataFrame({"treatment": ["A", "A", "B", "B", "C"], "intensity": [1, 2, 3, 4, 5]})
 
+        data_lists, labels, positions = _extract_groupwise_plotting_data(
+            df, grouping_column="treatment", value_column="intensity"
+        )
+        # data_lists: [[1, 2], [3, 4], [5]]
+        # labels: ['A', 'B', 'C']
+
+    Compare multiple columns directly:
+
+    .. code-block:: python
+
+        df = pd.DataFrame({"Protein1": [1, 2, 3], "Protein2": [4, 5, 6], "Protein3": [7, 8, 9]})
+
+        data_lists, labels, positions = _extract_groupwise_plotting_data(
+            df, direct_columns=["Protein1", "Protein2", "Protein3"]
+        )
+        # Each column becomes a group for comparison
     """
     if direct_columns is not None:
         if grouping_column is not None or value_column is not None:
@@ -128,32 +125,50 @@ def add_lines(
     linetype: str = "vline",
     color: str = "black",
     linestyle: str = "--",
-    linewidth: float = 1,
+    linewidth: float | None = None,
     line_kwargs: dict | None = None,
 ) -> None:
-    """Add a vertical or horizontal line to a matplotlib axes object
+    """Add vertical or horizontal reference lines to a plot
+
+    Useful for adding threshold lines to volcano plots, zero lines to bar plots,
+    or any other reference lines to visualizations.
 
     Parameters
     ----------
-    ax : plt.Axes
-        Matplotlib axes object to add the line to.
-    linetype : str
-        Type of line to add, either 'vline' or 'hline'.
-    intercepts : float | list[float | int]
-        Intercepts of the line(s) to add.
-    color : str, optional
-        Color of the line(s), by default "black".
-    linestyle : str, optional
-        Linestyle of the line(s), by default "--".
-    linewidth : float, optional
-        Linewidth of the line(s), by default 1.
-    line_kwargs : dict, optional
-        Additional keyword arguments for the line function, by default None. Will be overridden by color, linestyle, and linewidth arguments.
+    ax
+        Matplotlib axes object to add lines to
+    intercepts
+        Single value or list of x-positions (vline) or y-positions (hline)
+    linetype
+        Type of line: `"vline"` (vertical) or `"hline"` (horizontal)
+    color
+        Line color
+    linestyle
+        Line style (e.g., `"--"`, `"-"`, `":"`)
+    linewidth
+        Line width, defaults to `config["linewidths"]["medium"]`
+    line_kwargs
+        Additional matplotlib line arguments. Note: explicit color, linestyle,
+        and linewidth parameters take precedence
 
-    Returns
-    -------
-    None
+    Examples
+    --------
+    Add significance thresholds to a volcano plot:
 
+    .. code-block:: python
+
+        # Add fold-change thresholds
+        add_lines(ax, intercepts=[-1, 1], linetype="vline", color="red", linestyle=":")
+
+        # Add p-value threshold
+        add_lines(ax, intercepts=-np.log10(0.05), linetype="hline", color="blue", linestyle="--")
+
+    Add zero reference to bar plot:
+
+    .. code-block:: python
+
+        ax.bar(x, heights)
+        add_lines(ax, intercepts=0, linetype="hline", color="black")
     """
     if linetype not in ["vline", "hline"]:
         raise ValueError("linetype must be 'vline' or 'hline'")
@@ -170,6 +185,8 @@ def add_lines(
     line_kwargs = line_kwargs or {}
     color = line_kwargs.pop("color", color)
     linestyle = line_kwargs.pop("linestyle", linestyle)
+    if linewidth is None:
+        linewidth = config["linewidths"]["medium"]
     linewidth = line_kwargs.pop("linewidth", linewidth)
 
     # add lines to ax
@@ -186,21 +203,28 @@ def add_lines(
 def make_legend_patches(
     color_dict: dict[str, str | tuple],
 ) -> list[mpl.patches.Patch]:
-    """Create legend patches for a matplotlib legend from a value-to-color mapping
+    """Create colored patches for matplotlib legends
 
-    This is a helper function for the add_legend function.
-    Matplotlib legends display labelled patches with a defined color. This function
-    takes a dictionary of values and colors and returns a list of named patches.
+    Converts a label-to-color mapping into matplotlib patches suitable for legends.
 
     Parameters
     ----------
-    color_dict : dict[str, str | tuple]
-        Dictionary of values and colors.
+    color_dict
+        Dictionary mapping labels to colors
 
     Returns
     -------
-    list[mpl.patches.Patch]
-        List of named patches.
+    list[:class:`matplotlib.patches.Patch`]
+        List of colored patches with labels
+
+    Example
+    -------
+    .. code-block:: python
+
+        # Create patches for categorical legend
+        color_dict = {"Control": "blue", "Treatment": "red", "Knockout": "green"}
+        patches = make_legend_patches(color_dict)
+        ax.legend(handles=patches)
     """
     patches = []
     for value, color in color_dict.items():
@@ -221,23 +245,30 @@ def add_legend_to_axes_from_patches(
     patches: list[mpl.patches.Patch],
     **kwargs,
 ) -> None:
-    """Make a legend and directly add it to a matplotlib axes object.
+    """Add a legend with patches to an axes, using config defaults for font sizes
 
-    Expects a list of named patches.
+    Automatically applies alphapepttools font sizes for legend text and title
+    from the config unless overridden.
 
     Parameters
     ----------
-    ax : plt.Axes
-        Matplotlib axes object to add the legend to.
-    patches : list[mpl.patches.Patch]
-        List of patches to use for the legend.
+    ax
+        Matplotlib axes to add the legend to
+    patches
+        List of colored patches created by `make_legend_patches`
+    **kwargs
+        Additional arguments passed to `ax.legend()`.
+        If `fontsize` not provided, uses `config["legend"]["font_size"]`
 
-    Returns
+    Example
     -------
-    None
+    .. code-block:: python
 
+        color_dict = {"WT": "blue", "KO": "red"}
+        patches = make_legend_patches(color_dict)
+        add_legend_to_axes_from_patches(ax, patches, title="Genotype", loc="upper right")
+        # Legend will use config font sizes for text and title
     """
-    # create new legend
     if "fontsize" not in kwargs:
         kwargs["fontsize"] = config["legend"]["font_size"]
 
@@ -254,31 +285,62 @@ def add_legend_to_axes(
     palette: list[str | tuple] | None = None,
     **legend_kwargs,
 ) -> None:
-    """Add a legend to an axis object.
+    """Flexibly add a legend to axes with automatic color assignment
 
-    Handle legend creation in three ways:
-    1.: 'levels' is a dictionary of levels and colors, in which case these levels and colors are used directly.
-    2.: 'levels' is a list of levels, in which case a color palette is used to assign colors to levels. A custom
-    palette can be provided, otherwise a default palette is used.
-    3.: 'legend' is a matplotlib legend object, which overrides all other options and is added directly to the axes.
-    This defaults to 'auto', which directs to the first two cases.
+    Handles multiple legend creation patterns: from a list with palette,
+    from a color dictionary, or using an existing legend object.
+    Automatically switches from qualitative to sequential palette when
+    the number of levels exceeds available colors.
 
     Parameters
     ----------
-    ax : plt.Axes
-        Matplotlib axes object to add the legend to.
-    levels : list[str] | dict[str, str | tuple] | None
-        List of levels to use for the legend. Duplicates are removed. Colors from the palette are assigned to unique values from this list,
-        but no particular color-binding is enforced. If this is a dictionary, the legend contains exactly the labels (keys) and colors (values) provided.
-    legend : str | mpl.legend.Legend | None
-        Legend to add to the plot. If "auto", a legend is created based on levels. If a Legend object, it is added directly to the axes. By default "auto".
-    palette : list[str | tuple] | None
-        List of colors to use for the legend. If None, a default palette will be used. By default None. Only relevant when levels is a list, i.e. when matching
-        of values to colors happens automatically.
-    legend_kwargs : dict, optional
-        Additional keyword arguments for the legend, by default {}. This can include 'fontsize', 'title', etc. These kwargs are not enforced if a matplotlib legend object
-        is passed as the `legend` parameter.
+    ax
+        Matplotlib axes to add the legend to
+    levels
+        Either a list of labels (colors assigned from palette) or
+        a dict mapping labels to specific colors
+    legend
+        `"auto"` creates legend from levels, or pass existing Legend object
+    palette
+        Custom color palette for list-based levels. If `None`, uses
+        qualitative palette (or sequential if too many levels)
+    **legend_kwargs
+        Additional arguments for legend (title, loc, fontsize, etc.)
 
+    Examples
+    --------
+    List with automatic colors from palette:
+
+    .. code-block:: python
+
+        # Automatic qualitative palette
+        levels = ["Control", "Treatment", "Recovery"]
+        add_legend_to_axes(ax, levels=levels, title="Condition")
+
+        # Custom palette
+        levels = ["WT", "Het", "KO"]
+        palette = ["#blue", "#lightblue", "#red"]
+        add_legend_to_axes(ax, levels=levels, palette=palette)
+
+        # Many levels trigger sequential palette
+        levels = [f"Sample_{i}" for i in range(20)]
+        add_legend_to_axes(ax, levels=levels)  # Switches to sequential
+
+    Dict with explicit color mapping:
+
+    .. code-block:: python
+
+        # Direct color specification
+        color_dict = {"Significant": "red", "Not significant": "gray", "Borderline": "orange"}
+        add_legend_to_axes(ax, levels=color_dict, title="Status")
+
+    Using existing matplotlib legend:
+
+    .. code-block:: python
+
+        # Pass pre-created legend
+        existing_legend = ax.legend(["A", "B"], loc="upper left")
+        add_legend_to_axes(other_ax, legend=existing_legend)
     """
     if isinstance(legend, mpl.legend.Legend):
         ax.add_artist(legend)
@@ -307,6 +369,37 @@ def _drop_nans_from_plot_arrays(
     y_values: np.ndarray,
     labels: np.ndarray | list[str],
 ) -> tuple:
+    """Remove entries where either x or y is NaN, applying same mask to labels
+
+    Creates a mask from x and y arrays where neither value is NaN, then
+    applies this same mask to filter all three arrays consistently.
+
+    Parameters
+    ----------
+    x_values
+        X coordinates for plotting
+    y_values
+        Y coordinates for plotting
+    labels
+        Labels corresponding to each x,y pair
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray, np.ndarray]
+        (filtered_x, filtered_y, filtered_labels) with NaN entries removed
+
+    Example
+    -------
+    .. code-block:: python
+
+        x = np.array([1, 2, np.nan, 4])
+        y = np.array([5, np.nan, 7, 8])
+        labels = np.array(["A", "B", "C", "D"])
+
+        x_clean, y_clean, labels_clean = _drop_nans_from_plot_arrays(x, y, labels)
+        # Returns: ([1, 4], [5, 8], ["A", "D"])
+        # Drops index 1 (y is NaN) and index 2 (x is NaN)
+    """
     # Missing x or y values are breaking and should be dropped
     keep_mask = ~np.logical_or(pd.isna(x_values), pd.isna(y_values))
 
@@ -317,6 +410,29 @@ def _assign_nearest_anchor_position_to_values(
     values: np.ndarray,
     anchors: list[int | float] | np.ndarray | None,
 ) -> np.ndarray:
+    """Snap values to their nearest anchor positions
+
+    Parameters
+    ----------
+    values
+        Values to be snapped
+    anchors
+        Anchor positions to snap to. If `None`, returns values unchanged
+
+    Returns
+    -------
+    :class:`numpy.ndarray`
+        Values snapped to nearest anchors
+
+    Example
+    -------
+    .. code-block:: python
+
+        values = np.array([1.2, 2.7, 5.1])
+        anchors = [1, 3, 5]
+        result = _assign_nearest_anchor_position_to_values(values, anchors)
+        # Returns: [1, 3, 5] - each value snapped to nearest anchor
+    """
     if anchors is None:
         return values
 
@@ -332,9 +448,10 @@ def _assign_nearest_anchor_position_to_values(
 
 def label_plot(
     ax: plt.Axes,
-    x_values: list | np.ndarray | pd.Series,
-    y_values: list | np.ndarray | pd.Series,
-    labels: list[str] | np.ndarray | pd.Series,
+    data: pd.DataFrame | ad.AnnData,
+    x_column: str,
+    y_column: str,
+    label_column: str,
     x_anchors: list[int | float] | np.ndarray | None = None,
     label_kwargs: dict | None = None,
     line_kwargs: dict | None = None,
@@ -345,20 +462,20 @@ def label_plot(
     """Add labels to a 2D axes object
 
     Add labels to a plot based on x and y coordinates. The labels are either placed near the datapoint
-    using the automatic dodging function from adjust_text or anchored to the left or right of the plot,
-    where labels below the splitpoint are anchored to the left and labels above the splitpoint are anchored
-    to the right.
+    or anchored to specific x-positions. Lines are drawn from the data points to the labels.
 
     Parameters
     ----------
     ax : plt.Axes
         Matplotlib axes object to add the labels to.
-    x_values : list | np.ndarray
-        x-coordinates of the labels.
-    y_values : list | np.ndarray
-        y-coordinates of the labels.
-    labels : list[str] | np.ndarray
-        Labels to add to the plot.
+    data : pd.DataFrame | ad.AnnData
+        Data containing the x, y, and label columns.
+    x_column : str
+        Column name for x-coordinates.
+    y_column : str
+        Column name for y-coordinates.
+    label_column : str
+        Column name for labels.
     x_anchors : list[int | float] | np.ndarray | None, optional
         x-coordinates of the anchors to use for the labels. If None, labels are placed at the x-coordinates of the data points. By default None.
     label_kwargs : dict | None, optional
@@ -381,17 +498,19 @@ def label_plot(
     line_kwargs = {"color": BaseColors.get("black"), "linewidth": config["linewidths"]["medium"], **(line_kwargs or {})}
     label_parser = label_parser or (lambda x: x)
 
-    if not len(x_values) == len(y_values) == len(labels):
-        raise ValueError("x_values, y_values, and labels must have the same length")
+    # Extract all needed columns into a DataFrame
+    df = data_columns_to_df(data, columns=[x_column, y_column, label_column])
 
-    # Force the order of labels from highest to lowest
-    y_value_order = np.argsort(np.array(y_values))[::-1]
-    y_values = np.array(y_values)[y_value_order]
-    x_values = np.array(x_values)[y_value_order]
-    labels = np.array(labels)[y_value_order]
+    # Sort by y values (highest to lowest)
+    df = df.sort_values(by=y_column, ascending=False)
 
-    # convert to numpy arrays for consistency & remove any nans
-    x_values, y_values, labels = _drop_nans_from_plot_arrays(np.array(x_values), np.array(y_values), np.array(labels))
+    # Extract arrays from sorted DataFrame
+    x_values = df[x_column].to_numpy()
+    y_values = df[y_column].to_numpy()
+    labels = df[label_column].to_numpy()
+
+    # Remove any nans
+    x_values, y_values, labels = _drop_nans_from_plot_arrays(x_values, y_values, labels)
 
     # determine label positions based on optional x_anchors
     if x_anchors is not None:
