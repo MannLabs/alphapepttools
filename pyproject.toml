@@ -33,7 +33,7 @@ dependencies = [
   "matplotlib",
   "numpy",
   "openpyxl",
-  "pandas<3",     # version to be fixed: 2.2.3 # TODO: Remove upper bound as soon as statsmodels fixes pre-release dependencies
+  "pandas",
   "pyarrow",
   "scanpy",
   "scikit-learn",
@@ -69,7 +69,7 @@ optional-dependencies.stable = [
   "matplotlib==3.10",
   "numpy==2.2.6",        # numpy > 2.2.6 dropped python 3.10 support
   "openpyxl==3.1.5",
-  "pandas==2.3.3",
+  "pandas==3",
   "pyarrow==23",
   "scanpy==1.11.5",      # scanpy > 1.11.5 dropped python 3.10 support
   "scikit-learn==1.7.2", # scikit-learn > 1.7.2 dropped python 3.10 support
