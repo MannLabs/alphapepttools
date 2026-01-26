@@ -1746,8 +1746,6 @@ class Plots:
         Creates a scatter plot displaying the percentage of variance explained by each
         principal component. Useful for determining how many PCs capture most of the
         variation in the data and for deciding how many components to retain for analysis.
-        The plot helps identify the "elbow" point where additional PCs contribute
-        diminishing returns.
 
         Parameters
         ----------
@@ -1944,11 +1942,10 @@ class Plots:
     ) -> None:
         """2D loadings plot showing top features contributing to two principal components.
 
-        Createsa scatter plot displaying the first two principal component loadings against each other.
+        Creates a scatter plot displaying the first two principal component loadings against each other.
         Loadings indicate how much each feature (gene/protein) contributes to each PC. The plot shows
-        all features used in PCA as grey points, with the top N features (by absolute loading value)
-        highlighted in blue. Optionally, labels can be added to the top features, and lines can be drawn
-        from the origin to these top features.
+        all features used in the PCA as grey points, with the top N features (by absolute loading value)
+        highlighted in blue. Optionally, labels can be added to the top features.
 
         Parameters
         ----------
