@@ -21,7 +21,25 @@ config = defaults.plot_settings.to_dict()
 def stylize(
     ax: plt.Axes,
 ) -> plt.Axes:
-    """Apply alphapepttools style to a matplotlib axes object"""
+    """Apply alphapepttools style to a matplotlib axes object
+
+    Parameters
+    ----------
+    ax
+        Matplotlib axes object to style
+
+    Returns
+    -------
+    :class:`matplotlib.axes.Axes`
+        The styled axes object
+
+    Example
+    -------
+    .. code-block:: python
+
+        fig, ax = plt.subplots()
+        stylize(ax)
+    """
     ax.set_prop_cycle("color", colors.BasePalettes.get("qualitative"))
     ax.grid(visible=True, linewidth=config["linewidths"]["small"])
     ax.xaxis.set_tick_params(width=config["linewidths"]["small"], labelsize=config["axes"]["tick_size"])
@@ -42,29 +60,39 @@ def label_axes(
 
     Parameters
     ----------
-    ax : plt.Axes
+    ax
         The axes object to apply labels to
-    xlabel : str, optional
-        The x-axis label, by default None (existing label is not changed)
-    ylabel : str, optional
-        The y-axis label, by default None (existing label is not changed)
-    title : str, optional
-        The title of the axes, by default None (existing title is not changed)
-    label_parser : Callable, optional
-        A function to parse labels, by default None. This is useful to convert
-        labels from a computation-context to presentation context, e.g. a column
-        like upregulated_proteins could be shown as "Upregulated Proteins" in the plot.
-    enumeration : str, optional
-        A string to enumerate the plot in the top left, e.g. "A", "B", "C", etc.
-    enumeration_xytext : Tuple[float, float], optional, by default (-10, 10)
-        This parameter describes the offset of the enumeration text in typographic points
-        relative to the top left of the axis. This does not scale with resolution or plot
-        size, but can be adapted to fit the plot.
+    xlabel
+        The x-axis label. If `None`, existing label is not changed
+    ylabel
+        The y-axis label. If `None`, existing label is not changed
+    title
+        The title of the axes. If `None`, existing title is not changed
+    label_parser
+        Function to parse labels from computation to presentation context,
+        e.g., `upregulated_proteins` -> "Upregulated Proteins"
+    enumeration
+        String to enumerate the plot in the top left, e.g., "A", "B", "C"
+    enumeration_xytext
+        Offset of enumeration text in points relative to top left of axis.
+        Does not scale with resolution or plot size
 
-    Returns
+    Example
     -------
-    None
+    .. code-block:: python
 
+        import string
+        from alphapepttools.pl import label_axes
+
+        fig, axs = plt.subplots(2, 2)
+        for i, ax in enumerate(axs.flat):
+            label_axes(
+                ax,
+                xlabel="X values",
+                ylabel="Y values",
+                title=f"Function {i + 1}",
+                enumeration=string.ascii_uppercase[i],
+            )
     """
     label_parser = label_parser or (lambda x: x)
 
@@ -184,55 +212,62 @@ def create_figure(
     subplots_kwargs: dict | None = None,
     gridspec_kwargs: dict | None = None,
 ) -> tuple[plt.Figure, np.ndarray]:
-    """Create a figure with a specified number of rows and columns. Returns an AxisManager object to manage axes objects.
+    """Create a figure with consistent styling and an AxisManager for subplot iteration
 
-    This is especially useful for creating subplots with consistent styling. Importantly, it should completely sync the
-    plot a user sees in a jupyter notebook with the exported (e.g. .png) figure file. The aim of this is to entirely
-    eliminate time consuming iterations of checking the exported plot and going back to adjust sizes/padding in the code.
-
-    Example:
-
-    # This works:
-    fig, axm = create_figure(nrows=2, ncols=2, figsize = (4, 4))
-    x = np.linspace(0, 10, 100)
-    functions = [lambda x: np.sin(x + 1), lambda x: np.sin(x) * 2, lambda x: np.sin(x) + 2, lambda x: np.sin(x) - 2]
-    for i, func in enumerate(functions):
-        ax = axm[i]
-        ax.scatter(x, func(x))
-
-    # Just the same as this:
-    fig, axm = create_figure(nrows=1, ncols=4, figsize = (8, 2))
-    x = np.linspace(0, 10, 100)
-    functions = [lambda x: np.sin(x + 1), lambda x: np.sin(x) * 2, lambda x: np.sin(x) + 2, lambda x: np.sin(x) - 2]
-    for i, func in enumerate(functions):
-        ax = axm[i]
-        ax.scatter(x, func(x))
+    Creates matplotlib figures where the exported file matches exactly what you see
+    in Jupyter notebooks, eliminating iterative size/padding adjustments.
 
     Parameters
     ----------
-    nrows : int, optional
-        The number of rows in the figure, by default 1
-
-    ncols : int, optional
-        The number of columns in the figure, by default 1
-
-    figsize : tuple[float, float] | tuple[str, str], optional
-        The size of the figure in inches. If a tuple of strings is provided, the strings must be valid keys in the config file, by default None
-
-    height_ratios : list[float], optional
-        The height ratios of the rows in the figure, by default None
-
-    width_ratios : list[float], optional
-        The width ratios of the columns in the figure, by default None
+    nrows
+        Number of rows in the figure
+    ncols
+        Number of columns in the figure
+    figsize
+        Figure size in inches or as config preset keys (e.g., `("1", "2")`)
+    height_ratios
+        Height ratios of the rows
+    width_ratios
+        Width ratios of the columns
+    subplots_kwargs
+        Additional keyword arguments for `plt.subplots`
+    gridspec_kwargs
+        Additional keyword arguments for gridspec
 
     Returns
     -------
-    fig : plt.Figure
+    :class:`matplotlib.figure.Figure`
         The figure object
+    :class:`AxisManager`
+        An iterable and indexable manager for accessing styled axes
 
-    axm : AxisManager object
-        An iterable and indexable object to manage matplotlib.axes objects
+    Examples
+    --------
+    Basic usage with iteration:
 
+    .. code-block:: python
+
+        from alphapepttools.pl import create_figure
+
+        fig, axm = create_figure(1, 2, figsize=(7, 3))
+
+        # Iterate through axes
+        for ax in [axm.next(), axm.next()]:
+            ax.plot([1, 2, 3], [1, 4, 9])
+
+    Using indexing:
+
+    .. code-block:: python
+
+        fig, axm = create_figure(2, 2, figsize=(6, 6))
+
+        # Access by index
+        axm[0].scatter(x, y1)
+        axm[1].scatter(x, y2)
+
+        # Or by row/column
+        axm[1, 0].scatter(x, y3)
+        axm[1, 1].scatter(x, y4)
     """
     # set global rcParams
     plt.rcParams.update(
@@ -273,29 +308,32 @@ def save_figure(
     transparent: bool = False,  # noqa: FBT002, FBT001 shadows savefig signature
     **kwargs,
 ) -> None:
-    """Save a figure in a publication friendly format
+    """Save a figure in publication-friendly format
 
     Parameters
     ----------
-    fig : matplotlib.pyplot.Figure
+    fig
         The figure to save
-
-    filename : str
-        The filename to save the figure. Must have a supported extension.
-        If no extension is given, the figure will be saved as a .png file.
-
-    output_dir : str
-        The directory to save the figure in. Will be created in case it does not exist.
-
-    dpi : int, optional
-        The resolution of the figure, taken by default from config
-
-    transparent : bool, optional
-        Whether to save a .png figure with a transparent background.
-
+    filename
+        Filename with extension. Defaults to `.png` if no extension given
+    output_dir
+        Output directory. Created if it doesn't exist
+    dpi
+        Resolution of the figure, defaults from config
+    transparent
+        Whether to save with transparent background (PNG only)
     **kwargs
-        Additional keyword arguments to pass to fig.savefig
+        Additional keyword arguments passed to `fig.savefig`
 
+    Example
+    -------
+    .. code-block:: python
+
+        from alphapepttools.pl import create_figure, save_figure
+
+        fig, axm = create_figure(1, 2, figsize=(7, 3))
+        # ... add plots ...
+        save_figure(fig, "my_plot.png", "./figures", dpi=300)
     """
     output_path = Path(output_dir)
     if not output_path.exists():
