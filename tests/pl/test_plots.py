@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from alphapepttools.pl.figure import create_figure
-from alphapepttools.pl.plots import _extract_columns_to_df, _extract_groupwise_plotting_data, label_plot
+from alphapepttools.pl.plots import _extract_groupwise_plotting_data, data_columns_to_df, label_plot
 
 
 # Fixtures
@@ -199,7 +199,7 @@ def test__extract_columns_to_df(which_data, example_data, example_sample_metadat
     else:
         data_input = example_data
 
-    extracted_data = _extract_columns_to_df(data_input, columns)
+    extracted_data = data_columns_to_df(data_input, columns)
 
     pd.testing.assert_frame_equal(extracted_data, expected_data)
 
@@ -226,7 +226,7 @@ def test__extract_columns_to_df_failures(which_data, example_data, example_sampl
         data_input = example_data
 
     with pytest.raises(KeyError):
-        _extract_columns_to_df(data_input, columns)
+        data_columns_to_df(data_input, columns)
 
 
 # Test parsing of anndata objects to bar/box/violin-plottable data

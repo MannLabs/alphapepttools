@@ -2,7 +2,32 @@ import matplotlib.colors as mpl_colors
 
 
 class PlotSettings:
-    """Default settings for alphapepttools plots."""
+    """Default settings for alphapepttools plots
+
+    Access plot configuration settings throughout alphapepttools plotting functions.
+
+    Example
+    -------
+    .. code-block:: python
+
+        from alphapepttools.pl import defaults
+
+        # Convert to dictionary for easy access
+        config = defaults.plot_settings.to_dict()
+
+        # Use in plotting functions
+        ax.plot(x, y, linewidth=config["linewidths"]["medium"])
+        ax.set_xlabel("X", fontsize=config["axes"]["label_size"])
+
+        # Available settings:
+        # - font_sizes: small, medium, large
+        # - axes: title_size, label_size, tick_size
+        # - linewidths: small, medium, large
+        # - marker_sizes: small, medium, large
+        # - highlight_colors: high, low, general
+        # - resolution: dpi
+        # - preset_sizes: "2", "1.5", "1", "0.5", "0.25"
+    """
 
     def __init__(self):
         self.font_family = "sans-serif"
