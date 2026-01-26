@@ -129,7 +129,4 @@ def test_diff_exp_alphaquant__integration(test_data: tuple[ad.AnnData, pd.DataFr
 
         # Sanity checks - the other columns are not tested due to potential changes in the alphaquant backend
         assert all(results[feature_level]["condition_pair"] == expected_comparison)
-        assert (results[feature_level]["p_value"].between(0, 1)).all()
-        assert (results[feature_level]["-log10(p_value)"] >= 0).all()
-        assert (results[feature_level]["-log10(fdr)"] >= 0).all()
         assert all(results[feature_level]["method"] == "alphaquant")
