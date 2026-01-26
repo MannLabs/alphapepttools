@@ -197,7 +197,6 @@ def test_diff_exp_ttest(example_data, example_metadata, between_column, comparis
 
 
 # Test diff_exp_alphaquant by loading small example datasets
-# TODO: Mock alphaquant itself to avoid dependency on it for testing diff_exp_alphaquant; this might depend on implementing an AlphaQuant API to avoid the temp-file construct currently required
 def test_diff_exp_alphaquant():
     """Testing function to ascertain stable functionality of diff_exp_alphaquant on small example datasets.
 
@@ -304,20 +303,12 @@ def test_diff_exp_alphaquant():
         ),
     }
 
-    def read_csv_side_effect(path, **kwargs):
-        """Return appropriate mock DataFrame based on filename."""
-        path_str = str(path)
-        if path_str.endswith(".results.tsv"):
-            return mock_protein_df.copy()
-        if path_str.endswith("proteoforms.tsv"):
-            return mock_proteoform_df.copy()
-        if path_str.endswith("results.seq.tsv"):
-            return mock_peptide_df.copy()
-        raise ValueError(f"Unexpected path: {path}")
-
     with (
         patch("alphapepttools.tl.diff_exp.alphaquant.aq_pipeline.run_pipeline"),
-        patch("alphapepttools.tl.diff_exp.alphaquant.pd.read_csv", side_effect=read_csv_side_effect),
+        patch(
+            "alphapepttools.tl.diff_exp.alphaquant.pd.read_csv",
+            side_effect=[mock_protein_df.copy(), mock_proteoform_df.copy(), mock_peptide_df.copy()],
+        ),
     ):
         comparison_key, results = tl.diff_exp_alphaquant(
             adata=adata,
