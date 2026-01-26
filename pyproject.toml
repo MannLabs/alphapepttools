@@ -73,7 +73,7 @@ optional-dependencies.stable = [
   "pyarrow==23",
   "scanpy==1.11.5",      # scanpy > 1.11.5 dropped python 3.10 support
   "scikit-learn==1.7.2", # scikit-learn > 1.7.2 dropped python 3.10 support
-  "session-info2==1",
+  "session-info2==0.3",
 ]
 optional-dependencies.test = [
   "coverage",
