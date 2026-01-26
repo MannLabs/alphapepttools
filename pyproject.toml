@@ -25,7 +25,7 @@ dynamic = [ "version" ]
 
 dependencies = [
   "alphabase",
-  "alphaquant",   # TODO [AX-1020]: Remove alphaquant version fix.
+  "alphaquant",
   "anndata",
   "bpca>=0.1",
   "cmcrameri",    # TODO: remove this to optional dependencies?
@@ -34,7 +34,7 @@ dependencies = [
   "numpy",
   "openpyxl",
   "pandas<3",     # version to be fixed: 2.2.3 # TODO: Remove upper bound as soon as statsmodels fixes pre-release dependencies
-  "pyarrow",      # version to be fixed: 19.0.1
+  "pyarrow",
   "scanpy",
   "scikit-learn",
   # for debug logging (referenced from the issue template)
@@ -61,7 +61,7 @@ optional-dependencies.doc = [
   "sphinxext-opengraph",
 ]
 optional-dependencies.stable = [
-  "alphabase==1.8",
+  "alphabase==1.8.1",
   "alphaquant==0.3",
   "anndata==0.11.4",     # anndata > 0.11.4 dropped python 3.10 support
   "cmcrameri==1.9",

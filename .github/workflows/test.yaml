@@ -27,18 +27,18 @@ jobs:
             python: "3.10"
             name: LOOSE
           - os: ubuntu-latest
-            python: "3.12"
+            python: "3.13"
             name: LOOSE
           - os: ubuntu-latest
             python: "3.10"
             extras: "stable"
             name: STABLE
           - os: ubuntu-latest
-            python: "3.12"
+            python: "3.13"
             extras: "stable"
             name: STABLE
           - os: ubuntu-latest
-            python: "3.12"
+            python: "3.13"
             pip-flags: "--pre"
             name: PRE-RELEASE DEPENDENCIES
 
