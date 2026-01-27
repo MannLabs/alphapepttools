@@ -8,9 +8,9 @@ import pandas as pd
 try:
     import alphaquant.run_pipeline as aq_pipeline
 
-    HAS_ALPHAQUANT = True
+    _HAS_ALPHAQUANT = True
 except ModuleNotFoundError:
-    HAS_ALPHAQUANT = False
+    _HAS_ALPHAQUANT = False
 
 from alphapepttools.tl import tl_defaults
 from alphapepttools.tl.utils import _suppress_plots, determine_max_replicates, negative_log10_pvalue
@@ -87,7 +87,7 @@ def diff_exp_alphaquant(
     plots: str = "hide",
 ) -> tuple[str, dict[str, pd.DataFrame]]:
     """Calculate differential expression using AlphaQuant."""
-    if not HAS_ALPHAQUANT:
+    if not _HAS_ALPHAQUANT:
         raise ImportError(
             "alphaquant is required for diff_exp_alphaquant(). Install with: pip install alphapepttools[alphaquant]"
         )

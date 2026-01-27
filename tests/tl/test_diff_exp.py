@@ -10,7 +10,7 @@ from scipy.stats import ttest_ind
 from alphapepttools import tl
 from alphapepttools.pp import nanlog
 from alphapepttools.tl.defaults import tl_defaults
-from alphapepttools.tl.diff_exp.alphaquant_wrapper import HAS_ALPHAQUANT, _standardize_alphaquant_results
+from alphapepttools.tl.diff_exp.alphaquant_wrapper import _HAS_ALPHAQUANT, _standardize_alphaquant_results
 from alphapepttools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
 
 
@@ -197,7 +197,7 @@ def test_diff_exp_ttest(example_data, example_metadata, between_column, comparis
 
 
 # Test diff_exp_alphaquant by loading small example datasets
-@pytest.mark.skipif(not HAS_ALPHAQUANT, reason="alphaquant not installed")
+@pytest.mark.skipif(not _HAS_ALPHAQUANT, reason="alphaquant not installed")
 def test_diff_exp_alphaquant():
     """Testing function to ascertain stable functionality of diff_exp_alphaquant on small example datasets.
 
