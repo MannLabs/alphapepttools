@@ -10,7 +10,7 @@ from scipy.stats import ttest_ind
 from alphapepttools import tl
 from alphapepttools.pp import nanlog
 from alphapepttools.tl.defaults import tl_defaults
-from alphapepttools.tl.diff_exp.alphaquant import HAS_ALPHAQUANT, _standardize_alphaquant_results
+from alphapepttools.tl.diff_exp.alphaquant_wrapper import HAS_ALPHAQUANT, _standardize_alphaquant_results
 from alphapepttools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
 
 
@@ -305,9 +305,9 @@ def test_diff_exp_alphaquant():
     }
 
     with (
-        patch("alphapepttools.tl.diff_exp.alphaquant.aq_pipeline.run_pipeline"),
+        patch("alphapepttools.tl.diff_exp.alphaquant_wrapper.aq_pipeline.run_pipeline"),
         patch(
-            "alphapepttools.tl.diff_exp.alphaquant.pd.read_csv",
+            "alphapepttools.tl.diff_exp.alphaquant_wrapper.pd.read_csv",
             side_effect=[mock_protein_df.copy(), mock_proteoform_df.copy(), mock_peptide_df.copy()],
         ),
     ):

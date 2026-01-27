@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 from alphapepttools.tl import diff_exp_alphaquant
+from alphapepttools.tl.diff_exp.alphaquant_wrapper import HAS_ALPHAQUANT
 
 
 @pytest.fixture
@@ -43,6 +44,7 @@ def validate_test_data(test_data):
     assert all(condition in adata.obs["condition"].tolist() for condition in ("brain", "kidney"))
 
 
+@pytest.mark.skipif(not HAS_ALPHAQUANT, reason="alphaquant not installed")
 def test_diff_exp_alphaquant__integration(test_data: tuple[ad.AnnData, pd.DataFrame]) -> None:
     """Integration test that checks contract between alphaquant and alphapepttools
 
