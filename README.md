@@ -77,7 +77,7 @@ See the [GitHub Release page](https://github.com/MannLabs/alphapepttools/release
 
 ## Developer Guide
 
-This document gathers information on how to develop and contribute to the alphaDIA project.
+This document gathers information on how to develop and contribute to the alphapepttools project.
 
 ### Release process
 
