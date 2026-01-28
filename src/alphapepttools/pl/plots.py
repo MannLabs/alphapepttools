@@ -11,7 +11,7 @@
 import logging
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from typing import Any
 
 import anndata as ad
@@ -626,55 +626,77 @@ def _dict_keys_to_str(
     return {str(k): v for k, v in dictionary.items()}
 
 
-# Immutable dataclass to hold scatterplot default parameters, meant to be called with plot config factory
 @dataclass(frozen=True)
-class ScatterConfig:
-    """Immutable configuration for scatterplots"""
+class PlotConfig:
+    """Base configuration for all plot types
 
-    # Required args
-    data: ad.AnnData | pd.DataFrame
-    x_column: str
-    y_column: str
+    This dataclass holds common configuration parameters for different plot types.
+    It allows handling of dynamic fields, which are stored in the _extra attribute.
 
-    # Optional with defaults
-    color: str | tuple | None = None
-    color_column: str | None = None
-    color_map_column: str | None = None
-    scatter_kwargs: dict | None = None
 
-    def copy_with(self, **changes) -> "ScatterConfig":
-        """Create a copy of the ScatterConfig with specified changes, without changing the original."""
-        current = asdict(self)
-        if "scatter_kwargs" in changes and self.scatter_kwargs is not None:
-            merged_kwargs = {**self.scatter_kwargs, **changes["scatter_kwargs"]}
-            changes["scatter_kwargs"] = merged_kwargs
+    """
+
+    data: ad.AnnData | pd.DataFrame | None = None
+    _extra: dict = None  # Store additional fields
+
+    def __post_init__(self):
+        # Initialize _extra as empty dict if None
+        if self._extra is None:
+            object.__setattr__(self, "_extra", {})
+
+    def __getattr__(self, name: str) -> str | int | float | list | dict | ad.AnnData | pd.DataFrame:
+        """Access extra fields as attributes"""
+        if "_extra" in self.__dict__ and name in self._extra:
+            return self._extra[name]
+        raise AttributeError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+    def copy_with(
+        self,
+        **changes: dict,
+    ) -> "PlotConfig":
+        """Create a copy with specified changes"""
+        # Make it so that changes can override existing data & _extra fields
+        current = {"data": self.data}
+        current.update(self._extra)
         current.update(changes)
-        return ScatterConfig(**current)
+
+        # Since PlotConfig is instantiated with data and _extra, separate them here
+        data = current.pop("data", None)
+        new_extra = current  # Everything else goes into _extra
+
+        return PlotConfig(data=data, _extra=new_extra)
 
     def to_kwargs(self) -> dict:
-        """Convert ScatterConfig to a dictionary of keyword arguments."""
-        return {k: v for k, v in asdict(self).items() if v is not None}
+        """Convert to kwargs dict"""
+        result = {}
+        if self.data is not None:
+            result["data"] = self.data
+        result.update(self._extra)
+        return {k: v for k, v in result.items() if v is not None}
 
 
-def _validate_scatter_config(config: ScatterConfig) -> None:
-    """Check for essential parameters in ScatterConfig."""
-    if config.data is None or not isinstance(config.data, (ad.AnnData, pd.DataFrame)):
-        raise ValueError("ScatterConfig must have 'data' defined as AnnData or DataFrame.")
-    if config.x_column is None or not isinstance(config.x_column, str):
-        raise ValueError("ScatterConfig must have 'x_column' defined as a string.")
-    if config.y_column is None or not isinstance(config.y_column, str):
-        raise ValueError("ScatterConfig must have 'y_column' defined as a string.")
+def make_scatter_config(data: ad.AnnData | pd.DataFrame, x_column: str, y_column: str, **kwargs) -> PlotConfig:
+    """Create a config for scatter plots
 
+    Parameters
+    ----------
+    data : ad.AnnData | pd.DataFrame
+        Data to plot
+    x_column : str
+        Column for x-axis
+    y_column : str
+        Column for y-axis
+    **kwargs
+        Additional scatter parameters (color, scatter_kwargs, etc.)
 
-class PlotConfig:
-    """Factory for plot configuration dataclasses"""
-
-    @staticmethod
-    def scatter(
-        **kwargs,
-    ) -> ScatterConfig:
-        """Create a ScatterConfig dataclass from keyword arguments."""
-        return ScatterConfig(**kwargs)
+    Returns
+    -------
+    PlotConfig
+        Configuration object with all parameters set
+    """
+    extra = {"x_column": x_column, "y_column": y_column}
+    extra.update(kwargs)
+    return PlotConfig(data=data, _extra=extra)
 
 
 def _extract_plot_layer_specs(layer_specs: tuple) -> tuple[str, str | int | list, str, dict]:
@@ -721,128 +743,6 @@ def _extract_plot_layer_specs(layer_specs: tuple) -> tuple[str, str | int | list
     return layer_column, layer_val, color_key, scatter_kwargs
 
 
-# A function to layer scatterplots for advanced visualizations and higher-level plotting functions like volcano plots
-def scatter_layers(
-    ax: plt.Axes,
-    base_config: ScatterConfig,
-    layers: list[tuple] | None = None,
-    color_dict: dict[str, str | tuple] | None = None,
-    default_layer_column: str = "__data",
-    default_layer_val: str = "__all",
-    default_color_key: str = "__default_color",
-    default_color: str | tuple = BaseColors.get("blue"),
-    default_scatter_kwargs: dict | None = None,
-) -> None:
-    """Plot multiple layers with defined hierarchy and without datapoint reuse.
-
-    In order to layer multiple levels of scatterplots onto each other (e.g. color points by differential
-    expression, and then highlight extra points on top of that), this function allows for defining multiple
-    scatterplot layers. The base_config is an instance of the ScatterConfig class, which holds scatterplot arguments.
-    The purpose of this is to avoid repetitive specification of shared parameters in the layers list. Points
-    which are not assigned to any layer are plotted in the default layer in the background. A shared color_dict
-    is used by all layers to lookup colors by key.
-
-    Parameters
-    ----------
-    ax : plt.Axes
-        Matplotlib axes object to plot on.
-    base_config : ScatterConfig
-        Base configuration for the scatterplot layers.
-    layers : list[tuple], optional
-        List of layer specifications, each a tuple of (layer_column, layer_val, color_key[, scatter_kwargs]).
-        - layer_column (str): Column name to filter on for this layer
-        - layer_val (str|int|list): Value(s) to match in the layer_column (i.e. this layer will only contain points
-          where data[layer_column] is in layer_val)
-        - color_key (str): Color key in color_dict for this layer
-        - scatter_kwargs (dict, optional): Additional scatter parameters for this layer
-        By default None, which results in a single default layer containing all points.
-    color_dict : dict[str, str | tuple], optional
-        Dictionary mapping color keys to colors. By default None, which results in a single default color.
-    default_layer_column : str, optional
-        Column name to use for the default layer. By default "__data".
-    default_layer_val : str, optional
-        Value to use for the default layer. By default "__all".
-    default_color_key : str, optional
-        Color key to use for the default color. By default "__default_color".
-    default_color : str | tuple, optional
-        Color to use for the default color. By default BaseColors.get("blue").
-    default_scatter_kwargs : dict, optional
-
-    """
-    color_dict = color_dict or {default_color_key: default_color}
-    default_scatter_kwargs = default_scatter_kwargs or {}
-
-    _validate_scatter_config(base_config)
-
-    # Extract essential parameters from base_config
-    data = base_config.data
-
-    # By default, all datapoints are in the default layer
-    if layers is None:
-        data[default_layer_column] = data_index_to_array(data, "obs")
-    layers = layers or [(default_layer_column, default_layer_val, default_color_key, default_scatter_kwargs)]
-
-    # Initialize alphapepttools style figure and axes if not provided
-    fig = None
-    if ax is None:
-        fig, axm = create_figure()
-        ax = axm.next()
-
-    # Prior to plotting, gather indices for each layer, ensuring no datapoint is used twice
-    glob_spent_idxs = []
-    glob_layer_idxs = []
-    entry_indices = np.arange(len(data))
-    for layer_specs in layers:
-        # Flexibly extract layer specifications: scatter kwargs are optional
-        layer_column, layer_val, color_key, scatter_kwargs = _extract_plot_layer_specs(layer_specs)
-
-        # Create index mask for current layer
-        layer_column_array = data_column_to_array(data, layer_column)
-        current_layer_mask = np.isin(layer_column_array, _tolist(layer_val))
-
-        # Update the current layer mask to exclude points already assigned to previous layers
-        not_spent = ~np.isin(entry_indices, glob_spent_idxs)
-        current_layer_mask = current_layer_mask & not_spent
-
-        # Save indices for current layer
-        layer_idxs = entry_indices[current_layer_mask].tolist()
-
-        # Lookup color for current layer
-        layer_color = color_dict.get(color_key, default_color)
-        glob_layer_idxs.append((layer_idxs, layer_color, color_key, scatter_kwargs))
-
-        # Update spent indices so they are not assigned again
-        glob_spent_idxs.extend(layer_idxs)
-
-    # If any indices are not spent, assign them to the default layer
-    if len(glob_spent_idxs) < len(data):
-        remaining_idxs = list(set(entry_indices) - set(glob_spent_idxs))
-        glob_layer_idxs.append(
-            (
-                remaining_idxs,
-                color_dict.get(default_color_key, default_color),
-                default_color_key,
-                default_scatter_kwargs,
-            )
-        )
-        glob_spent_idxs.extend(remaining_idxs)
-
-    # Check that no points were left unassigned
-    if len(glob_spent_idxs) != len(data):
-        raise ValueError("Some data points were not assigned to any layer in the volcano plot.")
-
-    # Plot each layer in reverse order so that the first layer is on top
-    for layer_idxs, layer_color, _, scatter_kwargs in reversed(glob_layer_idxs):
-        if len(layer_idxs) > 0:
-            layer_config = base_config.copy_with(
-                data=subset_data(data, layer_idxs),
-                color=layer_color,
-                ax=ax,
-                scatter_kwargs=scatter_kwargs,
-            )
-            Plots.scatter(**layer_config.to_kwargs())
-
-
 class Plots:
     """Class for creating figures with matplotlib
 
@@ -856,6 +756,138 @@ class Plots:
         config: dict = defaults.plot_settings.to_dict(),
     ):
         self.config = config
+
+    @classmethod
+    def layered_plot(
+        cls,
+        ax: plt.Axes,
+        base_config: PlotConfig,
+        layers: list[tuple] | None = None,
+        color_dict: dict[str, str | tuple] | None = None,
+        default_layer_column: str = "__data",
+        default_layer_val: str = "__all",
+        default_color_key: str = "__default_color",
+        default_color: str | tuple = BaseColors.get("blue"),
+        default_scatter_kwargs: dict | None = None,
+        lim_padding_factor: float = 1.1,
+        xlims: tuple[float, float] | None = None,
+        ylims: tuple[float, float] | None = None,
+        plotting_callable: Callable | None = None,
+    ) -> None:
+        """Plot multiple layers with defined hierarchy and without datapoint reuse.
+
+        In order to layer multiple levels of scatterplots onto each other (e.g. color points by differential
+        expression, and then highlight extra points on top of that), this function allows for defining multiple
+        scatterplot layers. The base_config is an instance of BaseConfig, which holds plot arguments.
+        The purpose of this is to avoid repetitive specification of shared parameters in the layers list. Points
+        which are not assigned to any layer are plotted in the default layer in the background. A shared color_dict
+        is used by all layers to lookup colors by key.
+
+        Parameters
+        ----------
+        ax : plt.Axes
+            Matplotlib axes object to plot on.
+        base_config : BaseConfig
+            Base configuration for the plot layers containing data and plot parameters.
+        layers : list[tuple], optional
+            List of layer specifications, each a tuple of (layer_column, layer_val, color_key[, scatter_kwargs]).
+            - layer_column (str): Column name to filter on for this layer
+            - layer_val (str|int|list): Value(s) to match in the layer_column (i.e. this layer will only contain points
+            where data[layer_column] is in layer_val)
+            - color_key (str): Color key in color_dict for this layer
+            - scatter_kwargs (dict, optional): Additional scatter parameters for this layer
+            By default None, which results in a single default layer containing all points.
+        color_dict : dict[str, str | tuple], optional
+            Dictionary mapping color keys to colors. By default None, which results in a single default color.
+        default_layer_column : str, optional
+            Column name to use for the default layer. By default "__data".
+        default_layer_val : str, optional
+            Value to use for the default layer. By default "__all".
+        default_color_key : str, optional
+            Color key to use for the default color. By default "__default_color".
+        default_color : str | tuple, optional
+            Color to use for the default color. By default BaseColors.get("blue").
+        default_scatter_kwargs : dict, optional
+            Default scatterplot keyword arguments for the default layer. By default None.
+        lim_padding_factor : float, optional
+            Factor to pad the x and y limits of the plot. By default 1.1.
+        xlims : tuple[float, float] | None, optional
+            x-axis limits for the plot. If None, limits are calculated from the data with padding. By default None.
+        ylims : tuple[float, float] | None, optional
+            y-axis limits for the plot. If None, limits are calculated from the data with padding. By default None.
+        """
+        color_dict = color_dict or {default_color_key: default_color}
+        default_scatter_kwargs = default_scatter_kwargs or {}
+        base_config = base_config or PlotConfig.scatter()
+        plotting_callable = plotting_callable or cls.scatter
+
+        # Get data from base_config
+        data = base_config.data
+        x_column = base_config.x_column
+        y_column = base_config.y_column
+
+        # By default, all datapoints are in the default layer
+        if layers is None:
+            data[default_layer_column] = data_index_to_array(data, "obs")
+        layers = layers or [(default_layer_column, default_layer_val, default_color_key, default_scatter_kwargs)]
+
+        # We need to ensure that we have consistent limits across all layers
+        xlims = xlims or _get_plot_lims(data_column_to_array(data, x_column), lim_padding_factor, sym="max")
+        ylims = ylims or _get_plot_lims(data_column_to_array(data, y_column), lim_padding_factor, sym="max")
+
+        # Prior to plotting, gather indices for each layer, ensuring no datapoint is used twice
+        glob_spent_idxs = []
+        glob_layer_idxs = []
+        entry_indices = np.arange(len(data))
+        for layer_specs in layers:
+            # Flexibly extract layer specifications: scatter kwargs are optional
+            layer_column, layer_val, color_key, scatter_kwargs = _extract_plot_layer_specs(layer_specs)
+
+            # Create index mask for current layer
+            layer_column_array = data_column_to_array(data, layer_column)
+            current_layer_mask = np.isin(layer_column_array, _tolist(layer_val))
+
+            # Update the current layer mask to exclude points already assigned to previous layers
+            not_spent = ~np.isin(entry_indices, glob_spent_idxs)
+            current_layer_mask = current_layer_mask & not_spent
+
+            # Save indices for current layer
+            layer_idxs = entry_indices[current_layer_mask].tolist()
+
+            # Lookup color for current layer
+            layer_color = color_dict.get(color_key, default_color)
+            glob_layer_idxs.append((layer_idxs, layer_color, color_key, scatter_kwargs))
+
+            # Update spent indices so they are not assigned again
+            glob_spent_idxs.extend(layer_idxs)
+
+        # If any indices are not spent, assign them to the default layer
+        if len(glob_spent_idxs) < len(data):
+            remaining_idxs = list(set(entry_indices) - set(glob_spent_idxs))
+            glob_layer_idxs.append(
+                (
+                    remaining_idxs,
+                    color_dict.get(default_color_key, default_color),
+                    default_color_key,
+                    default_scatter_kwargs,
+                )
+            )
+            glob_spent_idxs.extend(remaining_idxs)
+
+        # Check that no points were left unassigned
+        if len(glob_spent_idxs) != len(data):
+            raise ValueError("Some data points were not assigned to any layer in the volcano plot.")
+
+        # Plot each layer in reverse order so that the first layer is on top
+        for layer_idxs, layer_color, _, scatter_kwargs in reversed(glob_layer_idxs):
+            if len(layer_idxs) > 0:
+                layer_config = base_config.copy_with(
+                    data=subset_data(data, layer_idxs),
+                    color=layer_color,
+                    scatter_kwargs=scatter_kwargs,
+                )
+                # ax and limits must be passed explicitly
+                plotting_callable(ax=ax, xlims=xlims, ylims=ylims, **layer_config.to_kwargs())
 
     @classmethod
     def histogram(

@@ -396,15 +396,12 @@ def data_column_to_array(
     if isinstance(data, ad.AnnData):
         if column in data.var_names:
             col_idx = data.var_names.get_loc(column)
-            logging.info(f"Column '{column}' found in: data.var_names. Using that")
             return data.X[:, col_idx].flatten()
 
         if column in data.obs.columns:
-            logging.info(f"Column '{column}' found in: data.obs.columns. Using that")
             return data.obs[column].to_numpy()
 
         if column in data.var.columns:
-            logging.info(f"Column '{column}' found in: data.var.columns. Using that")
             return data.var[column].to_numpy()
 
         raise ValueError(
@@ -493,6 +490,7 @@ def subset_data(
     """Subset data based on indices
 
     filtering data based on provided indices, handle both pd.DataFrame and AnnData objects.
+    The returned object is a copy of the input data with only the specified indices.
 
     Parameters
     ----------
@@ -508,9 +506,9 @@ def subset_data(
 
     """
     if isinstance(data, pd.DataFrame):
-        return data.iloc[idxs]
+        return data.iloc[idxs].copy()
     # AnnData
-    return data[idxs]
+    return data[idxs].copy()
 
 
 def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
