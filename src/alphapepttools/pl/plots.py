@@ -773,7 +773,8 @@ class Plots:
         xlims: tuple[float, float] | None = None,
         ylims: tuple[float, float] | None = None,
         plotting_callable: Callable | None = None,
-    ) -> None:
+        return_glob_layer_indices: bool = False,  # noqa: FBT001, FBT002
+    ) -> None | list:
         """Plot multiple layers with defined hierarchy and without datapoint reuse.
 
         In order to layer multiple levels of scatterplots onto each other (e.g. color points by differential
@@ -888,6 +889,11 @@ class Plots:
                 )
                 # ax and limits must be passed explicitly
                 plotting_callable(ax=ax, xlims=xlims, ylims=ylims, **layer_config.to_kwargs())
+
+        if return_glob_layer_indices:
+            return glob_layer_idxs
+
+        return None
 
     @classmethod
     def histogram(
@@ -1786,270 +1792,273 @@ class Plots:
         label_axes(ax, xlabel=f"PC{pc_x}{space_suffix}", ylabel=f"PC{pc_y}{space_suffix}")
 
     @classmethod
-    def volcano(  # NOQA: C901, PLR0915, PLR0912
-        # scatter parameters
+    def volcano(  # noqa: C901
         cls,
+        # Required data parameters
         data: ad.AnnData | pd.DataFrame,
         x_column: str,
         y_column: str,
+        # Core plotting parameters
         ax: plt.Axes | None = None,
+        layers: list[tuple] | None = None,
         color_dict: dict[str, str | tuple] | None = None,
-        legend: str | mpl.legend.Legend | None = None,
-        scatter_kwargs: dict | None = None,
-        legend_kwargs: dict | None = None,
-        lim_padding_factor: float = 1.2,
-        default_group: str = "__data",
-        default_color: tuple = BaseColors.get("blue"),
-        # volcano specific parameters
+        # Volcano-specific thresholds
         x_thresholds: tuple | None = (-1, 1),
         y_thresholds: tuple | None = (-np.log10(0.05),),
-        plot_layers: list[tuple] | None = None,
-        display_id_column: str | None = None,
+        # Labeling parameters
         label_layers: list[str] | None = None,
+        display_id_column: str | None = None,
         max_labels: int | None = None,
         x_label_anchors: list[float] | None = None,
-        figure_kwargs: dict | None = None,
-        label_kwargs: dict | None = None,
-        line_kwargs: dict | None = None,
         y_display_start: float | None = 1,
         y_padding_factor: float | None = 4,
+        # Plot limits
         xlims: tuple[float, float] | None = None,
         ylims: tuple[float, float] | None = None,
+        # Styling parameters
+        scatter_kwargs: dict | None = None,
+        line_kwargs: dict | None = None,
+        label_kwargs: dict | None = None,
+        legend: str | mpl.legend.Legend | None = None,
+        legend_kwargs: dict | None = None,
+        # Default layer parameters
+        default_color: str | tuple = BaseColors.get("grey"),
+        default_group: str = "data",
     ) -> None:
-        """Volcanoplot
+        """Create a volcano plot for differential expression visualization
 
-        In order to visualize differential expression results, a summary function of several plot elements is
-        provided here. Importantly, this is not a separate plot type, but rather a convenience function that
-        combines several plotting elements:
-
-        - Scatter plot of all points, with data-dependent coloring (Plots.scatter)
-        - Vertical and horizontal lines to indicate points passing thresholds (add_lines)
-        - Optional labeling of selected points (label_plot)
-        - Legend indicating the color scheme (add_legend_to_axes)
-
-        A particular consideration for volcanoplots is the differential coloring of various points of interest,
-        e.g. significantly regulated, manually selected or belonging to a certain group of interest. The current
-        solution uses `plot_layers` to define the hierarchy of visualization layers. `plot_layers` is a list of
-        tuples, where each tuple contains
-
-        layer_column, layer_val, color_key
-
-        - a `layer_column` from `data`
-        - a `layer_val` to match in the `layer_column`, either a single value or a list of values
-        - a `color_key` to retrieve a color from the `color_dict`
-
-        For example, given this plot_layers definition:
-
-        ```
-        pois = ["P10291", "P10292", "P10293", "P10294", "P10295"]
-        plot_layers = [
-            # look for all points in the "id" column that are in the pois list and color them according to the "POI_hypothesis" color in the color_dict
-            ("id", pois, "POI_hypothesis_color"),
-            # look for all points that have "POI" in the "label" column and color them according to the "POI" color in the color_dict
-            ("label", "POI", "POI_color"),  # in the second layer, plot all points where the label is "POI"
-            # similar for regulation status
-            ("diff_exp_status", "upregulated", "upregulated_color"),
-            ("diff_exp_status", "downregulated", "downregulated_color"),
-            ("diff_exp_status", "unchanged", "unchanged_color"),
-        ]
-        ```
-
-        Importantly, order matters: these plot_layers ensure that the 'pois' are on top, then the points labeled as 'POI',
-        then the upregulated, downregulated and unchanged points in the background. We specify the colors in a
-        separate `color_dict`, where the order of keys does not matter:
-
-        ```
-        color_dict = {
-            "upregulated_color": BaseColors.get("orange"),  # the specific point "P10001" should be colored orange
-            "downregulated_color": BaseColors.get("blue"),  # the specific point "P10002" should be colored blue
-            "unchanged_color": BaseColors.get(
-                "grey"
-            ),  # points from the list ["P10002", "P10003", "P10004"] should be colored grey
-            "POI_color": "black",  # points where the label is "POI" should be colored black
-            "POI_hypothesis_color": BaseColors.get("red", lighten=0.2),  # points in the pois list should be colored red
-        }
-        ```
-
-        Combined with this layer_dict:
-
-        ```
-        # Add labels to selected points: call them by their color lookup keys
-        label_layers = [
-            "POI_color",  # label all points where the label is "POI"
-            "POI_hypothesis_color",  # label all points in the pois list
-        ]
-        ```
-
-        We create a volcanoplot that's saying "put regulated points in the background, highlight POIs in black and special
-        hypothesis POIs in purple on top. Additionally, add labels only to the first two layers."
+        Volcano plots visualize differential expression results by plotting fold change (x-axis)
+        against statistical significance (y-axis). This function creates layered scatter plots
+        with threshold lines and optional point labeling.
 
         Parameters
         ----------
-        data : pd.DataFrame | ad.AnnData
-            Data to plot, must contain the x_column and y_column.
+        data : ad.AnnData | pd.DataFrame
+            Data containing expression values and statistics
         x_column : str
-            Column in data to plot on the x-axis. Must contain numeric data.
+            Column name for x-axis values (typically log fold change)
         y_column : str
-            Column in data to plot on the y-axis. Must contain numeric data.
+            Column name for y-axis values (typically -log10 p-value)
         ax : plt.Axes, optional
-            Matplotlib axes object to plot on, if None a new figure is created. By default None.
+            Axes to plot on. If None, creates new figure
+        layers : list[tuple], optional
+            List of layer specifications for hierarchical plotting. Each tuple contains
+            (column_name, value(s), color_key[, scatter_kwargs]). Points are plotted
+            in reverse order (first layer on top). Example:
+            [("gene_type", "housekeeping", "hk_color"),
+             ("significance", "significant", "sig_color", {"s": 100})]
         color_dict : dict[str, str | tuple], optional
-            Dictionary mapping color keys to colors. Color keys are matched from plot_layers. By default None.
-        legend : str | mpl.legend.Legend, optional
-            Legend to add to the plot. If "auto", a legend is created from the color_dict. By default None.
+            Maps color keys from layers to actual colors. Example:
+            {"hk_color": "blue", "sig_color": "red"}
+        x_thresholds : tuple, optional
+            X-axis values for vertical threshold lines. Default (-1, 1) for
+            fold change cutoffs
+        y_thresholds : tuple, optional
+            Y-axis values for horizontal threshold lines. Default (-log10(0.05),)
+            for p-value cutoff
+        label_layers : list[str], optional
+            Color keys of layers to label. Only points in these layers will have
+            text labels added
+        display_id_column : str, optional
+            Column containing labels to display. If None, uses data index
+        max_labels : int, optional
+            Maximum number of labels to show. Labels are prioritized by y-value
+        x_label_anchors : list[float], optional
+            X-positions to anchor labels to (for alignment). If None, labels
+            appear at data point positions
+        y_display_start : float, optional
+            Starting y-position for stacked labels (1=top, 0=bottom). Default 1
+        y_padding_factor : float, optional
+            Vertical spacing multiplier between stacked labels. Default 4
+        xlims : tuple[float, float], optional
+            X-axis limits. If None, calculated from data with padding
+        ylims : tuple[float, float], optional
+            Y-axis limits. If None, calculated from data with padding
         scatter_kwargs : dict, optional
-            Additional keyword arguments for the matplotlib scatter function. By default None.
+            Additional arguments passed to scatter plot (e.g., {"s": 50, "alpha": 0.5})
+        line_kwargs : dict, optional
+            Additional arguments for threshold lines (e.g., {"linewidth": 2, "linestyle": "--"})
+        label_kwargs : dict, optional
+            Additional arguments for axis labels
+        legend : str | mpl.legend.Legend, optional
+            Legend specification. If "auto", creates legend from color_dict
         legend_kwargs : dict, optional
-            Additional keyword arguments for the matplotlib legend function. By default None.
-        lim_padding_factor : float, optional
-            Factor to multiply the data range by for axis padding. By default 1.2.
+            Additional arguments for legend
+        default_color : str | tuple, optional
+            Color for points not matching any layer. Default grey
         default_group : str, optional
-            Default group name for unlabeled points. By default "__data".
-        default_color : tuple, optional
-            Default color for points not matching any layer. By default BaseColors.get("blue").
-        x_thresholds : tuple | None, optional
-            Tuple of x-axis thresholds for vertical lines. By default (-1, 1).
-        y_thresholds : float, optional
-            Y-axis threshold for horizontal line. By default -log10(0.05).
-        plot_layers : list[tuple] | None, optional
-            List of tuples defining the layers for coloring. Each tuple has the structure (layer_column, layer_val, color_key).
-            The order of the list defines the plotting order, i.e. the first layer is plotted on top. By default None.
-        display_id_column : str | None, optional
-            Column name for the labels to display. If None, uses the DataFrame index. By default None.
-        label_layers : list[str] | None, optional
-            List of color keys from plot_layers for which to add labels. By default None.
-        max_labels : int | None, optional
-            Maximum number of labels to add. If None, all points in label_layers are labeled. By default None.
-        x_label_anchors : list[float] | None, optional
-            X positions for label anchors. If None, labels are placed at data point x-coordinates. By default None.
-        figure_kwargs : dict | None, optional
-            Additional keyword arguments for figure creation. By default None.
-        label_kwargs : dict | None, optional
-            Additional keyword arguments for axis labeling. By default None.
-        line_kwargs : dict | None, optional
-            Additional keyword arguments for threshold lines. By default None.
-        y_display_start : float | None, optional
-            Starting y position for labels in figure coordinates (1 = top, 0 = bottom). By default 1.
-        y_padding_factor : float | None, optional
-            Padding factor for vertical spacing between stacked labels. By default 4.
-        xlims : tuple[float, float] | None, optional
-            X-axis limits. If None, determined automatically. By default None.
-        ylims : tuple[float, float] | None, optional
-            Y-axis limits. If None, determined automatically. By default None.
+            Name for the default layer containing unassigned points. Default "data"
 
         Returns
         -------
         None
 
+        See Also
+        --------
+        layered_plot : Core layering functionality
+        add_lines : Add threshold lines
+        label_plot : Add text labels
+
+        Notes
+        -----
+        The layering system ensures each point appears in exactly one layer.
+        Points are assigned to the first matching layer in the list.
+        Unassigned points go to the default layer (plotted in background).
+
+        Examples
+        --------
+        Create a volcano plot with differential expression data:
+
+        .. code-block:: python
+
+            import numpy as np
+            import pandas as pd
+            from alphapepttools.pl import Plots, BaseColors
+
+            # Generate example differential expression data
+            rng = np.random.default_rng(seed=42)
+            testx = rng.normal(0, 1, 300)
+            testy = -np.cos(testx) + rng.normal(0, 0.2, 300)
+            testp = 10 ** -(testy - min(testy))
+
+            data = pd.DataFrame(
+                {
+                    "id": [f"P{10000 + i}" for i in range(300)],
+                    "gene": [f"gene_{i}" for i in range(300)],
+                    "log2fc": testx,
+                    "pval": testp,
+                    "neg_log10pval": -np.log10(testp),
+                }
+            )
+            data.index = data["id"]
+
+            # Add differential expression status
+            data["diff_exp_status"] = data["log2fc"].apply(
+                lambda x: "upregulated" if x > 1 else ("downregulated" if x < -1 else "unchanged")
+            )
+
+            # Mark first 10 genes as proteins of interest
+            data["label"] = "other"
+            data.loc[data.index[:10], "label"] = "POI"
+
+            # Define specific proteins to highlight
+            pois = ["P10291", "P10292", "P10293", "P10294", "P10295"]
+
+            # Define visualization layers (plotted in reverse order)
+            plot_layers = [
+                ("id", pois, "POI_hypothesis"),  # Specific hypothesis proteins on top
+                ("label", "POI", "POI"),  # General POI proteins
+                ("diff_exp_status", "upregulated", "upregulated"),  # Upregulated
+                ("diff_exp_status", "downregulated", "downregulated"),  # Downregulated
+                ("diff_exp_status", "unchanged", "unchanged"),  # Background
+            ]
+
+            # Define colors for each layer
+            color_dict = {
+                "upregulated": BaseColors.get("orange"),
+                "downregulated": BaseColors.get("blue"),
+                "unchanged": BaseColors.get("grey"),
+                "POI": "black",
+                "POI_hypothesis": BaseColors.get("purple", lighten=0.7),
+            }
+
+            # Specify which layers to label
+            label_layers = ["POI", "POI_hypothesis"]
+
+            # Create volcano plot
+            Plots.volcano(
+                data=data,
+                x_column="log2fc",
+                y_column="neg_log10pval",
+                color_dict=color_dict,
+                layers=plot_layers,
+                label_layers=label_layers,
+                x_label_anchors=[-3.5, 3.5],  # Anchor labels to left/right
+                y_padding_factor=1.7,  # Vertical spacing between labels
+                y_display_start=0.75,  # Start labels at 75% from bottom
+                xlims=(-6, 6),
+            )
+
+        This creates a volcano plot where:
+
+        - Background points (unchanged) appear in grey
+        - Differentially expressed genes are colored orange (up) or blue (down)
+        - Proteins of interest (POI) are highlighted in black
+        - Specific hypothesis proteins are emphasized in purple on top
+        - Only POI and hypothesis proteins receive text labels
+
         """
         data = data.copy()
 
-        scatter_kwargs = scatter_kwargs or {}
         label_kwargs = label_kwargs or {}
-        figure_kwargs = figure_kwargs or {"figsize": (3, 3)}
+        scatter_kwargs = scatter_kwargs or {}
+        line_kwargs = line_kwargs or {}
         legend_kwargs = legend_kwargs or {}
         x_thresholds = x_thresholds or ()
         y_thresholds = y_thresholds or ()
 
-        color_dict = color_dict or {default_group: default_color}
+        # Generate a plotting config
+        plot_config = make_scatter_config(
+            data=data,
+            x_column=x_column,
+            y_column=y_column,
+            scatter_kwargs=scatter_kwargs,
+        )
 
-        # By default, all datapoints are in the default layer
-        if plot_layers is None:
-            data[default_group] = data_index_to_array(data, "obs")
-
-        plot_layers = plot_layers or [(default_group, _tolist(data[default_group].tolist()))]
-
-        x_values = data_column_to_array(data, x_column)
-        y_values = data_column_to_array(data, y_column)
+        # get limits
+        if xlims is None:
+            xlims = _get_plot_lims(
+                data_column_to_array(data, x_column),
+                padding_factor=1.1,
+                sym="max",
+            )
+        if ylims is None:
+            ylims = _get_plot_lims(
+                data_column_to_array(data, y_column),
+                padding_factor=1.1,
+                set_left=0,
+            )
 
         # Initialize alphapepttools style figure and axes if not provided
-        fig = None
         if ax is None:
-            fig, axm = create_figure(**figure_kwargs)
+            _, axm = create_figure()
             ax = axm.next()
 
-        # Lims should be symmetric (x) and adapt to the data with some padding
-        xlims = xlims or _get_plot_lims(x_values, lim_padding_factor, sym="max")
-        ylims = ylims or _get_plot_lims(y_values, lim_padding_factor, set_left=0)
-        ax.set_xlim(xlims)
-        ax.set_ylim(ylims)
-
-        # Add visualization layers: Iterate through layer dict and plot each layer so that the first layer is on top.
-        glob_spent_idxs = []
-        glob_layer_idxs = []
-        entry_indices = np.arange(len(data))
-        for layer_specs in plot_layers:
-            layer_column, layer_val, color_key = layer_specs
-
-            if (
-                not isinstance(layer_column, str)
-                or not isinstance(layer_val, (str, int, list))
-                or not isinstance(color_key, str)
-            ):
-                raise TypeError(f"Layer specifications must be tuples of (str, str|int|list, str), got {layer_specs}")
-
-            layer_column_array = data_column_to_array(data, layer_column)
-            layer_color = color_dict.get(color_key, default_color)
-            current_layer_mask = np.isin(layer_column_array, _tolist(layer_val))
-
-            # Update the current layer mask to exclude points already assigned to previous layers
-            not_spent = ~np.isin(entry_indices, glob_spent_idxs)
-            current_layer_mask = current_layer_mask & not_spent
-
-            # Save indices and lookup value to color current layer
-            layer_idxs = entry_indices[current_layer_mask].tolist()
-            glob_layer_idxs.append((layer_idxs, layer_color, color_key))
-
-            # Update spent indices so they are not assigned again
-            glob_spent_idxs.extend(layer_idxs)
-
-        # If any indices are not spent, assign them to the default layer
-        if len(glob_spent_idxs) < len(data):
-            remaining_idxs = list(set(entry_indices) - set(glob_spent_idxs))
-            glob_layer_idxs.append((remaining_idxs, color_dict.get(default_group, default_color), default_group))
-            glob_spent_idxs.extend(remaining_idxs)
-
-        # Check that no points were left unassigned
-        if len(glob_spent_idxs) != len(data):
-            raise ValueError("Some data points were not assigned to any layer in the volcano plot.")
-
-        # Plot each layer in reverse order so that the first layer is on top
-        for layer_idxs, layer_color, _ in reversed(glob_layer_idxs):
-            if len(layer_idxs) > 0:
-                Plots.scatter(
-                    data=subset_data(data, layer_idxs),
-                    x_column=x_column,
-                    y_column=y_column,
-                    color=layer_color,
-                    ax=ax,
-                    scatter_kwargs=scatter_kwargs,
-                )
-
-        # Add decoration to volcanoplot
+        # Add decoration to volcanoplot prior to setting limits
         add_lines(ax=ax, linetype="vline", intercepts=list(x_thresholds), line_kwargs=line_kwargs)
         add_lines(ax=ax, linetype="hline", intercepts=list(y_thresholds), line_kwargs=line_kwargs)
 
-        ax.set_xlim(xlims)
-        ax.set_ylim(ylims)
+        # Visualize & keep track of display layers for labelling
+        global_layer_indices = cls.layered_plot(
+            ax=ax,
+            base_config=plot_config,
+            layers=layers,
+            color_dict=color_dict,
+            xlims=xlims,
+            ylims=ylims,
+            return_glob_layer_indices=True,
+            default_color=default_color,
+            default_color_key=default_group,
+        )
 
-        # Label IDs per label_layers: only layers specified in label_layers are considered for labeling
+        # Labeling
         if label_layers is not None:
-            glob_label_idxs = []
-            for layer_idxs, _, layer_label_key in glob_layer_idxs:
-                if layer_label_key in label_layers:
-                    glob_label_idxs.extend(layer_idxs)
+            idxs_to_label = []
+            for layer_idxs, _, color_key, _ in global_layer_indices:
+                if color_key in label_layers:
+                    idxs_to_label.extend(layer_idxs)
 
-            if glob_label_idxs:
+            if idxs_to_label:
                 # Extract arrays for the label indices
-                label_y_values = y_values[glob_label_idxs]
-                label_x_values = x_values[glob_label_idxs]
+                label_y_values = data_column_to_array(data, y_column)[idxs_to_label]
+                label_x_values = data_column_to_array(data, x_column)[idxs_to_label]
 
                 # Get display labels, fall back to index if no display_id_column is provided
                 if display_id_column is None:
                     all_labels = data_index_to_array(data, "obs")
                 else:
                     all_labels = data_column_to_array(data, display_id_column)
-                display_labels = all_labels[glob_label_idxs]
+                display_labels = all_labels[idxs_to_label]
 
                 # Sort by y values (descending) to minimize crossing lines between labels and points
                 sort_order = np.argsort(label_y_values)[::-1]
@@ -2073,7 +2082,7 @@ class Plots:
                     y_padding_factor=y_padding_factor,
                 )
 
-        # Label axes
+        # Sensible default axis labeling
         label_axes(
             ax=ax,
             xlabel=x_column,
