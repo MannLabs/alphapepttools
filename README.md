@@ -64,7 +64,7 @@ If you want to use `alphapepttools` in an isolated environment and enforce strin
 pip install "alphapepttools[stable]"
 ```
 
-Note that this installs only a subset of alphabase functionality, as it misses
+Note that this installs only a subset of alphapepttools functionality, as it misses
 the `alphaquant` and `inmoose` packages (required for advanced differential expression analysis).
 If you encounter a respective warning, you need to install the `full` extra option
 
