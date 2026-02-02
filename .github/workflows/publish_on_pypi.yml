@@ -17,7 +17,7 @@ jobs:
       package_name: alphapepttools
       src_folder: src/alphapepttools
       tag_to_release: ${{ inputs.tag_to_release }}
-      python_version: 3.12
+      python_version: 3.13
       test_stable: true
     secrets:
       test_pypi_api_token: ${{ secrets.TEST_PYPI_API_TOKEN }}

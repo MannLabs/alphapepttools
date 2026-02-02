@@ -2,19 +2,31 @@
 
 Learn about how to use alphapepttools with the following tutorials.
 
+## End-to-end workflows
+
+These notebooks analyse a dataset end-to-end and provide a full overview
+
 ```{toctree}
 ---
 maxdepth: 1
 ---
-notebooks/00_data_sources.ipynb
-notebooks/01_basic_workflow.ipynb
-notebooks/01_plotting.ipynb
-notebooks/02_basic_analysis.ipynb
-notebooks/02_plotting.ipynb
-notebooks/04_basic_PCA_workflow.ipynb
-notebooks/04_differential_expression.ipynb
-notebooks/05_pycombat.ipynb
-notebooks/A01_load_psm_tables.ipynb
-notebooks/A01_plotting.ipynb
-notebooks/A02_filtering_demo.ipynb
+notebooks/studies/study_01_biomarker_csf
+notebooks/studies/study_02_peptidomics_pelsa
+notebooks/studies/study_03_biomarker_skin
+```
+
+## Functional steps
+
+These notebooks center around a specific analysis step or functionality of the package
+
+```{toctree}
+---
+maxdepth: 1
+---
+notebooks/tutorials/tutorial_00_data_sources
+notebooks/tutorials/tutorial_01_basic_workflow
+notebooks/tutorials/tutorial_02_basic_plotting_workflow
+notebooks/tutorials/tutorial_03_basic_PCA_workflow
+notebooks/supplementary/supplementary_01_filtering_demo
+
 ```

@@ -19,6 +19,7 @@ API
     pp.impute_gaussian
     pp.impute_median
     pp.impute_knn
+    pp.impute_bpca
     pp.scanpy_pycombat
 
 ```
@@ -39,6 +40,7 @@ API
     tl.diff_exp_ttest
     tl.diff_exp_alphaquant
     tl.pca
+    tl.bpca
     tl.diff_exp_ebayes
 
 ```
