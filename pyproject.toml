@@ -29,6 +29,7 @@ dependencies = [
   "anndata==0.11.1",
   "bpca==0.1",
   "cmcrameri==1.9",      # TODO: remove this to optional dependencies?
+  "decoupler==2.1.4",
   "inmoose==0.8.1",
   "matplotlib==3.10",
   "numpy<2",
