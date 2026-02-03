@@ -113,3 +113,10 @@
   search_engine: diann
   data_type: psm
   description: Small example reports for testing PSM readers (DiaNN 1.9.0, parquet)
+
+- name: albrecht_pcan
+  url: https://datashare.biochem.mpg.de/s/Bn6R9FQRj3Jn2ZB
+  search_engine: diann
+  data_type: psm
+  citation: "Albrecht, V., Müller-Reif, J. B., Brennsteiner, V. & Mann, M. A Simplified Perchloric Acid Workflow With Neutralization (PCA N) for Democratizing Deep Plasma Proteomics at Population Scale. Molecular & Cellular Proteomics 24, 101071 (2025)."
+  description: "2000 Plasma samples processed with the PCA-N workflow (PXD064475)."
