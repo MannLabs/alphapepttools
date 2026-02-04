@@ -13,10 +13,9 @@ maintainers = [
 authors = [
   { name = "MannLabs" },
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -66,13 +65,17 @@ optional-dependencies.full-stable = [
 ]
 optional-dependencies.stable = [
   "alphabase==1.8.1",
-  "anndata==0.11.4",     # anndata > 0.11.4 dropped python 3.10 support
+  "alphaquant==0.3",
+  "anndata==0.12.9",
   "cmcrameri==1.9",
+  "inmoose==0.9.1",
   "matplotlib==3.10",
+  "numpy==2.4.2",
   "openpyxl==3.1.5",
+  "pandas==3",
   "pyarrow==23",
-  "scanpy==1.11.5",      # scanpy > 1.11.5 dropped python 3.10 support
-  "scikit-learn==1.7.2", # scikit-learn > 1.7.2 dropped python 3.10 support
+  "scanpy==1.12",
+  "scikit-learn==1.8",
   "session-info2==0.3",
 ]
 optional-dependencies.test = [
