@@ -39,6 +39,10 @@ jobs:
             name: STABLE
           - os: ubuntu-latest
             python: "3.13"
+            extras: "stable,alphaquant-stable"
+            name: STABLE-ALPHAQUANT
+          - os: ubuntu-latest
+            python: "3.13"
             pip-flags: "--pre"
             name: PRE-RELEASE DEPENDENCIES
 

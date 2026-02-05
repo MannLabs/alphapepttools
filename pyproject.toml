@@ -25,7 +25,6 @@ dynamic = [ "version" ]
 
 dependencies = [
   "alphabase",
-  "alphaquant",
   "anndata",
   "bpca>=0.1",
   "cmcrameri",    # TODO: remove this to optional dependencies?
@@ -39,6 +38,12 @@ dependencies = [
   "scikit-learn",
   # for debug logging (referenced from the issue template)
   "session-info2",
+]
+optional-dependencies.alphaquant = [
+  "alphaquant",
+]
+optional-dependencies.alphaquant-stable = [
+  "alphaquant==0.3",
 ]
 optional-dependencies.dev = [
   "pre-commit",
@@ -62,7 +67,6 @@ optional-dependencies.doc = [
 ]
 optional-dependencies.stable = [
   "alphabase==1.8.1",
-  "alphaquant==0.3",
   "anndata==0.11.4",     # anndata > 0.11.4 dropped python 3.10 support
   "cmcrameri==1.9",
   "inmoose==0.8.1",      # inmoose > 0.8.1 dropped python 3.10 support
