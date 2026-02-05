@@ -64,11 +64,15 @@ If you want to use `alphapepttools` in an isolated environment and enforce strin
 pip install "alphapepttools[stable]"
 ```
 
-For differential expression analysis using [AlphaQuant](https://github.com/MannLabs/alphaquant), install the optional alphaquant dependency:
+Note that this installs only a subset of alphapepttools functionality, as it misses
+the `alphaquant` and `inmoose` packages (required for advanced differential expression analysis).
+If you encounter a respective warning, you need to install the `full` extra option
 
 ```bash
-pip install "alphapepttools[alphaquant]"
+pip install "alphapepttools[full]"  # or [full-stable]
 ```
+
+or install the respective packages manually.
 
 For development purposes like running tests, pre-commit hooks, and building the documentation locally, install the optional development dependencies:
 

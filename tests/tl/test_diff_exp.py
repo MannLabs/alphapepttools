@@ -11,6 +11,7 @@ from alphapepttools import tl
 from alphapepttools.pp import nanlog
 from alphapepttools.tl.defaults import tl_defaults
 from alphapepttools.tl.diff_exp.alphaquant_wrapper import _HAS_ALPHAQUANT, _standardize_alphaquant_results
+from alphapepttools.tl.diff_exp.ebayes import _HAS_INMOOSE
 from alphapepttools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
 
 
@@ -379,6 +380,7 @@ def expected_ebayes_base_df():
 
 
 # Test diff_exp_limma by loading small example datasets
+@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
 @pytest.mark.parametrize(
     ("comparison", "expected_comparison_key", "between_column"),
     [

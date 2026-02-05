@@ -89,7 +89,7 @@ def diff_exp_alphaquant(
     """Calculate differential expression using AlphaQuant."""
     if not _HAS_ALPHAQUANT:
         raise ImportError(
-            "alphaquant is required for diff_exp_alphaquant(). Install with: pip install alphapepttools[alphaquant]"
+            "alphaquant is required for diff_exp_alphaquant(). Install it through pip or install alphapepttools with the 'full'/'full-stable' extra."
         )
 
     if plots not in {"hide", "show"}:
