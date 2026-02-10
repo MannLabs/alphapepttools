@@ -24,20 +24,19 @@ classifiers = [
 dynamic = [ "version" ]
 
 dependencies = [
-  "alphabase==1.8",
-  "alphaquant==0.2",
-  "anndata==0.11.1",
-  "cmcrameri==1.9",      # TODO: remove this to optional dependencies?
-  "inmoose==0.8.1",
-  "matplotlib==3.10",
-  "numpy<2",
-  "openpyxl>=3.1.3",
-  "pandas<3",            # version to be fixed: 2.2.3 # TODO: Remove upper bound as soon as statsmodels fixes pre-release dependencies
-  "pyarrow",             # version to be fixed: 19.0.1
-  "scanpy==1.10.4",
-  "scikit-learn==1.5.1",
+  "alphabase",
+  "anndata",
+  "bpca>=0.1",
+  "cmcrameri",    # TODO: remove this to optional dependencies?
+  "matplotlib",
+  "numpy",
+  "openpyxl",
+  "pandas<3",     # version to be fixed: 2.2.3 # TODO: Remove upper bound as soon as statsmodels fixes pre-release dependencies
+  "pyarrow",
+  "scanpy",
+  "scikit-learn",
   # for debug logging (referenced from the issue template)
-  "session-info==1",
+  "session-info2",
 ]
 optional-dependencies.dev = [
   "pre-commit",
@@ -58,6 +57,27 @@ optional-dependencies.doc = [
   "sphinx-tabs",
   "sphinxcontrib-bibtex>=1",
   "sphinxext-opengraph",
+]
+optional-dependencies.full = [
+  "alphaquant",
+  "inmoose",
+]
+optional-dependencies.full-stable = [
+  "alphaquant==0.3",
+  "inmoose==0.8.1",
+]
+optional-dependencies.stable = [
+  "alphabase==1.8.1",
+  "anndata==0.11.4",     # anndata > 0.11.4 dropped python 3.10 support
+  "cmcrameri==1.9",
+  "matplotlib==3.10",
+  "numpy==2.2.6",        # numpy > 2.2.6 dropped python 3.10 support
+  "openpyxl==3.1.5",
+  "pandas==2.3.3",
+  "pyarrow==23",
+  "scanpy==1.11.5",      # scanpy > 1.11.5 dropped python 3.10 support
+  "scikit-learn==1.7.2", # scikit-learn > 1.7.2 dropped python 3.10 support
+  "session-info2==0.3",
 ]
 optional-dependencies.test = [
   "coverage",

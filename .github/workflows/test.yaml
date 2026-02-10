@@ -25,10 +25,28 @@ jobs:
         include:
           - os: ubuntu-latest
             python: "3.10"
+            name: LOOSE
           - os: ubuntu-latest
-            python: "3.12"
+            python: "3.13"
+            name: LOOSE
           - os: ubuntu-latest
-            python: "3.12"
+            python: "3.13"
+            name: LOOSE-FULL
+            extras: "full"
+          - os: ubuntu-latest
+            python: "3.10"
+            extras: "stable"
+            name: STABLE
+          - os: ubuntu-latest
+            python: "3.13"
+            extras: "stable"
+            name: STABLE
+          - os: ubuntu-latest
+            python: "3.13"
+            extras: "stable,full-stable"
+            name: STABLE-FULL
+          - os: ubuntu-latest
+            python: "3.13"
             pip-flags: "--pre"
             name: PRE-RELEASE DEPENDENCIES
 
@@ -52,7 +70,12 @@ jobs:
           python -m pip install --upgrade pip wheel
       - name: Install dependencies
         run: |
-          pip install ${{ matrix.pip-flags }} ".[dev,test]"
+          if [ -n "${{ matrix.extras }}" ]; then
+            pip install ${{ matrix.pip-flags }} ".[dev,test,${{ matrix.extras }}]"
+          else
+            pip install ${{ matrix.pip-flags }} ".[dev,test]"
+          fi
+
       - name: Test
         env:
           MPLBACKEND: agg
