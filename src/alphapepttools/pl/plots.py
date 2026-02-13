@@ -248,10 +248,11 @@ def add_lines(
         intercepts = [intercepts]
 
     # handle clashes between keyword arguments and line_kwargs
+    # explicit parameters take precedence over line_kwargs
     line_kwargs = line_kwargs or {}
-    color = line_kwargs.pop("color", color)
-    linestyle = line_kwargs.pop("linestyle", linestyle)
-    linewidth = line_kwargs.pop("linewidth", linewidth)
+    line_kwargs.pop("color", None)
+    line_kwargs.pop("linestyle", None)
+    line_kwargs.pop("linewidth", None)
 
     # add lines to ax
     for intercept in intercepts:
@@ -384,7 +385,7 @@ def add_legend_to_axes(
 
         # Custom palette
         levels = ["WT", "Het", "KO"]
-        palette = ["#blue", "#lightblue", "#red"]
+        palette = ["blue", "lightblue", "red"]
         add_legend_to_axes(ax, levels=levels, palette=palette)
 
         # Many levels trigger sequential palette
@@ -722,55 +723,6 @@ class Plots:
     ax : matplotlib.axes.Axes, optional
         Axes to plot on (created in alphapepttools style if not provided)
 
-    Examples
-    --------
-    Basic scatter plot:
-
-    >>> import pandas as pd
-    >>> from alphapepttools.pl import Plots
-    >>>
-    >>> df = pd.DataFrame(
-    ...     {
-    ...         "log2fc": [1.5, -2.0, 0.5, 3.0],
-    ...         "pvalue": [0.01, 0.001, 0.5, 0.005],
-    ...         "significant": ["yes", "yes", "no", "yes"],
-    ...     }
-    ... )
-    >>>
-    >>> fig, ax = plt.subplots()
-    >>> Plots.scatter(
-    ...     data=df,
-    ...     x_column="log2fc",
-    ...     y_column="pvalue",
-    ...     color_map_column="significant",
-    ...     color_dict={"yes": "red", "no": "gray"},
-    ...     ax=ax,
-    ... )
-
-    Distribution comparison with violin plot:
-
-    >>> # Compare protein intensities across conditions
-    >>> Plots.violinplot(
-    ...     ax=ax,
-    ...     data=adata,
-    ...     grouping_column="condition",
-    ...     value_column="intensity",
-    ...     color_dict={"Control": "blue", "Treatment": "red"},
-    ... )
-
-    PCA with sample labels:
-
-    >>> # PCA plot with sample type coloring and labels
-    >>> Plots.plot_pca(
-    ...     data=adata,
-    ...     x_column=1,  # PC1
-    ...     y_column=2,  # PC2
-    ...     color_map_column="sample_type",
-    ...     label=True,
-    ...     label_column="sample_id",
-    ...     ax=ax,
-    ... )
-
     Notes
     -----
     - All methods are class methods and can be called directly without instantiation
@@ -857,34 +809,74 @@ class Plots:
         --------
         Simple histogram:
 
-        >>> Plots.histogram(data=df, value_column="intensity", bins=30, color="skyblue", ax=ax)
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            df = pd.DataFrame({"intensity": [1.5, 2.3, 2.8, 1.9, 3.1, 2.5]})
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.histogram(data=df, value_column="intensity", bins=30, color="skyblue", ax=ax)
 
         Grouped histogram with transparency:
 
-        >>> Plots.histogram(
-        ...     data=df,
-        ...     value_column="values",
-        ...     color_map_column="condition",
-        ...     bins=20,
-        ...     legend="auto",
-        ...     hist_kwargs={"alpha": 0.7, "histtype": "stepfilled"},
-        ...     legend_kwargs={"title": "Condition"},
-        ...     ax=ax,
-        ... )
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            df = pd.DataFrame(
+                {
+                    "values": [1.5, 2.3, 2.8, 1.9, 3.1, 2.5, 4.2, 3.8],
+                    "condition": ["A", "A", "B", "B", "A", "B", "A", "B"],
+                }
+            )
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.histogram(
+                data=df,
+                value_column="values",
+                color_map_column="condition",
+                bins=20,
+                legend="auto",
+                hist_kwargs={"alpha": 0.7, "histtype": "stepfilled"},
+                legend_kwargs={"title": "Condition"},
+                ax=ax,
+            )
 
         Custom color mapping:
 
-        >>> Plots.histogram(
-        ...     data=example_df,
-        ...     value_column="values",
-        ...     color_map_column="levels",
-        ...     color_dict={"A": "red", "B": "blue", "C": "green"},
-        ...     bins=20,
-        ...     ax=ax,
-        ...     legend="auto",
-        ...     hist_kwargs={"alpha": 0.7, "histtype": "stepfilled", "edgecolor": "k"},
-        ...     legend_kwargs={"title": "Levels", "loc": "upper left"},
-        ... )
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            example_df = pd.DataFrame(
+                {
+                    "values": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+                    "levels": ["A", "B", "C", "A", "B", "C", "A", "B", "C"],
+                }
+            )
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.histogram(
+                data=example_df,
+                value_column="values",
+                color_map_column="levels",
+                color_dict={"A": "red", "B": "blue", "C": "green"},
+                bins=20,
+                ax=ax,
+                legend="auto",
+                hist_kwargs={"alpha": 0.7, "histtype": "stepfilled", "edgecolor": "k"},
+                legend_kwargs={"title": "Levels", "loc": "upper left"},
+            )
 
         Notes
         -----
@@ -1027,79 +1019,127 @@ class Plots:
         --------
         Simple scatter with single color:
 
-        >>> Plots.scatter(data=df, x_column="log2fc", y_column="pvalue", color="red", ax=ax)
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            df = pd.DataFrame({"x": [1, 2, 3, 4, 5], "y": [2, 4, 1, 3, 5]})
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.scatter(data=df, x_column="x", y_column="y", color="red", ax=ax)
 
         Categorical coloring with automatic palette:
 
-        >>> Plots.scatter(
-        ...     data=adata,
-        ...     x_column="values",
-        ...     y_column="values2",
-        ...     color_map_column="levels3",
-        ...     legend="auto",
-        ...     ax=ax,
-        ...     palette=None,  # Uses default qualitative palette
-        ... )
+        .. code-block:: python
 
-        Many categories with repeating palette:
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
 
-        >>> # Default palette repeats for many distinct values
-        >>> Plots.scatter(
-        ...     data=df,
-        ...     x_column="values",
-        ...     y_column="values2",
-        ...     color_map_column="levels2",  # e.g., 50 distinct values
-        ...     ax=ax,
-        ... )
+            df = pd.DataFrame(
+                {
+                    "x": [1, 2, 3, 4, 5],
+                    "y": [2, 4, 1, 3, 5],
+                    "category": ["A", "B", "A", "C", "B"],
+                }
+            )
 
-        Sequential colormap for unique colors:
-
-        >>> # Avoid repetition with sequential colormap
-        >>> Plots.scatter(
-        ...     data=adata,
-        ...     x_column="values",
-        ...     y_column="values2",
-        ...     color_map_column="levels2",  # Many distinct values
-        ...     ax=ax,
-        ...     palette=colors.BaseColormaps.get("sequential"),
-        ... )
-
-        Quantitative gradient with numeric data:
-
-        >>> # Numeric values mapped to continuous gradient
-        >>> Plots.scatter(
-        ...     data=adata,
-        ...     x_column="values",
-        ...     y_column="values2",
-        ...     color_map_column="levels3",  # Numeric column
-        ...     legend="auto",
-        ...     ax=ax,
-        ...     palette=colors.BaseColormaps.get("sequential"),
-        ... )
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.scatter(
+                data=df,
+                x_column="x",
+                y_column="y",
+                color_map_column="category",
+                legend="auto",
+                ax=ax,
+            )
 
         Custom color dictionary:
 
-        >>> Plots.scatter(
-        ...     data=df,
-        ...     x_column="x",
-        ...     y_column="y",
-        ...     color_map_column="significance",
-        ...     color_dict={"significant": "red", "not_sig": "grey", "borderline": "orange"},
-        ...     legend="auto",
-        ...     scatter_kwargs={"s": 50, "alpha": 0.7},
-        ...     ax=ax,
-        ... )
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            df = pd.DataFrame(
+                {
+                    "x": [1, 2, 3, 4, 5],
+                    "y": [2, 4, 1, 3, 5],
+                    "significance": ["significant", "not_significant", "significant", "not_significant", "significant"],
+                }
+            )
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.scatter(
+                data=df,
+                x_column="x",
+                y_column="y",
+                color_map_column="significance",
+                color_dict={"significant": "red", "not_significant": "gray"},
+                legend="auto",
+                scatter_kwargs={"s": 50, "alpha": 0.7},
+                ax=ax,
+            )
+
+        Quantitative gradient with numeric data:
+
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+            from alphapepttools.pl.colors import BaseColormaps
+
+            df = pd.DataFrame(
+                {
+                    "x": [1, 2, 3, 4, 5],
+                    "y": [2, 4, 1, 3, 5],
+                    "intensity": [1.0, 5.0, 10.0, 15.0, 20.0],
+                }
+            )
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.scatter(
+                data=df,
+                x_column="x",
+                y_column="y",
+                color_map_column="intensity",
+                palette=BaseColormaps.get("sequential"),
+                ax=ax,
+            )
 
         Direct color values from column:
 
-        >>> # color_column contains actual color values like "#FF0000" or "red"
-        >>> Plots.scatter(
-        ...     data=df,
-        ...     x_column="x",
-        ...     y_column="y",
-        ...     color_column="my_colors",  # Contains hex/RGB/color names
-        ...     ax=ax,
-        ... )
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            df = pd.DataFrame(
+                {
+                    "x": [1, 2, 3, 4, 5],
+                    "y": [2, 4, 1, 3, 5],
+                    "my_colors": ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF"],
+                }
+            )
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.scatter(
+                data=df,
+                x_column="x",
+                y_column="y",
+                color_column="my_colors",
+                ax=ax,
+            )
 
         Notes
         -----
@@ -1221,26 +1261,48 @@ class Plots:
 
         Examples
         --------
-        Grouped comparison (categories from one column):
+        Grouped comparison (long format):
 
-        >>> # Compare values across different treatment groups (long table format)
-        >>> Plots.barplot(
-        ...     ax=ax,
-        ...     data=adata,
-        ...     grouping_column="treatment",  # Categories: "Control", "Drug_A", "Drug_B"
-        ...     value_column="expression",  # Numeric values to compare
-        ...     color_dict={"Control": "gray", "Drug_A": "blue", "Drug_B": "red"},
-        ... )
+        .. code-block:: python
 
-        Direct column comparison:
+            import pandas as pd
+            import anndata as ad
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
 
-        >>> # Compare multiple measurement columns directly (wide table format)
-        >>> Plots.barplot(
-        ...     ax=ax,
-        ...     data=adata,
-        ...     direct_columns=["protein1", "protein2", "protein3"],  # Each column becomes a bar
-        ...     color=BaseColors.get("green"),
-        ... )
+            data = pd.DataFrame({"intensity": [1, 2, 3, 4, 5, 6, 7]})
+            obs = pd.DataFrame({"group": ["A", "A", "B", "B", "B", "C", "C"]})
+            adata = ad.AnnData(X=data.values, obs=obs, var=pd.DataFrame(index=data.columns))
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.barplot(
+                ax=ax,
+                data=adata,
+                grouping_column="group",
+                value_column="intensity",
+                color_dict={"A": "red", "B": "green", "C": "blue"},
+            )
+
+        Direct column comparison (wide format):
+
+        .. code-block:: python
+
+            import pandas as pd
+            import anndata as ad
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            data = pd.DataFrame({"protein1": [1, 2, 3], "protein2": [4, 5, 6], "protein3": [7, 8, 9]})
+            adata = ad.AnnData(X=data.values, var=pd.DataFrame(index=data.columns))
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.barplot(
+                ax=ax,
+                data=adata,
+                direct_columns=["protein1", "protein2", "protein3"],
+            )
 
         Notes
         -----
@@ -1326,26 +1388,48 @@ class Plots:
 
         Examples
         --------
-        Grouped comparison (categories from one column):
+        Grouped comparison (long format):
 
-        >>> # Compare values across different treatment groups (long table format)
-        >>> Plots.boxplot(
-        ...     ax=ax,
-        ...     data=adata,
-        ...     grouping_column="treatment",  # Categories: "Control", "Drug_A", "Drug_B"
-        ...     value_column="expression",  # Numeric values to compare
-        ...     color_dict={"Control": "gray", "Drug_A": "blue", "Drug_B": "red"},
-        ... )
+        .. code-block:: python
 
-        Direct column comparison:
+            import pandas as pd
+            import anndata as ad
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
 
-        >>> # Compare multiple measurement columns directly (wide table format)
-        >>> Plots.boxplot(
-        ...     ax=ax,
-        ...     data=adata,
-        ...     direct_columns=["protein1", "protein2", "protein3"],  # Each column becomes a box
-        ...     color=BaseColors.get("green"),
-        ... )
+            data = pd.DataFrame({"intensity": [1, 2, 3, 4, 5, 6, 7]})
+            obs = pd.DataFrame({"group": ["A", "A", "B", "B", "B", "C", "C"]})
+            adata = ad.AnnData(X=data.values, obs=obs, var=pd.DataFrame(index=data.columns))
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.boxplot(
+                ax=ax,
+                data=adata,
+                grouping_column="group",
+                value_column="intensity",
+                color_dict={"A": "red", "B": "green", "C": "blue"},
+            )
+
+        Direct column comparison (wide format):
+
+        .. code-block:: python
+
+            import pandas as pd
+            import anndata as ad
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            data = pd.DataFrame({"protein1": [1, 2, 3], "protein2": [4, 5, 6], "protein3": [7, 8, 9]})
+            adata = ad.AnnData(X=data.values, var=pd.DataFrame(index=data.columns))
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.boxplot(
+                ax=ax,
+                data=adata,
+                direct_columns=["protein1", "protein2", "protein3"],
+            )
 
         Notes
         -----
@@ -1443,26 +1527,48 @@ class Plots:
 
         Examples
         --------
-        Grouped comparison (categories from one column):
+        Grouped comparison (long format):
 
-        >>> # Compare values across different treatment groups (long table format)
-        >>> Plots.violinplot(
-        ...     ax=ax,
-        ...     data=adata,
-        ...     grouping_column="treatment",  # Categories: "Control", "Drug_A", "Drug_B"
-        ...     value_column="expression",  # Numeric values to compare
-        ...     color_dict={"Control": "gray", "Drug_A": "blue", "Drug_B": "red"},
-        ... )
+        .. code-block:: python
 
-        Direct column comparison:
+            import pandas as pd
+            import anndata as ad
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
 
-        >>> # Compare multiple measurement columns directly (wide table format)
-        >>> Plots.violinplot(
-        ...     ax=ax,
-        ...     data=adata,
-        ...     direct_columns=["protein1", "protein2", "protein3"],  # Each column becomes a violin
-        ...     color=BaseColors.get("purple"),
-        ... )
+            data = pd.DataFrame({"intensity": [1, 2, 3, 4, 5, 6, 7]})
+            obs = pd.DataFrame({"group": ["A", "A", "B", "B", "B", "C", "C"]})
+            adata = ad.AnnData(X=data.values, obs=obs, var=pd.DataFrame(index=data.columns))
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.violinplot(
+                ax=ax,
+                data=adata,
+                grouping_column="group",
+                value_column="intensity",
+                color_dict={"A": "red", "B": "green", "C": "blue"},
+            )
+
+        Direct column comparison (wide format):
+
+        .. code-block:: python
+
+            import pandas as pd
+            import anndata as ad
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            data = pd.DataFrame({"protein1": [1, 2, 3], "protein2": [4, 5, 6], "protein3": [7, 8, 9]})
+            adata = ad.AnnData(X=data.values, var=pd.DataFrame(index=data.columns))
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.violinplot(
+                ax=ax,
+                data=adata,
+                direct_columns=["protein1", "protein2", "protein3"],
+            )
 
         Notes
         -----
