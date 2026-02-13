@@ -718,9 +718,9 @@ class Plots:
     -----------------
     Most plotting methods share these common parameters:
 
-    data : pd.DataFrame or ad.AnnData
+    data
         Input data object
-    ax : matplotlib.axes.Axes, optional
+    ax
         Axes to plot on (created in alphapepttools style if not provided)
 
     Notes
@@ -1793,7 +1793,7 @@ class Plots:
             If None, uses default naming convention ("X_pca_obs" or "X_pca_var").
         label
             Whether to add text labels to points in the scatter plot.
-        label_column : str, optional
+        label_column
             Column to use for point labels. If None and label=True, uses the index
             (data.obs.index for dim_space="obs", data.var.index for dim_space="var").
         ax
