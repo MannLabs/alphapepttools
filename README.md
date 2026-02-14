@@ -76,7 +76,7 @@ or install the respective packages manually.
 For development purposes like running tests, pre-commit hooks, and building the documentation locally, install the optional development dependencies:
 
 ```bash
-git clone https://github.com/MannLabs/alphapepttools.git@main && cd alphapepttools
+git clone https://github.com/MannLabs/alphapepttools.git && cd alphapepttools
 pip install -e ".[test, dev]"
 ```
 
