@@ -2,9 +2,15 @@ import logging
 import tempfile
 from pathlib import Path
 
-import alphaquant.run_pipeline as aq_pipeline
 import anndata as ad
 import pandas as pd
+
+try:
+    import alphaquant.run_pipeline as aq_pipeline
+
+    _HAS_ALPHAQUANT = True
+except ModuleNotFoundError:
+    _HAS_ALPHAQUANT = False
 
 from alphapepttools.tl import tl_defaults
 from alphapepttools.tl.utils import _suppress_plots, determine_max_replicates, negative_log10_pvalue
@@ -81,6 +87,11 @@ def diff_exp_alphaquant(
     plots: str = "hide",
 ) -> tuple[str, dict[str, pd.DataFrame]]:
     """Calculate differential expression using AlphaQuant."""
+    if not _HAS_ALPHAQUANT:
+        raise ImportError(
+            "alphaquant is required for diff_exp_alphaquant(). Install it through pip or install alphapepttools with the 'full'/'full-stable' extra."
+        )
+
     if plots not in {"hide", "show"}:
         raise ValueError("Parameter 'plots' must be either 'hide' or 'show'.")
 
