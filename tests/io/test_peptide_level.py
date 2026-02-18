@@ -50,27 +50,27 @@ def expected_peptide_adata():
     """Create expected peptide-level AnnData after aggregation.
 
     Expected result after max aggregation:
-    - 2 peptides: PEPTIDEK_IN_P1;P1-1, DIPEPTKEK_IN_P2
-    - sample_1: [100, 3] (max of [10, 100] and max of [3])
-    - sample_2: [100, nan] (max of [100, 30] and nan)
+    - 2 peptides: DIPEPTKEK_IN_P2, PEPTIDEK_IN_P1;P1-1 (alphabetical order)
+    - sample_1: [3, 100] (max of [3] for DIPEPTKEK, max of [10, 100] for PEPTIDEK)
+    - sample_2: [nan, 100] (nan for DIPEPTKEK, max of [100, 30] for PEPTIDEK)
     """
-    # Expected index format: sequence_IN_protein
-    peptide_indices = ["PEPTIDEK_IN_P1;P1-1", "DIPEPTKEK_IN_P2"]
+    # Expected index format: sequence_IN_protein (alphabetical order)
+    peptide_indices = ["DIPEPTKEK_IN_P2", "PEPTIDEK_IN_P1;P1-1"]
 
-    # Quantification matrix after max aggregation
+    # Quantification matrix after max aggregation (matching alphabetical order)
     X = np.array(
         [
-            [100.0, 3.0],  # sample_1
-            [100.0, np.nan],  # sample_2
+            [3.0, 100.0],  # sample_1: DIPEPTKEK then PEPTIDEK
+            [np.nan, 100.0],  # sample_2: DIPEPTKEK then PEPTIDEK
         ]
     )
 
     # Sample metadata (unchanged from precursor level)
     obs = pd.DataFrame({"cell_type": ["T1", "T1"], "treatment": ["A", "B"]}, index=["sample_1", "sample_2"])
 
-    # Peptide metadata
+    # Peptide metadata (matching alphabetical order)
     var = pd.DataFrame(
-        {"genes": ["G1", "G2"], "sequence": ["PEPTIDEK", "DIPEPTKEK"], "proteins": ["P1;P1-1", "P2"]},
+        {"genes": ["G2", "G1"], "sequence": ["DIPEPTKEK", "PEPTIDEK"], "proteins": ["P2", "P1;P1-1"]},
         index=peptide_indices,
     )
 
@@ -126,27 +126,27 @@ def expected_peptide_adata_median():
     """Create expected peptide-level AnnData after median aggregation.
 
     Expected result after median aggregation:
-    - 2 peptides: PEPTIDEK_IN_P1;P1-1, DIPEPTKEK_IN_P2
-    - sample_1: [55, 3] (median of [10, 100] = 55, median of [3] = 3)
-    - sample_2: [65, nan] (median of [100, 30] = 65, median of [nan, nan] = nan)
+    - 2 peptides: DIPEPTKEK_IN_P2, PEPTIDEK_IN_P1;P1-1 (alphabetical order)
+    - sample_1: [3, 55] (median of [3] for DIPEPTKEK, median of [10, 100] for PEPTIDEK)
+    - sample_2: [nan, 65] (nan for DIPEPTKEK, median of [100, 30] for PEPTIDEK)
     """
-    # Expected index format: sequence_IN_protein
-    peptide_indices = ["PEPTIDEK_IN_P1;P1-1", "DIPEPTKEK_IN_P2"]
+    # Expected index format: sequence_IN_protein (alphabetical order)
+    peptide_indices = ["DIPEPTKEK_IN_P2", "PEPTIDEK_IN_P1;P1-1"]
 
-    # Quantification matrix after median aggregation
+    # Quantification matrix after median aggregation (matching alphabetical order)
     X = np.array(
         [
-            [55.0, 3.0],  # sample_1: median([10, 100]) = 55, median([3]) = 3
-            [65.0, np.nan],  # sample_2: median([100, 30]) = 65, median([nan, nan]) = nan
+            [3.0, 55.0],  # sample_1: DIPEPTKEK then PEPTIDEK
+            [np.nan, 65.0],  # sample_2: DIPEPTKEK then PEPTIDEK
         ]
     )
 
     # Sample metadata (unchanged from precursor level)
     obs = pd.DataFrame({"cell_type": ["T1", "T1"], "treatment": ["A", "B"]}, index=["sample_1", "sample_2"])
 
-    # Peptide metadata
+    # Peptide metadata (matching alphabetical order)
     var = pd.DataFrame(
-        {"genes": ["G1", "G2"], "sequence": ["PEPTIDEK", "DIPEPTKEK"], "proteins": ["P1;P1-1", "P2"]},
+        {"genes": ["G2", "G1"], "sequence": ["DIPEPTKEK", "PEPTIDEK"], "proteins": ["P2", "P1;P1-1"]},
         index=peptide_indices,
     )
 

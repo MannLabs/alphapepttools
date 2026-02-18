@@ -1,6 +1,8 @@
 import anndata as ad
 import pandas as pd
 
+import alphapepttools as apt
+
 
 def _create_peptide_group_id(sequence: pd.Series, protein_id: pd.Series, separator: str = "_IN_") -> pd.Series:
     """Create unique identifier by concatenating sequence and protein ID.
@@ -163,7 +165,7 @@ def _add_metadata_columns(
 
 def _create_anndata_from_aggregated(
     aggregated_df: pd.DataFrame,
-    original_adata_var: pd.DataFrame,
+    original_adata: ad.AnnData,
     sequence_column: str,
     protein_id_column: str,
     added_columns: list[str] | None,
@@ -174,8 +176,8 @@ def _create_anndata_from_aggregated(
     ----------
     aggregated_df : pd.DataFrame
         Aggregated quantification data with metadata
-    original_adata_var : pd.DataFrame
-        Original AnnData.var (sample metadata)
+    original_adata : ad.AnnData
+        Original AnnData object
     sequence_column : str
         Column name for peptide sequences
     protein_id_column : str
@@ -199,16 +201,14 @@ def _create_anndata_from_aggregated(
     # Extract quantification matrix and transpose back to samples * peptides
     quant_matrix = aggregated_df.drop(columns=var_columns).T
 
-    # Create AnnData object
+    # Create AnnData object with basic index information
     return_adata = ad.AnnData(X=quant_matrix)
 
-    # Add sample metadata (obs) from original
-    return_adata.obs = original_adata_var.copy()
+    # Use add_metadata to properly add sample metadata from original
+    return_adata = apt.pp.add_metadata(return_adata, original_adata.obs, axis=0)
 
-    # Add peptide metadata (var)
-    return_adata.var = var_metadata.copy()
-
-    return return_adata
+    # Use add_metadata to properly add peptide metadata
+    return apt.pp.add_metadata(return_adata, var_metadata, axis=1)
 
 
 def group_peptides(
@@ -322,7 +322,7 @@ def group_peptides(
     # Step 4: Create output AnnData object
     return _create_anndata_from_aggregated(
         aggregated_df,
-        adata.var,
+        adata,
         sequence_column,
         protein_id_column,
         added_columns,
