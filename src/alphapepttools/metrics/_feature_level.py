@@ -1,7 +1,11 @@
 """Feature level metrics"""
 
+import warnings
+
 import anndata as ad
 import numpy as np
+
+from alphapepttools.pp.transform import detect_special_values
 
 
 def _cv(data: np.ndarray, *, min_valid: int = 3, axis: int = 0) -> np.ndarray:
@@ -92,3 +96,166 @@ def coefficient_of_variation(
     adata.var[key_added] = _cv(data, min_valid=min_valid, axis=0)
 
     return adata if copy else None
+
+
+def sum_intensity(
+    adata: ad.AnnData,
+    *,
+    layer: str | None = None,
+    features: list[str] | None = None,
+    obs_col_name: str = "sum_intensity",
+    add_to_adata: bool = True,
+) -> np.ndarray | None:
+    """Calculate sum of intensity for each observation.
+
+    Parameters
+    ----------
+    adata
+        AnnData object
+    layer
+        Name of the layer to compute the sum on. If None (default), the data matrix X is used.
+    features
+        Optional list of specific features (var_names) to include in the sum.
+        If None (default), all features are used.
+    obs_col_name
+        Name of the column to add to adata.obs. Default is "sum_intensity".
+    add_to_adata
+        If True (default), adds the result to adata.obs[obs_col_name].
+        If False, returns the calculated values without modifying adata.
+
+    Returns
+    -------
+    np.ndarray | None
+        If add_to_adata is False, returns the sum values as an array.
+        If add_to_adata is True, modifies adata inplace and returns None.
+    """
+    data = adata.X if layer is None else adata.layers[layer]
+
+    if features is not None:
+        missing = set(features) - set(adata.var_names)
+        if missing:
+            warnings.warn(f"The following features were not found in adata.var_names: {missing}")
+        feature_mask = adata.var_names.isin(features)
+        data = data[:, feature_mask]
+
+    result = np.nansum(data, axis=1)
+
+    if add_to_adata:
+        adata.obs[obs_col_name] = result
+        return None
+    return result
+
+
+def num_detected(
+    adata: ad.AnnData,
+    *,
+    layer: str | None = None,
+    obs_col_name: str = "num_prot",
+    add_to_adata: bool = True,
+) -> np.ndarray | None:
+    """Count the number of detected features per observation.
+
+    A feature is considered detected if it is not a special value
+    (NaN, zero, negative, or infinite).
+
+    Parameters
+    ----------
+    adata
+        AnnData object
+    layer
+        Name of the layer to use. If None (default), the data matrix X is used.
+    obs_col_name
+        Name of the column to add to adata.obs. Default is "num_prot".
+    add_to_adata
+        If True (default), adds the result to adata.obs[obs_col_name].
+        If False, returns the calculated values without modifying adata.
+
+    Returns
+    -------
+    np.ndarray | None
+        If add_to_adata is False, returns the count values as an array.
+        If add_to_adata is True, modifies adata inplace and returns None.
+    """
+    if layer is not None and layer not in adata.layers:
+        raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
+
+    data = adata.X if layer is None else adata.layers[layer]
+    special_values_mask = detect_special_values(data, verbosity=0)
+    detected_features = np.sum(~special_values_mask, axis=1)
+
+    if add_to_adata:
+        adata.obs[obs_col_name] = detected_features
+        return None
+    return detected_features
+
+
+def frac_detected(
+    adata: ad.AnnData,
+    *,
+    layer: str | None = None,
+    obs_col_name: str = "frac_prot",
+    add_to_adata: bool = True,
+) -> np.ndarray | None:
+    """Calculate the fraction of detected features per observation.
+
+    A feature is considered detected if it is not a special value
+    (NaN, zero, negative, or infinite).
+
+    Parameters
+    ----------
+    adata
+        AnnData object
+    layer
+        Name of the layer to use. If None (default), the data matrix X is used.
+    obs_col_name
+        Name of the column to add to adata.obs. Default is "frac_prot".
+    add_to_adata
+        If True (default), adds the result to adata.obs[obs_col_name].
+        If False, returns the calculated values without modifying adata.
+
+    Returns
+    -------
+    np.ndarray | None
+        If add_to_adata is False, returns the fraction values as an array.
+        If add_to_adata is True, modifies adata inplace and returns None.
+    """
+    n_detected = num_detected(adata, layer=layer, add_to_adata=False)
+    n_features = adata.shape[1]
+    frac_features = n_detected / n_features
+
+    if add_to_adata:
+        adata.obs[obs_col_name] = frac_features
+        return None
+    return frac_features
+
+
+def calculate_qc_metrics(
+    adata: ad.AnnData,
+    *,
+    layer: str | None = None,
+) -> None:
+    """Calculate all QC metrics and add them to adata.obs.
+
+    This function computes and adds the following metrics:
+    - sum_intensity: Sum of intensities per observation
+    - num_prot: Number of detected features per observation
+    - frac_prot: Fraction of detected features per observation
+
+    Parameters
+    ----------
+    adata
+        AnnData object
+    layer
+        Name of the layer to use. If None (default), the data matrix X is used.
+
+    Returns
+    -------
+    None
+        Modifies adata inplace by adding the following columns to adata.obs:
+        - ``adata.obs["sum_intensity"]``: Sum of intensities per observation
+        - ``adata.obs["num_prot"]``: Number of detected features per observation
+        - ``adata.obs["frac_prot"]``: Fraction of detected features per observation
+    """
+    sum_intensity(adata, layer=layer)
+    num_detected(adata, layer=layer)
+    frac_detected(adata, layer=layer)
