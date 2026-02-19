@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import median_abs_deviation
 
-from ._feature_level import _cv
+from .feature_level import _cv
 
 METRICS_KEY = "metrics"
 PMAD_KEY = "pmad"

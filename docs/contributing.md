@@ -138,10 +138,11 @@ Consider enabling this option for [ruff][ruff-editors] and [prettier][prettier-e
 
 [pre-commit]: https://pre-commit.com/
 [ruff-editors]: https://docs.astral.sh/ruff/integrations/
-
 [prettier-editors]: https://prettier.io/docs/en/editors.html
 
-(writing-tests)=
+## Writing modules
+
+Top-level modules consist of `data`, `io`, `metrics`, `pl`, `pp` and `tl`. Modules are usually python scripts containing semantically related code (e.g. code to impute values lives in the `impute.py` module inside `pp`). If necessary, sub-module directories may be introduced to enhance clarity, but in general a flat structure is preferred. `.py` modules are lowercase and don't start with underscores, and generally have a `test_....py` module in the corresponding tests-top-level module. An example for this structure is the top-level module `io/anndata_factory.py`, which is covered by unit tests in `tests/io/test_anndata_factory.py`.
 
 ## Writing tests
 
