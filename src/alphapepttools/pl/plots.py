@@ -24,7 +24,7 @@ from matplotlib.patches import Patch
 from alphapepttools.pl import defaults
 from alphapepttools.pl.colors import BaseColors, BasePalettes, _get_colors_from_cmap, get_color_mapping
 from alphapepttools.pl.figure import create_figure, label_axes
-from alphapepttools.pp.data import data_column_to_array
+from alphapepttools.pp.data import data_column_to_array, data_columns_to_df
 from alphapepttools.tl.plot_data_handling import (
     extract_pca_anndata,
     prepare_pca_1d_loadings_data_to_plot,
@@ -37,72 +37,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 config = defaults.plot_settings.to_dict()
-
-
-def _extract_columns_to_df(
-    data: ad.AnnData | pd.DataFrame,
-    columns: list[str] | None = None,
-) -> pd.DataFrame:
-    """Extract selected columns from AnnData or DataFrame.
-
-    This function serves as an adapter upstream of matplotlib plotting functions,
-    which frequently accept an array of values. Extracts the requested columns
-    from an AnnData object's X and/or obs object & validates there are no duplicates.
-
-    Parameters
-    ----------
-    data : ad.AnnData | pd.DataFrame
-        Input data object.
-    columns : list[str] | None, optional
-        List of column names to extract. If None, uses all columns (DataFrame)
-        or all columns in X (AnnData). Default is None.
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame containing only the selected columns.
-
-    """
-    if isinstance(data, pd.DataFrame):
-        columns = columns or data.columns.tolist()
-        try:
-            dataset = data[columns]
-        except KeyError as e:
-            raise KeyError(f"Columns {columns} not found in dataframe.") from e
-
-    elif isinstance(data, ad.AnnData):
-        if columns is None:
-            dataset = data.to_df()
-        else:
-            # Partition columns by source
-            x_cols = [col for col in columns if col in data.var_names]
-            obs_cols = [col for col in columns if col in data.obs.columns]
-
-            # Check for duplicate columns across sources
-            duplicates = set(x_cols) & set(obs_cols)
-            if duplicates:
-                raise KeyError(
-                    f"Columns {duplicates} found in both AnnData X and obs. Please ensure unique column names."
-                )
-
-            # Check for missing columns
-            missing_cols = set(columns) - set(x_cols) - set(obs_cols)
-            if missing_cols:
-                raise KeyError(f"Columns {missing_cols} not found in AnnData X or obs.")
-
-            # Build dataset from available sources
-            parts = []
-            if x_cols:
-                parts.append(data.to_df()[x_cols])
-            if obs_cols:
-                parts.append(data.obs[obs_cols])
-
-            dataset = pd.concat(parts, axis=1) if len(parts) > 1 else parts[0]
-
-    else:
-        raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
-
-    return dataset
 
 
 def _extract_groupwise_plotting_data(
@@ -164,11 +98,11 @@ def _extract_groupwise_plotting_data(
     if direct_columns is not None:
         if grouping_column is not None or value_column is not None:
             logger.info("'direct_columns' provided, ignoring 'grouping_column' and 'value_column' parameters.")
-        df = _extract_columns_to_df(data, columns=direct_columns)[direct_columns]  # ensure order
+        df = data_columns_to_df(data, columns=direct_columns)[direct_columns]  # ensure order
         df = df.melt(var_name="variable", value_name="value")
         grouping_column, value_column = "variable", "value"
     else:
-        df = _extract_columns_to_df(data, columns=[grouping_column, value_column])
+        df = data_columns_to_df(data, columns=[grouping_column, value_column])
 
     # Determine groups
     groups_to_plot = df[grouping_column].dropna().unique().tolist()
@@ -398,9 +332,10 @@ def _assign_nearest_anchor_position_to_values(
 
 def label_plot(
     ax: plt.Axes,
-    x_values: list | np.ndarray | pd.Series,
-    y_values: list | np.ndarray | pd.Series,
-    labels: list[str] | np.ndarray | pd.Series,
+    data: pd.DataFrame | ad.AnnData,
+    x_column: str,
+    y_column: str,
+    label_column: str,
     x_anchors: list[int | float] | np.ndarray | None = None,
     label_kwargs: dict | None = None,
     line_kwargs: dict | None = None,
@@ -411,20 +346,20 @@ def label_plot(
     """Add labels to a 2D axes object
 
     Add labels to a plot based on x and y coordinates. The labels are either placed near the datapoint
-    using the automatic dodging function from adjust_text or anchored to the left or right of the plot,
-    where labels below the splitpoint are anchored to the left and labels above the splitpoint are anchored
-    to the right.
+    or anchored to specific x-positions. Lines are drawn from the data points to the labels.
 
     Parameters
     ----------
     ax : plt.Axes
         Matplotlib axes object to add the labels to.
-    x_values : list | np.ndarray
-        x-coordinates of the labels.
-    y_values : list | np.ndarray
-        y-coordinates of the labels.
-    labels : list[str] | np.ndarray
-        Labels to add to the plot.
+    data : pd.DataFrame | ad.AnnData
+        Data containing the x, y, and label columns.
+    x_column : str
+        Column name for x-coordinates.
+    y_column : str
+        Column name for y-coordinates.
+    label_column : str
+        Column name for labels.
     x_anchors : list[int | float] | np.ndarray | None, optional
         x-coordinates of the anchors to use for the labels. If None, labels are placed at the x-coordinates of the data points. By default None.
     label_kwargs : dict | None, optional
@@ -447,17 +382,19 @@ def label_plot(
     line_kwargs = {"color": BaseColors.get("black"), "linewidth": config["linewidths"]["medium"], **(line_kwargs or {})}
     label_parser = label_parser or (lambda x: x)
 
-    if not len(x_values) == len(y_values) == len(labels):
-        raise ValueError("x_values, y_values, and labels must have the same length")
+    # Extract all needed columns into a DataFrame
+    df = data_columns_to_df(data, columns=[x_column, y_column, label_column])
 
-    # Force the order of labels from highest to lowest
-    y_value_order = np.argsort(np.array(y_values))[::-1]
-    y_values = np.array(y_values)[y_value_order]
-    x_values = np.array(x_values)[y_value_order]
-    labels = np.array(labels)[y_value_order]
+    # Sort by y values (highest to lowest)
+    df = df.sort_values(by=y_column, ascending=False)
 
-    # convert to numpy arrays for consistency & remove any nans
-    x_values, y_values, labels = _drop_nans_from_plot_arrays(np.array(x_values), np.array(y_values), np.array(labels))
+    # Extract arrays from sorted DataFrame
+    x_values = df[x_column].to_numpy()
+    y_values = df[y_column].to_numpy()
+    labels = df[label_column].to_numpy()
+
+    # Remove any nans
+    x_values, y_values, labels = _drop_nans_from_plot_arrays(x_values, y_values, labels)
 
     # determine label positions based on optional x_anchors
     if x_anchors is not None:
