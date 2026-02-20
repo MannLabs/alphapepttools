@@ -11,7 +11,7 @@
 import logging
 from collections import Counter
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 import anndata as ad
 import matplotlib as mpl
@@ -675,6 +675,7 @@ class Plots:
         legend_kwargs: dict | None = None,
         xlim: tuple[float, float] | None = None,
         ylim: tuple[float, float] | None = None,
+        order: Literal["color_frequency", "original"] = "color_frequency",
     ) -> None:
         """Plot a scatterplot from a DataFrame or AnnData object
 
@@ -730,6 +731,8 @@ class Plots:
             Limits for the x-axis. By default None.
         ylim : tuple[float, float], optional
             Limits for the y-axis. By default None.
+        order : str
+            Ordering of plotting data points. If "color_frequency", the rarest colors (based on color_map_column) are plotted on top. If "original", the order of the data is kept as is, which is useful for plotting ordered categorical datapoints
 
         Returns
         -------
@@ -776,8 +779,12 @@ class Plots:
             color_values = np.array([color_dict[DEFAULT_GROUP]] * len(data))
 
         # Handle ordering of plotting arrays by string: order by the frequency of the color column
-        counts = Counter([str(cv) for cv in color_values])
-        order = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
+        if order == "color_frequency":
+            counts = Counter([str(cv) for cv in color_values])
+            order = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
+        else:  # default is "original", which means keeping the 'data' order
+            order = np.arange(len(color_values))
+
         x_values = data_column_to_array(data, x_column)[order]
         y_values = data_column_to_array(data, y_column)[order]
         color_values = np.array(color_values)[order]
