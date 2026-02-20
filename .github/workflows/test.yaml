@@ -30,6 +30,10 @@ jobs:
             python: "3.13"
             name: LOOSE
           - os: ubuntu-latest
+            python: "3.13"
+            name: LOOSE-FULL
+            extras: "full"
+          - os: ubuntu-latest
             python: "3.11"
             extras: "stable"
             name: STABLE
