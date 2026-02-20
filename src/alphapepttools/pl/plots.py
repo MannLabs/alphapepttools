@@ -782,7 +782,7 @@ class Plots:
         if order == "color_frequency":
             counts = Counter([str(cv) for cv in color_values])
             order = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
-        else:  # default is "original", which means keeping the 'data' order
+        else:  # "original" means keeping the 'data' order
             order = np.arange(len(color_values))
 
         x_values = data_column_to_array(data, x_column)[order]
