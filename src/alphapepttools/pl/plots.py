@@ -1152,11 +1152,18 @@ class Plots:
                 labels = data.obs.index if label_column is None else data_column_to_array(data, label_column)
             else:  # dim_space == "var"
                 labels = data.var.index if label_column is None else data_column_to_array(data, label_column)
+
+            # Create a DataFrame with the PCA coordinates and labels for the new label_plot interface
+            label_df = pd.DataFrame(
+                {"x": adata_pca.X[:, x_column - 1], "y": adata_pca.X[:, y_column - 1], "label": labels}
+            )
+
             label_plot(
                 ax=ax,
-                x_values=adata_pca.X[:, x_column - 1],
-                y_values=adata_pca.X[:, y_column - 1],
-                labels=labels,
+                data=label_df,
+                x_column="x",
+                y_column="y",
+                label_column="label",
                 x_anchors=None,
             )
 
@@ -1359,9 +1366,10 @@ class Plots:
         if add_labels:
             label_plot(
                 ax=ax,
-                x_values=loadings_top["dim1_loadings"],
-                y_values=loadings_top["dim2_loadings"],
-                labels=loadings_top["feature"],
+                data=loadings_top,
+                x_column="dim1_loadings",
+                y_column="dim2_loadings",
+                label_column="feature",
                 x_anchors=None,
                 label_kwargs={"fontsize": config["font_sizes"]["medium"], "ha": "center", "va": "bottom"},
                 line_kwargs={"color": BaseColors.get("black"), "linewidth": config["linewidths"]["medium"]},
