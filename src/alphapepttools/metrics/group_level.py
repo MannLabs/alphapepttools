@@ -1,5 +1,6 @@
 """Pooled median absolute deviation"""
 
+import numbers
 from collections.abc import Callable
 
 import anndata as ad
@@ -85,8 +86,9 @@ def _compute_groupwise_metric(
     for group_name, indices in groups.indices.items():
         result = func(data[indices, :], **kwargs)
 
-        if not isinstance(result, (float, int)):
-            raise TypeError(f"`func` needs to return a numeric value (float, int), but returned {type(result)}")
+        # Check if result is a numeric scalar (handles numpy types and python built-ins)
+        if not isinstance(result, numbers.Real):
+            raise TypeError(f"`func` needs to return a numeric value, but returned {type(result).__name__}: {result}")
 
         metrics[group_name] = result
 
