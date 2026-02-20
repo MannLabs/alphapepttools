@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from alphapepttools.metrics import coefficient_of_variation
-from alphapepttools.metrics._feature_level import _cv
+from alphapepttools.metrics.feature_level import _cv
 
 
 @pytest.fixture

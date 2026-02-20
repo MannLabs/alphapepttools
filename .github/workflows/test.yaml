@@ -30,6 +30,10 @@ jobs:
             python: "3.13"
             name: LOOSE
           - os: ubuntu-latest
+            python: "3.13"
+            name: LOOSE-FULL
+            extras: "full"
+          - os: ubuntu-latest
             python: "3.10"
             extras: "stable"
             name: STABLE
@@ -37,6 +41,10 @@ jobs:
             python: "3.13"
             extras: "stable"
             name: STABLE
+          - os: ubuntu-latest
+            python: "3.13"
+            extras: "stable,full-stable"
+            name: STABLE-FULL
           - os: ubuntu-latest
             python: "3.13"
             pip-flags: "--pre"
