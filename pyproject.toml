@@ -42,7 +42,7 @@ optional-dependencies.dev = [
 # TODO: decouple dependencies required for plotting from the core functionality
 optional-dependencies.doc = [
   # Until pybtex >0.23.0 releases: https://bitbucket.org/pybtex-devs/pybtex/issues/169/
-  "docutils>=0.8,!=0.18.*,!=0.19.*",
+  "docutils>=0.8,!=0.18.*,!=0.19.*,<0.22", # TODO [AX-1128]: Remove restriction of docutils when https://github.com/executablebooks/sphinx-tabs/issues/212 is fixed
   "ipykernel",
   "ipython",
   "myst-nb>=1.1",
