@@ -460,6 +460,10 @@ def data_columns_to_df(
         df = data_columns_to_df(adata, columns=["group", "intensity"])
         ax.violinplot(df.groupby("group")["intensity"].apply(list))
     """
+    # Prevent double extraction of the same column
+    if columns is not None:
+        columns = pd.Series(columns).drop_duplicates().tolist()
+
     if isinstance(data, pd.DataFrame):
         columns = columns or data.columns.tolist()
         try:
