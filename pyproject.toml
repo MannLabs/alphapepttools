@@ -19,6 +19,7 @@ classifiers = [
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
 ]
 dynamic = [ "version" ]
 
@@ -26,8 +27,8 @@ dependencies = [
   "alphabase",
   "anndata",
   "bpca>=0.1",
-  "cmcrameri",    # TODO: remove this to optional dependencies?
-  "matplotlib",
+  "cmcrameri",          # TODO: remove this to optional dependencies?
+  "matplotlib>=3.10.5", # 3.10.5 contains a critical fix (https://github.com/matplotlib/matplotlib/pull/30217) to make matplotlib compatible with python 3.14
   "openpyxl",
   "pyarrow",
   "scanpy",
