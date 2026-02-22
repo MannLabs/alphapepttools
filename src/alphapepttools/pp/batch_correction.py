@@ -16,35 +16,34 @@ def coerce_nans_to_batch(
 
     Parameters
     ----------
-    adata : anndata.AnnData
-        Annotated data matrix, where rows are cells and columns are features.
-    batch : str
-        Name of the batch feature in obs, the variation associated with this feature will be corrected.
+    adata
+        Annotated data matrix, where rows are cells and columns are features
+    batch
+        Name of the batch feature in obs, the variation associated with this feature will be corrected
 
     Returns
     -------
-    adata : anndata.AnnData
-        Annotated data matrix with NaN values in the batch column replaced by "NA".
+    Annotated data matrix with NaN values in the batch column replaced by "NA"
 
-    Example:
-    >>> import anndata as ad
-    >>> import pandas as pd
-    >>> import numpy as np
-    >>> from alphapepttools.pp.batch_correction import coerce_nans_to_batch
-    >>> # Create a sample AnnData object with NaN values in the batch column
-    >>> data = np.random.rand(5, 3)
-    >>> obs = pd.DataFrame({"batch": ["A", "B", np.nan, "A", np.nan]})
-    >>> var = pd.DataFrame(index=["gene1", "gene2", "gene3"])
-    >>> adata = ad.AnnData(X=data, obs=obs, var=var)
-    >>> # Apply the function to coerce NaNs to 'NA'
-    >>> adata_corrected = coerce_nans_to_batch(adata, batch="batch")
-    >>> print(adata_corrected.obs)
-        batch
-        0     A
-        1     B
-        2    NA
-        3     A
-        4    NA
+    Examples
+    --------
+    .. code-block:: python
+
+        import anndata as ad
+        import pandas as pd
+        import numpy as np
+        from alphapepttools.pp.batch_correction import coerce_nans_to_batch
+
+        # Create a sample AnnData object with NaN values in the batch column
+        data = np.random.rand(5, 3)
+        obs = pd.DataFrame({"batch": ["A", "B", np.nan, "A", np.nan]})
+        var = pd.DataFrame(index=["gene1", "gene2", "gene3"])
+        adata = ad.AnnData(X=data, obs=obs, var=var)
+
+        # Apply the function to coerce NaNs to 'NA'
+        adata_corrected = coerce_nans_to_batch(adata, batch="batch")
+        print(adata_corrected.obs["batch"].unique())
+        # ['A' 'B' 'NA']
 
     """
     adata = adata.copy()
@@ -66,32 +65,33 @@ def drop_singleton_batches(
 
     Parameters
     ----------
-    adata : anndata.AnnData
-        Annotated data matrix, where rows are cells and columns are features.
-    batch : str
-        Name of the batch feature in obs, the variation associated with this feature will be corrected.
+    adata
+        Annotated data matrix, where rows are cells and columns are features
+    batch
+        Name of the batch feature in obs, the variation associated with this feature will be corrected
 
     Returns
     -------
-    adata : anndata.AnnData
-        Annotated data matrix with samples from singleton batches removed.
+    Annotated data matrix with samples from singleton batches removed
 
-    Example:
-    >>> import anndata as ad
-    >>> import pandas as pd
-    >>> import numpy as np
-    >>> from alphapepttools.pp.batch_correction import drop_singleton_batches
-    >>> # Create a sample AnnData object with singleton batches
-    >>> data = np.random.rand(5, 3)
-    >>> obs = pd.DataFrame({"batch": ["A", "B", "B", "C", "D"]})
-    >>> var = pd.DataFrame(index=["gene1", "gene2", "gene3"])
-    >>> adata = ad.AnnData(X=data, obs=obs, var=var)
-    >>> # Apply the function to drop singleton batches
-    >>> adata_filtered = drop_singleton_batches(adata, batch="batch")
-    >>> print(adata_filtered.obs)
-        batch
-        1     B
-        2     B
+    Examples
+    --------
+    .. code-block:: python
+
+        import anndata as ad
+        import pandas as pd
+        import numpy as np
+        from alphapepttools.pp.batch_correction import drop_singleton_batches
+
+        # Create a sample AnnData object with singleton batches
+        data = np.random.rand(5, 3)
+        obs = pd.DataFrame({"batch": ["A", "B", "B", "C", "D"]})
+        var = pd.DataFrame(index=["gene1", "gene2", "gene3"])
+        adata = ad.AnnData(X=data, obs=obs, var=var)
+
+        # Apply the function to drop singleton batches
+        adata_filtered = drop_singleton_batches(adata, batch="batch")
+        print(adata_filtered.shape)  # (2, 3) - only samples from batch "B" remain
 
     """
     adata = adata.copy()
@@ -126,22 +126,46 @@ def scanpy_pycombat(adata: ad.AnnData, batch: str, layer: str | None = None, *, 
     ----------
     adata
         Annotated data matrix, where rows are cells and columns are features. The data matrix
-        cannot contain NaN values.
+        cannot contain NaN values
     batch
         Name of the batch feature in obs, the variation associated with this feature will be corrected.
-        Missing values in this column will be replaced by one single "NA" batch.
+        Missing values in this column will be replaced by one single "NA" batch
     layer
-        Name of the layer to batch correct. If None (default), the attribute adata.X is used.
+        Name of the layer to batch correct. If None (default), the attribute adata.X is used
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
 
     Returns
     -------
-    adata : anndata.AnnData
-        AnnData with batch correction applied to layer.
-        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
-        returns a modified copy.
+    AnnData with batch correction applied to layer.
+    If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
+    returns a modified copy
+
+    Examples
+    --------
+    .. code-block:: python
+
+        import anndata as ad
+        import pandas as pd
+        import numpy as np
+        import alphapepttools as at
+
+        # Create example data with batch effects
+        np.random.seed(0)
+        batch1_data = np.random.randn(3, 4) + 1  # Batch 1 with offset
+        batch2_data = np.random.randn(3, 4) - 1  # Batch 2 with offset
+        X = np.vstack([batch1_data, batch2_data])
+
+        adata = ad.AnnData(
+            X=X,
+            obs=pd.DataFrame({"batch": ["B1", "B1", "B1", "B2", "B2", "B2"]}),
+            var=pd.DataFrame(index=["protein1", "protein2", "protein3", "protein4"]),
+        )
+
+        # Apply batch correction
+        at.pp.scanpy_pycombat(adata, batch="batch")
+        print("Batch correction applied to adata.X")
 
     """
     adata = adata.copy() if copy else adata
