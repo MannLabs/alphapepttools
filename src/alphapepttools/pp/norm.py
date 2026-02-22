@@ -7,7 +7,18 @@ STRATEGIES = ["total_mean", "total_median"]
 
 
 def _validate_strategies(strategy: str) -> None:
-    """Verify that valid strategy was selected"""
+    """Verify that valid strategy was selected.
+
+    Parameters
+    ----------
+    strategy
+        Normalization strategy to validate.
+
+    Raises
+    ------
+    ValueError
+        If strategy is not in the list of valid strategies.
+    """
     if strategy not in STRATEGIES:
         raise ValueError(f"`strategy` must be one of {STRATEGIES}, not {strategy}")
 
@@ -30,13 +41,12 @@ def _total_mean_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]
 
         # Each sample has the same total intensity
         arr = np.array([[1, 1], [2, 0], [0, 2]])
-        assert (_total_mean_normalization(arr) == arr).all()
+        assert (_total_mean_normalization(arr)[0] == arr).all()
 
         # Sample 0 has a lower total intensity
         arr = np.array([[0.8, 1], [2, 0], [0, 2]])
-        arr_norm = _total_mean_normalization(arr)
-        arr_norm.sum(axis=1)
-        > array([1.93333333, 1.93333333, 1.93333333])
+        arr_norm, factors = _total_mean_normalization(arr)
+        # arr_norm.sum(axis=1) gives [1.93333333, 1.93333333, 1.93333333]
     """
     # Compute sample-wise means
     # NaNs are interpreted as zero-values
@@ -61,6 +71,20 @@ def _total_median_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarra
     -------
     tuple[np.ndarray, np.ndarray]
         Tuple of normalized data and scaling factors
+
+    Example
+    -------
+
+    .. code-block:: python
+
+        # Each sample has the same total intensity
+        arr = np.array([[1, 1], [2, 0], [0, 2]])
+        assert (_total_median_normalization(arr)[0] == arr).all()
+
+        # Sample 0 has a lower total intensity
+        arr = np.array([[0.8, 1], [2, 0], [0, 3]])
+        arr_norm, factors = _total_median_normalization(arr)
+        # arr_norm.sum(axis=1) gives [2., 2., 2.] - all normalized to median total
 
     See Also
     --------
@@ -116,24 +140,20 @@ def normalize(
     .. code-block:: python
 
         adata = ad.AnnData(X=np.array([[0.8, 1.0], [2.0, 0.0], [0.0, 2.0]]))
-        adata.X
-        > np.array([
-            [0.8, 1. ],
-            [2. , 0. ],
-            [0. , 2. ]
-        ])
+        # Initial data:
+        # [[0.8, 1.0],
+        #  [2.0, 0.0],
+        #  [0.0, 2.0]]
 
     The anndata object gets normalized in place. Per default, the `.X` attribute will be modified
 
     .. code-block:: python
 
         normalize(adata)
-        adata.X
-        > np.array([
-        [0.85925926, 1.07407407],
-        [1.93333333, 0.        ],
-        [0.        , 1.93333333]]
-        )
+        # adata.X is now normalized:
+        # [[0.85925926, 1.07407407],
+        #  [1.93333333, 0.        ],
+        #  [0.        , 1.93333333]]
 
     Alternatively, we can normalize a different layer
 
@@ -141,21 +161,15 @@ def normalize(
 
         adata.layers["normalized"] = adata.X.copy()
         normalize(adata, strategy="total_mean", layer="normalized")
-        adata.X
-        # Unchanged
-        > array([
-            [0.8, 1. ],
-            [2. , 0. ],
-            [0. , 2. ]
-        ])
+        # adata.X remains unchanged:
+        # [[0.8, 1.0],
+        #  [2.0, 0.0],
+        #  [0.0, 2.0]]
 
-        # Normalized
-        adata.layers["normalized"]
-        > np.array([
-        [0.85925926, 1.07407407],
-        [1.93333333, 0.        ],
-        [0.        , 1.93333333]]
-        )
+        # adata.layers["normalized"] is now normalized:
+        # [[0.85925926, 1.07407407],
+        #  [1.93333333, 0.        ],
+        #  [0.        , 1.93333333]]
 
     Or we return a copy of the object
 
