@@ -38,11 +38,11 @@ def _pcr(principal_component_embeddings: np.ndarray, covariate: np.ndarray, expl
     Parameters
     ----------
     principal_component_embeddings
-        PCA embeddings matrix (N observations x C components).
+        PCA embeddings matrix (N observations x C components)
     covariate
-        Values of covariate (N observations x 1 | L levels (covariate, encoded)).
+        Values of covariate (N observations x 1 | L levels if categorical, encoded)
     explained_variance
-        Explained variance per component/weighting factor (C components x 1).
+        Explained variance per component/weighting factor (C components x 1)
 
     Returns
     -------
@@ -93,22 +93,21 @@ def principal_component_regression(
     Parameters
     ----------
     adata
-        :class:`ad.AnnData` object
+        AnnData object
     covariate
         Covariate of interest as column in `adata.obs`. For continuous covariates, the pearson correlation coefficient (PCC) is computed between covariate and
-        principal component. Categorical covariates (`dtype=category`) are one hot encoded.
+        principal component. Categorical covariates (`dtype=category`) are one hot encoded
     n_components
-        Number of principal components to consider. If `None`, uses all available components.
+        Number of principal components to consider. If `None`, uses all available components
     pca_key
-        Key in `adata.obsm` that stores PCA embeddings.
+        Key in `adata.obsm` that stores PCA embeddings
     pca_key_uns
-        Key in `adata.uns` that stores information on the PCA.
+        Key in `adata.uns` that stores information on the PCA
 
     Returns
     -------
-    float
-        Principal component regression score: an estimate of how much variance in the covariate
-        is explained by the principal components.
+    Principal component regression score: an estimate of how much variance in the covariate
+    is explained by the principal components
 
     Raises
     ------
