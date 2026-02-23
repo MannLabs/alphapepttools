@@ -34,7 +34,7 @@ in particular, the [API documentation][].
 
 ## Installation
 
-You need to have Python 3.10 or newer installed on your system.
+You need to have Python 3.11 or newer installed on your system.
 If you don't have Python installed, we recommend installing [Mambaforge][].
 
 There are several alternative options to install alphapepttools:
@@ -45,18 +45,38 @@ There are several alternative options to install alphapepttools:
 pip install alphapepttools
 ```
 
-As the package is still under development, consider installing the latest development version:
+As the package is still under development, consider installing the latest development version with the latest changes, features, and bug fixes:
 
 2. Development version
 
 ```bash
-git clone https://github.com/MannLabs/alphapepttools.git@main && cd alphapepttools
-pip install -e .
+pip install git+https://github.com/MannLabs/alphapepttools.git@main
 ```
 
-or with more dependencies:
+### Installation extras
+
+Depending on your use case, you might want to install specific versions of packages or additional dependencies.
+
+If you want to use `alphapepttools` in an isolated environment and enforce stringent dependencies, you can install the stable version:
 
 ```bash
+pip install "alphapepttools[stable]"
+```
+
+Note that this installs only a subset of alphapepttools functionality, as it misses
+the `alphaquant` and `inmoose` packages (required for advanced differential expression analysis).
+If you encounter a respective warning, you need to install the `full` extra option
+
+```bash
+pip install "alphapepttools[full]"  # or [full-stable]
+```
+
+or install the respective packages manually.
+
+For development purposes like running tests, pre-commit hooks, and building the documentation locally, install the optional development dependencies:
+
+```bash
+git clone https://github.com/MannLabs/alphapepttools.git && cd alphapepttools
 pip install -e ".[test, dev]"
 ```
 
@@ -66,7 +86,7 @@ See the [GitHub Release page](https://github.com/MannLabs/alphapepttools/release
 
 ## Developer Guide
 
-This document gathers information on how to develop and contribute to the alphaDIA project.
+This document gathers information on how to develop and contribute to the alphapepttools project.
 
 ### Release process
 
