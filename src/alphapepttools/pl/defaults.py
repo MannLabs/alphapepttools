@@ -5,9 +5,6 @@ class PlotSettings:
     """Default settings for alphapepttools plots."""
 
     def __init__(self):
-        self.font_family = "sans-serif"
-        self.default_font = "Arial"
-
         self.font_sizes = {
             "small": 8,
             "medium": 10,

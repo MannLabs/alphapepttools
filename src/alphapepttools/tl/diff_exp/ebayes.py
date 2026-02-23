@@ -5,7 +5,13 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import patsy
-from inmoose import limma
+
+try:
+    from inmoose import limma
+
+    _HAS_INMOOSE = True
+except ModuleNotFoundError:
+    _HAS_INMOOSE = False
 
 from alphapepttools.pp.data import filter_data_completeness
 from alphapepttools.tl import tl_defaults
@@ -140,6 +146,11 @@ def diff_exp_ebayes(
     this function.
 
     """
+    if not _HAS_INMOOSE:
+        raise ImportError(
+            "inmoose is required for diff_exp_ebayes(). Install it through pip or install alphapepttools with the 'full'/'full-stable' extra."
+        )
+
     logger.info("Running Limma eBayes differential expression analysis via inmoose")
 
     # Validate inputs (simplified without min_valid_values)
