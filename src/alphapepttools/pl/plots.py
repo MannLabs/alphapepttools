@@ -816,10 +816,22 @@ class Plots:
             x-axis limits for the plot. If None, limits are calculated from the data with padding. By default None.
         ylims : tuple[float, float] | None, optional
             y-axis limits for the plot. If None, limits are calculated from the data with padding. By default None.
+        plotting_callable : Callable | None, optional
+            Custom plotting function to use instead of cls.scatter. Should accept ax, data, and other parameters.
+            By default None, which uses cls.scatter.
+        return_glob_layer_indices : bool, optional
+            If True, returns a list of (indices, color, color_key, scatter_kwargs) tuples for each layer.
+            Useful for debugging or further processing of layer assignments. By default False.
+
+        Returns
+        -------
+        None | list
+            If return_glob_layer_indices is False, returns None. Otherwise, returns a list of tuples
+            containing (layer_indices, layer_color, color_key, scatter_kwargs) for each layer.
         """
         color_dict = color_dict or {default_color_key: default_color}
         default_scatter_kwargs = default_scatter_kwargs or {}
-        base_config = base_config or PlotConfig.scatter()
+        base_config = base_config or PlotConfig(data=None)
         plotting_callable = plotting_callable or cls.scatter
 
         # Get data from base_config
