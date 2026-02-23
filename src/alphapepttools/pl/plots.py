@@ -401,7 +401,7 @@ def drop_nan_coordinate_points(
     >>> x = np.array([1.0, 2.0, np.nan, 4.0])
     >>> y = np.array([5.0, np.nan, 7.0, 8.0])
     >>> labels = np.array(["a", "b", "c", "d"])
-    >>> x_clean, y_clean, labels_clean = _drop_nans_from_plot_arrays(x, y, labels)
+    >>> x_clean, y_clean, labels_clean = drop_nan_coordinate_points(x, y, labels)
     >>> x_clean
     array([1., 4.])
     >>> y_clean
@@ -637,7 +637,7 @@ class PlotConfig:
     """
 
     data: ad.AnnData | pd.DataFrame | None = None
-    _extra: dict = None  # Store additional fields
+    _extra: dict | None = None  # Store additional fields
 
     def __post_init__(self):
         # Initialize _extra as empty dict if None
