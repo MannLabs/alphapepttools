@@ -192,7 +192,7 @@ class TestFracDetected:
 
     def test_frac_detected_custom_col_name(self, qc_adata):
         """Test frac_detected with custom column name."""
-        fraction_complete(qc_adata, obs_col_name="custom_frac")
+        fraction_complete(qc_adata, col_name="custom_frac")
 
         assert "custom_frac" in qc_adata.obs.columns
         assert "fraction_complete" not in qc_adata.obs.columns
