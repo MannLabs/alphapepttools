@@ -9,7 +9,7 @@ from alphapepttools.metrics._feature_level import (
     _cv,
     calculate_qc_metrics,
     fraction_complete,
-    num_detected,
+    num_features_detected,
     total_intensity,
 )
 
@@ -133,48 +133,48 @@ class TestTotalIntensity:
         assert "total_intensity" in qc_adata.obs.columns
 
 
-class TestNumDetected:
-    def test_num_detected_expected_values(self, qc_adata):
-        """Test num_detected computes correct values."""
+class TestNumFeaturesDetected:
+    def test_num_features_detected_expected_values(self, qc_adata):
+        """Test num_features_detected computes correct values."""
         # detected = not (NaN, zero, negative, inf)
         # Row 0: [1, 2, 3] -> 3 detected
         # Row 1: [0, 2, nan] -> 1 detected
         # Row 2: [1, 0, 0] -> 1 detected
         expected = np.array([3, 1, 1])
 
-        num_detected(qc_adata)
+        num_features_detected(qc_adata)
 
-        assert "num_prot" in qc_adata.obs.columns
-        assert np.array_equal(qc_adata.obs["num_prot"].values, expected)
+        assert "num_features_detected" in qc_adata.obs.columns
+        assert np.array_equal(qc_adata.obs["num_features_detected"].values, expected)
 
-    def test_num_detected_custom_col_name(self, qc_adata):
-        """Test num_detected with custom column name."""
-        num_detected(qc_adata, obs_col_name="custom_num")
+    def test_num_features_detected_custom_col_name(self, qc_adata):
+        """Test num_features_detected with custom column name."""
+        num_features_detected(qc_adata, obs_col_name="custom_num")
 
         assert "custom_num" in qc_adata.obs.columns
-        assert "num_prot" not in qc_adata.obs.columns
+        assert "num_features_detected" not in qc_adata.obs.columns
 
-    def test_num_detected_return_value(self, qc_adata):
-        """Test num_detected returns values when add_to_adata=False."""
+    def test_num_features_detected_return_value(self, qc_adata):
+        """Test num_features_detected returns values when add_to_adata=False."""
         expected = np.array([3, 1, 1])
 
-        result = num_detected(qc_adata, inplace=False)
+        result = num_features_detected(qc_adata, inplace=False)
 
         assert result is not None
         assert np.array_equal(result, expected)
-        assert "num_prot" not in qc_adata.obs.columns
+        assert "num_features_detected" not in qc_adata.obs.columns
 
     @pytest.mark.parametrize("layer", [None, "raw"])
-    def test_num_detected_layer(self, qc_adata, layer):
-        """Test num_detected works with different layers."""
-        num_detected(qc_adata, layer=layer)
+    def test_num_features_detected_layer(self, qc_adata, layer):
+        """Test num_features_detected works with different layers."""
+        num_features_detected(qc_adata, layer=layer)
 
-        assert "num_prot" in qc_adata.obs.columns
+        assert "num_features_detected" in qc_adata.obs.columns
 
-    def test_num_detected_invalid_layer(self, qc_adata):
-        """Test num_detected raises error for invalid layer."""
+    def test_num_features_detected_invalid_layer(self, qc_adata):
+        """Test num_features_detected raises error for invalid layer."""
         with pytest.raises(ValueError, match="not found in adata.layers"):
-            num_detected(qc_adata, layer="nonexistent")
+            num_features_detected(qc_adata, layer="nonexistent")
 
 
 class TestFracDetected:
@@ -221,8 +221,9 @@ class TestCalculateQCMetrics:
         calculate_qc_metrics(qc_adata)
 
         assert "total_intensity" in qc_adata.obs.columns
-        assert "num_prot" in qc_adata.obs.columns
+        assert "num_features_detected" in qc_adata.obs.columns
         assert "fraction_complete" in qc_adata.obs.columns
+        assert "fraction_complete" in qc_adata.var.columns
 
     def test_calculate_qc_metrics_correct_values(self, qc_adata):
         """Test calculate_qc_metrics computes correct values."""
@@ -233,7 +234,7 @@ class TestCalculateQCMetrics:
         calculate_qc_metrics(qc_adata)
 
         assert np.allclose(qc_adata.obs["total_intensity"].values, expected_sum, equal_nan=True)
-        assert np.array_equal(qc_adata.obs["num_prot"].values, expected_num)
+        assert np.array_equal(qc_adata.obs["num_features_detected"].values, expected_num)
         assert np.allclose(qc_adata.obs["fraction_complete"].values, expected_frac)
 
     @pytest.mark.parametrize("layer", [None, "raw"])
@@ -242,5 +243,40 @@ class TestCalculateQCMetrics:
         calculate_qc_metrics(qc_adata, layer=layer)
 
         assert "total_intensity" in qc_adata.obs.columns
-        assert "num_prot" in qc_adata.obs.columns
+        assert "num_features_detected" in qc_adata.obs.columns
         assert "fraction_complete" in qc_adata.obs.columns
+
+    def test_frac_detected_axis_var_expected_values(self, qc_adata):
+        """Test fraction_complete with axis='var' computes correct values."""
+        # Data:
+        # Col 0: [1, 0, 1] -> 2 detected out of 3 obs -> 2/3
+        # Col 1: [2, 2, 0] -> 2 detected out of 3 obs -> 2/3
+        # Col 2: [3, nan, 0] -> 1 detected out of 3 obs -> 1/3
+        expected = np.array([2 / 3, 2 / 3, 1 / 3])
+
+        fraction_complete(qc_adata, axis="var")
+
+        assert "fraction_complete" in qc_adata.var.columns
+        assert np.allclose(qc_adata.var["fraction_complete"].values, expected)
+
+    def test_frac_detected_axis_var_custom_col_name(self, qc_adata):
+        """Test fraction_complete with axis='var' and custom column name."""
+        fraction_complete(qc_adata, axis="var", col_name="custom_frac")
+
+        assert "custom_frac" in qc_adata.var.columns
+        assert "fraction_complete" not in qc_adata.var.columns
+
+    def test_frac_detected_axis_var_return_value(self, qc_adata):
+        """Test fraction_complete with axis='var' returns values when inplace=False."""
+        expected = np.array([2 / 3, 2 / 3, 1 / 3])
+
+        result = fraction_complete(qc_adata, axis="var", inplace=False)
+
+        assert result is not None
+        assert np.allclose(result, expected)
+        assert "fraction_complete" not in qc_adata.var.columns
+
+    def test_frac_detected_invalid_axis(self, qc_adata):
+        """Test fraction_complete raises error for invalid axis."""
+        with pytest.raises(ValueError, match="axis must be 'obs' or 'var'"):
+            fraction_complete(qc_adata, axis="invalid")
