@@ -98,13 +98,13 @@ def coefficient_of_variation(
     return adata if copy else None
 
 
-def sum_intensity(
+def total_intensity(
     adata: ad.AnnData,
     *,
     layer: str | None = None,
     features: list[str] | None = None,
-    obs_col_name: str = "sum_intensity",
-    add_to_adata: bool = True,
+    obs_col_name: str = "total_intensity",
+    inplace: bool = True,
 ) -> np.ndarray | None:
     """Calculate sum of intensity for each observation.
 
@@ -118,16 +118,16 @@ def sum_intensity(
         Optional list of specific features (var_names) to include in the sum.
         If None (default), all features are used.
     obs_col_name
-        Name of the column to add to adata.obs. Default is "sum_intensity".
-    add_to_adata
-        If True (default), adds the result to adata.obs[obs_col_name].
+        Name of the column to add to adata.obs. Default is "total_intensity".
+    inplace
+        If True (default), modifies anndata inplace and adds the result to adata.obs[obs_col_name].
         If False, returns the calculated values without modifying adata.
 
     Returns
     -------
     np.ndarray | None
-        If add_to_adata is False, returns the sum values as an array.
-        If add_to_adata is True, modifies adata inplace and returns None.
+        If inplace is False, returns the sum values as an array.
+        If inplace is True, modifies adata inplace and returns None.
     """
     data = adata.X if layer is None else adata.layers[layer]
 
@@ -140,7 +140,7 @@ def sum_intensity(
 
     result = np.nansum(data, axis=1)
 
-    if add_to_adata:
+    if inplace:
         adata.obs[obs_col_name] = result
         return None
     return result
@@ -151,7 +151,7 @@ def num_detected(
     *,
     layer: str | None = None,
     obs_col_name: str = "num_prot",
-    add_to_adata: bool = True,
+    inplace: bool = True,
 ) -> np.ndarray | None:
     """Count the number of detected features per observation.
 
@@ -166,15 +166,15 @@ def num_detected(
         Name of the layer to use. If None (default), the data matrix X is used.
     obs_col_name
         Name of the column to add to adata.obs. Default is "num_prot".
-    add_to_adata
-        If True (default), adds the result to adata.obs[obs_col_name].
+    inplace
+        If True (default), modifies anndata inplace and adds the result to adata.obs[obs_col_name].
         If False, returns the calculated values without modifying adata.
 
     Returns
     -------
     np.ndarray | None
-        If add_to_adata is False, returns the count values as an array.
-        If add_to_adata is True, modifies adata inplace and returns None.
+        If inplace is False, returns the count values as an array.
+        If inplace is True, modifies adata inplace and returns None.
     """
     if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
@@ -183,18 +183,18 @@ def num_detected(
     special_values_mask = detect_special_values(data, verbosity=0)
     detected_features = np.sum(~special_values_mask, axis=1)
 
-    if add_to_adata:
+    if inplace:
         adata.obs[obs_col_name] = detected_features
         return None
     return detected_features
 
 
-def frac_detected(
+def fraction_complete(
     adata: ad.AnnData,
     *,
     layer: str | None = None,
-    obs_col_name: str = "frac_prot",
-    add_to_adata: bool = True,
+    obs_col_name: str = "fraction_complete",
+    inplace: bool = True,
 ) -> np.ndarray | None:
     """Calculate the fraction of detected features per observation.
 
@@ -208,22 +208,22 @@ def frac_detected(
     layer
         Name of the layer to use. If None (default), the data matrix X is used.
     obs_col_name
-        Name of the column to add to adata.obs. Default is "frac_prot".
-    add_to_adata
-        If True (default), adds the result to adata.obs[obs_col_name].
+        Name of the column to add to adata.obs. Default is "fraction_complete".
+    inplace
+        If True (default), modifies anndata inplace and adds the result to adata.obs[obs_col_name].
         If False, returns the calculated values without modifying adata.
 
     Returns
     -------
     np.ndarray | None
-        If add_to_adata is False, returns the fraction values as an array.
-        If add_to_adata is True, modifies adata inplace and returns None.
+        If inplace is False, returns the fraction values as an array.
+        If inplace is True, modifies adata inplace and returns None.
     """
-    n_detected = num_detected(adata, layer=layer, add_to_adata=False)
+    n_detected = num_detected(adata, layer=layer, inplace=False)
     n_features = adata.shape[1]
     frac_features = n_detected / n_features
 
-    if add_to_adata:
+    if inplace:
         adata.obs[obs_col_name] = frac_features
         return None
     return frac_features
@@ -239,7 +239,7 @@ def calculate_qc_metrics(
     This function computes and adds the following metrics:
     - sum_intensity: Sum of intensities per observation
     - num_prot: Number of detected features per observation
-    - frac_prot: Fraction of detected features per observation
+    - fraction_complete: Fraction of detected features per observation
 
     Parameters
     ----------
@@ -254,8 +254,8 @@ def calculate_qc_metrics(
         Modifies adata inplace by adding the following columns to adata.obs:
         - ``adata.obs["sum_intensity"]``: Sum of intensities per observation
         - ``adata.obs["num_prot"]``: Number of detected features per observation
-        - ``adata.obs["frac_prot"]``: Fraction of detected features per observation
+        - ``adata.obs["fraction_complete"]``: Fraction of detected features per observation
     """
-    sum_intensity(adata, layer=layer)
+    total_intensity(adata, layer=layer)
     num_detected(adata, layer=layer)
-    frac_detected(adata, layer=layer)
+    fraction_complete(adata, layer=layer)

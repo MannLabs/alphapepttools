@@ -8,9 +8,9 @@ from alphapepttools.metrics import coefficient_of_variation
 from alphapepttools.metrics._feature_level import (
     _cv,
     calculate_qc_metrics,
-    frac_detected,
+    fraction_complete,
     num_detected,
-    sum_intensity,
+    total_intensity,
 )
 
 
@@ -99,39 +99,38 @@ def qc_adata():
     return ad.AnnData(X=data, layers={"raw": data.copy()})
 
 
-class TestSumIntensity:
-    def test_sum_intensity_expected_values(self, qc_adata):
-        """Test sum_intensity computes correct values."""
+class TestTotalIntensity:
+    def test_total_intensity_expected_values(self, qc_adata):
+        """Test total_intensity computes correct values."""
         expected = np.array([6.0, 2.0, 1.0])
 
-        sum_intensity(qc_adata)
+        total_intensity(qc_adata)
 
-        assert "sum_intensity" in qc_adata.obs.columns
-        assert np.allclose(qc_adata.obs["sum_intensity"].values, expected, equal_nan=True)
+        assert "total_intensity" in qc_adata.obs.columns
+        assert np.allclose(qc_adata.obs["total_intensity"].values, expected, equal_nan=True)
 
-    def test_sum_intensity_custom_col_name(self, qc_adata):
-        """Test sum_intensity with custom column name."""
-        sum_intensity(qc_adata, obs_col_name="custom_sum")
+    def test_total_intensity_custom_col_name(self, qc_adata):
+        """Test total_intensity with custom column name."""
+        total_intensity(qc_adata, obs_col_name="custom_total_intensity")
+        assert "custom_total_intensity" in qc_adata.obs.columns
+        assert "total_intensity" not in qc_adata.obs.columns
 
-        assert "custom_sum" in qc_adata.obs.columns
-        assert "sum_intensity" not in qc_adata.obs.columns
-
-    def test_sum_intensity_return_value(self, qc_adata):
-        """Test sum_intensity returns values when add_to_adata=False."""
+    def test_total_intensity_return_value(self, qc_adata):
+        """Test total_intensity returns values when add_to_adata=False."""
         expected = np.array([6.0, 2.0, 1.0])
 
-        result = sum_intensity(qc_adata, add_to_adata=False)
+        result = total_intensity(qc_adata, inplace=False)
 
         assert result is not None
         assert np.allclose(result, expected, equal_nan=True)
-        assert "sum_intensity" not in qc_adata.obs.columns
+        assert "total_intensity" not in qc_adata.obs.columns
 
     @pytest.mark.parametrize("layer", [None, "raw"])
-    def test_sum_intensity_layer(self, qc_adata, layer):
-        """Test sum_intensity works with different layers."""
-        sum_intensity(qc_adata, layer=layer)
+    def test_total_intensity_layer(self, qc_adata, layer):
+        """Test total_intensity works with different layers."""
+        total_intensity(qc_adata, layer=layer)
 
-        assert "sum_intensity" in qc_adata.obs.columns
+        assert "total_intensity" in qc_adata.obs.columns
 
 
 class TestNumDetected:
@@ -159,7 +158,7 @@ class TestNumDetected:
         """Test num_detected returns values when add_to_adata=False."""
         expected = np.array([3, 1, 1])
 
-        result = num_detected(qc_adata, add_to_adata=False)
+        result = num_detected(qc_adata, inplace=False)
 
         assert result is not None
         assert np.array_equal(result, expected)
@@ -186,34 +185,34 @@ class TestFracDetected:
         # Row 2: 1/3 = 0.333...
         expected = np.array([1.0, 1 / 3, 1 / 3])
 
-        frac_detected(qc_adata)
+        fraction_complete(qc_adata)
 
-        assert "frac_prot" in qc_adata.obs.columns
-        assert np.allclose(qc_adata.obs["frac_prot"].values, expected)
+        assert "fraction_complete" in qc_adata.obs.columns
+        assert np.allclose(qc_adata.obs["fraction_complete"].values, expected)
 
     def test_frac_detected_custom_col_name(self, qc_adata):
         """Test frac_detected with custom column name."""
-        frac_detected(qc_adata, obs_col_name="custom_frac")
+        fraction_complete(qc_adata, obs_col_name="custom_frac")
 
         assert "custom_frac" in qc_adata.obs.columns
-        assert "frac_prot" not in qc_adata.obs.columns
+        assert "fraction_complete" not in qc_adata.obs.columns
 
     def test_frac_detected_return_value(self, qc_adata):
         """Test frac_detected returns values when add_to_adata=False."""
         expected = np.array([1.0, 1 / 3, 1 / 3])
 
-        result = frac_detected(qc_adata, add_to_adata=False)
+        result = fraction_complete(qc_adata, inplace=False)
 
         assert result is not None
         assert np.allclose(result, expected)
-        assert "frac_prot" not in qc_adata.obs.columns
+        assert "fraction_complete" not in qc_adata.obs.columns
 
     @pytest.mark.parametrize("layer", [None, "raw"])
     def test_frac_detected_layer(self, qc_adata, layer):
         """Test frac_detected works with different layers."""
-        frac_detected(qc_adata, layer=layer)
+        fraction_complete(qc_adata, layer=layer)
 
-        assert "frac_prot" in qc_adata.obs.columns
+        assert "fraction_complete" in qc_adata.obs.columns
 
 
 class TestCalculateQCMetrics:
@@ -221,9 +220,9 @@ class TestCalculateQCMetrics:
         """Test calculate_qc_metrics adds all expected columns."""
         calculate_qc_metrics(qc_adata)
 
-        assert "sum_intensity" in qc_adata.obs.columns
+        assert "total_intensity" in qc_adata.obs.columns
         assert "num_prot" in qc_adata.obs.columns
-        assert "frac_prot" in qc_adata.obs.columns
+        assert "fraction_complete" in qc_adata.obs.columns
 
     def test_calculate_qc_metrics_correct_values(self, qc_adata):
         """Test calculate_qc_metrics computes correct values."""
@@ -233,15 +232,15 @@ class TestCalculateQCMetrics:
 
         calculate_qc_metrics(qc_adata)
 
-        assert np.allclose(qc_adata.obs["sum_intensity"].values, expected_sum, equal_nan=True)
+        assert np.allclose(qc_adata.obs["total_intensity"].values, expected_sum, equal_nan=True)
         assert np.array_equal(qc_adata.obs["num_prot"].values, expected_num)
-        assert np.allclose(qc_adata.obs["frac_prot"].values, expected_frac)
+        assert np.allclose(qc_adata.obs["fraction_complete"].values, expected_frac)
 
     @pytest.mark.parametrize("layer", [None, "raw"])
     def test_calculate_qc_metrics_layer(self, qc_adata, layer):
         """Test calculate_qc_metrics works with different layers."""
         calculate_qc_metrics(qc_adata, layer=layer)
 
-        assert "sum_intensity" in qc_adata.obs.columns
+        assert "total_intensity" in qc_adata.obs.columns
         assert "num_prot" in qc_adata.obs.columns
-        assert "frac_prot" in qc_adata.obs.columns
+        assert "fraction_complete" in qc_adata.obs.columns
