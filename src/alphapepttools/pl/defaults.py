@@ -43,6 +43,8 @@ class PlotSettings:
         self.resolution = {"dpi": 300}
 
         self.preset_sizes = {
+            "3": 283,
+            "2.5": 227,
             "2": 183,
             "1.5": 135,
             "1": 89,
