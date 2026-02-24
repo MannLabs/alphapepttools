@@ -59,9 +59,9 @@
     metrics.pooled_coefficient_of_variation
     metrics.pooled_median_absolute_deviation
     metrics.calculate_qc_metrics
-    metrics.frac_detected
-    metrics.num_detected
-    metrics.sum_intensity
+    metrics.fraction_complete
+    metrics.num_features_detected
+    metrics.total_intensity
 
 ```
 
