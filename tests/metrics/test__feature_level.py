@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 
 from alphapepttools.metrics import coefficient_of_variation
-from alphapepttools.metrics._feature_level import (
+from alphapepttools.metrics.feature_level import (
     _cv,
     calculate_qc_metrics,
     fraction_complete,
