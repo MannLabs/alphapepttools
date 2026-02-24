@@ -27,6 +27,10 @@ jobs:
             python: "3.11"
             name: LOOSE
           - os: ubuntu-latest
+            python: "3.11"
+            name: LOOSE-FULL
+            extras: "full"
+          - os: ubuntu-latest
             python: "3.14"
             name: LOOSE
           - os: ubuntu-latest
