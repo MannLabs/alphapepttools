@@ -31,6 +31,14 @@ jobs:
             python: "3.14"
             name: LOOSE-FULL
             extras: "full"
+          - os: ubuntu-latest
+            python: "3.11"
+            name: STABLE-FULL
+            extras: "full-stable"
+          - os: ubuntu-latest
+            python: "3.14"
+            name: STABLE-FULL
+            extras: "full-stable"
 
     name: ${{ matrix.name }} Python ${{ matrix.python }}
 
