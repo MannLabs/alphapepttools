@@ -137,7 +137,7 @@ def drop_features_with_too_few_valid_values(
         X = np.array(
             [
                 [1, 2, np.nan, 4],
-                [5, np.nan, 7, 8],
+                [5, np.nan, np.nan, 8],
                 [9, 10, 11, 12],
                 [np.nan, 14, 15, 16],
                 [17, 18, np.nan, 20],
@@ -151,6 +151,8 @@ def drop_features_with_too_few_valid_values(
 
         # Keep only features with at least 2 valid values per group
         filtered = drop_features_with_too_few_valid_values(adata, "group", ("A", "B"), min_valid_values=2)
+
+        # in this case, features 1, 2 and 4 would be kept, while feature 3 would be dropped due to too many NaNs
 
     """
     for lvl in comparison:
