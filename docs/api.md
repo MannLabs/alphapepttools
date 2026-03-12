@@ -60,7 +60,7 @@
     metrics.pooled_median_absolute_deviation
     metrics.calculate_qc_metrics
     metrics.fraction_complete
-    metrics.num_features_detected
+    metrics.number_detected
     metrics.total_intensity
 
 ```

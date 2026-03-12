@@ -4,7 +4,7 @@ from .feature_level import (
     calculate_qc_metrics,
     coefficient_of_variation,
     fraction_complete,
-    num_features_detected,
+    number_detected,
     total_intensity,
 )
 from .group_level import pooled_coefficient_of_variation, pooled_median_absolute_deviation
@@ -14,7 +14,7 @@ __all__ = [
     "calculate_qc_metrics",
     "coefficient_of_variation",
     "fraction_complete",
-    "num_features_detected",
+    "number_detected",
     "pooled_coefficient_of_variation",
     "pooled_median_absolute_deviation",
     "principal_component_regression",
