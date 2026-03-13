@@ -194,6 +194,8 @@ def pca(
     embeddings_name: str | None = None,
     n_comps: int | None = None,
     meta_data_mask_column_name: str | None = None,
+    *,
+    copy: bool = False,
     **pca_kwargs: dict | None,
 ) -> ad.AnnData | np.ndarray:
     """Principal component analysis :cite:p:`Pedregosa2011`.
@@ -232,6 +234,8 @@ def pca(
         the features to be used in PCA. This is useful for running PCA with the
         core proteome as "mask_var" to remove nan values. Must be of boolean dtype.
         If None, all features are used (data should not include NaNs!).
+    copy
+        If `False` (default), modifies `adata` inplace and returns `None`. If `True`, returns a copy of the `adata` object.
     **pca_kwargs
         Additional keyword arguments for the :func:`scanpy.pp.pca` By default None.
 
@@ -314,6 +318,7 @@ def pca(
         variance_ratio = adata.uns["variance_pca_var"]["variance_ratio"]
 
     """
+    adata = adata.copy() if copy else adata
     logger.info("computing PCA")
 
     _check_inputs_for_dim_reduction(
@@ -326,7 +331,7 @@ def pca(
     # run PCA
     pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, **pca_kwargs)
 
-    return _store_pca_results(
+    _store_pca_results(
         adata=adata,
         pca_res=pca_res,
         dim_space=dim_space,
@@ -336,6 +341,8 @@ def pca(
         default_loadings_prefix="PCs",
         default_uns_prefix="variance_pca",
     )
+
+    return adata if copy else None
 
 
 def _run_bpca(
