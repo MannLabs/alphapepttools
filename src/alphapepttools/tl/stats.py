@@ -18,7 +18,7 @@ def nan_safe_bh_correction(
 
     Parameters
     ----------
-    pvals : np.array
+    pvals
         Array of p-values, may contain NaNs.
 
     Returns
@@ -28,11 +28,14 @@ def nan_safe_bh_correction(
 
     Examples
     --------
-    >>> import numpy as np
-    >>> from alphapepttools.tl.stats import nan_safe_bh_correction
-    >>> pvals = np.array([0.01, 0.05, np.nan, 0.001, np.nan])
-    >>> corrected = nan_safe_bh_correction(pvals)
-    >>> # Returns [0.015, 0.05, nan, 0.015, nan] (approximately)
+    .. code-block:: python
+
+        import numpy as np
+        from alphapepttools.tl.stats import nan_safe_bh_correction
+
+        pvals = np.array([0.01, 0.05, np.nan, 0.001, np.nan])
+        corrected = nan_safe_bh_correction(pvals)
+        # Returns array with BH-corrected p-values, NaNs preserved
     """
     # Convert to numpy array if not already
     pvals = np.asarray(pvals)
