@@ -382,9 +382,9 @@ def bpca(
     n_comps: int = 50,
     meta_data_mask_column_name: str | None = None,
     *,
-    copy: bool = True,
+    copy: bool = False,
     **bpca_kwargs,
-) -> ad.AnnData:
+) -> None | ad.AnnData:
     """Bayesian Principal Component Analysis
 
     Bayesian implementation of PCA that explicitly supports missing values. Computes latent space coordinates, loadings and variance decomposition.
