@@ -197,7 +197,7 @@ def pca(
     *,
     copy: bool = False,
     **pca_kwargs: dict | None,
-) -> ad.AnnData | np.ndarray:
+) -> None | ad.AnnData:
     """Principal component analysis :cite:p:`Pedregosa2011`.
 
     Computes PCA coordinates, loadings and variance decomposition. The passed adata will be changed as a result to include the pca calculations.
