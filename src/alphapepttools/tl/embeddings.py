@@ -241,7 +241,7 @@ def pca(
 
     Returns
     -------
-    If `copy=True` and updated `adata` object, else changes anndata object inplace.
+    If `copy=True` and an updated `adata` object, else changes anndata object inplace.
 
     Sets the following fields:
     for `dim_space='obs'` (sample projection):
@@ -328,7 +328,7 @@ def pca(
     # Run on array instead of anndata to allow for PCA on variables instead of observations)
     var_mask = adata.var[meta_data_mask_column_name] if meta_data_mask_column_name is not None else None
     data_for_pca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask, dim_space=dim_space)
-    pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, **pca_kwargs)
+    pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, copy=False, **pca_kwargs)
 
     adata = _store_pca_results(
         adata=adata,
@@ -425,7 +425,7 @@ def bpca(
 
     Returns
     -------
-    If `copy=True` and updated `adata` object, else changes anndata object inplace.
+    If `copy=True` and an updated `adata` object, else changes anndata object inplace.
 
     Sets the following fields:
     for `dim_space='obs'` (sample projection):
