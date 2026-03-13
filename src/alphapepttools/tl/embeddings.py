@@ -241,8 +241,8 @@ def pca(
 
     Returns
     -------
-    (as output from the scanpy.pp.pca function)
-    unless changed in the kwargs passed on to scanpy, an updated `AnnData` object.
+    If `copy=True` and updated `adata` object, else changes anndata object inplace.
+
     Sets the following fields:
     for `dim_space='obs'` (sample projection):
     `.obsm['X_pca_obs' | embeddings_name]` : :class:`~scipy.sparse.csr_matrix` | :class:`~scipy.sparse.csc_matrix` | :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
