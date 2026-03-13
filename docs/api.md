@@ -46,6 +46,7 @@
     tl.prepare_pca_1d_loadings_data_to_plot
     tl.prepare_pca_2d_loadings_data_to_plot
     tl.prepare_scree_data_to_plot
+    tl.prepare_pca_1d_loadings_data_to_plot
 ```
 
 ## Metrics
@@ -83,7 +84,7 @@
     pl.create_figure
     pl.label_axes
     pl.save_figure
-
+    pl.get_color_mapping
 ```
 
 ## IO
