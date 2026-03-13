@@ -42,7 +42,7 @@
     tl.pca
     tl.bpca
     tl.diff_exp_ebayes
-
+    tl.prepare_pca_1d_loadings_data_to_plot
 ```
 
 ## Metrics
@@ -80,7 +80,7 @@
     pl.create_figure
     pl.label_axes
     pl.save_figure
-
+    pl.get_color_mapping
 ```
 
 ## IO
