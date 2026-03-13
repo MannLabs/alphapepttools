@@ -330,7 +330,7 @@ def pca(
     data_for_pca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask, dim_space=dim_space)
     pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, **pca_kwargs)
 
-    _store_pca_results(
+    adata = _store_pca_results(
         adata=adata,
         pca_res=pca_res,
         dim_space=dim_space,
