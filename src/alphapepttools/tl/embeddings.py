@@ -381,6 +381,8 @@ def bpca(
     embeddings_name: str | None = None,
     n_comps: int = 50,
     meta_data_mask_column_name: str | None = None,
+    *,
+    copy: bool = True,
     **bpca_kwargs,
 ) -> ad.AnnData:
     """Bayesian Principal Component Analysis
@@ -416,11 +418,15 @@ def bpca(
         If provided, the colname in `adata.var` to use as a mask for
         the features to be used in PCA. This is useful for running PCA with the
         core proteome as "mask_var" to remove nan values. Must be of boolean dtype.
+    copy
+        If `False` (default), modifies `adata` inplace and returns `None`. If `True`, returns a copy of the `adata` object.
     **bpca_kwargs
         Additional keyword arguments to :class:`bpca.BPCA`. By default None.
 
     Returns
     -------
+    If `copy=True` and updated `adata` object, else changes anndata object inplace.
+
     Sets the following fields:
     for `dim_space='obs'` (sample projection):
     `.obsm['BPCA' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
@@ -477,6 +483,7 @@ def bpca(
     --------
     :class:`bpca.BPCA`
     """
+    adata = adata.copy() if copy else adata
     _check_inputs_for_dim_reduction(
         adata=adata, layer=layer, dim_space=dim_space, meta_data_mask_column_name=meta_data_mask_column_name
     )
@@ -486,7 +493,7 @@ def bpca(
 
     pca_res = _run_bpca(data_for_bpca=data_for_bpca, n_components=n_comps, **bpca_kwargs)
 
-    return _store_pca_results(
+    adata = _store_pca_results(
         adata=adata,
         pca_res=pca_res,
         dim_space=dim_space,
@@ -496,3 +503,5 @@ def bpca(
         default_loadings_prefix="PCs_bpca",
         default_uns_prefix="variance_bpca",
     )
+
+    return adata if copy else None
