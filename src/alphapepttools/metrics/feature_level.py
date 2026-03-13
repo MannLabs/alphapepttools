@@ -104,7 +104,7 @@ def total_intensity(
     layer: str | None = None,
     axis: str = "obs",
     features: list[str] | None = None,
-    column: str | None = None,
+    column: str = "total_intensity",
     inplace: bool = True,
 ) -> np.ndarray | None:
     """Calculate sum of intensity per observation or per feature.
@@ -125,7 +125,7 @@ def total_intensity(
         Optional list of specific features (var_names) to include in the sum.
         If None (default), all features are used. Valid only when `axis="obs"`.
     column
-        Name of the column to add. If None, defaults to "total_intensity".
+        Name of the column to add. Default is "total_intensity".
     inplace
         If True (default), modifies adata inplace and adds the result to adata.obs or adata.var.
         If False, returns the calculated values without modifying adata.
@@ -141,9 +141,6 @@ def total_intensity(
 
     if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
-
-    if column is None:
-        column = "total_intensity"
 
     data = adata.X if layer is None else adata.layers[layer]
 
@@ -229,7 +226,7 @@ def fraction_complete(
     *,
     layer: str | None = None,
     axis: str = "obs",
-    column: str | None = None,
+    column: str = "fraction_complete",
     inplace: bool = True,
 ) -> np.ndarray | None:
     """Calculate the fraction of detected values per observation or per feature.
@@ -250,7 +247,7 @@ def fraction_complete(
         - "var": Calculate fraction of detected observations per feature.
           Result is added to adata.var.
     column
-        Name of the column to add. If None, defaults to "fraction_complete".
+        Name of the column to add. Default is "fraction_complete".
     inplace
         If True (default), modifies adata inplace and adds the result to adata.obs or adata.var.
         If False, returns the calculated values without modifying adata.
@@ -266,9 +263,6 @@ def fraction_complete(
 
     if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
-
-    if column is None:
-        column = "fraction_complete"
 
     data = adata.X if layer is None else adata.layers[layer]
     special_values_mask = detect_special_values(data, verbosity=0)
