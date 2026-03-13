@@ -19,13 +19,13 @@ def _check_inputs_for_dim_reduction(
     Parameters
     ----------
     adata
-        The (annotated) data matrix of shape `n_obs` X `n_vars`. TypeError if not AnnData.
+        The (annotated) data matrix of shape `n_obs` X `n_vars`.
     layer
-        Layer name to check, ValueError if not in `adata.layers`.
+        Layer name to check. If None, default to `adata.X`
     dim_space
         Must be "obs" or "var". ValueError otherwise.
     meta_data_mask_column_name
-        Colname to check in `adata.var`. Must be of boolean dtype. Raises an error if not found (ValueError) or not boolean (TypeError).
+        Colname to check in `adata.var`. Must be of boolean dtype.
 
     Raises
     ------
@@ -33,6 +33,11 @@ def _check_inputs_for_dim_reduction(
         If adata is not an AnnData object or if meta_data_mask_column_name exists but is not boolean dtype.
     ValueError
         If layer is not found in adata.layers, dim_space is not 'obs' or 'var', or meta_data_mask_column_name is not found in adata.var.
+    TypeError
+        If adata.var[metadata_mask_column_name] is not boolean dtype
+    ValueError
+        If adata.var[metadata_mask_column_name] does not exist
+
     """
     logger.debug("Checking inputs for dimensionality reduction")
     # check inputs
