@@ -13,6 +13,7 @@ maxdepth: 1
 notebooks/studies/study_01_biomarker_csf
 notebooks/studies/study_02_peptidomics_pelsa
 notebooks/studies/study_03_biomarker_skin
+notebooks/studies/study_04_scDVP
 ```
 
 ## Functional steps
