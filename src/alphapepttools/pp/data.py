@@ -1,4 +1,4 @@
-# Create and manipulate Anndata objects
+# Create and manipulate AnnData objects
 
 import logging
 import numbers
@@ -28,7 +28,7 @@ def _to_anndata(
 
     Returns
     -------
-    Anndata object with data, obs, and var
+    AnnData object with data, obs, and var
 
     Examples
     --------
@@ -82,7 +82,7 @@ def add_metadata(  # noqa: C901, PLR0912
     Parameters
     ----------
     adata
-        Anndata object to add metadata to
+        AnnData object to add metadata to
     incoming_metadata
         Metadata dataframe to add. The matching entity is always the INDEX, depending on axis it is
         matched against obs (axis = 0) or var (axis = 1)
@@ -373,7 +373,7 @@ def filter_by_metadata(
     Parameters
     ----------
     adata
-        Anndata object to filter
+        AnnData object to filter
     filter_dict
         Dictionary with column names as keys and filter values as values.
         Values can be either string, list or tuple. For strings, exact matches
@@ -448,7 +448,7 @@ def _raise_nonoverlapping_indices(
     Parameters
     ----------
     data
-        Data DataFrame to check.
+        DataFrame to check.
     metadata
         Metadata DataFrame to check against.
     axis
@@ -598,7 +598,7 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     Parameters
     ----------
     adata
-        Anndata object with data to scale.
+        AnnData object with data to scale.
     scaler
         Sklearn scaler to use. Available scalers are 'standard' and 'robust'.
     layer
