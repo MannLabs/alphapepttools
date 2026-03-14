@@ -24,7 +24,33 @@ def _standardize_alphaquant_results(
     level: str,
     result_df: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Standardize AlphaQuant result columns"""
+    """Standardize AlphaQuant result columns.
+
+    Processes AlphaQuant output to create a standardized format with consistent
+    column names and additional calculated fields. Handles different output formats
+    for protein, peptide, and proteoform levels by mapping level-specific column
+    names to standard names and adding negative log-transformed p-values.
+
+    Parameters
+    ----------
+    comparison_key
+        String identifying the comparison (e.g., "Group1_VS_Group2").
+    level
+        Analysis level - must be 'protein', 'peptide', or 'proteoform'.
+    result_df
+        Raw AlphaQuant results DataFrame to standardize.
+
+    Returns
+    -------
+    pd.DataFrame
+        Standardized DataFrame with consistent column names and calculated fields
+        including -log10 transformed p-values and FDR values.
+
+    Raises
+    ------
+    ValueError
+        If level is not one of 'protein', 'peptide', or 'proteoform'.
+    """
     result_df = result_df.copy()
 
     # Base columns for all levels
@@ -86,7 +112,63 @@ def diff_exp_alphaquant(
     valid_values_filter_mode: str = "either",
     plots: str = "hide",
 ) -> tuple[str, dict[str, pd.DataFrame]]:
-    """Calculate differential expression using AlphaQuant."""
+    """Calculate differential expression using AlphaQuant.
+
+    Parameters
+    ----------
+    adata
+        AnnData object containing the expression data and sample metadata.
+    report
+        DataFrame with quantification report data for AlphaQuant analysis.
+    between_column
+        Column name in adata.obs containing group labels for comparison.
+    comparison
+        Tuple of exactly two group names to compare.
+    min_valid_values
+        Minimum number of valid values required per group for statistical testing.
+    valid_values_filter_mode
+        How to apply the min_valid_values filter - 'either' or 'both'.
+    plots
+        Whether to 'show' or 'hide' AlphaQuant's generated plots.
+
+    Returns
+    -------
+    tuple[str, dict[str, pd.DataFrame]]
+        Tuple containing:
+        - comparison_key: String identifier for the comparison (e.g., "Group1_VS_Group2")
+        - results: Dictionary with keys 'protein', 'peptide', 'proteoform' containing
+          standardized differential expression results for each level.
+
+    Raises
+    ------
+    ImportError
+        If alphaquant is not installed.
+    ValueError
+        If plots is not 'hide' or 'show', if between_column is not in adata.obs,
+        or if comparison is not a tuple of exactly two elements.
+
+    Examples
+    --------
+    Run differential expression analysis between treatment groups:
+
+    .. code-block:: python
+
+        comparison_key, alphaquant_results = at.tl.diff_exp_alphaquant(
+            adata=adata_precursor,
+            report=full_report,
+            between_column="treatment",
+            comparison=("control", "treated"),
+            valid_values_filter_mode="either",
+            min_valid_values=3,
+            plots="hide",
+        )
+
+        # Access results for different levels
+        protein_results = alphaquant_results["protein"]
+        peptide_results = alphaquant_results["peptide"]
+        proteoform_results = alphaquant_results["proteoform"]
+
+    """
     if not _HAS_ALPHAQUANT:
         raise ImportError(
             "alphaquant is required for diff_exp_alphaquant(). Install it through pip or install alphapepttools with the 'full'/'full-stable' extra."
@@ -112,6 +194,20 @@ def diff_exp_alphaquant(
         """Extract AlphaQuant-compatible samplemap from AnnData.
 
         Returns DataFrame with 'sample' and 'condition' columns for the specified comparison groups.
+
+        Parameters
+        ----------
+        adata
+            AnnData object containing sample metadata.
+        between_column
+            Column name in adata.obs containing group labels.
+        comparison
+            List of group names to include in the samplemap.
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame with 'sample' and 'condition' columns.
         """
         mask = adata.obs[between_column].isin(comparison)
         return pd.DataFrame(
