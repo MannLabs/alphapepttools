@@ -1,4 +1,4 @@
-name: Test
+name: Test Notebooks
 
 on:
   push:
@@ -25,34 +25,20 @@ jobs:
         include:
           - os: ubuntu-latest
             python: "3.11"
-            name: LOOSE
-          - os: ubuntu-latest
-            python: "3.11"
             name: LOOSE-FULL
             extras: "full"
-          - os: ubuntu-latest
-            python: "3.14"
-            name: LOOSE
           - os: ubuntu-latest
             python: "3.14"
             name: LOOSE-FULL
             extras: "full"
           - os: ubuntu-latest
             python: "3.11"
-            extras: "stable"
-            name: STABLE
-          - os: ubuntu-latest
-            python: "3.14"
-            extras: "stable"
-            name: STABLE
-          - os: ubuntu-latest
-            python: "3.14"
-            extras: "stable,full-stable"
             name: STABLE-FULL
+            extras: "full-stable"
           - os: ubuntu-latest
             python: "3.14"
-            pip-flags: "--pre"
-            name: PRE-RELEASE DEPENDENCIES
+            name: STABLE-FULL
+            extras: "full-stable"
 
     name: ${{ matrix.name }} Python ${{ matrix.python }}
 
@@ -79,16 +65,7 @@ jobs:
           else
             pip install ${{ matrix.pip-flags }} ".[dev,test]"
           fi
-
-      - name: Test
-        env:
-          MPLBACKEND: agg
-          PLATFORM: ${{ matrix.os }}
-          DISPLAY: :42
+      - name: Test notebooks
         run: |
-          coverage run -m pytest -v --color=yes
-      - name: Report coverage
-        run: |
-          coverage report
-      - name: Upload coverage
-        uses: codecov/codecov-action@v3
+          cd tests
+          ./run_notebook_tests.sh
