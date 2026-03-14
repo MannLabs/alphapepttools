@@ -34,19 +34,29 @@ def _total_mean_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     data
         Count data of shape (samples, features)
 
-    Example
-    -------
+    Examples
+    --------
+    Each sample has the same total intensity:
 
     .. code-block:: python
 
-        # Each sample has the same total intensity
         arr = np.array([[1, 1], [2, 0], [0, 2]])
-        assert (_total_mean_normalization(arr)[0] == arr).all()
+        arr_norm, factors = _total_mean_normalization(arr)
+        arr_norm
+        > array([[1., 1.],
+                [2., 0.],
+                [0., 2.]])
+        (arr_norm == arr).all()
+        > True
 
-        # Sample 0 has a lower total intensity
+    Sample 0 has a lower total intensity:
+
+    .. code-block:: python
+
         arr = np.array([[0.8, 1], [2, 0], [0, 2]])
         arr_norm, factors = _total_mean_normalization(arr)
-        # arr_norm.sum(axis=1) gives [1.93333333, 1.93333333, 1.93333333]
+        arr_norm.sum(axis=1)
+        > array([1.93333333, 1.93333333, 1.93333333])
     """
     # Compute sample-wise means
     # NaNs are interpreted as zero-values
@@ -72,19 +82,25 @@ def _total_median_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarra
     tuple[np.ndarray, np.ndarray]
         Tuple of normalized data and scaling factors
 
-    Example
-    -------
+    Examples
+    --------
+    Each sample has the same total intensity:
 
     .. code-block:: python
 
-        # Each sample has the same total intensity
         arr = np.array([[1, 1], [2, 0], [0, 2]])
-        assert (_total_median_normalization(arr)[0] == arr).all()
+        arr_norm, factors = _total_median_normalization(arr)
+        (arr_norm == arr).all()
+        > True
 
-        # Sample 0 has a lower total intensity
+    Sample 0 has a lower total intensity:
+
+    .. code-block:: python
+
         arr = np.array([[0.8, 1], [2, 0], [0, 3]])
         arr_norm, factors = _total_median_normalization(arr)
-        # arr_norm.sum(axis=1) gives [2., 2., 2.] - all normalized to median total
+        arr_norm.sum(axis=1)
+        > array([2., 2., 2.])
 
     See Also
     --------
@@ -134,44 +150,44 @@ def normalize(
         If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
         returns a modified copy.
 
-    Example
-    -------
+    Examples
+    --------
+    Create an AnnData object with intensity data:
 
     .. code-block:: python
 
         adata = ad.AnnData(X=np.array([[0.8, 1.0], [2.0, 0.0], [0.0, 2.0]]))
-        # Initial data:
-        # [[0.8, 1.0],
-        #  [2.0, 0.0],
-        #  [0.0, 2.0]]
+        adata.X
+        > array([[0.8, 1.0],
+                [2.0, 0.0],
+                [0.0, 2.0]])
 
-    The anndata object gets normalized in place. Per default, the `.X` attribute will be modified
+    The anndata object gets normalized in place. Per default, the `.X` attribute will be modified:
 
     .. code-block:: python
 
         normalize(adata)
-        # adata.X is now normalized:
-        # [[0.85925926, 1.07407407],
-        #  [1.93333333, 0.        ],
-        #  [0.        , 1.93333333]]
+        adata.X
+        > array([[0.85925926, 1.07407407],
+                [1.93333333, 0.        ],
+                [0.        , 1.93333333]])
 
-    Alternatively, we can normalize a different layer
+    Alternatively, we can normalize a different layer:
 
     .. code-block:: python
 
         adata.layers["normalized"] = adata.X.copy()
         normalize(adata, strategy="total_mean", layer="normalized")
-        # adata.X remains unchanged:
-        # [[0.8, 1.0],
-        #  [2.0, 0.0],
-        #  [0.0, 2.0]]
+        adata.X
+        > array([[0.8, 1.0],
+                [2.0, 0.0],
+                [0.0, 2.0]])
+        adata.layers["normalized"]
+        > array([[0.85925926, 1.07407407],
+                [1.93333333, 0.        ],
+                [0.        , 1.93333333]])
 
-        # adata.layers["normalized"] is now normalized:
-        # [[0.85925926, 1.07407407],
-        #  [1.93333333, 0.        ],
-        #  [0.        , 1.93333333]]
-
-    Or we return a copy of the object
+    Or we return a copy of the object:
 
     .. code-block:: python
 
