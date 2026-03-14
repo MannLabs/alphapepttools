@@ -115,12 +115,13 @@ def drop_singleton_batches(
 
 
 def scanpy_pycombat(adata: ad.AnnData, batch: str, layer: str | None = None, *, copy: bool = False) -> ad.AnnData:
-    """Wrap scanpy's pp.combat function with error checks and preprocessing suggestions.
+    """Correct batch effects using the ComBat method :cite:`Johnson.2007`.
 
-    Correct for the batch effect of a categorical covariate using an empirical
-    Bayes framework as implemented in the pyComBat function of scanpy. The
-    underlying function requires a complete data matrix without NaN values, which
-    may require imputation prior to running batch correction.
+    Applies empirical Bayes batch correction to remove systematic
+    non-biological variation associated with a batch variable in
+    ``adata.obs``. The input data must be free of NaN values. Remove features with missing values or run an appropriate imputation method before calling this function.
+
+    Uses :func:`scanpy.pp.combat` under the hood (:cite:`Wolf.2018`).
 
     Parameters
     ----------
@@ -167,6 +168,10 @@ def scanpy_pycombat(adata: ad.AnnData, batch: str, layer: str | None = None, *, 
         at.pp.scanpy_pycombat(adata, batch="batch")
         print("Batch correction applied to adata.X")
 
+    References
+    ----------
+    .. [1] Johnson, W. E., Li, C., & Rabinovic, A. (2007). Adjusting batch effects in microarray expression data using empirical Bayes methods. Biostatistics (Oxford, England), 8(1), 118-127. https://doi.org/10.1093/biostatistics/kxj037
+    .. [2] Wolf, F. A., Angerer, P., & Theis, F. J. (2018). SCANPY: large-scale single-cell gene expression data analysis. Genome biology, 19(1), 15. https://doi.org/10.1186/s13059-017-1382-0
     """
     adata = adata.copy() if copy else adata
     logger.info(f" scanpy_pycombat: pply pyComBat to correct for {batch}")
