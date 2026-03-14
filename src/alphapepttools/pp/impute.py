@@ -352,7 +352,20 @@ def impute_median(
 
 
 def _impute_knn(data: np.ndarray, **kwargs) -> np.ndarray:
-    """Impute missing values using kNN imputation"""
+    """Impute missing values using kNN imputation.
+
+    Parameters
+    ----------
+    data
+        Samples x Features array with missing values to impute.
+    **kwargs
+        Additional keyword arguments passed to sklearn.impute.KNNImputer.
+
+    Returns
+    -------
+    np.ndarray
+        Data array with missing values imputed using k-nearest neighbors.
+    """
     if _is_data_complete(data):
         logger.info("Data contains no missing values. Skipping imputation.")
         return data
@@ -362,7 +375,20 @@ def _impute_knn(data: np.ndarray, **kwargs) -> np.ndarray:
 
 
 def _validate_knn_grouping(groups: dict, n_neighbors: int) -> None:
-    """Validate that knn grouping is valid"""
+    """Validate that knn grouping is valid.
+
+    Parameters
+    ----------
+    groups
+        Dictionary mapping group names to indices of samples in each group.
+    n_neighbors
+        Number of neighbors required for kNN imputation.
+
+    Raises
+    ------
+    ValueError
+        If group keys contain NaN values or if any group has fewer members than n_neighbors.
+    """
     if any(pd.isna(key) for key in groups):
         raise ValueError(
             "`group_column` contains nans. The respective observations will be dropped and not get imputed.",
