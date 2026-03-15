@@ -29,14 +29,40 @@ class AnnDataFactory:
 
         Parameters
         ----------
-        psm_df: pd.DataFrame
+        psm_df
             Dataframe containing precursor intensity, sample_id and feature_id columns in a longtable
-        intensity_column: str
+        intensity_column
             Column containing the precursor intensities
-        sample_id_column: str
+        sample_id_column
             Column containing the sample identifiers
-        feature_id_column: str
+        feature_id_column
             Column dictating which feature ends up as the AnnData's var_names after the pivoting operation
+
+        Examples
+        --------
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.io.anndata_factory import AnnDataFactory
+
+            # Create sample data
+            df = pd.DataFrame(
+                {
+                    "raw_name": ["sample1", "sample1", "sample2", "sample2"],
+                    "protein_group": ["PROT1", "PROT2", "PROT1", "PROT2"],
+                    "intensity": [100.5, 200.3, 150.2, 180.7],
+                }
+            )
+
+            # Initialize factory
+            factory = AnnDataFactory(
+                psm_df=df, intensity_column="intensity", sample_id_column="raw_name", feature_id_column="protein_group"
+            )
+
+            # Create AnnData object and display
+            display(factory.create_anndata().to_df())
+            display(factory.create_anndata().obs)
+            display(factory.create_anndata().var)
 
         """
         self._psm_df = psm_df
@@ -55,19 +81,18 @@ class AnnDataFactory:
 
         Parameters
         ----------
-        adata : ad.AnnData
+        adata
             AnnData object to add metadata to
-        columns : str | list[str] | None
+        columns
             Columns to extract as metadata
-        index_column : str
+        index_column
             Column to use as index
-        axis : int
+        axis
             0 for obs (samples), 1 for var (features)
 
         Returns
         -------
-        ad.AnnData
-            AnnData object with added metadata
+        AnnData object with added metadata
         """
         if columns is None:
             return adata
@@ -100,18 +125,49 @@ class AnnDataFactory:
 
         Parameters
         ----------
-        var_columns : Union[str, List[str]], optional
+        var_columns
             Additional columns to include in `var` of the AnnData object, by default None
-        obs_columns : Union[str, List[str]], optional
+        obs_columns
             Additional columns to include in `obs` of the AnnData object, by default None
 
         Returns
         -------
-        ad.AnnData
-            AnnData object where:
-            - obs (rows) are raw names
-            - var (columns) are proteins
-            - X contains intensity values
+        AnnData object where:
+        - obs (rows) are samples
+        - var (columns) are features (e.g., proteins, peptides, or genes)
+        - X contains intensity values
+
+        Examples
+        --------
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.io.anndata_factory import AnnDataFactory
+
+            # Create sample data with metadata
+            df = pd.DataFrame(
+                {
+                    "raw_name": ["sample1"] * 3 + ["sample2"] * 3,
+                    "protein_group": ["PROT1", "PROT2", "PROT3"] * 2,
+                    "intensity": [100, 200, 150, 120, 210, 160],
+                    "gene_names": ["GENE1", "GENE2", "GENE3"] * 2,
+                    "condition": ["control"] * 3 + ["treated"] * 3,
+                }
+            )
+
+            factory = AnnDataFactory(
+                psm_df=df, intensity_column="intensity", sample_id_column="raw_name", feature_id_column="protein_group"
+            )
+
+            # Create AnnData with metadata
+            adata = factory.create_anndata(
+                var_columns=["gene_names"],  # Add gene names to var
+                obs_columns=["condition"],  # Add condition to obs
+            )
+
+            print(adata.shape)  # (2, 3) - 2 samples, 3 proteins
+            print(adata.var["gene_names"])  # Gene annotations
+            print(adata.obs["condition"])  # Sample conditions
 
         """
         # Create pivot table: raw names x proteins with intensity values
@@ -165,19 +221,19 @@ class AnnDataFactory:
 
         Parameters
         ----------
-        file_paths : Union[str, List[str]]
+        file_paths
             Path(s) to PSM file(s)
-        reader_type : str, optional
+        reader_type
             Type of PSM reader to use, by default "maxquant"
-        level : str, optional
+        level
             Level of quantification to read. One of "proteins", "precursors", or "genes". Defaults to "proteins".
-        intensity_column: str, optional
+        intensity_column
             Name of the column storing intensity data. Default is taken from `psm_reader.yaml`
-        feature_id_column: str, optional
+        feature_id_column
             Name of the column storing feature ids. Default is taken from `psm_reader.yaml`
-        sample_id_column: str, optional
+        sample_id_column
             Name of the column storing sample ids. Default is taken from `psm_reader.yaml`
-        additional_columns: list[str], optional
+        additional_columns
             Names of additional columns from the PSM table to retain for experiment-specific metadata.
             These columns can be added to the resulting AnnData object as annotations.
             Note that if a column has a higher cardinality than the `feature_id_column`
@@ -187,8 +243,31 @@ class AnnDataFactory:
 
         Returns
         -------
-        AnnDataFactory
-            Initialized AnnDataFactory instance
+        Initialized AnnDataFactory instance
+
+        Examples
+        --------
+        .. code-block:: python
+
+            from alphapepttools.io.anndata_factory import AnnDataFactory
+
+            # Load DIA-NN data at protein level
+            # assuming a diann report called "report.tsv" exists in the current directory
+
+            factory = AnnDataFactory.from_files("report.tsv", reader_type="diann", level="proteins")
+            adata = factory.create_anndata()
+
+            # Load with custom column names and additional metadata columns
+            factory = AnnDataFactory.from_files(
+                report_path,
+                reader_type="diann",
+                intensity_column="Precursor.Quantity",
+                additional_columns=["Precursor.Quantity"],  # additional columns need to be specified here.
+            )
+            adata = factory.create_anndata(
+                var_columns=["charge", "sequence"]
+            )  # Add m/z and stripped sequence via their alphabase-standardized column names in var
+            display(adata.var)  # Check that additional columns are included in var
 
         """
         # Set default configurations if they are not passed to the function
