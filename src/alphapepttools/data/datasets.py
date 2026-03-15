@@ -38,16 +38,6 @@ class StudyData:
     description
         Human-readable description of the study content, optional
 
-    Attributes
-    ----------
-    df
-        DataFrame representation of the study metadata
-
-    Methods
-    -------
-    download(output_dir)
-        Download the study data to specified directory
-
     Examples
     --------
     .. code-block:: python
@@ -139,22 +129,6 @@ class StudyCollection:
     and display available proteomics datasets. The collection can be initialized from
     YAML configuration files and provides a convenient interface for accessing
     multiple studies.
-
-    Attributes
-    ----------
-    collection
-        List of StudyData objects in the collection
-    df
-        DataFrame representation of all studies with their metadata
-
-    Methods
-    -------
-    get_study(name)
-        Retrieve a specific study by its name
-    register(study)
-        Add new study or studies to the collection
-    from_yaml(file_path)
-        Class method to create collection from YAML configuration
 
     Examples
     --------
