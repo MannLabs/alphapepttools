@@ -29,11 +29,11 @@ def nan_safe_ttest_ind(
 
     Parameters
     ----------
-    a : pd.Series
+    a
         First sample for comparison.
-    b : pd.Series
+    b
         Second sample for comparison.
-    min_valid_values : int, optional
+    min_valid_values
         Minimum number of non-NaN values required in either sample to perform t-test. Since this
         function has no means of imputation, this means that BOTH samples must have at least this many
         non-NaN values to perform the t-test. Default is 2.
@@ -48,17 +48,24 @@ def nan_safe_ttest_ind(
 
     Examples
     --------
-    >>> import pandas as pd
-    >>> import numpy as np
-    >>> from alphapepttools.tl.stats import nan_safe_ttest_ind
-    >>> a = pd.Series([1, 2, 3, np.nan])
-    >>> b = pd.Series([4, 5, 6, 7])
-    >>> t_stat, p_val = nan_safe_ttest_ind(a, b)
-    >>> # Returns valid t-test results since both have >= 2 non-NaN values
+    Perform t-test with missing values:
 
-    >>> c = pd.Series([1, np.nan])  # Only 1 non-NaN value
-    >>> t_stat, p_val = nan_safe_ttest_ind(c, b)
-    >>> # Returns (nan, nan) since c has < 2 non-NaN values
+    .. code-block:: python
+
+        import pandas as pd
+        import numpy as np
+        from alphapepttools.tl.diff_exp.ttest import nan_safe_ttest_ind
+
+        # Both samples have sufficient non-NaN values
+        a = pd.Series([1, 2, 3, np.nan])
+        b = pd.Series([4, 5, 6, 7])
+        t_stat, p_val = nan_safe_ttest_ind(a, b)
+        # Returns valid t-test results
+
+        # Sample with insufficient non-NaN values
+        c = pd.Series([1, np.nan])  # Only 1 non-NaN value
+        t_stat, p_val = nan_safe_ttest_ind(c, b)
+        # Returns (nan, nan) since c has < 2 non-NaN values
     """
     # fewer than two values per group is not a valid t-test
     min_valid_values = min_valid_values or 2
@@ -86,23 +93,22 @@ def _standardize_diff_exp_ttest_results(
     comparison_key: str,
     result_df: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Standardize ttest results DataFrames
+    """Standardize ttest results DataFrames.
 
     To harmonize the output of the standard ttest with other methods,
     we rename some columns and add columns for context.
 
     Parameters
     ----------
-    comparison_key : str
+    comparison_key
         Identifier for the comparison, e.g. "group1_VS_group2".
-    result_df : pd.DataFrame
+    result_df
         DataFrame with ttest results.
 
     Returns
     -------
     pd.DataFrame
         Standardized DataFrame with columns outlined in the common DIFF_EXP_COLS.
-
     """
     result_df = result_df.copy()
 
@@ -142,15 +148,15 @@ def diff_exp_ttest(
 
     Parameters
     ----------
-    adata : ad.AnnData
+    adata
         AnnData object with features and observations.
-    between_column : str
+    between_column
         Name of the column in adata.obs that contains the groups to compare.
-    comparison : tuple
+    comparison
         Tuple of exactly two group names to compare (group1, group2).
-    min_valid_values : int, optional
+    min_valid_values
         Minimum number of samples required per group. By default 2.
-    equal_var : bool, optional
+    equal_var
         Whether to assume equal variance in the t-test. By default False.
 
     Returns
@@ -158,6 +164,24 @@ def diff_exp_ttest(
     pd.DataFrame | None
         DataFrame with ratios, deltas, t-statistics, p-values, and adjusted p-values
         for the comparison between the two specified groups. Returns None if validation fails.
+
+    Examples
+    --------
+    Run differential expression t-test between treatment groups:
+
+    .. code-block:: python
+
+        ttest_peptide_results = at.tl.diff_exp_ttest(
+            adata=adata_precursor,
+            between_column="treatment",
+            comparison=("treated", "control"),
+            min_valid_values=3,
+            equal_var=False,
+        )
+
+        # Access significant peptides
+        significant = ttest_peptide_results[ttest_peptide_results["fdr"] < 0.05]
+
     """
     # Validate inputs
     g1, g2 = validate_ttest_inputs(adata, between_column, comparison, min_valid_values)
