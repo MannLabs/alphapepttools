@@ -4,7 +4,8 @@ import pandas as pd
 import pytest
 
 from alphapepttools.pl.figure import create_figure
-from alphapepttools.pl.plots import _extract_columns_to_df, _extract_groupwise_plotting_data, label_plot
+from alphapepttools.pl.plots import _extract_groupwise_plotting_data, label_plot
+from alphapepttools.pp.data import data_columns_to_df
 
 
 # Fixtures
@@ -74,17 +75,25 @@ def extract_label_plot_data(ax):
 # ends up at the top right label after anchor assignment.
 @pytest.mark.parametrize(
     (
-        "x",
-        "y",
-        "labels",
+        "data",
+        "x_column",
+        "y_column",
+        "label_column",
         "anchors",
         "expected_lines",
     ),
     [
         (
-            [2, 1, 2, 1, 2, 1],
-            [2, 2.1, 3, 3.1, 1, 1.1],
-            ["middle_right", "middle_left", "top_right", "top_left", "bottom_right", "bottom_left"],
+            pd.DataFrame(
+                {
+                    "x": [2, 1, 2, 1, 2, 1],
+                    "y": [2, 2.1, 3, 3.1, 1, 1.1],
+                    "label": ["middle_right", "middle_left", "top_right", "top_left", "bottom_right", "bottom_left"],
+                }
+            ),
+            "x",
+            "y",
+            "label",
             None,
             # Expected lines read from plot visually
             pd.DataFrame(
@@ -98,9 +107,16 @@ def extract_label_plot_data(ax):
             ),
         ),
         (
-            [2, 1, 2, 1, 2, 1],
-            [2, 2.1, 3, 3.1, 1, 1.1],
-            ["middle_right", "middle_left", "top_right", "top_left", "bottom_right", "bottom_left"],
+            pd.DataFrame(
+                {
+                    "x": [2, 1, 2, 1, 2, 1],
+                    "y": [2, 2.1, 3, 3.1, 1, 1.1],
+                    "label": ["middle_right", "middle_left", "top_right", "top_left", "bottom_right", "bottom_left"],
+                }
+            ),
+            "x",
+            "y",
+            "label",
             (0.5, 2.5),
             # Expected lines read from plot visually
             pd.DataFrame(
@@ -122,7 +138,7 @@ def extract_label_plot_data(ax):
         ),
     ],
 )
-def test_label_plot(example_ax, x, y, labels, anchors, expected_lines):
+def test_label_plot(example_ax, data, x_column, y_column, label_column, anchors, expected_lines):
     _, ax = example_ax
 
     # Empirical parameters to handle default alphapepttools font size
@@ -132,9 +148,10 @@ def test_label_plot(example_ax, x, y, labels, anchors, expected_lines):
     # Add the lines to the axes
     label_plot(
         ax=ax,
-        x_values=x,
-        y_values=y,
-        labels=labels,
+        data=data,
+        x_column=x_column,
+        y_column=y_column,
+        label_column=label_column,
         x_anchors=anchors,
         y_display_start=A_DISPLAY_START,
         y_padding_factor=Y_PADDING_FACTOR,
@@ -192,14 +209,14 @@ def test_label_plot(example_ax, x, y, labels, anchors, expected_lines):
         ),
     ],
 )
-def test__extract_columns_to_df(which_data, example_data, example_sample_metadata, columns, expected_data):
+def test_data_columns_to_df(which_data, example_data, example_sample_metadata, columns, expected_data):
     if which_data == "anndata":
         adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
         data_input = adata
     else:
         data_input = example_data
 
-    extracted_data = _extract_columns_to_df(data_input, columns)
+    extracted_data = data_columns_to_df(data_input, columns)
 
     pd.testing.assert_frame_equal(extracted_data, expected_data)
 
@@ -213,7 +230,7 @@ def test__extract_columns_to_df(which_data, example_data, example_sample_metadat
         ("anndata_with_duplicate", ["A", "age"]),
     ],
 )
-def test__extract_columns_to_df_failures(which_data, example_data, example_sample_metadata, columns):
+def test_data_columns_to_df_failures(which_data, example_data, example_sample_metadata, columns):
     if which_data == "anndata":
         adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
         data_input = adata
@@ -226,7 +243,7 @@ def test__extract_columns_to_df_failures(which_data, example_data, example_sampl
         data_input = example_data
 
     with pytest.raises(KeyError):
-        _extract_columns_to_df(data_input, columns)
+        data_columns_to_df(data_input, columns)
 
 
 # Test parsing of anndata objects to bar/box/violin-plottable data
