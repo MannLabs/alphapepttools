@@ -2,7 +2,7 @@ import matplotlib.colors as mpl_colors
 
 
 class PlotSettings:
-    """Central configuration class for alphapepttools plot aesthetics and styling
+    """Central configuration class for alphapepttools plot aesthetics and styling.
 
     Provides a centralized location for managing all plotting defaults used throughout
     alphapepttools. This includes font sizes, marker sizes, line widths, colors, and
@@ -131,7 +131,7 @@ class PlotSettings:
         self.na_color = mpl_colors.to_rgba("lightgrey")
 
     def to_dict(self) -> dict:
-        """Convert PlotSettings instance to a dictionary representation
+        """Convert PlotSettings instance to a dictionary representation.
 
         Exports all plot settings as a dictionary, excluding any private attributes
         (those starting with double underscores). This is useful for inspecting
