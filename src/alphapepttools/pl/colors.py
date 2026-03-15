@@ -495,43 +495,6 @@ class BaseColors:
     visualization. Colors are derived from the base qualitative colorscale
     with additional utility colors (grey, black, white).
 
-    Attributes
-    ----------
-    default_colors : dict
-        Dictionary mapping color names to RGBA tuples. Available colors:
-        'red', 'green', 'blue', 'orange', 'yellow', 'lightred', 'lightgreen',
-        'lightblue', 'lightorange', 'grey', 'black', 'white'.
-
-    Methods
-    -------
-    get(color_name, lighten=None, alpha=None)
-        Retrieve a color by name with optional lightness and alpha adjustments.
-
-    Examples
-    --------
-    Get a default color:
-
-    .. code-block:: python
-
-        from alphapepttools.pl.colors import BaseColors
-
-        red_color = BaseColors.get("red")
-        # Returns RGBA tuple for red
-
-    Get a lightened color:
-
-    .. code-block:: python
-
-        light_blue = BaseColors.get("blue", lighten=0.3)
-        # Returns lightened version of blue
-
-    Get a color with custom alpha:
-
-    .. code-block:: python
-
-        transparent_red = BaseColors.get("red", alpha=0.5)
-        # Returns red with 50% transparency
-
     """
 
     _colorscale = _base_qualitative_colorscale()
@@ -648,29 +611,6 @@ class BasePalettes:
         'qualitative' - Perceptually uniform palette from cmcrameri
         'binary' - Two-color palette for binary data
 
-    Methods
-    -------
-    get(palette_name, n=9)
-        Retrieve a palette by name with n colors (cycles if needed).
-
-    Examples
-    --------
-    Get a default palette:
-
-    .. code-block:: python
-
-        from alphapepttools.pl.colors import BasePalettes
-
-        colors = BasePalettes.get("qualitative", n=5)
-        # Returns 5 colors from the qualitative palette
-
-    Get a palette from matplotlib:
-
-    .. code-block:: python
-
-        colors = BasePalettes.get("viridis", n=10)
-        # Retrieves 10 colors from the viridis colormap
-
     """
 
     default_palettes: ClassVar[dict] = {
@@ -749,23 +689,6 @@ class BaseColormaps:
     data visualization. Uses cmcrameri colormaps to avoid visual distortion
     (Crameri, F. (2018a), Scientific colour maps. Zenodo.
     http://doi.org/10.5281/zenodo.1243862).
-
-    Attributes
-    ----------
-    default_colormaps : dict
-        Dictionary of available colormaps:
-        'sequential' - Sequential colormap (devon)
-        'diverging' - Diverging colormap (managua_r)
-        'sequential_r' - Reversed sequential colormap
-        'diverging_r' - Reversed diverging colormap
-        'sequential_clipped' - Sequential colormap with reduced range
-        'sequential_r_clipped' - Reversed sequential with reduced range
-        'magma_clipped' - Clipped magma colormap
-
-    Methods
-    -------
-    get(colormap_name, n=None)
-        Retrieve a colormap or sample n colors from it.
 
     """
 
@@ -873,53 +796,6 @@ class MappedColormaps:
     percentile : tuple[float, float], optional
         Percentile range to be used for normalization. If None, the full range of data is used.
         For example, (5, 95) will map colors between the 5th and 95th percentile.
-
-    Attributes
-    ----------
-    cmap : Colormap
-        Matplotlib Colormap object to be used for mapping data to colors
-    vmin : float
-        Minimum value of the data used for normalization
-    vmax : float
-        Maximum value of the data used for normalization
-    color_normalizer : mpl.colors.Normalize
-        Normalization instance used to map data to colors based on vmin and vmax
-    scalar_mappable : mpl.cm.ScalarMappable
-        MappedColormaps(color_map, percentile).scalar_mappable is a mpl.cm.ScalarMappable instance of the current
-        colormap and normalized data values which can be used in colorbars.
-
-    Examples
-    --------
-    Map data to colors with percentile normalization:
-
-    .. code-block:: python
-
-        from alphapepttools.pl.colors import MappedColormaps
-        import numpy as np
-
-        # Data with outliers
-        data = np.concatenate([np.random.randn(100), [50, -50]])
-
-        # Map colors using 5th to 95th percentile
-        mapper = MappedColormaps(cmap="diverging", percentile=(5, 95))
-        colors = mapper.fit_transform(data)
-        # Outliers clamped to percentile bounds
-
-    Use with full data range (no percentile clipping):
-
-    .. code-block:: python
-
-        mapper = MappedColormaps(cmap="sequential")
-        colors = mapper.fit_transform(data)
-        # Uses full min/max range
-
-    Get hex colors for web visualization:
-
-    .. code-block:: python
-
-        mapper = MappedColormaps(cmap="sequential", percentile=(5, 95))
-        hex_colors = mapper.fit_transform(data, as_hex=True)
-        # Returns array of hex color strings
 
     """
 
