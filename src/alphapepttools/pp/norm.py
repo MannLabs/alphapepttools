@@ -7,7 +7,18 @@ STRATEGIES = ["total_mean", "total_median"]
 
 
 def _validate_strategies(strategy: str) -> None:
-    """Verify that valid strategy was selected"""
+    """Verify that valid strategy was selected.
+
+    Parameters
+    ----------
+    strategy
+        Normalization strategy to validate.
+
+    Raises
+    ------
+    ValueError
+        If strategy is not in the list of valid strategies.
+    """
     if strategy not in STRATEGIES:
         raise ValueError(f"`strategy` must be one of {STRATEGIES}, not {strategy}")
 
@@ -23,18 +34,27 @@ def _total_mean_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     data
         Count data of shape (samples, features)
 
-    Example
-    -------
+    Examples
+    --------
+    Each sample has the same total intensity:
 
     .. code-block:: python
 
-        # Each sample has the same total intensity
         arr = np.array([[1, 1], [2, 0], [0, 2]])
-        assert (_total_mean_normalization(arr) == arr).all()
+        arr_norm, factors = _total_mean_normalization(arr)
+        arr_norm
+        > array([[1., 1.],
+                [2., 0.],
+                [0., 2.]])
+        (arr_norm == arr).all()
+        > True
 
-        # Sample 0 has a lower total intensity
+    Sample 0 has a lower total intensity:
+
+    .. code-block:: python
+
         arr = np.array([[0.8, 1], [2, 0], [0, 2]])
-        arr_norm = _total_mean_normalization(arr)
+        arr_norm, factors = _total_mean_normalization(arr)
         arr_norm.sum(axis=1)
         > array([1.93333333, 1.93333333, 1.93333333])
     """
@@ -61,6 +81,26 @@ def _total_median_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarra
     -------
     tuple[np.ndarray, np.ndarray]
         Tuple of normalized data and scaling factors
+
+    Examples
+    --------
+    Each sample has the same total intensity:
+
+    .. code-block:: python
+
+        arr = np.array([[1, 1], [2, 0], [0, 2]])
+        arr_norm, factors = _total_median_normalization(arr)
+        (arr_norm == arr).all()
+        > True
+
+    Sample 0 has a lower total intensity:
+
+    .. code-block:: python
+
+        arr = np.array([[0.8, 1], [2, 0], [0, 3]])
+        arr_norm, factors = _total_median_normalization(arr)
+        arr_norm.sum(axis=1)
+        > array([2., 2., 2.])
 
     See Also
     --------
@@ -110,54 +150,44 @@ def normalize(
         If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
         returns a modified copy.
 
-    Example
-    -------
+    Examples
+    --------
+    Create an AnnData object with intensity data:
 
     .. code-block:: python
 
         adata = ad.AnnData(X=np.array([[0.8, 1.0], [2.0, 0.0], [0.0, 2.0]]))
         adata.X
-        > np.array([
-            [0.8, 1. ],
-            [2. , 0. ],
-            [0. , 2. ]
-        ])
+        > array([[0.8, 1.0],
+                [2.0, 0.0],
+                [0.0, 2.0]])
 
-    The anndata object gets normalized in place. Per default, the `.X` attribute will be modified
+    The anndata object gets normalized in place. Per default, the `.X` attribute will be modified:
 
     .. code-block:: python
 
         normalize(adata)
         adata.X
-        > np.array([
-        [0.85925926, 1.07407407],
-        [1.93333333, 0.        ],
-        [0.        , 1.93333333]]
-        )
+        > array([[0.85925926, 1.07407407],
+                [1.93333333, 0.        ],
+                [0.        , 1.93333333]])
 
-    Alternatively, we can normalize a different layer
+    Alternatively, we can normalize a different layer:
 
     .. code-block:: python
 
         adata.layers["normalized"] = adata.X.copy()
         normalize(adata, strategy="total_mean", layer="normalized")
         adata.X
-        # Unchanged
-        > array([
-            [0.8, 1. ],
-            [2. , 0. ],
-            [0. , 2. ]
-        ])
-
-        # Normalized
+        > array([[0.8, 1.0],
+                [2.0, 0.0],
+                [0.0, 2.0]])
         adata.layers["normalized"]
-        > np.array([
-        [0.85925926, 1.07407407],
-        [1.93333333, 0.        ],
-        [0.        , 1.93333333]]
-        )
+        > array([[0.85925926, 1.07407407],
+                [1.93333333, 0.        ],
+                [0.        , 1.93333333]])
 
-    Or we return a copy of the object
+    Or we return a copy of the object:
 
     .. code-block:: python
 

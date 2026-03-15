@@ -33,9 +33,9 @@ def detect_special_values(
 
     Parameters
     ----------
-    data : np.ndarray
+    data
         Input data to check for nonstandard values.
-    verbosity : int, default 0
+    verbosity
         If 1, log warnings for nonstandard values found in the data.
 
     Returns
@@ -43,6 +43,26 @@ def detect_special_values(
     np.ndarray
         A boolean mask indicating the positions of nonstandard values in the data.
         True indicates a nonstandard value.
+
+    Examples
+    --------
+    Detect special values in a data array:
+
+    .. code-block:: python
+
+        import numpy as np
+        from alphapepttools.pp.transform import detect_special_values
+
+        # Create array with various special values
+        data = np.array([[1.0, 0.0, -2.0], [np.nan, 5.0, np.inf], [3.0, -np.inf, 10.0]])
+
+        # Get mask of special values
+        mask = detect_special_values(data, verbosity=0)
+
+        # With verbosity to see counts
+        mask = detect_special_values(data, verbosity=1)
+        # Logs warnings about found special values
+
     """
     if not isinstance(data, np.ndarray):
         raise TypeError("Input data must be a numpy.ndarray.")
@@ -85,9 +105,9 @@ def nanlog(
     ----------
     adata
         Input data; negatives and/or zeros are converted to np.nan
-    base : int
+    base
         Base of the logarithm. Defaults to 2 (log2).
-    verbosity : int, default 1
+    verbosity
         If 1, log warnings for invalid values found in the data.
     layer
         Name of the layer to transform. If None (default), the data matrix X is used.
@@ -101,21 +121,34 @@ def nanlog(
     If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
     returns a modified copy.
 
-
     Examples
     --------
-    The function can act on anndata objects inplace or return copies:
+    Apply log transformation with different bases:
 
     .. code-block:: python
 
-        at.pp.nanlog(adata, layer=None, copy=False)
-        # will update adata.X and modify the object inplace
+        import anndata as ad
+        import numpy as np
+        import pandas as pd
+        from alphapepttools.pp.transform import nanlog
 
-        at.pp.nanlog(adata, layer=None, copy=True)
-        # will update adata.X and return a new object
+        # Create sample data with some invalid values
+        adata = ad.AnnData(
+            X=np.array([[100, 0, 10], [50, -5, 20], [200, 100, 30]]),
+            obs=pd.DataFrame({"sample": ["S1", "S2", "S3"]}),
+            var=pd.DataFrame(index=["protein1", "protein2", "protein3"]),
+        )
 
-        at.pp.nanlog(adata, layer="layer", copy=False)
-        # will update "layer" in adata.layers and modify the object inplace
+        # Apply log2 transformation (default)
+        nanlog(adata)
+        # Zero and negative values are replaced with NaN
+
+        # Apply log10 transformation on a layer
+        adata.layers["raw"] = adata.X.copy()
+        nanlog(adata, base=10, layer="raw")
+
+        # Return a copy instead of modifying inplace
+        adata_log = nanlog(adata, base=2, copy=True)
 
     """
     if not isinstance(adata, ad.AnnData):

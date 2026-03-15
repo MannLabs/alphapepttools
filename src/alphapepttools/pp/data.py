@@ -1,4 +1,4 @@
-# Create and manipulate Anndata objects
+# Create and manipulate AnnData objects
 
 import logging
 import numbers
@@ -21,15 +21,37 @@ def _to_anndata(
 
     Parameters
     ----------
-    data : np.ndarray or pd.DataFrame
-            The data array, where rows correspond to samples and columns correspond to features.
-            If data is a pd.DataFrame, row and column indices are used for inner join with obs and var.
-            If data is a np.ndarray, obs and var are not assigned.
+    data
+        The data array, where rows correspond to samples and columns correspond to features.
+        If data is a pd.DataFrame, row and column indices are used for inner join with obs and var.
+        If data is a np.ndarray, obs and var are not assigned
 
     Returns
     -------
-    adata : ad.AnnData
-            Anndata object with data, obs, and var.
+    AnnData object with data, obs, and var
+
+    Examples
+    --------
+    .. code-block:: python
+
+        import numpy as np
+        import pandas as pd
+        from alphapepttools.pp.data import _to_anndata
+
+        # From numpy array
+        data_array = np.random.randn(5, 3)
+        adata = _to_anndata(data_array)
+        print(adata.shape)  # (5, 3)
+
+        # From DataFrame with labeled indices
+        df = pd.DataFrame(
+            np.random.randn(4, 3),
+            index=["sample1", "sample2", "sample3", "sample4"],
+            columns=["protein1", "protein2", "protein3"],
+        )
+        adata = _to_anndata(df)
+        print(adata.obs.index.tolist())  # ['sample1', 'sample2', 'sample3', 'sample4']
+        print(adata.var.index.tolist())  # ['protein1', 'protein2', 'protein3']
 
     """
     # If data is a dataframe, convert row and col indices to obs and var
@@ -59,24 +81,59 @@ def add_metadata(  # noqa: C901, PLR0912
 
     Parameters
     ----------
-        adata : ad.AnnData
-                Anndata object to add metadata to.
-        incoming metadata : pd.DataFrame
-                Metadata dataframe to add. The matching entity is always the INDEX, depending on axis it is
-                matched against obs (axis = 0) or var (axis = 1).
-        axis : int
-                Axis to add metadata to. 0 for obs and 1 for var.
-        keep_data_shape : bool = False
-                If True, the incoming data is left-joined to the existing data, which may result in nan-padded
-                rows in the incoming data. If False, incoming data is added via inner join, which may change the
-                shape of the adata object.
-        keep_existing_metadata : bool = False
-                If True, incoming metadata is added to the existing metadata. If False, incoming metadata replaces
-                existing metadata. If columns between existing and incoming metadata are synonymous, the corresponding
-                incoming metadata columns are ignored.
-        verbose : bool = False
-                If True, print additional information about the operation.
+    adata
+        AnnData object to add metadata to
+    incoming_metadata
+        Metadata dataframe to add. The matching entity is always the INDEX, depending on axis it is
+        matched against obs (axis = 0) or var (axis = 1)
+    axis
+        Axis to add metadata to. 0 for obs and 1 for var
+    keep_data_shape
+        If True, the incoming data is left-joined to the existing data, which may result in nan-padded
+        rows in the incoming data. If False, incoming data is added via inner join, which may change the
+        shape of the adata object
+    keep_existing_metadata
+        If True, incoming metadata is added to the existing metadata. If False, incoming metadata replaces
+        existing metadata. If columns between existing and incoming metadata are synonymous, the corresponding
+        incoming metadata columns are ignored
+    verbose
+        If True, print additional information about the operation
 
+    Returns
+    -------
+    AnnData object with metadata added
+
+    Examples
+    --------
+    .. code-block:: python
+
+        import numpy as np
+        import anndata as ad
+        import pandas as pd
+        from alphapepttools.pp.data import add_metadata
+
+        # Create example AnnData
+        adata = ad.AnnData(
+            X=np.array([[1, 2], [5, 1], [6, 6], [9, 3]]),
+            obs=pd.DataFrame({"batch": ["A", "A", "B", "B"]}, index=["sample1", "sample2", "sample3", "sample4"]),
+            var=pd.DataFrame(index=["protein1", "protein2"]),
+        )
+
+        # New metadata to add
+        new_metadata = pd.DataFrame(
+            {"condition": ["control", "control", "treated", "treated"]},
+            index=["sample1", "sample2", "sample3", "sample4"],
+        )
+
+        # Method 1: Replace existing metadata (keep_existing_metadata=False, default)
+        adata1 = adata.copy()
+        adata1 = add_metadata(adata1, new_metadata, axis=0)
+        print(adata1.obs.columns.tolist())  # ['condition'] - batch is replaced
+
+        # Method 2: Add to existing metadata (keep_existing_metadata=True)
+        adata2 = adata.copy()
+        adata2 = add_metadata(adata2, new_metadata, axis=0, keep_existing_metadata=True)
+        print(adata2.obs.columns.tolist())  # ['batch', 'condition'] - both preserved
 
     """
     # Basic checks
@@ -167,24 +224,23 @@ def _filter_by_dict(
 
     Parameters
     ----------
-    data : pd.DataFrame
-        Dataframe to filter. Columns must match with filter_dict keys.
-    filter_dict : dict
+    data
+        Dataframe to filter. Columns must match with filter_dict keys
+    filter_dict
         Dictionary with column names as keys and filter values as values.
         Values can be either string, list or tuple. For strings, exact matches
         are performed. For lists, matches are performed on any element in the
         list. Tuples specify value ranges and must consist of numeric values,
         where 'None' is interpreted as an open end. Ranges are inclusive on
         the lower end and exclusive on the upper end to prevent double counting
-        with adjacent filters.
-    logic : str, optional
+        with adjacent filters
+    logic
         Filtering logic to apply in case of multiple filters. Default to 'and'.
-        Can be 'and' or 'or'.
+        Can be 'and' or 'or'
 
     Returns
     -------
-    filter_mask : pd.Series
-        Boolean mask to filter the dataframe.
+    Boolean mask to filter the dataframe
 
     """
     # data must have unique indices
@@ -225,7 +281,20 @@ def _tuple_based_filter(
     feature: pd.Series,
     input_tuple: tuple,
 ) -> pd.Series:
-    """Tuple-based filtering of numeric features"""
+    """Tuple-based filtering of numeric features
+
+    Parameters
+    ----------
+    feature
+        Series to filter, must be numeric
+    input_tuple
+        Tuple of (lower, upper) bounds for filtering. None values are treated as open bounds
+
+    Returns
+    -------
+    Boolean mask for filtering
+
+    """
     errors = []
     if not is_numeric_dtype(feature):
         errors.append("Tuple-based filtering only works on numeric features.")
@@ -254,6 +323,25 @@ def _verify_filter_dict(
     filter_dict: dict,
     data: pd.DataFrame,
 ) -> None:
+    """Validate filter dictionary against data
+
+    Parameters
+    ----------
+    filter_dict
+        Dictionary with column names as keys and filter values as values
+    data
+        DataFrame to validate filter_dict against
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    ValueError
+        If filter_dict contains invalid keys or values
+
+    """
     errors = []
     for k, v in filter_dict.items():
         if not isinstance(k, str):
@@ -284,30 +372,54 @@ def filter_by_metadata(
 
     Parameters
     ----------
-    adata : ad.AnnData
-        Anndata object to filter.
-    filter_dict : dict
+    adata
+        AnnData object to filter
+    filter_dict
         Dictionary with column names as keys and filter values as values.
         Values can be either string, list or tuple. For strings, exact matches
         are performed. For lists, matches are performed on any element in the
         list. Tuples specify value ranges and must consist of numeric values,
         where 'None' is interpreted as an open end. Ranges are inclusive on
         the lower end and exclusive on the upper end to prevent double counting
-        with adjacent filters.
-    axis : int
-        Axis to filter on. 0 for obs and 1 for var.
-    logic : str, optional
+        with adjacent filters
+    axis
+        Axis to filter on. 0 for obs and 1 for var
+    logic
         Filtering logic to apply in case of multiple filters. Default to 'and'.
-        Can be 'and' or 'or'.
-    action : str, optional
+        Can be 'and' or 'or'
+    action
         If "keep", extract rows/columns that match the filter conditions.
         If "drop", extract rows/columns outside the filter conditions.
-        Default to "keep".
+        Default to "keep"
 
     Returns
     -------
-    adata : ad.AnnData
-        Filtered anndata object.
+    Filtered anndata object
+
+    Examples
+    --------
+    .. code-block:: python
+
+        import numpy as np
+        import pandas as pd
+        import anndata as ad
+        import alphapepttools as at
+
+        # Create test data
+        X = pd.DataFrame({f"gene_{i}": np.random.randn(6) for i in range(5)}, index=[f"cell_{i}" for i in range(6)])
+
+        sample_metadata = pd.DataFrame(
+            {"column1": ["A", "B", "C", "D", "E", "F"], "column2": [50, 200, 50, 200, 50, 200]},
+            index=[f"cell_{i}" for i in range(6)],
+        )
+
+        test_adata = ad.AnnData(X, obs=sample_metadata)
+
+        # Filter: keep cells with column1 in ["A", "B", "C"] OR column2 between 20-100
+        adata_filtered = at.pp.filter_by_metadata(
+            test_adata, {"column1": ["A", "B", "C"], "column2": (20, 100)}, axis=0, logic="or", action="keep"
+        )
+        print(adata_filtered.shape)  # (5, 5) - cells 0,1,2,4 match the criteria
 
     """
     metadata_to_filter = adata.obs if axis == 0 else adata.var
@@ -331,7 +443,17 @@ def _raise_nonoverlapping_indices(
     metadata: pd.DataFrame,
     axis: int,
 ) -> None:
-    """Check if any fields overlap between two dataframes on respective axes"""
+    """Check if any fields overlap between two dataframes on respective axes.
+
+    Parameters
+    ----------
+    data
+        DataFrame to check.
+    metadata
+        Metadata DataFrame to check against.
+    axis
+        Axis to check (0 for rows, 1 for columns).
+    """
     if axis == 0:
         shared_idx_len = len(data.index.intersection(metadata.index))
     elif axis == 1:
@@ -348,7 +470,22 @@ def _handle_overlapping_columns(
     *,
     verbose: bool = True,
 ) -> pd.DataFrame:
-    """Drop overlapping fields from incoming metadata to avoid name collisions"""
+    """Drop overlapping fields from incoming metadata to avoid name collisions.
+
+    Parameters
+    ----------
+    metadata
+        Incoming metadata DataFrame.
+    _inplace_metadata
+        Existing metadata DataFrame to check against.
+    verbose
+        Whether to display warnings about dropped columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        Metadata with overlapping columns removed.
+    """
     overlapping_fields = metadata.columns.intersection(_inplace_metadata.columns)
     if not overlapping_fields.size:
         return metadata
@@ -368,13 +505,13 @@ def data_column_to_array(
     data: pd.DataFrame | ad.AnnData,
     column: str,
 ) -> np.ndarray:
-    """Get a column from a DataFrame or an AnnData object
+    """Get a column from a DataFrame or an AnnData object.
 
     Parameters
     ----------
-    data : pd.DataFrame | ad.AnnData
+    data
         Data to extract the column from.
-    column : str
+    column
         Column name to extract. If data is of type ad.AnnData, var_names is considered
         first for the column names. If the column is not found in var_names, the columns
         of data.obs are considered. If the column is not found in either, a ValueError
@@ -384,6 +521,42 @@ def data_column_to_array(
     -------
     np.ndarray
         The column data as a numpy array
+
+    Examples
+    --------
+    Extract from DataFrame:
+
+    .. code-block:: python
+
+        import pandas as pd
+        import numpy as np
+        from alphapepttools.pp.data import data_column_to_array
+
+        df = pd.DataFrame({"intensity": [100, 200, 150], "protein_id": ["P1", "P2", "P3"]})
+        arr = data_column_to_array(df, "intensity")
+        print(arr)  # [100 200 150]
+
+    Extract from AnnData:
+
+    .. code-block:: python
+
+        import anndata as ad
+        import pandas as pd
+        import numpy as np
+        from alphapepttools.pp.data import data_column_to_array
+
+        adata = ad.AnnData(
+            X=np.array([[1, 2], [3, 4], [5, 6]]),
+            obs=pd.DataFrame({"batch": ["A", "A", "B"]}),
+            var=pd.DataFrame(index=["protein1", "protein2"]),
+        )
+        # Get feature data from X
+        arr = data_column_to_array(adata, "protein1")
+        print(arr)  # [1 3 5]
+
+        # Get metadata from obs
+        arr = data_column_to_array(adata, "batch")
+        print(arr)  # ['A' 'A' 'B']
 
     """
     if isinstance(data, pd.DataFrame):
@@ -425,7 +598,7 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     Parameters
     ----------
     adata
-        Anndata object with data to scale.
+        AnnData object with data to scale.
     scaler
         Sklearn scaler to use. Available scalers are 'standard' and 'robust'.
     layer
@@ -439,6 +612,31 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     None | anndata.AnnData
         If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
         returns a modified copy.
+
+    Examples
+    --------
+    Apply standard scaling to data:
+
+    .. code-block:: python
+
+        import anndata as ad
+        import pandas as pd
+        import numpy as np
+        from alphapepttools.pp.data import scale_and_center
+
+        adata = ad.AnnData(
+            X=np.array([[1, 10], [2, 20], [3, 30], [4, 40]]),
+            obs=pd.DataFrame({"sample": ["S1", "S2", "S3", "S4"]}),
+            var=pd.DataFrame(index=["protein1", "protein2"]),
+        )
+
+        # Standard scaling (in-place)
+        scale_and_center(adata, scaler="standard")
+
+        # Robust scaling on a specific layer
+        adata.layers["raw"] = adata.X.copy()
+        scale_and_center(adata, scaler="robust", layer="raw")
+
     """
     adata = adata.copy() if copy else adata
     logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler.")
@@ -462,7 +660,32 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
 
 # TODO: Abstract class for validation of AnnData objects?
 def _validate_adata_for_completeness_filter(adata: ad.AnnData, action: str, var_colname: str) -> None:
-    """Validate AnnData object for data completeness filtering"""
+    """Validate AnnData object for data completeness filtering.
+
+    Checks that the AnnData object meets requirements for completeness filtering:
+    - Object is an actual AnnData instance
+    - Contains at least one feature (column)
+    - Data matrix X contains numeric values only
+    - No duplicated indices in obs
+    - Action parameter is either 'flag' or 'drop'
+    - Warns if var_colname already exists when action is 'flag'
+
+    Parameters
+    ----------
+    adata
+        AnnData object to validate.
+    action
+        Action to perform ('flag' or 'drop').
+    var_colname
+        Name of the column in var to flag features.
+
+    Raises
+    ------
+    TypeError
+        If adata is not an AnnData object or X is not numeric.
+    ValueError
+        If adata has no features, has duplicated indices, or action is invalid.
+    """
     if not isinstance(adata, ad.AnnData):
         raise TypeError("adata must be an AnnData object.")
 
@@ -492,7 +715,7 @@ def filter_data_completeness(
     action: str = "flag",
     var_colname: str = "passed_threshold_missing_values",
 ) -> ad.AnnData:
-    """Filter features based on missing values
+    """Filter features based on missing values.
 
     Filters AnnData features (columns) based on the fraction of missing values.
     If group_column and groups are provided, only missingness of certain metadata
@@ -505,22 +728,22 @@ def filter_data_completeness(
 
     Parameters
     ----------
-    max_missing : float
+    max_missing
         Maximum fraction of missing values allowed. Compared with the fraction of missing values
         in a "greater than" fashion, i.e. if max_missing is 0.6 and the fraction of missing values
         is 0.6, the sample or feature is kept. Greater than comparison is used here since the
         missing fraction may be 0.0, which equals filtering for 100 % data completeness.
-    group_column : str, optional
+    group_column
         Column in obs to determine groups for filtering.
-    groups : list[str], optional
+    groups
         List of levels of the group_column to consider in filtering. E.g. if the column has the levels
         ['A', 'B', 'C'], and groups = ['A', 'B'], only missingness of features in these
         groups is considered. If None, all groups are considered.
-    action : str, optional
+    action
         Action to perform. can be 'flag' (default) or 'drop'. If 'flag', a boolean column in `adata.var`
         is added to indicate whether the feature passed the missingness threshold. If 'drop',
         features that do not pass the threshold are dropped from the AnnData object.
-    var_colname : str, optional
+    var_colname
         Name of the `adata.var` boolean column to add if action is 'flag'. Default is 'passed_threshold_missing_values'.
 
     Returns
@@ -528,6 +751,41 @@ def filter_data_completeness(
     AnnData
         AnnData object with either a new `adata.var` column added (if `flag`)
         or filtered features (if `drop`).
+
+    Examples
+    --------
+    Flag features with too many missing values:
+
+    .. code-block:: python
+
+        import anndata as ad
+        import pandas as pd
+        import numpy as np
+        from alphapepttools.pp.data import filter_data_completeness
+
+        # Create data with missing values
+        X = np.array(
+            [[1.0, np.nan, 3.0, 4.0], [2.0, np.nan, 6.0, 8.0], [3.0, 5.0, np.nan, 12.0], [4.0, 6.0, 9.0, 16.0]]
+        )
+        adata = ad.AnnData(
+            X=X,
+            obs=pd.DataFrame({"group": ["A", "A", "B", "B"]}),
+            var=pd.DataFrame(index=["prot1", "prot2", "prot3", "prot4"]),
+        )
+
+        # Flag features with >30% missing values
+        adata = filter_data_completeness(adata, max_missing=0.3, action="flag")
+
+        # Drop features with >30% missing in group A only
+        adata = filter_data_completeness(adata, max_missing=0.3, group_column="group", groups=["A"], action="drop")
+
+    Filter by group-specific completeness:
+
+    .. code-block:: python
+
+        # Consider missingness only in specific groups
+        adata = filter_data_completeness(adata, max_missing=0.5, group_column="group", groups=["A", "B"], action="flag")
+
     """
     if max_missing < 0 or max_missing > 1:
         raise ValueError("Threshold must be between 0 and 1.")
