@@ -138,10 +138,11 @@ Consider enabling this option for [ruff][ruff-editors] and [prettier][prettier-e
 
 [pre-commit]: https://pre-commit.com/
 [ruff-editors]: https://docs.astral.sh/ruff/integrations/
-
 [prettier-editors]: https://prettier.io/docs/en/editors.html
 
-(writing-tests)=
+## Writing modules
+
+Top-level modules consist of `data`, `io`, `metrics`, `pl`, `pp` and `tl`. Modules are usually python scripts containing semantically related code (e.g. code to impute values lives in the `impute.py` module inside `pp`). If necessary, sub-module directories may be introduced to enhance clarity, but in general a flat structure is preferred. `.py` modules are lowercase and don't start with underscores, and generally have a `test_....py` module in the corresponding tests-top-level module. An example for this structure is the top-level module `io/anndata_factory.py`, which is covered by unit tests in `tests/io/test_anndata_factory.py`.
 
 ## Writing tests
 
@@ -223,6 +224,9 @@ This project uses [sphinx][] with the following features:
 
 - The [myst][] extension allows to write documentation in markdown/Markedly Structured Text
 - [Numpy-style docstrings][numpydoc] (through the [napoloen][numpydoc-napoleon] extension).
+- The last sentence in a docstring should not have a trailing punctuation mark
+- Type hints should not be added to parameters or returns (automatically added by the sphinx docstring compiler)
+- Docstrings should contain examples written as Python code blocks in restructured-text format (https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html)
 - Jupyter notebooks as tutorials through [myst-nb][] (See [Tutorials with myst-nb](#tutorials-with-myst-nb-and-jupyter-notebooks))
 - [sphinx-autodoc-typehints][], to automatically reference annotated input and output types
 - Citations (like {cite:p}`Virshup_2023`) can be included with [sphinxcontrib-bibtex](https://sphinxcontrib-bibtex.readthedocs.io/)
