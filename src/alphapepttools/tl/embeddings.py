@@ -194,8 +194,10 @@ def pca(
     embeddings_name: str | None = None,
     n_comps: int | None = None,
     meta_data_mask_column_name: str | None = None,
+    *,
+    copy: bool = False,
     **pca_kwargs: dict | None,
-) -> ad.AnnData | np.ndarray:
+) -> None | ad.AnnData:
     """Principal component analysis :cite:p:`Pedregosa2011`.
 
     Computes PCA coordinates, loadings and variance decomposition. The passed adata will be changed as a result to include the pca calculations.
@@ -232,13 +234,15 @@ def pca(
         the features to be used in PCA. This is useful for running PCA with the
         core proteome as "mask_var" to remove nan values. Must be of boolean dtype.
         If None, all features are used (data should not include NaNs!).
+    copy
+        If `False` (default), modifies `adata` inplace and returns `None`. If `True`, returns a copy of the `adata` object.
     **pca_kwargs
         Additional keyword arguments for the :func:`scanpy.pp.pca` By default None.
 
     Returns
     -------
-    (as output from the scanpy.pp.pca function)
-    unless changed in the kwargs passed on to scanpy, an updated `AnnData` object.
+    If `copy=True` and an updated `adata` object, else changes anndata object inplace.
+
     Sets the following fields:
     for `dim_space='obs'` (sample projection):
     `.obsm['X_pca_obs' | embeddings_name]` : :class:`~scipy.sparse.csr_matrix` | :class:`~scipy.sparse.csc_matrix` | :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
@@ -314,19 +318,19 @@ def pca(
         variance_ratio = adata.uns["variance_pca_var"]["variance_ratio"]
 
     """
+    adata = adata.copy() if copy else adata
     logger.info("computing PCA")
 
     _check_inputs_for_dim_reduction(
         adata=adata, layer=layer, dim_space=dim_space, meta_data_mask_column_name=meta_data_mask_column_name
     )
 
+    # Run on array instead of anndata to allow for PCA on variables instead of observations)
     var_mask = adata.var[meta_data_mask_column_name] if meta_data_mask_column_name is not None else None
     data_for_pca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask, dim_space=dim_space)
+    pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, copy=False, **pca_kwargs)
 
-    # run PCA
-    pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, **pca_kwargs)
-
-    return _store_pca_results(
+    adata = _store_pca_results(
         adata=adata,
         pca_res=pca_res,
         dim_space=dim_space,
@@ -336,6 +340,8 @@ def pca(
         default_loadings_prefix="PCs",
         default_uns_prefix="variance_pca",
     )
+
+    return adata if copy else None
 
 
 def _run_bpca(
@@ -375,8 +381,10 @@ def bpca(
     embeddings_name: str | None = None,
     n_comps: int = 50,
     meta_data_mask_column_name: str | None = None,
+    *,
+    copy: bool = False,
     **bpca_kwargs,
-) -> ad.AnnData:
+) -> None | ad.AnnData:
     """Bayesian Principal Component Analysis
 
     Bayesian implementation of PCA that explicitly supports missing values. Computes latent space coordinates, loadings and variance decomposition.
@@ -410,11 +418,15 @@ def bpca(
         If provided, the colname in `adata.var` to use as a mask for
         the features to be used in PCA. This is useful for running PCA with the
         core proteome as "mask_var" to remove nan values. Must be of boolean dtype.
+    copy
+        If `False` (default), modifies `adata` inplace and returns `None`. If `True`, returns a copy of the `adata` object.
     **bpca_kwargs
         Additional keyword arguments to :class:`bpca.BPCA`. By default None.
 
     Returns
     -------
+    If `copy=True` and an updated `adata` object, else changes anndata object inplace.
+
     Sets the following fields:
     for `dim_space='obs'` (sample projection):
     `.obsm['BPCA' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
@@ -471,6 +483,7 @@ def bpca(
     --------
     :class:`bpca.BPCA`
     """
+    adata = adata.copy() if copy else adata
     _check_inputs_for_dim_reduction(
         adata=adata, layer=layer, dim_space=dim_space, meta_data_mask_column_name=meta_data_mask_column_name
     )
@@ -480,7 +493,7 @@ def bpca(
 
     pca_res = _run_bpca(data_for_bpca=data_for_bpca, n_components=n_comps, **bpca_kwargs)
 
-    return _store_pca_results(
+    adata = _store_pca_results(
         adata=adata,
         pca_res=pca_res,
         dim_space=dim_space,
@@ -490,3 +503,5 @@ def bpca(
         default_loadings_prefix="PCs_bpca",
         default_uns_prefix="variance_bpca",
     )
+
+    return adata if copy else None
