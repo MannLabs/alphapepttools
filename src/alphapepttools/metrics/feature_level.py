@@ -16,15 +16,15 @@ def _cv(data: np.ndarray, *, min_valid: int = 3, axis: int = 0) -> np.ndarray:
     data
         Array of shape (observations, features)
     min_valid
-        Minimum number of samples with non-na values to compute the value.
+        Minimum number of samples with non-na values to compute the value
     axis
         Axis along which to compute CV (defaults to feature-wise)
 
     Returns
     -------
-    np.ndarray
-       1D Array with length of axis with computed CVs and `nan` where the
-       number of non-na values is smaller than min_valid.
+    1D Array with length of axis with computed CVs and `nan` where the
+    number of non-na values is smaller than min_valid
+
     """
     std = np.nanstd(data, axis=axis)
     mean = np.nanmean(data, axis=axis)
@@ -68,26 +68,47 @@ def coefficient_of_variation(
     adata
         AnnData object
     min_valid
-        Minimum number of samples required to estimate the CV. Will be set to `NaN` otherwise.
+        Minimum number of samples required to estimate the CV. Will be set to `NaN` otherwise
     key_added
         Name of column added to `adata.var`
     layer
-        Name of the layer to compute metric on. If None (default), the data matrix X is used.
+        Name of the layer to compute metric on. If None (default), the data matrix X is used
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
 
     Returns
     -------
-    None | anndata.AnnData
-        AnnData object with computed CVs added to `adata.var[key_added]`.
-        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
-        returns a modified copy.
+    AnnData object with computed CVs added to `adata.var[key_added]`.
+    If `copy=False` modifies the anndata object inplace and returns None. If `copy=True`,
+    returns a modified copy
+
+    Examples
+    --------
+    .. code-block:: python
+
+        import numpy as np
+        import anndata as ad
+        import pandas as pd
+        import alphapepttools as at
+
+        # Create example data
+        adata = ad.AnnData(
+            X=np.array([[1, 2], [5, 1], [6, 6], [9, 3], [4, 8], [7, 4]]),
+            obs=pd.DataFrame({"group": ["A", "A", "A", "B", "B", "B"]}),
+            var=pd.DataFrame(index=["protein1", "protein2"]),
+        )
+
+        # Compute CV for each protein across samples
+        at.metrics.coefficient_of_variation(adata)
+
+        # CVs are now stored in adata.var['cv']
+        print(adata.var["cv"])  # protein1: 0.5, protein2: 0.6
 
     Notes
     -----
     The CV only considers non-missing values and should be computed before imputation.
-    Features with fewer than `min_valid` non-missing values will return NaN for CV.
+    Features with fewer than `min_valid` non-missing values will return NaN for CV
 
     """
     adata = adata.copy() if copy else adata
