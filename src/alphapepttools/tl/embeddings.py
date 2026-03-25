@@ -337,7 +337,7 @@ def pca(
         embeddings_name=embeddings_name,
         meta_data_mask_column_name=meta_data_mask_column_name,
         default_coords_prefix="X_pca",
-        default_loadings_prefix="PCs",
+        default_loadings_prefix="PCs_pca",
         default_uns_prefix="variance_pca",
     )
 

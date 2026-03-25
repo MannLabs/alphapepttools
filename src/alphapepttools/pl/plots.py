@@ -11,7 +11,7 @@
 import logging
 from collections import Counter
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 import anndata as ad
 import matplotlib as mpl
@@ -1688,6 +1688,7 @@ class Plots:
         color_column: str | None = None,
         dim_space: str = "obs",
         embeddings_name: str | None = None,
+        method: Literal["pca", "bpca"] = "pca",
         label: bool = False,  # noqa: FBT001, FBT002
         label_column: str | None = None,
         ax: plt.Axes | None = None,
@@ -1728,6 +1729,9 @@ class Plots:
         embeddings_name
             Custom embeddings name if non-default name was used in the PCA function.
             If None, uses default naming convention ("X_pca_obs" or "X_pca_var").
+        method
+            The method used for dimensionality reduction. Options are "pca" or "bpca" with "pca" as the default.
+            This is used to construct the default keys if `embeddings_name` is None.
         label
             Whether to add text labels to points in the scatter plot.
         label_column
@@ -1805,7 +1809,11 @@ class Plots:
         scatter_kwargs = scatter_kwargs or {}
 
         adata_pca = extract_pca_anndata(
-            data, dim_space=dim_space, embeddings_name=embeddings_name, expression_columns=color_map_column
+            data,
+            dim_space=dim_space,
+            embeddings_name=embeddings_name,
+            expression_columns=color_map_column,
+            method=method,
         )
 
         # get the explained variance ratio for the dimensions (for axis labels)
@@ -1867,6 +1875,7 @@ class Plots:
         dim_space: str = "obs",
         color: str = "blue",
         embeddings_name: str | None = None,
+        method: Literal["pca", "bpca"] = "pca",
         scatter_kwargs: dict | None = None,
     ) -> None:
         """Scree plot showing explained variance for each principal component.
@@ -1892,6 +1901,9 @@ class Plots:
         embeddings_name
             Custom embeddings name if non-default name was used in the PCA function.
             If None, uses default naming convention.
+        method
+            The method used for dimensionality reduction. Options are "pca" or "bpca" with "pca" as the default.
+            This is used to construct the default keys if `embeddings_name` is None.
         scatter_kwargs
             Additional keyword arguments passed to matplotlib scatter (e.g., s, alpha).
 
@@ -1931,7 +1943,7 @@ class Plots:
         scatter_kwargs = scatter_kwargs or {}
 
         # create the dataframe for plotting, X = pcs, y = explained variance
-        values = prepare_scree_data_to_plot(adata, n_pcs, dim_space, embeddings_name)
+        values = prepare_scree_data_to_plot(adata, n_pcs, dim_space, embeddings_name, method=method)
 
         cls.scatter(
             data=values,
@@ -1953,6 +1965,7 @@ class Plots:
         ax: plt.Axes,
         dim_space: str = "obs",
         embeddings_name: str | None = None,
+        method: Literal["pca", "bpca"] = "pca",
         dim: int = 1,
         nfeatures: int = 20,
         scatter_kwargs: dict | None = None,
@@ -1977,6 +1990,9 @@ class Plots:
         embeddings_name
             Custom embeddings name if non-default name was used in the PCA function.
             If None, uses default naming convention.
+        method
+            The method used for dimensionality reduction. Options are "pca" or "bpca" with "pca" as the default.
+            This is used to construct the default keys if `embeddings_name` is None.
         dim
             Principal component number to show loadings for (1-indexed, so 1 = PC1, 2 = PC2, etc.).
         nfeatures
@@ -2035,6 +2051,7 @@ class Plots:
             data=data,
             dim_space=dim_space,
             embeddings_name=embeddings_name,
+            method=method,
             dim=dim,
             nfeatures=nfeatures,
         )
@@ -2060,6 +2077,7 @@ class Plots:
         ax: plt.Axes,
         dim_space: str = "obs",
         embeddings_name: str | None = None,
+        method: Literal["pca", "bpca"] = "pca",
         pc_x: int = 1,
         pc_y: int = 2,
         nfeatures: int = 20,
@@ -2082,19 +2100,28 @@ class Plots:
         ax
             Matplotlib axes object to plot on.
         dim_space
-            The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
+            The dimension space used in PCA. Can be either "obs" (default) for sample projection
+            or "var" for feature projection. By default "obs".
         embeddings_name
             The custom embeddings name used in PCA. If None, uses default naming convention. By default None.
+        method
+            The method used for dimensionality reduction. Options are "pca" or "bpca" with "pca" as the default.
+            This is used to construct the default keys if `embeddings_name` is None.
         pc_x
-            The PC principal component index to plot on the x axis, by default 1. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
+            The PC principal component index to plot on the x axis, by default 1.
+            Corresponds to the principal component order, the first principal is 1 (1-indexed,
+            i.e. the first PC is 1, not 0).
         pc_y
-            The principal component index to plot on the y axis, by default 2. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
+            The principal component index to plot on the y axis, by default 2.
+            Corresponds to the principal component order, the first principal is 1 (1-indexed,
+            i.e. the first PC is 1, not 0).
         nfeatures
             The number of top absolute loadings features to label from each component, by default 20
         add_labels
             Whether to add feature labels of the top `nfeatures` loadings. by default `True`.
         add_lines
-            If True, draw lines connecting the origin (0,0) to the points representing the top `nfeatures` loadings. Default is `False`.
+            If True, draw lines connecting the origin (0,0) to the points representing the top `nfeatures` loadings.
+            Default is `False`.
         scatter_kwargs
             Additional keyword arguments for the matplotlib scatter function. By default None.
 
@@ -2129,10 +2156,16 @@ class Plots:
         scatter_kwargs = scatter_kwargs or {}
 
         # Generate the correct loadings key name
-        loadings_key = f"PCs_{dim_space}" if embeddings_name is None else embeddings_name
+        loadings_key = f"PCs_{method}_{dim_space}" if embeddings_name is None else embeddings_name
 
         loadings_df = prepare_pca_2d_loadings_data_to_plot(
-            data=data, loadings_name=loadings_key, pc_x=pc_x, pc_y=pc_y, nfeatures=nfeatures, dim_space=dim_space
+            data=data,
+            loadings_name=loadings_key,
+            pc_x=pc_x,
+            pc_y=pc_y,
+            nfeatures=nfeatures,
+            dim_space=dim_space,
+            method=method,
         )
 
         # plot the loadings of all features (used in PCA) first
