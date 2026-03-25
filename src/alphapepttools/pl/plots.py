@@ -2156,16 +2156,15 @@ class Plots:
         scatter_kwargs = scatter_kwargs or {}
 
         # Generate the correct loadings key name
-        loadings_key = f"PCs_{method}_{dim_space}" if embeddings_name is None else embeddings_name
 
         loadings_df = prepare_pca_2d_loadings_data_to_plot(
             data=data,
-            loadings_name=loadings_key,
+            embeddings_name=embeddings_name,
+            method=method,
             pc_x=pc_x,
             pc_y=pc_y,
             nfeatures=nfeatures,
             dim_space=dim_space,
-            method=method,
         )
 
         # plot the loadings of all features (used in PCA) first

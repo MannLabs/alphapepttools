@@ -433,7 +433,7 @@ def prepare_scree_data_to_plot(
 
     """
     # Generate the correct variance key name
-    variance_key = f"variance_pca_{method}_{dim_space}" if embeddings_name is None else embeddings_name
+    variance_key = f"variance_{method}_{dim_space}" if embeddings_name is None else embeddings_name
 
     # Input checks
     _validate_scree_plot_input(adata, n_pcs, dim_space, variance_key)
@@ -633,7 +633,6 @@ def prepare_pca_2d_loadings_data_to_plot(
         # Get loadings for PC1 vs PC2 with top 2 features highlighted
         loadings_2d = at.tl.prepare_pca_2d_loadings_data_to_plot(
             adata,
-            loadings_name="PCs_pca_obs",  # Default loadings key
             pc_x=1,  # PC1
             pc_y=2,  # PC2
             nfeatures=2,  # Top 2 features per PC
