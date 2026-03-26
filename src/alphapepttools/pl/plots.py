@@ -11,7 +11,7 @@
 import logging
 from collections import Counter
 from collections.abc import Callable
-from typing import Any
+from typing import Any, Literal
 
 import anndata as ad
 import matplotlib as mpl
@@ -31,6 +31,7 @@ from alphapepttools.tl.plot_data_handling import (
     prepare_pca_2d_loadings_data_to_plot,
     prepare_scree_data_to_plot,
 )
+from alphapepttools.tl.utils import find_iterable_kwargs
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -117,6 +118,18 @@ def _extract_groupwise_plotting_data(
             positions.append(i + 1)
 
     return data_lists, labels, positions
+
+
+def _set_optional_axis_limits(
+    ax: plt.Axes,
+    xlim: tuple[float, float] | None = None,
+    ylim: tuple[float, float] | None = None,
+) -> None:
+    """Set x and y limits on an Axes object if specified."""
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
 
 
 def add_lines(
@@ -894,6 +907,7 @@ class Plots:
         legend_kwargs: dict | None = None,
         xlim: tuple[float, float] | None = None,
         ylim: tuple[float, float] | None = None,
+        order: Literal["color_frequency", "original"] = "color_frequency",
     ) -> None:
         """Plot a scatterplot from a DataFrame or AnnData object
 
@@ -947,6 +961,10 @@ class Plots:
             Limits for the x-axis. By default None.
         ylim
             Limits for the y-axis. By default None.
+        order : str
+            Ordering of plotting data points. If "color_frequency", the rarest occuring colors are plotted on top. This is the default
+            and follows the assumption that rarer categories are more important to the plot's message (e.g. 1000 grey points should not cover 100 green points, which should not cover 10 red points).
+            If "original", the order of the data is kept as is, which is useful for plotting ordered categorical datapoints.
 
         Returns
         -------
@@ -1123,12 +1141,25 @@ class Plots:
             color_dict = {DEFAULT_GROUP: color or DEFAULT_COLOR}
             color_values = np.array([color_dict[DEFAULT_GROUP]] * len(data))
 
-        # Handle ordering of plotting arrays by string: order by the frequency of the color column
-        counts = Counter([str(cv) for cv in color_values])
-        order = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
-        x_values = data_column_to_array(data, x_column)[order]
-        y_values = data_column_to_array(data, y_column)[order]
-        color_values = np.array(color_values)[order]
+        # Get base arrays
+        x_values = data_column_to_array(data, x_column)
+        y_values = data_column_to_array(data, y_column)
+        color_values = np.array(color_values)
+
+        # Order points by color frequency if needed, so that points that occur only rarely are plotted on top.
+        # This solves issues with e.g. plotting 1000 points and coloring 10 of them red, where presumable the red ones should overplot the grey ones but not vice versa.
+        if order == "color_frequency":
+            counts = Counter([str(cv) for cv in color_values])
+            order_indices = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
+
+            x_values = x_values[order_indices]
+            y_values = y_values[order_indices]
+            color_values = color_values[order_indices]
+
+            # In case users pass an array-like in kwargs, make sure the order is consistent. This concerns e.g. edgecolor, size, etc.
+            iterable_kwargs = find_iterable_kwargs(scatter_kwargs, match_length=len(color_values))
+            for k, v in iterable_kwargs.items():
+                scatter_kwargs[k] = list(np.array(v)[order_indices])
 
         ax.scatter(
             x=x_values,
@@ -1145,10 +1176,11 @@ class Plots:
                 **legend_kwargs,
             )
 
-        if xlim:
-            ax.set_xlim(xlim)
-        if ylim:
-            ax.set_ylim(ylim)
+        _set_optional_axis_limits(
+            ax=ax,
+            xlim=xlim,
+            ylim=ylim,
+        )
 
     @classmethod
     def barplot(
