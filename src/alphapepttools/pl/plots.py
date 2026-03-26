@@ -1139,21 +1139,25 @@ class Plots:
             color_dict = {DEFAULT_GROUP: color or DEFAULT_COLOR}
             color_values = np.array([color_dict[DEFAULT_GROUP]] * len(data))
 
-        # Handle ordering of plotting arrays by string: order by the frequency of the color column
+        # Get base arrays
+        x_values = data_column_to_array(data, x_column)
+        y_values = data_column_to_array(data, y_column)
+        color_values = np.array(color_values)
+
+        # Order points by color frequency if needed, so that points that occur only rarely are plotted on top.
+        # This solves issues with e.g. plotting 1000 points and coloring 10 of them red, where presumable the red ones should overplot the grey ones but not vice versa.
         if order == "color_frequency":
             counts = Counter([str(cv) for cv in color_values])
             order_indices = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
-        else:  # "original" means keeping the 'data' order
-            order_indices = np.arange(len(color_values))
 
-        x_values = data_column_to_array(data, x_column)[order_indices]
-        y_values = data_column_to_array(data, y_column)[order_indices]
-        color_values = np.array(color_values)[order_indices]
+            x_values = x_values[order_indices]
+            y_values = y_values[order_indices]
+            color_values = color_values[order_indices]
 
-        # In case users pass an array-like in kwargs, make sure the order is consistent
-        iterable_kwargs = find_iterable_kwargs(scatter_kwargs, match_length=len(color_values))
-        for k, v in iterable_kwargs.items():
-            scatter_kwargs[k] = np.array(v)[order_indices]
+            # In case users pass an array-like in kwargs, make sure the order is consistent
+            iterable_kwargs = find_iterable_kwargs(scatter_kwargs, match_length=len(color_values))
+            for k, v in iterable_kwargs.items():
+                scatter_kwargs[k] = list(np.array(v)[order_indices])
 
         ax.scatter(
             x=x_values,

@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from alphapepttools.tl.tools import get_id2gene_map, map_genes_to_protein_groups
-from alphapepttools.tl.utils import drop_features_with_too_few_valid_values
+from alphapepttools.tl.utils import drop_features_with_too_few_valid_values, find_iterable_kwargs
 
 DUMMY_FASTA = """>tr|ID0|ID0_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN0 PE=1 SV=1
 PEPTIDEKPEPTIDEK
@@ -134,3 +134,66 @@ def test_drop_features_with_too_few_valid_values(example_adata):
 
     expected_columns = ["A", "C"]
     assert list(filtered_adata.var_names) == expected_columns
+
+
+# Test the find_iterable_kwargs function
+def test_find_iterable_kwargs():
+    # Test with various kwargs including arrays, scalars, and other types
+    kwargs = {
+        "s": np.array([10, 20, 30, 40, 50]),  # NumPy array
+        "alpha": 0.5,  # scalar
+        "edgecolors": ["red", "blue", "green", "yellow", "purple"],  # list
+        "linewidths": pd.Series([1, 2, 3, 4, 5]),  # pandas Series
+        "marker": "o",  # string
+        "label": "data",  # string
+        "cmap": None,  # None
+        "empty_list": [],  # empty list
+        "single_item_list": [42],  # single item list
+    }
+
+    # Test without match_length (returns all iterables)
+    result = find_iterable_kwargs(kwargs)
+    assert "s" in result
+    assert "edgecolors" in result
+    assert "linewidths" in result
+    assert "empty_list" in result
+    assert "single_item_list" in result
+    assert "alpha" not in result  # scalar
+    assert "marker" not in result  # string
+    assert "label" not in result  # string
+    assert "cmap" not in result  # None
+    assert np.array_equal(result["s"], kwargs["s"])
+    assert result["edgecolors"] == kwargs["edgecolors"]
+    assert np.array_equal(result["linewidths"], kwargs["linewidths"])
+
+    # Test with match_length=5 (filters to matching length only)
+    result_filtered = find_iterable_kwargs(kwargs, match_length=5)
+    assert "s" in result_filtered
+    assert "edgecolors" in result_filtered
+    assert "linewidths" in result_filtered
+    assert "empty_list" not in result_filtered  # wrong length
+    assert "single_item_list" not in result_filtered  # wrong length
+    assert len(result_filtered["s"]) == 5  # noqa: PLR2004
+    assert len(result_filtered["edgecolors"]) == 5  # noqa: PLR2004
+    assert len(result_filtered["linewidths"]) == 5  # noqa: PLR2004
+
+    # Test with match_length=1
+    result_single = find_iterable_kwargs(kwargs, match_length=1)
+    assert "single_item_list" in result_single
+    assert "s" not in result_single
+    assert "edgecolors" not in result_single
+
+    # Test with empty kwargs
+    empty_result = find_iterable_kwargs({})
+    assert empty_result == {}
+
+    # Test with no iterables
+    no_iterables = {"a": 1, "b": "test", "c": None, "d": 3.14}
+    result_none = find_iterable_kwargs(no_iterables)
+    assert result_none == {}
+
+    # Test that strings are not considered iterables
+    string_kwargs = {"text": "hello", "values": [1, 2, 3]}
+    result_strings = find_iterable_kwargs(string_kwargs)
+    assert "text" not in result_strings
+    assert "values" in result_strings
