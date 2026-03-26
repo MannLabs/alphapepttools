@@ -962,7 +962,9 @@ class Plots:
         ylim
             Limits for the y-axis. By default None.
         order : str
-            Ordering of plotting data points. If "color_frequency", the rarest colors (based on color_map_column) are plotted on top. If "original", the order of the data is kept as is, which is useful for plotting ordered categorical datapoints
+            Ordering of plotting data points. If "color_frequency", the rarest occuring colors are plotted on top. This is the default
+            and follows the assumption that rarer categories are more important to the plot's message (e.g. 1000 grey points should not cover 100 green points, which should not cover 10 red points).
+            If "original", the order of the data is kept as is, which is useful for plotting ordered categorical datapoints.
 
         Returns
         -------
