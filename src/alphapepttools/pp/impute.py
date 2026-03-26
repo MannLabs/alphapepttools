@@ -258,7 +258,7 @@ def _impute_nanmedian(data: np.ndarray) -> np.ndarray:
 
 
 def impute_median(
-    adata: ad.AnnData, group_column: str | None = None, layer: str | None = None, *, copy: bool = True
+    adata: ad.AnnData, group_column: str | None = None, layer: str | None = None, *, copy: bool = False
 ) -> ad.AnnData:
     """Impute missing values using median imputation
 

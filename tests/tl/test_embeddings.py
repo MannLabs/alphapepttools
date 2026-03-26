@@ -52,6 +52,29 @@ def test_pca__default(toy_adata):
     assert "variance" in toy_adata.uns["variance_pca_obs"]
 
 
+def test_pca__copy(toy_adata) -> None:
+    """Test the pca function correctly handles copy behaviour."""
+    new_adata = at.tl.pca(toy_adata, n_comps=5, copy=True)
+
+    # Check that original data was not modified
+    assert "X_pca_obs" not in toy_adata.obsm
+    assert "PCs_obs" not in toy_adata.varm
+    assert "variance_pca_obs" not in toy_adata.uns
+
+    # Check default storage locations for obs space PCA
+    assert "X_pca_obs" in new_adata.obsm
+    assert "PCs_obs" in new_adata.varm
+    assert "variance_pca_obs" in new_adata.uns
+
+    # Check shapes
+    assert new_adata.obsm["X_pca_obs"].shape[0] == new_adata.n_obs
+    assert new_adata.varm["PCs_obs"].shape[0] == new_adata.n_vars
+
+    # Check variance information
+    assert "variance_ratio" in new_adata.uns["variance_pca_obs"]
+    assert "variance" in new_adata.uns["variance_pca_obs"]
+
+
 def test_pca__var_space(toy_adata):
     """Test the pca function in var space (PCA on genes)."""
     at.tl.pca(toy_adata, dim_space="var")
@@ -180,6 +203,26 @@ def test_bpca__default(toy_adata):
 
     assert "variance_ratio" in toy_adata.uns["variance_bpca_obs"]
     assert len(toy_adata.uns["variance_bpca_obs"]["variance_ratio"]) == 5  # noqa: PLR2004
+
+
+def test_bpca__copy(toy_adata) -> None:
+    """Test the bpca function correctly handles copy behaviour."""
+    new_adata = at.tl.bpca(toy_adata, n_comps=5, copy=True)
+
+    # Make sure that original adata was not modified
+    assert "X_bpca_obs" not in toy_adata.obsm
+    assert "variance_bpca_obs" not in toy_adata.uns
+
+    # Make sure that new adata object contains the expected fields
+    assert "X_bpca_obs" in new_adata.obsm
+    assert "PCs_bpca_obs" in new_adata.varm
+    assert "variance_bpca_obs" in new_adata.uns
+
+    assert new_adata.obsm["X_bpca_obs"].shape == (new_adata.n_obs, 5)
+    assert new_adata.varm["PCs_bpca_obs"].shape == (new_adata.n_vars, 5)
+
+    assert "variance_ratio" in new_adata.uns["variance_bpca_obs"]
+    assert len(new_adata.uns["variance_bpca_obs"]["variance_ratio"]) == 5  # noqa: PLR2004
 
 
 def test_bpca__var_space(toy_adata):

@@ -586,6 +586,99 @@ def data_column_to_array(
     raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
 
 
+def data_columns_to_df(
+    data: ad.AnnData | pd.DataFrame,
+    columns: list[str] | None = None,
+) -> pd.DataFrame:
+    """Extract selected columns from AnnData or DataFrame
+
+    Adapter function for matplotlib plotting that extracts columns from either
+    AnnData's X matrix/obs or from a DataFrame. Validates there are no duplicates
+    when extracting from AnnData.
+
+    Parameters
+    ----------
+    data
+        Input data object (AnnData or DataFrame)
+    columns
+        Column names to extract. If `None`, returns all columns (DataFrame)
+        or all columns in X (AnnData)
+
+    Returns
+    -------
+    :class:`pandas.DataFrame`
+        DataFrame containing the selected columns
+
+    Examples
+    --------
+    Extract from DataFrame:
+
+    .. code-block:: python
+
+        df = pd.DataFrame({"A": [1, 2], "B": [3, 4]})
+        result = data_columns_to_df(df, columns=["A"])
+
+    Extract from AnnData (searches both X and obs):
+
+    .. code-block:: python
+
+        # Get protein intensities from X and sample metadata from obs
+        df = data_columns_to_df(adata, columns=["Protein1", "sample_type"])
+
+    Use in plotting:
+
+    .. code-block:: python
+
+        # Prepare data for violin plot
+        df = data_columns_to_df(adata, columns=["group", "intensity"])
+        ax.violinplot(df.groupby("group")["intensity"].apply(list))
+    """
+    # Prevent double extraction of the same column
+    if columns is not None:
+        columns = pd.Series(columns).drop_duplicates().tolist()
+
+    if isinstance(data, pd.DataFrame):
+        columns = columns or data.columns.tolist()
+        try:
+            dataset = data[columns]
+        except KeyError as e:
+            raise KeyError(f"Columns {columns} not found in dataframe.") from e
+
+    elif isinstance(data, ad.AnnData):
+        if columns is None:
+            dataset = data.to_df()
+        else:
+            # Partition columns by source
+            x_cols = [col for col in columns if col in data.var_names]
+            obs_cols = [col for col in columns if col in data.obs.columns]
+
+            # Check for duplicate columns across sources
+            duplicates = set(x_cols) & set(obs_cols)
+            if duplicates:
+                raise KeyError(
+                    f"Columns {duplicates} found in both AnnData X and obs. Please ensure unique column names."
+                )
+
+            # Check for missing columns
+            missing_cols = set(columns) - set(x_cols) - set(obs_cols)
+            if missing_cols:
+                raise KeyError(f"Columns {missing_cols} not found in AnnData X or obs.")
+
+            # Build dataset from available sources
+            parts = []
+            if x_cols:
+                parts.append(data.to_df()[x_cols])
+            if obs_cols:
+                parts.append(data.obs[obs_cols])
+
+            dataset = pd.concat(parts, axis=1) if len(parts) > 1 else parts[0]
+
+    else:
+        raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
+
+    return dataset
+
+
 def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     adata: ad.AnnData, scaler: str = "standard", layer: str | None = None, *, copy: bool = False
 ) -> None | ad.AnnData:
