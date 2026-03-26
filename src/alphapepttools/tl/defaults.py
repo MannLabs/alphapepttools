@@ -2,7 +2,11 @@ from typing import ClassVar
 
 
 class TLDefaults:
-    """Default values and constants for the tl module."""
+    """Default values and constants for the tl module.
+
+    Provides standardized column names and constants for differential expression
+    functions to ensure consistent output format across different statistical methods.
+    """
 
     DIFF_EXP_COLS: ClassVar[list[str]] = [
         "condition_pair",
