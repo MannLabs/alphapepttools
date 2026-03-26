@@ -31,6 +31,7 @@ from alphapepttools.tl.plot_data_handling import (
     prepare_pca_2d_loadings_data_to_plot,
     prepare_scree_data_to_plot,
 )
+from alphapepttools.tl.utils import find_iterable_kwargs
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -117,6 +118,18 @@ def _extract_groupwise_plotting_data(
             positions.append(i + 1)
 
     return data_lists, labels, positions
+
+
+def _set_optional_axis_limits(
+    ax: plt.Axes,
+    xlim: tuple[float, float] | None = None,
+    ylim: tuple[float, float] | None = None,
+) -> None:
+    """Set x and y limits on an Axes object if specified."""
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
 
 
 def add_lines(
@@ -1129,13 +1142,18 @@ class Plots:
         # Handle ordering of plotting arrays by string: order by the frequency of the color column
         if order == "color_frequency":
             counts = Counter([str(cv) for cv in color_values])
-            order = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
+            order_indices = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
         else:  # "original" means keeping the 'data' order
-            order = np.arange(len(color_values))
+            order_indices = np.arange(len(color_values))
 
-        x_values = data_column_to_array(data, x_column)[order]
-        y_values = data_column_to_array(data, y_column)[order]
-        color_values = np.array(color_values)[order]
+        x_values = data_column_to_array(data, x_column)[order_indices]
+        y_values = data_column_to_array(data, y_column)[order_indices]
+        color_values = np.array(color_values)[order_indices]
+
+        # In case users pass an array-like in kwargs, make sure the order is consistent
+        iterable_kwargs = find_iterable_kwargs(scatter_kwargs, match_length=len(color_values))
+        for k, v in iterable_kwargs.items():
+            scatter_kwargs[k] = np.array(v)[order_indices]
 
         ax.scatter(
             x=x_values,
@@ -1152,10 +1170,11 @@ class Plots:
                 **legend_kwargs,
             )
 
-        if xlim:
-            ax.set_xlim(xlim)
-        if ylim:
-            ax.set_ylim(ylim)
+        _set_optional_axis_limits(
+            ax=ax,
+            xlim=xlim,
+            ylim=ylim,
+        )
 
     @classmethod
     def barplot(
