@@ -1154,7 +1154,7 @@ class Plots:
             y_values = y_values[order_indices]
             color_values = color_values[order_indices]
 
-            # In case users pass an array-like in kwargs, make sure the order is consistent
+            # In case users pass an array-like in kwargs, make sure the order is consistent. This concerns e.g. edgecolor, size, etc.
             iterable_kwargs = find_iterable_kwargs(scatter_kwargs, match_length=len(color_values))
             for k, v in iterable_kwargs.items():
                 scatter_kwargs[k] = list(np.array(v)[order_indices])
