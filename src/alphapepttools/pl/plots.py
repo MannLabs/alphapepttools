@@ -25,7 +25,14 @@ from matplotlib.patches import Patch
 from alphapepttools.pl import defaults
 from alphapepttools.pl.colors import BaseColors, BasePalettes, _get_colors_from_cmap, get_color_mapping
 from alphapepttools.pl.figure import create_figure, label_axes
-from alphapepttools.pp.data import _tolist, data_column_to_array, data_columns_to_df, data_index_to_array, subset_data
+from alphapepttools.pp.data import (
+    _tolist,
+    coerce_to_dataframe,
+    data_column_to_array,
+    data_columns_to_df,
+    data_index_to_array,
+    subset_data,
+)
 from alphapepttools.tl.plot_data_handling import (
     extract_pca_anndata,
     prepare_pca_1d_loadings_data_to_plot,
@@ -2870,34 +2877,28 @@ class Plots:
                     idxs_to_label.extend(layer_idxs)
 
             if idxs_to_label:
-                # Extract arrays for the label indices
-                label_y_values = data_column_to_array(data, y_column)[idxs_to_label]
-                label_x_values = data_column_to_array(data, x_column)[idxs_to_label]
-
-                # Get display labels, fall back to index if no display_id_column is provided
-                if display_id_column is None:
-                    all_labels = data_index_to_array(data, "obs")
-                else:
-                    all_labels = data_column_to_array(data, display_id_column)
-                display_labels = all_labels[idxs_to_label]
+                # Extract points for labeling
+                label_df = coerce_to_dataframe(subset_data(data, idxs_to_label))
 
                 # Sort by y values (descending) to minimize crossing lines between labels and points
-                sort_order = np.argsort(label_y_values)[::-1]
-                label_y_values = label_y_values[sort_order]
-                label_x_values = label_x_values[sort_order]
-                display_labels = display_labels[sort_order]
+                label_df = label_df.sort_values(y_column, ascending=False)
+
+                # Get display labels, fall back to index if no display_id_column is provided
+                if display_id_column is not None:
+                    label_df["__label__"] = data_column_to_array(label_df, display_id_column)
+                else:
+                    label_df["__label__"] = data_index_to_array(label_df, "obs")
 
                 # Apply max_labels if specified
-                if max_labels is not None and len(display_labels) > max_labels:
-                    label_y_values = label_y_values[:max_labels]
-                    label_x_values = label_x_values[:max_labels]
-                    display_labels = display_labels[:max_labels]
+                if max_labels is not None and len(label_df) > max_labels:
+                    label_df = label_df.head(max_labels)
 
                 label_plot(
                     ax=ax,
-                    x_values=label_x_values,
-                    y_values=label_y_values,
-                    labels=display_labels,
+                    data=label_df,
+                    x_column=x_column,
+                    y_column=y_column,
+                    label_column="__label__",
                     y_display_start=y_display_start,
                     x_anchors=x_label_anchors,
                     y_padding_factor=y_padding_factor,

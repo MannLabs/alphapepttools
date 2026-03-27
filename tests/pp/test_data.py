@@ -6,11 +6,7 @@ import pandas as pd
 import pytest
 
 import alphapepttools as at
-
-# import private method to obtain anndata object
-from alphapepttools.pp.data import _handle_overlapping_columns, _to_anndata, data_column_to_array
-
-### Fixtures ###
+from alphapepttools.pp.data import _handle_overlapping_columns, _to_anndata, coerce_to_dataframe, data_column_to_array
 
 
 # example data
@@ -1067,3 +1063,65 @@ def test_data_column_to_array(
 
     # then
     assert np.all(array == expected_array)
+
+
+### Test coerce_to_dataframe ###
+
+
+@pytest.fixture
+def sample_dataframe():
+    """Create a sample DataFrame for testing"""
+    return pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6], "C": [7, 8, 9]}, index=["row1", "row2", "row3"])
+
+
+@pytest.fixture
+def sample_anndata(sample_dataframe):
+    """Create a sample AnnData object for testing"""
+    # Create AnnData with X matrix and some obs data
+    return ad.AnnData(
+        X=sample_dataframe.values,
+        obs=pd.DataFrame({"cell_type": ["type_A", "type_B", "type_C"]}, index=sample_dataframe.index),
+        var=pd.DataFrame({"gene_name": sample_dataframe.columns.tolist()}, index=sample_dataframe.columns),
+    )
+
+
+@pytest.mark.parametrize(
+    ("input_type", "expected_shape", "expected_columns"),
+    [
+        ("dataframe", (3, 3), ["A", "B", "C"]),  # DataFrame input
+        ("anndata", (3, 4), ["A", "B", "C", "cell_type"]),  # AnnData input includes obs columns
+    ],
+)
+def test_coerce_to_dataframe(
+    sample_dataframe,
+    sample_anndata,
+    input_type,
+    expected_shape,
+    expected_columns,
+):
+    """Test that coerce_to_dataframe correctly handles DataFrame and AnnData inputs"""
+    # given
+    data = sample_dataframe if input_type == "dataframe" else sample_anndata
+
+    # when
+    result = coerce_to_dataframe(data)
+
+    # then
+    assert isinstance(result, pd.DataFrame)
+    assert result.shape == expected_shape
+    assert list(result.columns) == expected_columns
+
+    # Check index is preserved
+    assert list(result.index) == ["row1", "row2", "row3"]
+
+    # Check data values for the main columns
+    if input_type == "dataframe":
+        pd.testing.assert_frame_equal(result, sample_dataframe)
+    else:  # anndata
+        # Check that X values are preserved
+        pd.testing.assert_frame_equal(
+            result[["A", "B", "C"]],
+            pd.DataFrame(sample_anndata.X, index=sample_anndata.obs.index, columns=["A", "B", "C"]),
+        )
+        # Check that obs columns are included
+        assert list(result["cell_type"]) == ["type_A", "type_B", "type_C"]

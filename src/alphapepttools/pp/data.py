@@ -684,6 +684,30 @@ def subset_data(
     return data[idxs].copy()
 
 
+def coerce_to_dataframe(
+    data: pd.DataFrame | ad.AnnData,
+) -> pd.DataFrame:
+    """Coerce data to a DataFrame
+
+    If data is already a DataFrame, it is returned as is. If data is an AnnData object, the default .to_df() method is used to convert the X matrix to a DataFrame with obs index and var names as columns.
+
+    Parameters
+    ----------
+    data : pd.DataFrame | ad.AnnData
+        Data to coerce.
+
+    Returns
+    -------
+    pd.DataFrame
+        Coerced DataFrame.
+
+    """
+    if isinstance(data, pd.DataFrame):
+        return data
+    # AnnData case: convert X to DataFrame with obs index and var names as columns
+    return pd.concat([data.to_df(), data.obs], axis=1)
+
+
 def data_columns_to_df(
     data: ad.AnnData | pd.DataFrame,
     columns: list[str] | None = None,
