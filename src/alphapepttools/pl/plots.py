@@ -12,7 +12,7 @@ import logging
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import anndata as ad
 import matplotlib as mpl
@@ -32,6 +32,7 @@ from alphapepttools.tl.plot_data_handling import (
     prepare_pca_2d_loadings_data_to_plot,
     prepare_scree_data_to_plot,
 )
+from alphapepttools.tl.utils import find_iterable_kwargs
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -118,6 +119,18 @@ def _extract_groupwise_plotting_data(
             positions.append(i + 1)
 
     return data_lists, labels, positions
+
+
+def _set_optional_axis_limits(
+    ax: plt.Axes,
+    xlim: tuple[float, float] | None = None,
+    ylim: tuple[float, float] | None = None,
+) -> None:
+    """Set x and y limits on an Axes object if specified."""
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
 
 
 def add_lines(
@@ -415,7 +428,7 @@ def drop_nan_coordinate_points(
 
 def _get_plot_lims(
     values: np.ndarray,
-    padding_factor: float,
+    padding_factor: float = 1.1,
     sym: str | None = None,
     set_left: float | None = None,
     set_right: float | None = None,
@@ -449,6 +462,7 @@ def _get_plot_lims(
     >>> _get_plot_lims(values, 1.1, set_left=0)
     (0, 3.3)
     """
+    # Convert to Series for graceful handling of NaNs
     series = pd.Series(values)
 
     if sym == "max":
@@ -999,7 +1013,8 @@ class Plots:
                     scatter_kwargs=scatter_kwargs,
                 )
                 # ax and limits must be passed explicitly
-                plotting_callable(ax=ax, xlims=xlims, ylims=ylims, **layer_config.to_kwargs())
+                # TODO: change to xlims once scatter() args are updated to xlims/ylims
+                plotting_callable(ax=ax, xlim=xlims, ylim=ylims, **layer_config.to_kwargs())
 
         if return_glob_layer_indices:
             return glob_layer_idxs
@@ -1219,10 +1234,10 @@ class Plots:
         scatter_kwargs: dict | None = None,
         legend_kwargs: dict | None = None,
         figure_kwargs: dict | None = None,
-        xlims: tuple[float, float] | None = None,
-        ylims: tuple[float, float] | None = None,
-        lim_padding_factor: float = 1.2,
         default_group: str = "__data",
+        xlim: tuple[float, float] | None = None,
+        ylim: tuple[float, float] | None = None,
+        order: Literal["color_frequency", "original"] = "color_frequency",
     ) -> None:
         """Plot a scatterplot from a DataFrame or AnnData object
 
@@ -1278,6 +1293,10 @@ class Plots:
             Limits for the x-axis. By default None.
         ylim
             Limits for the y-axis. By default None.
+        order : str
+            Ordering of plotting data points. If "color_frequency", the rarest occuring colors are plotted on top. This is the default
+            and follows the assumption that rarer categories are more important to the plot's message (e.g. 1000 grey points should not cover 100 green points, which should not cover 10 red points).
+            If "original", the order of the data is kept as is, which is useful for plotting ordered categorical datapoints.
 
         Returns
         -------
@@ -1455,12 +1474,25 @@ class Plots:
             color_dict = {default_group: color or default_color}
             color_values = np.array([color_dict[default_group]] * len(data))
 
-        # Handle ordering of plotting arrays by string: order by the frequency of the color column
-        counts = Counter([str(cv) for cv in color_values])
-        order = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
-        x_values = data_column_to_array(data, x_column)[order]
-        y_values = data_column_to_array(data, y_column)[order]
-        color_values = np.array(color_values)[order]
+        # Get base arrays
+        x_values = data_column_to_array(data, x_column)
+        y_values = data_column_to_array(data, y_column)
+        color_values = np.array(color_values)
+
+        # Order points by color frequency if needed, so that points that occur only rarely are plotted on top.
+        # This solves issues with e.g. plotting 1000 points and coloring 10 of them red, where presumable the red ones should overplot the grey ones but not vice versa.
+        if order == "color_frequency":
+            counts = Counter([str(cv) for cv in color_values])
+            order_indices = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
+
+            x_values = x_values[order_indices]
+            y_values = y_values[order_indices]
+            color_values = color_values[order_indices]
+
+            # In case users pass an array-like in kwargs, make sure the order is consistent. This concerns e.g. edgecolor, size, etc.
+            iterable_kwargs = find_iterable_kwargs(scatter_kwargs, match_length=len(color_values))
+            for k, v in iterable_kwargs.items():
+                scatter_kwargs[k] = list(np.array(v)[order_indices])
 
         ax.scatter(
             x=x_values,
@@ -1477,11 +1509,12 @@ class Plots:
                 **legend_kwargs,
             )
 
-        xlims = xlims or _get_plot_lims(x_values, lim_padding_factor, sym="max")
-        ylims = ylims or _get_plot_lims(y_values, lim_padding_factor, set_left=0)
-
-        ax.set_xlim(xlims)
-        ax.set_ylim(ylims)
+        # TODO: set this to flexible limits with optional symmetric padding
+        _set_optional_axis_limits(
+            ax=ax,
+            xlim=xlim,
+            ylim=ylim,
+        )
 
     @classmethod
     def barplot(
