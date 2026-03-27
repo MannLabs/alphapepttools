@@ -27,10 +27,10 @@ def get_id2gene_map(
 
     Parameters
     ----------
-    fasta_input : str | Path
+    fasta_input
         If source_type is 'file' (default), this is interpreted as a filepath to a FASTA file.
         If source_type is 'string', this is parsed directly as a string-format fasta (multi-line with headers and sequences)
-    source_type : str, optional
+    source_type
         Specifies the source type of the FASTA input, either 'file' or 'string'.
         Defaults to 'file'.
 
@@ -96,11 +96,11 @@ def map_genes_to_protein_groups(
 
     Parameters
     ----------
-    id2gene_map : dict
+    id2gene_map
         Dictionary mapping UniProt IDs to gene names
-    id_column : list
+    protein_groups
         List containing protein group identifiers, where each identifier may consist of multiple UniProt IDs
-    delimiter : str, optional
+    delimiter
         Delimiter used to separate UniProt IDs in the protein group identifiers, by default ";"
 
     Examples

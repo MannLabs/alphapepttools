@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from alphapepttools.tl.tools import find_protease_cut_sites, get_id2gene_map, map_genes_to_protein_groups
-from alphapepttools.tl.utils import drop_features_with_too_few_valid_values
+from alphapepttools.tl.utils import drop_features_with_too_few_valid_values, find_iterable_kwargs
 
 DUMMY_FASTA = """>tr|ID0|ID0_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN0 PE=1 SV=1
 PEPTIDEKPEPTIDEK
@@ -165,3 +165,78 @@ def test_find_protease_cut_sites(sequences, expected_counts):
     counts = find_protease_cut_sites(adata, sequence_column="sequence")
 
     assert list(counts) == expected_counts
+
+
+# Test the find_iterable_kwargs function
+@pytest.fixture
+def example_kwargs_with_iterables():
+    """Fixture providing kwargs with various types including iterables."""
+    return {
+        "s": np.array([10, 20, 30, 40, 50]),  # NumPy array
+        "alpha": 0.5,  # scalar
+        "edgecolors": ["red", "blue", "green", "yellow", "purple"],  # list
+        "linewidths": pd.Series([1, 2, 3, 4, 5]),  # pandas Series
+        "marker": "o",  # string
+        "label": "data",  # string
+        "cmap": None,  # None
+        "empty_list": [],  # empty list
+        "single_item_list": [42],  # single item list
+    }
+
+
+@pytest.mark.parametrize(
+    ("match_length", "expected_keys", "unexpected_keys"),
+    [
+        (
+            None,  # No length filter
+            ["s", "edgecolors", "linewidths", "empty_list", "single_item_list"],
+            ["alpha", "marker", "label", "cmap"],
+        ),
+        (
+            5,  # Filter to length 5
+            ["s", "edgecolors", "linewidths"],
+            ["empty_list", "single_item_list", "alpha", "marker"],
+        ),
+        (
+            1,  # Filter to length 1
+            ["single_item_list"],
+            ["s", "edgecolors", "linewidths", "empty_list"],
+        ),
+        (
+            0,  # Filter to length 0
+            ["empty_list"],
+            ["s", "edgecolors", "linewidths", "single_item_list"],
+        ),
+    ],
+)
+def test_find_iterable_kwargs_filtering(example_kwargs_with_iterables, match_length, expected_keys, unexpected_keys):
+    """Test find_iterable_kwargs with different length filters."""
+    result = find_iterable_kwargs(example_kwargs_with_iterables, match_length=match_length)
+
+    # Check expected keys are present
+    for key in expected_keys:
+        assert key in result, f"Expected {key} to be in result"
+        # Verify the values match the original
+        original = example_kwargs_with_iterables[key]
+        if isinstance(original, (np.ndarray, pd.Series)):
+            assert np.array_equal(result[key], original)
+        else:
+            assert result[key] == original
+
+    # Check unexpected keys are absent
+    for key in unexpected_keys:
+        assert key not in result, f"Did not expect {key} to be in result"
+
+
+@pytest.mark.parametrize(
+    ("input_kwargs", "expected_result"),
+    [
+        ({}, {}),  # Empty input
+        ({"a": 1, "b": "test", "c": None, "d": 3.14}, {}),  # No iterables
+        ({"text": "hello", "values": [1, 2, 3]}, {"values": [1, 2, 3]}),  # String excluded
+    ],
+)
+def test_find_iterable_kwargs_edge_cases(input_kwargs, expected_result):
+    """Test find_iterable_kwargs with edge cases."""
+    result = find_iterable_kwargs(input_kwargs)
+    assert result == expected_result

@@ -43,7 +43,11 @@
     tl.pca
     tl.bpca
     tl.diff_exp_ebayes
-
+    tl.extract_pca_anndata
+    tl.prepare_pca_1d_loadings_data_to_plot
+    tl.prepare_pca_2d_loadings_data_to_plot
+    tl.prepare_scree_data_to_plot
+    tl.prepare_pca_1d_loadings_data_to_plot
 ```
 
 ## Metrics
@@ -59,6 +63,11 @@
     metrics.principal_component_regression
     metrics.pooled_coefficient_of_variation
     metrics.pooled_median_absolute_deviation
+    metrics.calculate_qc_metrics
+    metrics.fraction_complete
+    metrics.number_detected
+    metrics.total_intensity
+
 ```
 
 ## Plotting
@@ -81,7 +90,7 @@
     pl.create_figure
     pl.label_axes
     pl.save_figure
-
+    pl.get_color_mapping
 ```
 
 ## IO
