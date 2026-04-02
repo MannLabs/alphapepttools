@@ -198,9 +198,7 @@ class TestDataPreparationFunctions:
 
     def test_prepare_pca_2d_loadings_data_to_plot_basic(self, sample_adata):
         """Test prepare_pca_2d_loadings_data_to_plot with basic parameters."""
-        result = prepare_pca_2d_loadings_data_to_plot(
-            sample_adata, loadings_name="PCs_pca_obs", pc_x=1, pc_y=2, nfeatures=10, dim_space="obs"
-        )
+        result = prepare_pca_2d_loadings_data_to_plot(sample_adata, pc_x=1, pc_y=2, nfeatures=10, dim_space="obs")
 
         assert isinstance(result, pd.DataFrame)
         expected_columns = ["dim1_loadings", "dim2_loadings", "feature", "abs_dim1", "abs_dim2", "is_top"]
@@ -211,9 +209,7 @@ class TestDataPreparationFunctions:
 
     def test_prepare_pca_2d_loadings_data_to_plot_var_space(self, sample_adata):
         """Test prepare_pca_2d_loadings_data_to_plot with var space."""
-        result = prepare_pca_2d_loadings_data_to_plot(
-            sample_adata, loadings_name="PCs_pca_var", pc_x=1, pc_y=2, nfeatures=5, dim_space="var"
-        )
+        result = prepare_pca_2d_loadings_data_to_plot(sample_adata, pc_x=1, pc_y=2, nfeatures=5, dim_space="var")
 
         assert isinstance(result, pd.DataFrame)
         # In var space, features should be sample names
@@ -247,7 +243,7 @@ class TestEdgeCases:
         }
 
         # Test loadings with NaN values
-        result = prepare_pca_2d_loadings_data_to_plot(adata, "PCs_pca_obs", 1, 2, 3, "obs")
+        result = prepare_pca_2d_loadings_data_to_plot(adata, pc_x=1, pc_y=2, nfeatures=3, dim_space="obs")
         # Should filter out features with all-NaN loadings
         assert len(result) == 4  # 5 features - 1 with all NaN  # noqa: PLR2004
 
