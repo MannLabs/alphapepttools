@@ -223,8 +223,8 @@ def pca(
         If provided, this will be used as the key under which to store the PCA results in
         `adata.obsm`, `adata.varm`, and `adata.uns` (see Returns).
         If None, the default keys will be used:
-        - For `dim_space='obs'`: `X_pca_obs` for PC coordinates, `PCs_obs` for the feature loadings, `variance_pca_obs` for the variance.
-        - For `dim_space='var'`: `X_pca_var` for PC corrdinates, `PCs_var` for the sample loadings, `variance_pca_var` for the variance.
+        - For `dim_space='obs'`: `X_pca_obs` for PC coordinates, `PCs_pca_obs` for the feature loadings, `variance_pca_obs` for the variance.
+        - For `dim_space='var'`: `X_pca_var` for PC corrdinates, `PCs_pca_var` for the sample loadings, `variance_pca_var` for the variance.
         If provided, the keys will be `embeddings_name` for all three data frames.
     n_comps
         Number of principal components to compute. Defaults to 50, or 1 - minimum
@@ -247,7 +247,7 @@ def pca(
     for `dim_space='obs'` (sample projection):
     `.obsm['X_pca_obs' | embeddings_name]` : :class:`~scipy.sparse.csr_matrix` | :class:`~scipy.sparse.csc_matrix` | :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
         PCA representation of data.
-    `.varm['PCs_obs' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
+    `.varm['PCs_pca_obs' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
         The principal components containing the loadings.
     `.uns['variance_pca_obs' | embeddings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
         Ratio of explained variance.
@@ -258,7 +258,7 @@ def pca(
     for `dim_space='var'` (sample projection):
     `.varm['X_pca_var' | embeddings_name]` : :class:`~scipy.sparse.csr_matrix` | :class:`~scipy.sparse.csc_matrix` | :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
         PCA representation of data.
-    `.obsm['PCs_var' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
+    `.obsm['PCs_pca_var' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
         The principal components containing the loadings.
     `.uns['variance_pca_var' | embeddings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
         Ratio of explained variance.
@@ -304,7 +304,7 @@ def pca(
 
         # The PCA results are now stored in the AnnData object:
         # adata.varm['X_pca_var'] - PCA coordinates for each protein (5 x 2)
-        # adata.obsm['PCs_var'] - Sample loadings (5 x 2)
+        # adata.obsm['PCs_pca_var'] - Sample loadings (5 x 2)
         # adata.uns['variance_pca_var'] - Variance explained by each PC
 
         # To get the PCA embedding of proteins in the reduced space:
@@ -312,7 +312,7 @@ def pca(
         # First 4 proteins have coordinates, P5 has NaN (not used in PCA)
 
         # To project samples into the PC space:
-        sample_loadings = adata.obsm["PCs_var"]
+        sample_loadings = adata.obsm["PCs_pca_var"]
 
         # To see variance explained by each component:
         variance_ratio = adata.uns["variance_pca_var"]["variance_ratio"]
