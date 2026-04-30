@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import alphapepttools as at
+import alphapepttools as apt
 from alphapepttools.pp.data import _handle_overlapping_columns, _to_anndata, coerce_to_dataframe, data_column_to_array
 
 
@@ -58,9 +58,9 @@ def example_feature_metadata():
 @pytest.fixture
 def example_anndata():
     def make_dummy_data():
-        adata = at.pp.data._to_anndata(example_data())
-        at.pp.add_metadata(adata, example_sample_metadata(), axis=0)
-        at.pp.add_metadata(adata, example_feature_metadata(), axis=1)
+        adata = apt.pp.data._to_anndata(example_data())
+        apt.pp.add_metadata(adata, example_sample_metadata(), axis=0)
+        apt.pp.add_metadata(adata, example_feature_metadata(), axis=1)
         return adata
 
     return make_dummy_data()
@@ -290,10 +290,10 @@ def test_add_metadata(
     adata.var = pd.DataFrame({"UniProtID_new": ["P23456", "P34567", "P45678"]}, index=["G1", "G2", "G3"])
 
     # Add metadata to data
-    adata = at.pp.add_metadata(
+    adata = apt.pp.add_metadata(
         adata, sample_metadata, axis=0, keep_data_shape=keep_data_shape, keep_existing_metadata=keep_existing_metadata
     )
-    adata = at.pp.add_metadata(
+    adata = apt.pp.add_metadata(
         adata, feature_metadata, axis=1, keep_data_shape=keep_data_shape, keep_existing_metadata=keep_existing_metadata
     )
 
@@ -350,12 +350,12 @@ def test_add_metadata_nonmatching_sample_metadata(
         adata_before = adata.copy()
         with pytest.raises(ValueError):
             # when
-            adata = at.pp.add_metadata(adata, md, axis=axis)
+            adata = apt.pp.add_metadata(adata, md, axis=axis)
         assert adata.obs.equals(adata_before.obs)
         assert adata.var.equals(adata_before.var)
         assert np.array_equal(adata.X, adata_before.X)
     else:
-        adata = at.pp.add_metadata(adata, md, axis=axis)
+        adata = apt.pp.add_metadata(adata, md, axis=axis)
 
 
 # Test handling of incoming columns that overlap with existing metadata
@@ -446,9 +446,9 @@ def adata_for_filtering():
             },
             index=df.columns,
         )
-        adata = at.pp.data._to_anndata(df)
-        adata = at.pp.add_metadata(adata, sample_md, axis=0)
-        return at.pp.add_metadata(adata, feature_md, axis=1)
+        adata = apt.pp.data._to_anndata(df)
+        adata = apt.pp.add_metadata(adata, sample_md, axis=0)
+        return apt.pp.add_metadata(adata, feature_md, axis=1)
 
     return make_dummy_data()
 
@@ -731,7 +731,7 @@ def adata_for_filtering():
 def test_filter_by_metadata(adata_for_filtering, expected_adata_index, filter_dict, axis, logic, action):
     adata = adata_for_filtering.copy()
     # when
-    adata = at.pp.filter_by_metadata(adata, filter_dict, axis=axis, logic=logic, action=action)
+    adata = apt.pp.filter_by_metadata(adata, filter_dict, axis=axis, logic=logic, action=action)
     # then
     if len(expected_adata_index) == 0:
         assert adata.n_obs == 0 if axis == 0 else adata.n_vars == 0
@@ -765,7 +765,7 @@ class TestScaleAndCenter:
         """Test that alphapepttools.pp.scale_and_center modifies anndata correctly inplace"""
         adata, expected = anndata_scale_and_center
 
-        return_value = at.pp.scale_and_center(adata, scaler=scaler, layer=layer, copy=False)
+        return_value = apt.pp.scale_and_center(adata, scaler=scaler, layer=layer, copy=False)
 
         assert return_value is None  # inplace expected
 
@@ -781,7 +781,7 @@ class TestScaleAndCenter:
         adata, expected = anndata_scale_and_center
         adata_original = adata.copy()
 
-        adata_new = at.pp.scale_and_center(adata, scaler=scaler, layer=layer, copy=True)
+        adata_new = apt.pp.scale_and_center(adata, scaler=scaler, layer=layer, copy=True)
 
         assert isinstance(adata_new, ad.AnnData)
 
@@ -999,7 +999,7 @@ def test_filter_data_completeness(
     adata = data_test_completeness_filter.copy()
 
     # when
-    adata_filtered = at.pp.filter_data_completeness(
+    adata_filtered = apt.pp.filter_data_completeness(
         adata=adata, max_missing=max_missing, group_column=group_column, groups=groups, action=action
     )
 
@@ -1055,8 +1055,8 @@ def test_data_column_to_array(
 ):
     # given
     adata = _to_anndata(example_data)
-    adata = at.pp.add_metadata(adata, example_sample_metadata, axis=0)
-    adata = at.pp.add_metadata(adata, example_feature_metadata, axis=1)
+    adata = apt.pp.add_metadata(adata, example_sample_metadata, axis=0)
+    adata = apt.pp.add_metadata(adata, example_feature_metadata, axis=1)
 
     # when
     array = data_column_to_array(adata, column) if not transpose else data_column_to_array(adata.transpose(), column)
