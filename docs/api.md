@@ -92,6 +92,18 @@
     pl.label_axes
     pl.save_figure
     pl.get_color_mapping
+    pl.layered_plot
+    pl.histogram
+    pl.scatter
+    pl.barplot
+    pl.boxplot
+    pl.violinplot
+    pl.rank_median_plot
+    pl.plot_pca
+    pl.scree_plot
+    pl.plot_pca_loadings
+    pl.plot_pca_loadings_2d
+    pl.volcano
 ```
 
 ## IO
