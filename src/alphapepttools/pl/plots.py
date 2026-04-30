@@ -821,7 +821,51 @@ def _extract_plot_layer_specs(layer_specs: tuple) -> tuple[str, str | int | list
     return layer_column, layer_val, color_key, scatter_kwargs
 
 
-class Plots:
+_REMOVED_PLOTS_METHODS = (
+    "layered_plot",
+    "histogram",
+    "scatter",
+    "barplot",
+    "boxplot",
+    "violinplot",
+    "rank_median_plot",
+    "plot_pca",
+    "scree_plot",
+    "plot_pca_loadings",
+    "plot_pca_loadings_2d",
+    "volcano",
+)
+
+
+class _PlotsRemovedMeta(type):
+    def __getattr__(cls, name: str):
+        if name not in _REMOVED_PLOTS_METHODS:
+            raise AttributeError(f"type object 'Plots' has no attribute {name!r}")
+
+        def _removed(*args, **kwargs) -> None:
+            raise RuntimeError(
+                f"The 'Plots' wrapper class was removed, "
+                f"please update the call from 'Plots.{name}(...)' "
+                f"to 'apt.pl.{name}(...)'."
+            )
+
+        return _removed
+
+
+class Plots(metaclass=_PlotsRemovedMeta):
+    """Removed. Methods are now standalone functions in ``alphapepttools.pl``.
+
+    Migration: replace ``Plots.<name>(...)`` with ``apt.pl.<name>(...)``.
+    """
+
+    def __init__(self, *args, **kwargs):
+        raise RuntimeError(
+            "The 'Plots' wrapper class was removed. Use the standalone "
+            "functions in alphapepttools.pl (e.g. apt.pl.scatter(...)) directly."
+        )
+
+
+class PlotsToBeRemoved:
     """Class for creating figures with matplotlib
 
     Configuration for matplotlib plots is loaded from the defaults module
