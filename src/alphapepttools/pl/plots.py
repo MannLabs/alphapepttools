@@ -399,11 +399,11 @@ def drop_nan_coordinate_points(
 
     Parameters
     ----------
-    x_values : np.ndarray
+    x_values
         X-coordinates for plotting.
-    y_values : np.ndarray
+    y_values
         Y-coordinates for plotting.
-    labels : np.ndarray | list[str]
+    labels
         Labels corresponding to each (x, y) point.
 
     Returns
@@ -444,16 +444,16 @@ def _get_plot_lims(
 
     Parameters
     ----------
-    values : np.ndarray
+    values
         Array of values to calculate limits from.
-    padding_factor : float
+    padding_factor
         Factor to multiply the limits by for padding (e.g., 1.1 for 10% padding).
-    sym : str | None, optional
+    sym
         If "max", creates symmetric limits around 0 using the absolute max value.
         If None, uses min and max of values. By default None.
-    set_left : float | None, optional
+    set_left
         If provided, overrides the calculated left limit with this value. By default None.
-    set_right : float | None, optional
+    set_right
         If provided, overrides the calculated right limit with this value. By default None.
 
     Returns
@@ -871,11 +871,11 @@ class Plots:
 
         Parameters
         ----------
-        ax : plt.Axes
+        ax
             Matplotlib axes object to plot on.
-        base_config : BaseConfig
+        base_config
             Base configuration for the plot layers containing data and plot parameters.
-        layers : list[tuple], optional
+        layers
             List of layer specifications, each a tuple of (layer_column, layer_val, color_key, layer_kwargs).
             - layer_column (str): Column name to filter on for this layer
             - layer_val (str|int|list): Value(s) to match in the layer_column (i.e. this layer will only contain points
@@ -883,28 +883,28 @@ class Plots:
             - color_key (str): Color key in color_dict for this layer
             - layer_kwargs (dict, optional): Additional parameters for this layer
             By default None, which results in a single default layer containing all points.
-        color_dict : dict[str, str | tuple], optional
+        color_dict
             Dictionary mapping color keys to colors. By default None, which results in a single default color.
-        default_layer_column : str, optional
+        default_layer_column
             Column name to use for the default layer. By default "__data".
-        default_layer_val : str, optional
+        default_layer_val
             Value to use for the default layer. By default "__all".
-        default_color_key : str, optional
+        default_color_key
             Color key to use for the default color. By default "__default_color".
-        default_color : str | tuple, optional
+        default_color
             Color to use for the default color. By default BaseColors.get("blue").
-        default_layer_kwargs : dict, optional
+        default_layer_kwargs
             Default scatterplot keyword arguments for the default layer. By default None.
-        lim_padding_factor : float, optional
+        lim_padding_factor
             Factor to pad the x and y limits of the plot. By default 1.1.
-        xlims : tuple[float, float] | None, optional
+        xlims
             x-axis limits for the plot. If None, limits are calculated from the data with padding. By default None.
-        ylims : tuple[float, float] | None, optional
+        ylims
             y-axis limits for the plot. If None, limits are calculated from the data with padding. By default None.
-        plotting_callable : Callable | None, optional
+        plotting_callable
             Custom plotting function to use instead of cls.scatter. Should accept ax, data, and other parameters.
             By default None, which uses cls.scatter.
-        return_glob_layer_indices : bool, optional
+        return_glob_layer_indices
             If True, returns a list of (indices, color, color_key, scatter_kwargs) tuples for each layer.
             Useful for debugging or further processing of layer assignments. By default False.
 
