@@ -511,11 +511,12 @@ def data_column_to_array(
     ----------
     data
         Data to extract the column from.
-    column
-        Column name to extract. If data is of type ad.AnnData, var_names is considered
-        first for the column names. If the column is not found in var_names, the columns
-        of data.obs are considered. If the column is not found in either, a ValueError
-        is raised.
+    column : str
+        Column to extract. If data is of type ad.AnnData, the hierarchy to match fields is
+        - var_names first
+        - obs columns
+        - var columns
+        If the column is not found in either, a ValueError is raised.
 
     Returns
     -------
@@ -562,21 +563,18 @@ def data_column_to_array(
     if isinstance(data, pd.DataFrame):
         if column not in data.columns:
             raise ValueError(f"Column {column} not found in DataFrame.")
+
         return data[column].to_numpy()
 
     if isinstance(data, ad.AnnData):
-        # prioritize var_names, i.e. numeric data from X
         if column in data.var_names:
             col_idx = data.var_names.get_loc(column)
-            logging.info(f"Column '{column}' found in: data.var_names. Using that")
             return data.X[:, col_idx].flatten()
 
         if column in data.obs.columns:
-            logging.info(f"Column '{column}' found in: data.obs.columns. Using that")
             return data.obs[column].to_numpy()
 
         if column in data.var.columns:
-            logging.info(f"Column '{column}' found in: data.var.columns. Using that")
             return data.var[column].to_numpy()
 
         raise ValueError(
@@ -584,6 +582,130 @@ def data_column_to_array(
         )
 
     raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
+
+
+def data_index_to_array(
+    data: pd.DataFrame | ad.AnnData,
+    dim_space: str = "obs",
+) -> np.ndarray:
+    """Get indices from a DataFrame or an AnnData object
+
+    Parameters
+    ----------
+    data : pd.DataFrame | ad.AnnData
+        Data to extract indices from.
+    dim_space : str, optional
+        Dimension space to extract indices from. Either "obs" for observation/row indices
+        or "var" for variable/column indices. By default "obs".
+
+    Returns
+    -------
+    np.ndarray
+        The indices as a numpy array
+
+    Raises
+    ------
+    ValueError
+        If dim_space is not "obs" or "var"
+    TypeError
+        If data is not a DataFrame or AnnData object
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import anndata as ad
+    >>> import numpy as np
+    >>>
+    >>> # DataFrame example
+    >>> df = pd.DataFrame({"A": [1, 2, 3]}, index=["row1", "row2", "row3"])
+    >>> data_index_to_array(df, "obs")
+    array(['row1', 'row2', 'row3'], dtype=object)
+    >>> data_index_to_array(df, "var")
+    array(['A'], dtype=object)
+    >>>
+    >>> # AnnData example
+    >>> adata = ad.AnnData(np.random.rand(3, 2))
+    >>> adata.obs_names = ["cell1", "cell2", "cell3"]
+    >>> adata.var_names = ["gene1", "gene2"]
+    >>> data_index_to_array(adata, "obs")
+    array(['cell1', 'cell2', 'cell3'], dtype=object)
+    >>> data_index_to_array(adata, "var")
+    array(['gene1', 'gene2'], dtype=object)
+    """
+    if dim_space not in ["obs", "var"]:
+        raise ValueError(f"dim_space must be 'obs' or 'var', got '{dim_space}'")
+
+    if isinstance(data, pd.DataFrame):
+        if dim_space == "obs":
+            return data.index.to_numpy()
+        # dim_space == "var"
+        return data.columns.to_numpy()
+
+    if isinstance(data, ad.AnnData):
+        if dim_space == "obs":
+            return data.obs_names.to_numpy()
+        # dim_space == "var"
+        return data.var_names.to_numpy()
+
+    raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
+
+
+def _tolist(
+    obj: str | list,
+) -> list:
+    return obj if isinstance(obj, list) else [obj]
+
+
+def subset_data(
+    data: pd.DataFrame | ad.AnnData,
+    idxs: pd.Index | list[int],
+) -> pd.DataFrame | ad.AnnData:
+    """Subset data based on indices
+
+    filtering data based on provided indices, handle both pd.DataFrame and AnnData objects.
+    The returned object is a copy of the input data with only the specified indices.
+
+    Parameters
+    ----------
+    data : pd.DataFrame | ad.AnnData
+        Data to subset.
+    idxs : pd.Index | list[int]
+        Indices to subset the data.
+
+    Returns
+    -------
+    pd.DataFrame | ad.AnnData
+        Subsetted data.
+
+    """
+    if isinstance(data, pd.DataFrame):
+        return data.iloc[idxs].copy()
+    # AnnData
+    return data[idxs].copy()
+
+
+def coerce_to_dataframe(
+    data: pd.DataFrame | ad.AnnData,
+) -> pd.DataFrame:
+    """Coerce data to a DataFrame
+
+    If data is already a DataFrame, it is returned as is. If data is an AnnData object, the default .to_df() method is used to convert the X matrix to a DataFrame with obs index and var names as columns.
+
+    Parameters
+    ----------
+    data : pd.DataFrame | ad.AnnData
+        Data to coerce.
+
+    Returns
+    -------
+    pd.DataFrame
+        Coerced DataFrame.
+
+    """
+    if isinstance(data, pd.DataFrame):
+        return data
+    # AnnData case: convert X to DataFrame with obs index and var names as columns
+    return pd.concat([data.to_df(), data.obs], axis=1)
 
 
 def data_columns_to_df(

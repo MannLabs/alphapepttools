@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 from anndata import AnnData
 
-import alphapepttools as at
+import alphapepttools as apt
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def toy_adata_with_mask(toy_adata):
 
 def test_pca__default(toy_adata):
     """Test the pca function with default parameters (obs space)."""
-    at.tl.pca(toy_adata)
+    apt.tl.pca(toy_adata)
 
     # Check default storage locations for obs space PCA
     assert "X_pca_obs" in toy_adata.obsm
@@ -54,7 +54,7 @@ def test_pca__default(toy_adata):
 
 def test_pca__copy(toy_adata) -> None:
     """Test the pca function correctly handles copy behaviour."""
-    new_adata = at.tl.pca(toy_adata, n_comps=5, copy=True)
+    new_adata = apt.tl.pca(toy_adata, n_comps=5, copy=True)
 
     # Check that original data was not modified
     assert "X_pca_obs" not in toy_adata.obsm
@@ -77,7 +77,7 @@ def test_pca__copy(toy_adata) -> None:
 
 def test_pca__var_space(toy_adata):
     """Test the pca function in var space (PCA on genes)."""
-    at.tl.pca(toy_adata, dim_space="var")
+    apt.tl.pca(toy_adata, dim_space="var")
 
     # Check storage locations for var space PCA
     assert "X_pca_var" in toy_adata.varm
@@ -91,7 +91,7 @@ def test_pca__var_space(toy_adata):
 
 def test_pca__with_layer(toy_adata_with_layers):
     """Test the pca function using a specific layer."""
-    at.tl.pca(toy_adata_with_layers, layer="norm")
+    apt.tl.pca(toy_adata_with_layers, layer="norm")
 
     # Check that PCA results exist
     assert "X_pca_obs" in toy_adata_with_layers.obsm
@@ -102,7 +102,7 @@ def test_pca__with_layer(toy_adata_with_layers):
 def test_pca__with_custom_embeddings_name(toy_adata):
     """Test the pca function with custom embeddings name."""
     custom_name = "my_custom_pca"
-    at.tl.pca(toy_adata, embeddings_name=custom_name)
+    apt.tl.pca(toy_adata, embeddings_name=custom_name)
 
     # Check custom naming
     assert custom_name in toy_adata.obsm, f"Custom PCA coordinates not found with name {custom_name}"
@@ -112,7 +112,7 @@ def test_pca__with_custom_embeddings_name(toy_adata):
 
 def test_pca__with_mask(toy_adata_with_mask):
     """Test the pca function with feature mask."""
-    at.tl.pca(toy_adata_with_mask, meta_data_mask_column_name="feature_mask")
+    apt.tl.pca(toy_adata_with_mask, meta_data_mask_column_name="feature_mask")
 
     # Check that PCA results exist
     assert "X_pca_obs" in toy_adata_with_mask.obsm
@@ -131,7 +131,7 @@ def test_pca__with_mask(toy_adata_with_mask):
 
 def test_pca__var_space_with_mask(toy_adata_with_mask):
     """Test the pca function in var space with feature mask."""
-    at.tl.pca(toy_adata_with_mask, dim_space="var", meta_data_mask_column_name="feature_mask")
+    apt.tl.pca(toy_adata_with_mask, dim_space="var", meta_data_mask_column_name="feature_mask")
 
     # Check that PCA results exist in correct locations
     assert "X_pca_var" in toy_adata_with_mask.varm
@@ -152,7 +152,7 @@ def test_pca__var_space_with_mask(toy_adata_with_mask):
 def test_pca__legacy(toy_adata):
     """Test the run_pca function on a toy dataset (legacy test)."""
     toy_adata.layers["norm"] = toy_adata.X.copy()
-    at.tl.pca(toy_adata, layer="norm")
+    apt.tl.pca(toy_adata, layer="norm")
 
     # Assertions for Expected Outputs (checking default obs space)
     assert "X_pca_obs" in toy_adata.obsm, "PCA results not found in obsm"
@@ -192,7 +192,7 @@ def toy_adata_with_missing_values() -> dict[str, Any]:
 
 def test_bpca__default(toy_adata):
     """Test the bpca function with default parameters (obs space)."""
-    at.tl.bpca(toy_adata, n_comps=5)
+    apt.tl.bpca(toy_adata, n_comps=5)
 
     assert "X_bpca_obs" in toy_adata.obsm
     assert "PCs_bpca_obs" in toy_adata.varm
@@ -207,7 +207,7 @@ def test_bpca__default(toy_adata):
 
 def test_bpca__copy(toy_adata) -> None:
     """Test the bpca function correctly handles copy behaviour."""
-    new_adata = at.tl.bpca(toy_adata, n_comps=5, copy=True)
+    new_adata = apt.tl.bpca(toy_adata, n_comps=5, copy=True)
 
     # Make sure that original adata was not modified
     assert "X_bpca_obs" not in toy_adata.obsm
@@ -227,7 +227,7 @@ def test_bpca__copy(toy_adata) -> None:
 
 def test_bpca__var_space(toy_adata):
     """Test the bpca function in var space (BPCA on genes)."""
-    at.tl.bpca(toy_adata, dim_space="var", n_comps=5)
+    apt.tl.bpca(toy_adata, dim_space="var", n_comps=5)
 
     assert "PCs_bpca_var" in toy_adata.obsm
     assert "X_bpca_var" in toy_adata.varm
@@ -239,7 +239,7 @@ def test_bpca__var_space(toy_adata):
 
 def test_bpca__with_layer(toy_adata_with_layers):
     """Test the bpca function using a specific layer."""
-    at.tl.bpca(toy_adata_with_layers, layer="norm", n_comps=5)
+    apt.tl.bpca(toy_adata_with_layers, layer="norm", n_comps=5)
 
     assert "PCs_bpca_obs" in toy_adata_with_layers.varm
     assert "X_bpca_obs" in toy_adata_with_layers.obsm
@@ -251,7 +251,7 @@ def test_bpca__with_layer(toy_adata_with_layers):
 
 def test_bpca__with_mask(toy_adata_with_mask):
     """Test the bpca function with feature mask."""
-    at.tl.bpca(toy_adata_with_mask, meta_data_mask_column_name="feature_mask", n_comps=5)
+    apt.tl.bpca(toy_adata_with_mask, meta_data_mask_column_name="feature_mask", n_comps=5)
 
     assert "X_bpca_obs" in toy_adata_with_mask.obsm
     assert "PCs_bpca_obs" in toy_adata_with_mask.varm
@@ -269,7 +269,7 @@ def test_bpca__with_mask(toy_adata_with_mask):
 
 def test_bpca__var_space_with_mask(toy_adata_with_mask):
     """Test the bpca function in var space with feature mask."""
-    at.tl.bpca(toy_adata_with_mask, dim_space="var", meta_data_mask_column_name="feature_mask", n_comps=5)
+    apt.tl.bpca(toy_adata_with_mask, dim_space="var", meta_data_mask_column_name="feature_mask", n_comps=5)
 
     # Assert - Check that BPCA results exist in correct locations
     assert "PCs_bpca_var" in toy_adata_with_mask.obsm
@@ -293,7 +293,7 @@ def test_bpca__with_missing_values(toy_adata_with_missing_values):
     n_var = toy_adata_with_missing_values["n_var"]
     n_latent = toy_adata_with_missing_values["n_latent"]
 
-    at.tl.bpca(adata, n_comps=n_latent)
+    apt.tl.bpca(adata, n_comps=n_latent)
 
     # Assert - Check that BPCA results exist in correct locations
     assert "X_bpca_obs" in adata.obsm
@@ -314,7 +314,7 @@ def test_bpca__with_missing_values_var_space(toy_adata_with_missing_values):
     adata = toy_adata_with_missing_values["adata"]
     n_latent = toy_adata_with_missing_values["n_latent"]
 
-    at.tl.bpca(adata, dim_space="var", n_comps=n_latent)
+    apt.tl.bpca(adata, dim_space="var", n_comps=n_latent)
 
     # Assert - Check that BPCA results exist in correct locations
     assert "PCs_bpca_var" in adata.obsm
@@ -332,7 +332,7 @@ def test_bpca__returns_variance_ratio(toy_adata_with_missing_values, dim_space):
     adata = toy_adata_with_missing_values["adata"]
     n_latent = toy_adata_with_missing_values["n_latent"]
 
-    at.tl.bpca(adata, dim_space=dim_space, n_comps=n_latent)
+    apt.tl.bpca(adata, dim_space=dim_space, n_comps=n_latent)
 
     variance_ratio = adata.uns[f"variance_bpca_{dim_space}"]["variance_ratio"]
     assert len(variance_ratio) == n_latent, f"Should have {n_latent} variance ratio values"
@@ -345,7 +345,7 @@ def test_bpca__components_ordered_by_variance(toy_adata_with_missing_values, dim
     adata = toy_adata_with_missing_values["adata"]
     n_latent = toy_adata_with_missing_values["n_latent"]
 
-    at.tl.bpca(adata, dim_space=dim_space, n_comps=n_latent)
+    apt.tl.bpca(adata, dim_space=dim_space, n_comps=n_latent)
 
     variance_ratio = adata.uns[f"variance_bpca_{dim_space}"]["variance_ratio"]
     # Check that absolute variance ratios are in descending order

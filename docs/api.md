@@ -84,6 +84,8 @@
     pl.BaseColormaps
     pl.BaseColors
     pl.BasePalettes
+    pl.PlotConfig
+    pl.make_scatter_config
     pl.add_legend_to_axes
     pl.add_legend_to_axes_from_patches
     pl.create_figure
