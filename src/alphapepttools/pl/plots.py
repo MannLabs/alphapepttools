@@ -2676,7 +2676,7 @@ class Plots:
             - filter value(s) in the column (single value or list of values)
             - color_key in the color_dict
 
-            For example, layers = [("gene_type", ["housekeeping", "essential"], "hk_color")] uses the column "gene_type", filters for values "housekeeping" and "essential", and colors with the "hk_color" from the color_dict. A scatter_kwargs dict can be added at the fourth position in each tuple to specify custom styling for that layer (e.g., {"s": 50, "alpha": 0.7}). All points not included in any layer are assigned to the default layer.
+            For example, layers = [("gene_type", ["housekeeping", "essential"], "hk_color")] uses the column "gene_type", filters for values "housekeeping" and "essential", and colors with the "hk_color" from the color_dict. A scatter_kwargs dict can be added to each tuple for custom layer styling (e.g., {"s": 50, "alpha": 0.7}). All points not included in any layer are assigned to the default layer.
 
         color_dict
             Maps color keys from layers to actual colors. Example:
