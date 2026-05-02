@@ -1,5 +1,6 @@
 import contextlib
 import logging
+from collections.abc import Iterable
 
 import anndata as ad
 import matplotlib.pyplot as plt
@@ -243,3 +244,31 @@ def validate_ttest_inputs(
         )
 
     return g1, g2
+
+
+def find_iterable_kwargs(
+    kwargs_dict: dict,
+    match_length: int | None = None,
+) -> dict:
+    """Find kwargs whose values are array-like (not strings/bytes/dicts).
+
+    Parameters
+    ----------
+    kwargs_dict
+        A dictionary of keyword arguments to check.
+
+    Returns
+    -------
+        A dictionary containing only those key-value pairs from kwargs_dict where the value is an iterable and, if match_length is specified, has the specified length.
+
+    """
+    if not isinstance(kwargs_dict, dict):
+        raise TypeError(f"Input must be a dictionary of keyword arguments, got {type(kwargs_dict).__name__}.")
+
+    return {
+        k: v
+        for k, v in kwargs_dict.items()
+        if isinstance(v, Iterable)
+        and not isinstance(v, (str, bytes, dict))
+        and (match_length is None or len(v) == match_length)
+    }
