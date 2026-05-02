@@ -2670,16 +2670,14 @@ class Plots:
         ax
             Axes to plot on. If None, creates new figure
         layers
-            List of layer specifications for hierarchical plotting. Each tuple contains
-            - column
-            - match value(s) in the column
+            List of tuples where each tuple specifies a plotting layer. Each tuple contains
+
+            - column name to filter on
+            - filter value(s) in the column (single value or list of values)
             - color_key in the color_dict
-            - scatter_kwargs (optional) for additional styling
-            Layers are ordered according to the list, with the first entry being on top, the second below it, and so on. In the example below, housekeeping genes will be plotted on top of significant genes, which will be plotted on top of the default layer. Example:
-            layers = [
-                ("gene_type", "housekeeping", "hk_color"), # use column "gene_type", filter for value "housekeeping", and color with the "hk_color" entry in the color_dict
-                ("significance", "significant", "sig_color", {"s": 100}) # use column "significance", filter for value "significant", color with "sig_color" in color_dict, and set size to 100 for these points.
-            ]
+
+            For example, layers = [("gene_type", ["housekeeping", "essential"], "hk_color")] uses the column "gene_type", filters for values "housekeeping" and "essential", and colors with the "hk_color" from the color_dict. A scatter_kwargs dict can be added at the fourth position in each tuple to specify custom styling for that layer (e.g., {"s": 50, "alpha": 0.7}). All points not included in any layer are assigned to the default layer.
+
         color_dict
             Maps color keys from layers to actual colors. Example:
             {"hk_color": "blue", "sig_color": "red"}
