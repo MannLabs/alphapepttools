@@ -29,7 +29,42 @@ config = defaults.plot_settings.to_dict()
 
 
 def show_rgba_color_list(colors: list) -> None:
-    """Show a list of RGBA colors for quick inspection"""
+    """Display a horizontal bar of RGBA colors for visual inspection
+
+    Creates a matplotlib figure showing the provided colors as a horizontal bar,
+    useful for quickly visualizing color palettes or verifying color schemes.
+    The figure width is automatically adjusted based on the number of colors
+    (up to a maximum of 10 units).
+
+    Parameters
+    ----------
+    colors : list
+        List of RGBA color tuples, where each tuple contains (red, green, blue, alpha)
+        values in the range [0, 1].
+
+    Returns
+    -------
+    None
+
+    Examples
+    --------
+    Visualize a custom color palette:
+
+    .. code-block:: python
+
+        colors = [(1.0, 0.0, 0.0, 1.0), (0.0, 1.0, 0.0, 1.0), (0.0, 0.0, 1.0, 1.0)]
+        show_rgba_color_list(colors)
+
+    Inspect colors from a colormap:
+
+    .. code-block:: python
+
+        from alphapepttools.pl.colors import BaseColormaps
+
+        cmap_colors = BaseColormaps.get("sequential", n=5)
+        show_rgba_color_list(cmap_colors)
+
+    """
     fig, ax = plt.subplots(figsize=(np.min([len(colors), 10]), 1))
     ax.imshow([colors], aspect="auto")
     ax.axis("off")
@@ -40,7 +75,44 @@ def _lighten_color(
     color: tuple,
     factor: float = 0.5,
 ) -> tuple:
-    """Lighten a color by a factor"""
+    """Adjust the lightness of a color by a given factor
+
+    Converts the color to HLS (Hue, Lightness, Saturation) space, adjusts the
+    lightness component, and converts back to RGB(A). Positive factors lighten
+    the color, negative factors darken it. The alpha channel is preserved if present.
+
+    Parameters
+    ----------
+    color : tuple
+        RGB or RGBA color tuple with values in the range [0, 1].
+    factor : float, default=0.5
+        Lightness adjustment factor. Positive values lighten the color by moving
+        toward white, negative values darken by moving toward black. The adjustment
+        is applied to the interval between the current lightness and the target
+        (1 for positive, 0 for negative).
+
+    Returns
+    -------
+    tuple
+        Adjusted RGB or RGBA color tuple with values in the range [0, 1].
+
+    Examples
+    --------
+    Lighten a red color:
+
+    .. code-block:: python
+
+        red = (1.0, 0.0, 0.0, 1.0)
+        light_red = _lighten_color(red, factor=0.3)
+
+    Darken a blue color:
+
+    .. code-block:: python
+
+        blue = (0.0, 0.0, 1.0)
+        dark_blue = _lighten_color(blue, factor=-0.5)
+
+    """
     if len(color) == 4:  # noqa: PLR2004
         # dealing with RGBA
         alpha = color[-1]
@@ -69,7 +141,49 @@ def clip_colormap(
     highpoint: float = 1.0,
     n: int = 256,
 ) -> mcolors.LinearSegmentedColormap:
-    """Return a truncated version of a colormap."""
+    """Create a truncated version of a colormap by clipping to a specified range
+
+    Extracts a subset of colors from an existing colormap between the specified
+    low and high points, creating a new LinearSegmentedColormap. This is useful
+    for avoiding extreme colors (e.g., very dark or very light regions) that may
+    have poor visibility or contrast.
+
+    Parameters
+    ----------
+    cmap : mpl.colors.Colormap
+        The source colormap to be truncated.
+    lowpoint : float, default=0.0
+        Lower bound of the colormap range to extract, in the range [0, 1].
+    highpoint : float, default=1.0
+        Upper bound of the colormap range to extract, in the range [0, 1].
+    n : int, default=256
+        Number of discrete color levels in the resulting colormap.
+
+    Returns
+    -------
+    mcolors.LinearSegmentedColormap
+        New colormap containing only colors between lowpoint and highpoint.
+
+    Examples
+    --------
+    Clip the devon colormap to avoid very dark colors:
+
+    .. code-block:: python
+
+        import cmcrameri.cm as cmc
+
+        clipped = clip_colormap(cmc.devon, lowpoint=0, highpoint=0.8)
+
+    Create a symmetric diverging colormap from the middle range:
+
+    .. code-block:: python
+
+        import matplotlib.pyplot as plt
+
+        viridis = plt.get_cmap("viridis")
+        mid_range = clip_colormap(viridis, lowpoint=0.2, highpoint=0.8)
+
+    """
     new_colors = cmap(np.linspace(lowpoint, highpoint, n))
     return mcolors.LinearSegmentedColormap.from_list(f"{cmap.name}_trunc", new_colors)
 
@@ -78,7 +192,41 @@ def _cycle_palette(
     palette: list,
     n: int,
 ) -> list:
-    """Cycle through a palette to get n colors. If n > len(palette), repeat the palette"""
+    """Extend a color palette to n colors by cycling through the palette
+
+    If the requested number of colors exceeds the palette length, the palette
+    is repeated as many times as necessary. This ensures that all requested
+    colors are assigned, though colors may be reused when n > len(palette).
+
+    Parameters
+    ----------
+    palette : list
+        List of colors (as RGBA tuples, hex strings, or color names).
+    n : int
+        Number of colors to return.
+
+    Returns
+    -------
+    list
+        List of n colors, cycling through the original palette if necessary.
+
+    Examples
+    --------
+    Extend a 3-color palette to 5 colors:
+
+    .. code-block:: python
+
+        palette = ["red", "green", "blue"]
+        extended = _cycle_palette(palette, n=5)  # ["red", "green", "blue", "red", "green"]
+
+    Request fewer colors than available:
+
+    .. code-block:: python
+
+        palette = ["red", "green", "blue", "yellow"]
+        subset = _cycle_palette(palette, n=2)  # ["red", "green"]
+
+    """
     if n > len(palette):
         palette = palette * (n // len(palette) + 1)
     return palette[:n]
@@ -88,28 +236,55 @@ def _get_colors_from_cmap(
     cmap_name: str | mpl.colors.Colormap,
     values: int | np.ndarray,
 ) -> list | np.ndarray:
-    """Retrieve colors from a colormap
+    """Retrieve colors from a colormap for discrete or continuous data
+
+    This function supports two modes of operation: (1) extracting a fixed number
+    of evenly-spaced colors for categorical data, or (2) mapping continuous numeric
+    values to colors by normalizing the data range to the colormap range.
 
     Parameters
     ----------
     cmap_name : str | mpl.colors.Colormap
-        Name of the colormap or a Colormap instance. If a string, tries to retrieve the corresponding colormap from matplotlib.
+        Name of the colormap or a Colormap instance. If a string, tries to retrieve
+        the corresponding colormap from matplotlib.
     values : int | np.ndarray
-        If int, retrieve that many evenly spaced colors from the colormap as a list of RGBA tuples.
-        If np.ndarray, normalize the values to the range of the colormap and retrieve the corresponding colors in whatever shape the input array was. In
-        the case of 2D input arrays, the output will be a mxnx4 array of RGBA tuples.
+        If int, retrieve that many evenly spaced colors from the colormap as a list
+        of RGBA tuples. If np.ndarray, normalize the values to the range of the
+        colormap and retrieve the corresponding colors in whatever shape the input
+        array was. In the case of 2D input arrays, the output will be a mxnx4 array
+        of RGBA tuples.
 
     Returns
     -------
     list[tuple[float, float, float, float]] | np.ndarray
-        List of RGBA tuples if values is int, or an array of RGBA tuples with the same shape as values if values is np.ndarray.
+        List of RGBA tuples if values is int, or an array of RGBA tuples with the
+        same shape as values if values is np.ndarray.
 
     Examples
     --------
-    >>> _get_colors_from_cmap("Spectral", np.ones((2, 2))).shape
-    (2, 2, 4)
-    >>> _get_colors_from_cmap("Spectral", 1)
-    [(0.6196078431372549, 0.00392156862745098, 0.25882352941176473, 1.0)]
+    Extract 5 evenly spaced colors from a colormap:
+
+    .. code-block:: python
+
+        colors = _get_colors_from_cmap("viridis", 5)
+        # Returns list of 5 RGBA tuples
+
+    Map continuous data to colors preserving array shape:
+
+    .. code-block:: python
+
+        import numpy as np
+
+        data = np.random.rand(3, 4)
+        colors = _get_colors_from_cmap("Spectral", data)
+        # Returns (3, 4, 4) array where last dimension is RGBA
+
+    Single color from a colormap:
+
+    .. code-block:: python
+
+        color = _get_colors_from_cmap("Spectral", 1)
+        # [(0.619..., 0.003..., 0.258..., 1.0)]
 
     """
     cmap = plt.get_cmap(cmap_name)
@@ -126,13 +301,28 @@ def _get_colors_from_cmap(
 
 
 def _base_qualitative_colorscale() -> list:
-    """Base colorscale selected from matplotlib's 'Spectral' colorscale
+    """Generate base qualitative colorscale with maximum color separability
 
-    This colorscale aims for maximum separability when sequentially assigned to data:
-    Start with four basic colors: red, green, blue, orange. If the colorscale is
-    extended beyond 4 colors, bright yellow is introduced for maximum contrast.
-    Beyond that, lightened versions of the 4 basic colors are used for a maximum of
-    9 colors.
+    This colorscale is derived from matplotlib's 'Spectral' colormap and aims for
+    maximum separability when sequentially assigned to categorical data. The palette
+    starts with four basic colors: red, green, blue, orange. If extended beyond 4
+    colors, bright yellow is introduced for maximum contrast. Beyond that, lightened
+    versions of the 4 basic colors are used for a maximum of 9 distinct colors.
+
+    Returns
+    -------
+    list
+        List of 9 RGBA tuples optimized for categorical data visualization.
+
+    Examples
+    --------
+    Retrieve the base qualitative colorscale:
+
+    .. code-block:: python
+
+        colors = _base_qualitative_colorscale()
+        # Returns 9 carefully selected RGBA colors
+        show_rgba_color_list(colors)
 
     """
     colors = _get_colors_from_cmap("Spectral", 12)
@@ -154,9 +344,27 @@ def _base_qualitative_colorscale() -> list:
 
 
 def _perceptually_uniform_qualitative_colorscale() -> list:
-    """Base colorscale selected from a perceptually uniform colormap
+    """Generate perceptually uniform qualitative colorscale for categorical data
 
-    Sample along the lipari colorscale from cmcrameri to get 10 distinct colors
+    This colorscale is sampled from the cmcrameri batlow colormap. Since this colormap
+    is meant for qualitative data where differentiating different levels is paramount,
+    the colors are interlaced and lightness-adjusted to maximize perceptual distance
+    between sequential colors when assigned to categorical data.
+
+    Returns
+    -------
+    list
+        List of 9 RGBA tuples with perceptually uniform color distribution.
+
+    Examples
+    --------
+    Retrieve the perceptually uniform qualitative colorscale:
+
+    .. code-block:: python
+
+        colors = _perceptually_uniform_qualitative_colorscale()
+        # Returns 9 perceptually uniform RGBA colors
+        show_rgba_color_list(colors)
 
     """
     colors = _get_colors_from_cmap(cmc.batlow, 9)
@@ -177,7 +385,7 @@ def _perceptually_uniform_qualitative_colorscale() -> list:
 
 
 def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.colors.Colormap) -> dict:
-    """Map categorical values to colors.
+    """Map categorical values to colors
 
     Maps unique values in `values` to colors from `palette`. If `palette` is a list of colors,
     colors are assigned in a cycling manner, which can lead to non-unique assignments if there
@@ -197,6 +405,28 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
     -------
     dict
         Dictionary mapping values to colors
+
+    Examples
+    --------
+    Map categorical levels to a color palette:
+
+    .. code-block:: python
+
+        import numpy as np
+
+        levels = np.array(["A", "B", "C", "A", "B"])
+        palette = ["red", "green", "blue"]
+        color_dict = get_color_mapping(levels, palette)
+
+    Map using a matplotlib colormap:
+
+    .. code-block:: python
+
+        import matplotlib.pyplot as plt
+
+        levels = np.array(["low", "medium", "high"])
+        cmap = plt.get_cmap("viridis")
+        color_dict = get_color_mapping(levels, cmap)
 
     """
     values = pd.unique(values.astype(str))
@@ -230,7 +460,27 @@ def get_color_mapping(values: np.ndarray, palette: list[str | tuple] | mpl.color
 
 
 def _base_binary_colorscale() -> list:
-    """Base colorscale for binary data"""
+    """Generate base colorscale for binary data with high contrast
+
+    Selects two colors from complementary cmcrameri colormaps (batlow and devon)
+    to maximize contrast and aesthetics for binary data visualization.
+
+    Returns
+    -------
+    list
+        List of 2 RGBA tuples optimized for binary data visualization.
+
+    Examples
+    --------
+    Retrieve the binary colorscale:
+
+    .. code-block:: python
+
+        colors = _base_binary_colorscale()
+        # Returns 2 high-contrast RGBA colors
+        show_rgba_color_list(colors)
+
+    """
     colors_left = _get_colors_from_cmap("cmc.batlow", 10)
     colors_right = _get_colors_from_cmap("cmc.devon", 10)
 
@@ -239,7 +489,13 @@ def _base_binary_colorscale() -> list:
 
 
 class BaseColors:
-    """Base colors for alphapepttools plots"""
+    """Default color palette for alphapepttools plots
+
+    Provides access to a curated set of default colors optimized for data
+    visualization. Colors are derived from the base qualitative colorscale
+    with additional utility colors (grey, black, white).
+
+    """
 
     _colorscale = _base_qualitative_colorscale()
     default_colors: ClassVar[dict] = {
@@ -264,7 +520,59 @@ class BaseColors:
         lighten: float | None = None,
         alpha: float | None = None,
     ) -> tuple:
-        """Get a default color by name, optionally lightened and/or with alpha"""
+        """Retrieve a color by name with optional lightness and alpha adjustments
+
+        Retrieves colors from the default color palette, matplotlib named colors,
+        or passes through RGBA tuples. Optionally adjusts lightness and alpha
+        transparency.
+
+        Parameters
+        ----------
+        color_name : str | tuple
+            Name of color from default_colors, matplotlib color name, or RGBA tuple.
+        lighten : float, optional
+            Lightness adjustment factor. Positive values lighten, negative darken.
+        alpha : float, optional
+            Alpha transparency value in range [0, 1].
+
+        Returns
+        -------
+        tuple
+            RGBA color tuple with values in range [0, 1].
+
+        Examples
+        --------
+        Get a default color:
+
+        .. code-block:: python
+
+            from alphapepttools.pl.colors import BaseColors
+
+            red_color = BaseColors.get("red")
+            # Returns RGBA tuple for red
+
+        Get a lightened color:
+
+        .. code-block:: python
+
+            light_blue = BaseColors.get("blue", lighten=0.3)
+            # Returns lightened version of blue
+
+        Get a color with custom alpha:
+
+        .. code-block:: python
+
+            transparent_red = BaseColors.get("red", alpha=0.5)
+            # Returns red with 50% transparency
+
+        Use matplotlib color names:
+
+        .. code-block:: python
+
+            color = BaseColors.get("coral")
+            # Retrieves matplotlib's coral color
+
+        """
         # First, avoid trying to map RGBA tuples to colors
         if isinstance(color_name, tuple):
             color = color_name
@@ -289,7 +597,21 @@ class BaseColors:
 
 
 class BasePalettes:
-    """Base color palettes for alphapepttools plots"""
+    """Discrete color palettes for alphapepttools plots
+
+    Provides access to curated discrete color palettes optimized for categorical
+    data visualization. Palettes can be retrieved by name and will cycle to
+    provide the requested number of colors.
+
+    Attributes
+    ----------
+    default_palettes : dict
+        Dictionary of available palettes:
+        'qualitative_spectral' - Spectral-based palette with maximum separability
+        'qualitative' - Perceptually uniform palette from cmcrameri
+        'binary' - Two-color palette for binary data
+
+    """
 
     default_palettes: ClassVar[dict] = {
         "qualitative_spectral": _base_qualitative_colorscale(),
@@ -303,7 +625,50 @@ class BasePalettes:
         palette_name: str,
         n: int = 9,
     ) -> list:
-        """Get a default color palette by name"""
+        """Retrieve a color palette by name with specified number of colors
+
+        Retrieves palettes from the default palette collection or matplotlib
+        colormaps. Automatically cycles the palette to provide the requested
+        number of colors.
+
+        Parameters
+        ----------
+        palette_name : str
+            Name of palette from default_palettes or matplotlib colormap name.
+        n : int, default=9
+            Number of colors to return. Palette will cycle if n exceeds palette length.
+
+        Returns
+        -------
+        list
+            List of n RGBA color tuples.
+
+        Examples
+        --------
+        Get a default palette:
+
+        .. code-block:: python
+
+            from alphapepttools.pl.colors import BasePalettes
+
+            colors = BasePalettes.get("qualitative", n=5)
+            # Returns 5 colors from the qualitative palette
+
+        Get a palette from matplotlib:
+
+        .. code-block:: python
+
+            colors = BasePalettes.get("viridis", n=10)
+            # Retrieves 10 colors from the viridis colormap
+
+        Get binary colors for two groups:
+
+        .. code-block:: python
+
+            colors = BasePalettes.get("binary", n=2)
+            # Returns 2 high-contrast colors
+
+        """
         palette = None
         if palette_name in cls.default_palettes:
             palette = cls.default_palettes[palette_name]
@@ -318,7 +683,14 @@ class BasePalettes:
 
 # TODO: Fix so a defined number of colors can be retrieved with .get, as well as the whole colormap
 class BaseColormaps:
-    """Base colormaps for alphapepttools plots"""
+    """Continuous colormaps for alphapepttools plots
+
+    Provides access to perceptually uniform colormaps optimized for continuous
+    data visualization. Uses cmcrameri colormaps to avoid visual distortion
+    (Crameri, F. (2018a), Scientific colour maps. Zenodo.
+    http://doi.org/10.5281/zenodo.1243862).
+
+    """
 
     # Use perceptually uniform color palettes to avoid visual distortion (Crameri, F. (2018a), Scientific colour maps. Zenodo. http://doi.org/10.5281/zenodo.1243862)
     default_colormaps: ClassVar[dict] = {
@@ -337,23 +709,57 @@ class BaseColormaps:
         colormap_name: str,
         n: int | None = None,
     ) -> Colormap | list:
-        """Get a default matplotlib.pyplot cmap by name
+        """Retrieve a colormap by name or sample discrete colors from it
 
-        Optionally, specify the number of colors to be retrieved from the colormap. defaults
-        are set for colormap_name = "sequential" and "diverging". Otherwise, colormap_name is
-        passed to plt.get_cmap().
+        Retrieves colormaps from the default colormap collection or matplotlib.
+        Can return either the full continuous colormap or a discrete set of
+        n evenly-spaced colors sampled from it.
 
         Parameters
         ----------
         colormap_name : str
-            Name of the colormap to be used
+            Name of colormap from default_colormaps or matplotlib colormap name.
         n : int, optional
-            Number of colors to be retrieved from the colormap. If None, the full colormap is returned.
+            Number of discrete colors to sample from the colormap. If None, returns
+            the full continuous colormap object.
 
         Returns
         -------
         Colormap | list
-            Matplotlib Colormap object or list of colors
+            If n is None, returns matplotlib Colormap object. If n is specified,
+            returns list of n RGBA color tuples sampled evenly from the colormap.
+
+        Examples
+        --------
+        Get a full colormap for continuous data:
+
+        .. code-block:: python
+
+            from alphapepttools.pl.colors import BaseColormaps
+
+            cmap = BaseColormaps.get("sequential")
+            # Returns continuous colormap object for use with imshow, contourf, etc.
+
+        Sample discrete colors from a colormap:
+
+        .. code-block:: python
+
+            colors = BaseColormaps.get("sequential", n=5)
+            # Returns 5 evenly-spaced RGBA colors from sequential colormap
+
+        Use a diverging colormap:
+
+        .. code-block:: python
+
+            cmap = BaseColormaps.get("diverging")
+            # Returns diverging colormap centered at midpoint
+
+        Get clipped colormap to avoid extreme colors:
+
+        .. code-block:: python
+
+            cmap = BaseColormaps.get("sequential_clipped")
+            # Returns sequential colormap with darkest 20% removed
 
         """
         colormap = None
@@ -373,7 +779,7 @@ class BaseColormaps:
 
 
 class MappedColormaps:
-    """Mapped colorscales to numerical values in data
+    """Percentile-based colormap normalization for outlier-robust visualization
 
     Mapping a continuous colorscale to data can suffer from compression due to outliers.
     For example, if 90 % of values lie between 0 and 1 but 10 % of values are between 1 and 100,
@@ -391,20 +797,6 @@ class MappedColormaps:
         Percentile range to be used for normalization. If None, the full range of data is used.
         For example, (5, 95) will map colors between the 5th and 95th percentile.
 
-    Attributes
-    ----------
-    cmap : Colormap
-        Matplotlib Colormap object to be used for mapping data to colors
-    vmin : float
-        Minimum value of the data used for normalization
-    vmax : float
-        Maximum value of the data used for normalization
-    color_normalizer : mpl.colors.Normalize
-        Normalization instance used to map data to colors based on vmin and vmax
-    scalar_mappable : mpl.cm.ScalarMappable
-        MappedColormaps(color_map, percentile).scalar_mappable is a mpl.cm.ScalarMappable instance of the current
-        colormap and normalized data values which can be used in colorbars.
-
     """
 
     def __init__(
@@ -412,6 +804,22 @@ class MappedColormaps:
         cmap: str,
         percentile: tuple[float, float] | None = None,
     ):
+        """Initialize MappedColormaps with a colormap and optional percentile range for normalization
+
+        Parameters
+        ----------
+        cmap : str
+            Name of the colormap to be used for mapping data to colors. Can be a name from BaseColormaps or any matplotlib colormap name.
+        percentile : tuple[float, float], optional
+            Percentile range to be used for normalization. If None, the full range of data is used. For example, (5, 95) will map colors between the 5th and 95th percentile of the data.
+
+        Returns
+        -------
+        None
+
+        Example
+
+        """
         self.cmap = BaseColormaps.get(cmap)
         self.percentile = percentile
         self.vmin = None
@@ -425,10 +833,57 @@ class MappedColormaps:
     ) -> np.ndarray:
         """Normalize data and transform it to colors
 
+        Fits the colormap normalization to the data (determining vmin/vmax from
+        the data or percentile range) and transforms the data values to colors.
+        Values outside the normalization range are clipped.
+
         Parameters
         ----------
         data : np.ndarray
-            Data to be transformed into colors. Based on this data, the colormap will be normalized.
+            Data to be transformed into colors. Based on this data, the colormap
+            will be normalized. Can be any shape; colors are returned in the same shape.
+        as_hex : bool, default=False
+            If True, return hex color strings. If False, return RGBA tuples.
+
+        Returns
+        -------
+        np.ndarray
+            Array of colors with the same shape as input data. If as_hex=False,
+            the last dimension will be 4 (RGBA). If as_hex=True, returns array
+            of hex strings.
+
+        Examples
+        --------
+        Transform 1D data to colors:
+
+        .. code-block:: python
+
+            import numpy as np
+            from alphapepttools.pl.colors import MappedColormaps
+
+            data = np.array([1, 2, 3, 100])  # 100 is outlier
+            mapper = MappedColormaps(cmap="sequential", percentile=(5, 95))
+            colors = mapper.fit_transform(data)
+            # Returns (4, 4) array of RGBA colors
+
+        Transform 2D heatmap data:
+
+        .. code-block:: python
+
+            data = np.random.randn(10, 10)
+            mapper = MappedColormaps(cmap="diverging")
+            colors = mapper.fit_transform(data)
+            # Returns (10, 10, 4) array of RGBA colors
+
+        Get hex colors for plotting:
+
+        .. code-block:: python
+
+            data = np.array([1, 2, 3, 4, 5])
+            mapper = MappedColormaps(cmap="sequential")
+            hex_colors = mapper.fit_transform(data, as_hex=True)
+            # Returns array of hex strings like ['#1a2b3c', ...]
+
         """
         data = np.asarray(data).copy()
 
@@ -449,7 +904,17 @@ class MappedColormaps:
 
     @property
     def scalar_mappable(self) -> mpl.cm.ScalarMappable:
-        """Return a ScalarMappable for use in colorbars"""
+        """Return a ScalarMappable for use in colorbars
+
+        This property provides a ScalarMappable instance that can be used to create colorbars consistent with the normalization applied in fit_transform.
+        It uses the same vmin, vmax, and colormap, ensuring that the colorbar accurately reflects the mapping of data values to colors.
+
+        Returns
+        -------
+        mpl.cm.ScalarMappable
+            ScalarMappable instance with the same colormap and normalization as used in fit_transform.
+
+        """
         if self.vmin is None or self.vmax is None:
             raise ValueError("fit_transform must be called before accessing scalar_mappable")
         sm = plt.cm.ScalarMappable(norm=mpl_colors.Normalize(vmin=self.vmin, vmax=self.vmax), cmap=self.cmap)
@@ -460,17 +925,50 @@ class MappedColormaps:
 def invert_color(
     color: tuple | str,
 ) -> tuple | str:
-    """Invert a color
+    """Invert a color by subtracting RGB values from 1
+
+    Inverts the RGB components of a color while preserving the alpha channel.
+    Useful for creating contrasting colors or generating color opposites for
+    visualization purposes.
 
     Parameters
     ----------
     color : tuple | str
-        Color to be inverted. Can be an RGBA tuple or a color name.
+        Color to be inverted. Can be an RGBA tuple with values in [0, 1] or a
+        color name/hex string.
 
     Returns
     -------
-    Tuple | str
-        Inverted color as RGBA tuple or hex string.
+    tuple | str
+        Inverted color in the same format as input. If input is a tuple, returns
+        RGBA tuple. If input is a string, returns hex string.
+
+    Examples
+    --------
+    Invert an RGBA tuple:
+
+    .. code-block:: python
+
+        from alphapepttools.pl.colors import invert_color
+
+        red = (1.0, 0.0, 0.0, 1.0)
+        inverted = invert_color(red)
+        # Returns (0.0, 1.0, 1.0, 1.0) - cyan
+
+    Invert a color name:
+
+    .. code-block:: python
+
+        inverted = invert_color("blue")
+        # Returns hex string for inverted blue (yellow)
+
+    Invert a hex color:
+
+    .. code-block:: python
+
+        inverted = invert_color("#FF5733")
+        # Returns hex string for inverted color
+
     """
     if isinstance(color, str):
         color = mpl_colors.to_rgba(color)

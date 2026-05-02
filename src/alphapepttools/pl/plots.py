@@ -11,7 +11,8 @@
 import logging
 from collections import Counter
 from collections.abc import Callable
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Literal
 
 import anndata as ad
 import matplotlib as mpl
@@ -24,13 +25,21 @@ from matplotlib.patches import Patch
 from alphapepttools.pl import defaults
 from alphapepttools.pl.colors import BaseColors, BasePalettes, _get_colors_from_cmap, get_color_mapping
 from alphapepttools.pl.figure import create_figure, label_axes
-from alphapepttools.pp.data import data_column_to_array
+from alphapepttools.pp.data import (
+    _tolist,
+    coerce_to_dataframe,
+    data_column_to_array,
+    data_columns_to_df,
+    data_index_to_array,
+    subset_data,
+)
 from alphapepttools.tl.plot_data_handling import (
     extract_pca_anndata,
     prepare_pca_1d_loadings_data_to_plot,
     prepare_pca_2d_loadings_data_to_plot,
     prepare_scree_data_to_plot,
 )
+from alphapepttools.tl.utils import find_iterable_kwargs
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -39,136 +48,67 @@ logger = logging.getLogger(__name__)
 config = defaults.plot_settings.to_dict()
 
 
-def _extract_columns_to_df(
-    data: ad.AnnData | pd.DataFrame,
-    columns: list[str] | None = None,
-) -> pd.DataFrame:
-    """Extract selected columns from AnnData or DataFrame.
-
-    This function serves as an adapter upstream of matplotlib plotting functions,
-    which frequently accept an array of values. Extracts the requested columns
-    from an AnnData object's X and/or obs object & validates there are no duplicates.
-
-    Parameters
-    ----------
-    data : ad.AnnData | pd.DataFrame
-        Input data object.
-    columns : list[str] | None, optional
-        List of column names to extract. If None, uses all columns (DataFrame)
-        or all columns in X (AnnData). Default is None.
-
-    Returns
-    -------
-    pd.DataFrame
-        DataFrame containing only the selected columns.
-
-    """
-    if isinstance(data, pd.DataFrame):
-        columns = columns or data.columns.tolist()
-        try:
-            dataset = data[columns]
-        except KeyError as e:
-            raise KeyError(f"Columns {columns} not found in dataframe.") from e
-
-    elif isinstance(data, ad.AnnData):
-        if columns is None:
-            dataset = data.to_df()
-        else:
-            # Partition columns by source
-            x_cols = [col for col in columns if col in data.var_names]
-            obs_cols = [col for col in columns if col in data.obs.columns]
-
-            # Check for duplicate columns across sources
-            duplicates = set(x_cols) & set(obs_cols)
-            if duplicates:
-                raise KeyError(
-                    f"Columns {duplicates} found in both AnnData X and obs. Please ensure unique column names."
-                )
-
-            # Check for missing columns
-            missing_cols = set(columns) - set(x_cols) - set(obs_cols)
-            if missing_cols:
-                raise KeyError(f"Columns {missing_cols} not found in AnnData X or obs.")
-
-            # Build dataset from available sources
-            parts = []
-            if x_cols:
-                parts.append(data.to_df()[x_cols])
-            if obs_cols:
-                parts.append(data.obs[obs_cols])
-
-            dataset = pd.concat(parts, axis=1) if len(parts) > 1 else parts[0]
-
-    else:
-        raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
-
-    return dataset
-
-
 def _extract_groupwise_plotting_data(
     data: ad.AnnData | pd.DataFrame,
     grouping_column: str | None = None,
     value_column: str | None = None,
     direct_columns: list[str] | None = None,
 ) -> tuple[list[list], list[str], list[int]]:
-    """Extract data for group-wise plotting (violin, bar, box plots).
+    """Extract data for group-wise plotting (violin, bar, box plots)
 
     Transforms long-format data into the list-of-lists format required by
     matplotlib's violin, bar, and box plot functions. Each sublist contains
-    the values for one group. Using direct_columns makes each of its columns
-    directly correspond to a group.
+    the values for one group.
 
     Parameters
     ----------
-    data : ad.AnnData | pd.DataFrame
+    data
         Data containing grouping and value columns
-    grouping_column : str
+    grouping_column
         Column containing the groups to compare
-    value_column : str
+    value_column
         Column whose values should be plotted
-    direct_columns: list[str] | None
-        Overrides grouping_column and value_column: This argument allows for extraction of
-        actual columns directly into data_lists, labels and positions.
+    direct_columns
+        Alternative to grouping/value columns: treat each column as a separate group
 
     Returns
     -------
     tuple[list[list], list[str], list[int]]
-        Tuple of (data_lists, labels, positions) for plotting
+        (data_lists, labels, positions) for plotting
 
     Examples
     --------
-    >>> import pandas as pd
-    >>> from alphapepttools.pl import _extract_groupwise_plotting_data
-    >>> df = pd.DataFrame({
-    ...     'group': ['A', 'A', 'B', 'B', 'C'],
-    ...     'X1': [1, 2, 3, 4, 5]
-    ...     'X2': [5, 4, 3, 2, 1]
-    ...     'X3': [1, 2, 3, 4, 5]
-    ... })
+    Group by categorical column:
 
-    >>> # Use grouping column
-    >>> data_lists, labels, positions = _extract_groupwise_plotting_data(df, "group", "X1")
-    >>> print(data_lists)  # [[1, 2], [3, 4], [5]]
-    >>> print(labels)  # ['A', 'B', 'C']
-    >>> print(positions)  # [1, 2, 3]
+    .. code-block:: python
 
-    >>> # Use columns directly
-    >>> data_lists, labels, positions = _extract_groupwise_plotting_data(
-    ...     df, "group", "X1", direct_columns=["X1", "X2", "X3"]
-    ... )
-    >>> print(data_lists)  # [[1, 2, 5], [3, 4, 3], [5, 1, 5]]
-    >>> print(labels)  # ['X1', 'X2', 'X3']
-    >>> print(positions)  # [1, 2, 3]
+        df = pd.DataFrame({"treatment": ["A", "A", "B", "B", "C"], "intensity": [1, 2, 3, 4, 5]})
 
+        data_lists, labels, positions = _extract_groupwise_plotting_data(
+            df, grouping_column="treatment", value_column="intensity"
+        )
+        # data_lists: [[1, 2], [3, 4], [5]]
+        # labels: ['A', 'B', 'C']
+
+    Compare multiple columns directly:
+
+    .. code-block:: python
+
+        df = pd.DataFrame({"Protein1": [1, 2, 3], "Protein2": [4, 5, 6], "Protein3": [7, 8, 9]})
+
+        data_lists, labels, positions = _extract_groupwise_plotting_data(
+            df, direct_columns=["Protein1", "Protein2", "Protein3"]
+        )
+        # Each column becomes a group for comparison
     """
     if direct_columns is not None:
         if grouping_column is not None or value_column is not None:
             logger.info("'direct_columns' provided, ignoring 'grouping_column' and 'value_column' parameters.")
-        df = _extract_columns_to_df(data, columns=direct_columns)[direct_columns]  # ensure order
+        df = data_columns_to_df(data, columns=direct_columns)[direct_columns]  # ensure order
         df = df.melt(var_name="variable", value_name="value")
         grouping_column, value_column = "variable", "value"
     else:
-        df = _extract_columns_to_df(data, columns=[grouping_column, value_column])
+        df = data_columns_to_df(data, columns=[grouping_column, value_column])
 
     # Determine groups
     groups_to_plot = df[grouping_column].dropna().unique().tolist()
@@ -188,6 +128,18 @@ def _extract_groupwise_plotting_data(
     return data_lists, labels, positions
 
 
+def _set_optional_axis_limits(
+    ax: plt.Axes,
+    xlim: tuple[float, float] | None = None,
+    ylim: tuple[float, float] | None = None,
+) -> None:
+    """Set x and y limits on an Axes object if specified."""
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_ylim(ylim)
+
+
 def add_lines(
     ax: plt.Axes,
     intercepts: float | list[float | int],
@@ -197,29 +149,47 @@ def add_lines(
     linewidth: float = 1,
     line_kwargs: dict | None = None,
 ) -> None:
-    """Add a vertical or horizontal line to a matplotlib axes object
+    """Add vertical or horizontal reference lines to a plot
+
+    Useful for adding threshold lines to volcano plots, zero lines to bar plots,
+    or any other reference lines to visualizations.
 
     Parameters
     ----------
-    ax : plt.Axes
-        Matplotlib axes object to add the line to.
-    linetype : str
-        Type of line to add, either 'vline' or 'hline'.
-    intercepts : float | list[float | int]
-        Intercepts of the line(s) to add.
-    color : str, optional
-        Color of the line(s), by default "black".
-    linestyle : str, optional
-        Linestyle of the line(s), by default "--".
-    linewidth : float, optional
-        Linewidth of the line(s), by default 1.
-    line_kwargs : dict, optional
-        Additional keyword arguments for the line function, by default None. Will be overridden by color, linestyle, and linewidth arguments.
+    ax
+        Matplotlib axes object to add lines to
+    intercepts
+        Single value or list of x-positions (vline) or y-positions (hline)
+    linetype
+        Type of line: `"vline"` (vertical) or `"hline"` (horizontal)
+    color
+        Line color
+    linestyle
+        Line style (e.g., `"--"`, `"-"`, `":"`)
+    linewidth
+        Line width, defaults to `config["linewidths"]["medium"]`
+    line_kwargs
+        Additional matplotlib line arguments. Note: explicit color, linestyle,
+        and linewidth parameters take precedence
 
-    Returns
-    -------
-    None
+    Examples
+    --------
+    Add significance thresholds to a volcano plot:
 
+    .. code-block:: python
+
+        # Add fold-change thresholds
+        add_lines(ax, intercepts=[-1, 1], linetype="vline", color="red", linestyle=":")
+
+        # Add p-value threshold
+        add_lines(ax, intercepts=-np.log10(0.05), linetype="hline", color="blue", linestyle="--")
+
+    Add zero reference to bar plot:
+
+    .. code-block:: python
+
+        ax.bar(x, heights)
+        add_lines(ax, intercepts=0, linetype="hline", color="black")
     """
     if linetype not in ["vline", "hline"]:
         raise ValueError("linetype must be 'vline' or 'hline'")
@@ -233,10 +203,11 @@ def add_lines(
         intercepts = [intercepts]
 
     # handle clashes between keyword arguments and line_kwargs
+    # explicit parameters take precedence over line_kwargs
     line_kwargs = line_kwargs or {}
-    color = line_kwargs.pop("color", color)
-    linestyle = line_kwargs.pop("linestyle", linestyle)
-    linewidth = line_kwargs.pop("linewidth", linewidth)
+    line_kwargs.pop("color", None)
+    line_kwargs.pop("linestyle", None)
+    line_kwargs.pop("linewidth", None)
 
     # add lines to ax
     for intercept in intercepts:
@@ -252,21 +223,28 @@ def add_lines(
 def make_legend_patches(
     color_dict: dict[str, str | tuple],
 ) -> list[mpl.patches.Patch]:
-    """Create legend patches for a matplotlib legend from a value-to-color mapping
+    """Create colored patches for matplotlib legends
 
-    This is a helper function for the add_legend function.
-    Matplotlib legends display labelled patches with a defined color. This function
-    takes a dictionary of values and colors and returns a list of named patches.
+    Converts a label-to-color mapping into matplotlib patches suitable for legends.
 
     Parameters
     ----------
-    color_dict : dict[str, str | tuple]
-        Dictionary of values and colors.
+    color_dict
+        Dictionary mapping labels to colors
 
     Returns
     -------
-    list[mpl.patches.Patch]
-        List of named patches.
+    list[:class:`matplotlib.patches.Patch`]
+        List of colored patches with labels
+
+    Example
+    -------
+    .. code-block:: python
+
+        # Create patches for categorical legend
+        color_dict = {"Control": "blue", "Treatment": "red", "Knockout": "green"}
+        patches = make_legend_patches(color_dict)
+        ax.legend(handles=patches)
     """
     patches = []
     for value, color in color_dict.items():
@@ -287,21 +265,29 @@ def add_legend_to_axes_from_patches(
     patches: list[mpl.patches.Patch],
     **kwargs,
 ) -> None:
-    """Make a legend and directly add it to a matplotlib axes object.
+    """Add a legend with patches to an axes, using config defaults for font sizes
 
-    Expects a list of named patches.
+    Automatically applies alphapepttools font sizes for legend text and title
+    from the config unless overridden.
 
     Parameters
     ----------
-    ax : plt.Axes
-        Matplotlib axes object to add the legend to.
-    patches : list[mpl.patches.Patch]
-        List of patches to use for the legend.
+    ax
+        Matplotlib axes to add the legend to
+    patches
+        List of colored patches created by `make_legend_patches`
+    **kwargs
+        Additional arguments passed to `ax.legend()`.
+        If `fontsize` not provided, uses `config["legend"]["font_size"]`
 
-    Returns
+    Example
     -------
-    None
+    .. code-block:: python
 
+        color_dict = {"WT": "blue", "KO": "red"}
+        patches = make_legend_patches(color_dict)
+        add_legend_to_axes_from_patches(ax, patches, title="Genotype", loc="upper right")
+        # Legend will use config font sizes for text and title
     """
     # create new legend
     if "fontsize" not in kwargs:
@@ -320,31 +306,62 @@ def add_legend_to_axes(
     palette: list[str | tuple] | None = None,
     **legend_kwargs,
 ) -> None:
-    """Add a legend to an axis object.
+    """Flexibly add a legend to axes with automatic color assignment
 
-    Handle legend creation in three ways:
-    1.: 'levels' is a dictionary of levels and colors, in which case these levels and colors are used directly.
-    2.: 'levels' is a list of levels, in which case a color palette is used to assign colors to levels. A custom
-    palette can be provided, otherwise a default palette is used.
-    3.: 'legend' is a matplotlib legend object, which overrides all other options and is added directly to the axes.
-    This defaults to 'auto', which directs to the first two cases.
+    Handles multiple legend creation patterns: from a list with palette,
+    from a color dictionary, or using an existing legend object.
+    Automatically switches from qualitative to sequential palette when
+    the number of levels exceeds available colors.
 
     Parameters
     ----------
-    ax : plt.Axes
-        Matplotlib axes object to add the legend to.
-    levels : list[str] | dict[str, str | tuple] | None
-        List of levels to use for the legend. Duplicates are removed. Colors from the palette are assigned to unique values from this list,
-        but no particular color-binding is enforced. If this is a dictionary, the legend contains exactly the labels (keys) and colors (values) provided.
-    legend : str | mpl.legend.Legend | None
-        Legend to add to the plot. If "auto", a legend is created based on levels. If a Legend object, it is added directly to the axes. By default "auto".
-    palette : list[str | tuple] | None
-        List of colors to use for the legend. If None, a default palette will be used. By default None. Only relevant when levels is a list, i.e. when matching
-        of values to colors happens automatically.
-    legend_kwargs : dict, optional
-        Additional keyword arguments for the legend, by default {}. This can include 'fontsize', 'title', etc. These kwargs are not enforced if a matplotlib legend object
-        is passed as the `legend` parameter.
+    ax
+        Matplotlib axes to add the legend to
+    levels
+        Either a list of labels (colors assigned from palette) or
+        a dict mapping labels to specific colors
+    legend
+        `"auto"` creates legend from levels, or pass existing Legend object
+    palette
+        Custom color palette for list-based levels. If `None`, uses
+        qualitative palette (or sequential if too many levels)
+    **legend_kwargs
+        Additional arguments for legend (title, loc, fontsize, etc.)
 
+    Examples
+    --------
+    List with automatic colors from palette:
+
+    .. code-block:: python
+
+        # Automatic qualitative palette
+        levels = ["Control", "Treatment", "Recovery"]
+        add_legend_to_axes(ax, levels=levels, title="Condition")
+
+        # Custom palette
+        levels = ["WT", "Het", "KO"]
+        palette = ["blue", "lightblue", "red"]
+        add_legend_to_axes(ax, levels=levels, palette=palette)
+
+        # Many levels trigger sequential palette
+        levels = [f"Sample_{i}" for i in range(20)]
+        add_legend_to_axes(ax, levels=levels)  # Switches to sequential
+
+    Dict with explicit color mapping:
+
+    .. code-block:: python
+
+        # Direct color specification
+        color_dict = {"Significant": "red", "Not significant": "gray", "Borderline": "orange"}
+        add_legend_to_axes(ax, levels=color_dict, title="Status")
+
+    Using existing matplotlib legend:
+
+    .. code-block:: python
+
+        # Pass pre-created legend
+        existing_legend = ax.legend(["A", "B"], loc="upper left")
+        add_legend_to_axes(other_ax, legend=existing_legend)
     """
     if isinstance(legend, mpl.legend.Legend):
         ax.add_artist(legend)
@@ -368,21 +385,136 @@ def add_legend_to_axes(
         logging.warning("No valid 'legend' parameter provided. Skipping legend creation.")
 
 
-def _drop_nans_from_plot_arrays(
+def drop_nan_coordinate_points(
     x_values: np.ndarray,
     y_values: np.ndarray,
     labels: np.ndarray | list[str],
-) -> tuple:
-    # Missing x or y values are breaking and should be dropped
-    keep_mask = ~np.logical_or(pd.isna(x_values), pd.isna(y_values))
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Remove entries where either x or y is NaN, applying same mask to labels
 
+    Filters out instances where either x or y values are NaN, ensuring all three arrays
+    (x, y, labels) remain synchronized. This is essential for plotting functions as
+    matplotlib cannot handle NaN coordinates. Note that nans in the labels do not cause
+    dropping of the respective row, since labels can be strings and missing labels are valid.
+
+    Parameters
+    ----------
+    x_values
+        X-coordinates for plotting.
+    y_values
+        Y-coordinates for plotting.
+    labels
+        Labels corresponding to each (x, y) point.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray, np.ndarray]
+        Filtered arrays (x_values, y_values, labels) with NaN rows removed.
+        All three arrays maintain the same length and element correspondence.
+
+    Examples
+    --------
+    >>> x = np.array([1.0, 2.0, np.nan, 4.0])
+    >>> y = np.array([5.0, np.nan, 7.0, 8.0])
+    >>> labels = np.array(["a", "b", "c", "d"])
+    >>> x_clean, y_clean, labels_clean = drop_nan_coordinate_points(x, y, labels)
+    >>> x_clean
+    array([1., 4.])
+    >>> y_clean
+    array([5., 8.])
+    >>> labels_clean
+    array(['a', 'd'], dtype='<U1')
+
+    Notes
+    -----
+    Uses pandas.isna() to handle both NaN and None values correctly.
+    """
+    keep_mask = ~(pd.isna(x_values) | pd.isna(y_values))
     return x_values[keep_mask], y_values[keep_mask], labels[keep_mask]
+
+
+def _get_plot_lims(
+    values: np.ndarray,
+    padding_factor: float = 1.1,
+    sym: str | None = None,
+    set_left: float | None = None,
+    set_right: float | None = None,
+) -> tuple[float, float]:
+    """Calculate plot limits with optional symmetry and padding.
+
+    Parameters
+    ----------
+    values
+        Array of values to calculate limits from.
+    padding_factor
+        Factor to multiply the limits by for padding (e.g., 1.1 for 10% padding).
+    sym
+        If "max", creates symmetric limits around 0 using the absolute max value.
+        If None, uses min and max of values. By default None.
+    set_left
+        If provided, overrides the calculated left limit with this value. By default None.
+    set_right
+        If provided, overrides the calculated right limit with this value. By default None.
+
+    Returns
+    -------
+    tuple[float, float]
+        Tuple of (left_limit, right_limit).
+
+    Examples
+    --------
+    >>> values = np.array([1, 2, 3, -2, -1])
+    >>> _get_plot_lims(values, 1.1, sym="max")
+    (-3.3, 3.3)
+    >>> _get_plot_lims(values, 1.1, set_left=0)
+    (0, 3.3)
+    """
+    # Convert to Series for graceful handling of NaNs
+    series = pd.Series(values)
+
+    if sym == "max":
+        abs_max = max(abs(series.min()), abs(series.max()))
+        left = -abs_max * padding_factor
+        right = abs_max * padding_factor
+    else:
+        left = series.min() * padding_factor
+        right = series.max() * padding_factor
+
+    if set_left is not None:
+        left = set_left
+    if set_right is not None:
+        right = set_right
+
+    return (left, right)
 
 
 def _assign_nearest_anchor_position_to_values(
     values: np.ndarray,
     anchors: list[int | float] | np.ndarray | None,
 ) -> np.ndarray:
+    """Snap values to their nearest anchor positions
+
+    Parameters
+    ----------
+    values
+        Values to be snapped
+    anchors
+        Anchor positions to snap to. If `None`, returns values unchanged
+
+    Returns
+    -------
+    :class:`numpy.ndarray`
+        Values snapped to nearest anchors
+
+    Example
+    -------
+    .. code-block:: python
+
+        values = np.array([1.2, 2.7, 5.1])
+        anchors = [1, 3, 5]
+        result = _assign_nearest_anchor_position_to_values(values, anchors)
+        # Returns: [1, 3, 5] - each value snapped to nearest anchor
+    """
     if anchors is None:
         return values
 
@@ -398,9 +530,10 @@ def _assign_nearest_anchor_position_to_values(
 
 def label_plot(
     ax: plt.Axes,
-    x_values: list | np.ndarray | pd.Series,
-    y_values: list | np.ndarray | pd.Series,
-    labels: list[str] | np.ndarray | pd.Series,
+    data: pd.DataFrame | ad.AnnData,
+    x_column: str,
+    y_column: str,
+    label_column: str,
     x_anchors: list[int | float] | np.ndarray | None = None,
     label_kwargs: dict | None = None,
     line_kwargs: dict | None = None,
@@ -411,53 +544,84 @@ def label_plot(
     """Add labels to a 2D axes object
 
     Add labels to a plot based on x and y coordinates. The labels are either placed near the datapoint
-    using the automatic dodging function from adjust_text or anchored to the left or right of the plot,
-    where labels below the splitpoint are anchored to the left and labels above the splitpoint are anchored
-    to the right.
+    or anchored to the left or right of the plot, where labels below the splitpoint are anchored to the
+    left and labels above the splitpoint are anchored to the right.
 
     Parameters
     ----------
-    ax : plt.Axes
+    ax
         Matplotlib axes object to add the labels to.
-    x_values : list | np.ndarray
+    x_values
         x-coordinates of the labels.
-    y_values : list | np.ndarray
+    y_values
         y-coordinates of the labels.
-    labels : list[str] | np.ndarray
+    labels
         Labels to add to the plot.
-    x_anchors : list[int | float] | np.ndarray | None, optional
+    x_anchors
         x-coordinates of the anchors to use for the labels. If None, labels are placed at the x-coordinates of the data points. By default None.
-    label_kwargs : dict | None, optional
+    label_kwargs
         Additional keyword arguments for the label text, by default None.
-    line_kwargs : dict | None, optional
+    line_kwargs
         Additional keyword arguments for the line connecting the label to the data point, by default None.
-    label_parser : Callable | None, optional
+    label_parser
         Function to parse the labels, by default None. This is useful to convert
         labels from a computation-context to presentation context, e.g. a column
         like upregulated_proteins could be shown as "Upregulated Proteins" in the plot.
     y_display_start : float, optional
-        Starting point for the y-coordinates of the labels, by default 1. This is used to determine the spacing between labels.
-        The y-coordinates of the labels are adjusted to be evenly spaced between the min and max y-coordinates at that anchor.
-        This is useful for avoiding label overlap.
+        Starting point for the y-coordinates of the labels, by default 1.
     y_padding_factor: float, optional
         Factor to increase or decrease how far apart labels are spread in the y-direction when stacked into a column over x-anchors
+
+    Returns
+    -------
+    None
+        The function modifies the axes in place and does not return anything.
+
+    Examples
+    --------
+    Basic scatter plot with labels:
+
+    .. code-block:: python
+
+        import pandas as pd
+        from alphapepttools.pl.figure import create_figure
+        from alphapepttools.pl.plots import Plots, label_plot
+
+        # Sample data
+        df = pd.DataFrame({"x": [-2, -1, 0, 1, 2], "y": [3, 5, 2, 6, 4], "label": ["A", "B", "C", "D", "E"]})
+
+        fig, axm = create_figure(1, 1, figsize=(6, 4))
+        ax = axm.next()
+        Plots.scatter(ax=ax, data=df, x_column="x", y_column="y")
+        label_plot(ax, df["x"], df["y"], df["label"])
+
+    With anchored labels on left and right sides:
+
+    .. code-block:: python
+
+        fig, axm = create_figure(1, 1, figsize=(6, 4))
+        ax = axm.next()
+        Plots.scatter(ax=ax, data=df, x_column="x", y_column="y")
+        label_plot(ax, df["x"], df["y"], df["label"], x_anchors=[-2.5, 2.5], y_display_start=4, y_padding_factor=10)
 
     """
     label_kwargs = {"fontsize": config["font_sizes"]["medium"], **(label_kwargs or {})}
     line_kwargs = {"color": BaseColors.get("black"), "linewidth": config["linewidths"]["medium"], **(line_kwargs or {})}
     label_parser = label_parser or (lambda x: x)
 
-    if not len(x_values) == len(y_values) == len(labels):
-        raise ValueError("x_values, y_values, and labels must have the same length")
+    # Extract all needed columns into a DataFrame
+    df = data_columns_to_df(data, columns=[x_column, y_column, label_column])
 
-    # Force the order of labels from highest to lowest
-    y_value_order = np.argsort(np.array(y_values))[::-1]
-    y_values = np.array(y_values)[y_value_order]
-    x_values = np.array(x_values)[y_value_order]
-    labels = np.array(labels)[y_value_order]
+    # Sort by y values (highest to lowest)
+    df = df.sort_values(by=y_column, ascending=False)
 
     # convert to numpy arrays for consistency & remove any nans
-    x_values, y_values, labels = _drop_nans_from_plot_arrays(np.array(x_values), np.array(y_values), np.array(labels))
+    x_values = data_column_to_array(df, x_column)
+    y_values = data_column_to_array(df, y_column)
+    labels = data_column_to_array(df, label_column)
+
+    # Remove any nans
+    x_values, y_values, labels = drop_nan_coordinate_points(x_values, y_values, labels)
 
     # determine label positions based on optional x_anchors
     if x_anchors is not None:
@@ -535,11 +699,140 @@ def _dict_keys_to_str(
     return {str(k): v for k, v in dictionary.items()}
 
 
+@dataclass(frozen=True)
+class PlotConfig:
+    """Base configuration for all plot types
+
+    This dataclass holds common configuration parameters for different plot types.
+    It allows handling of different arguments for different plot types, eliminating the need to
+    repeat shared parameters across different instances of the same plot.
+
+    Usage
+    -----
+
+
+
+    """
+
+    data: ad.AnnData | pd.DataFrame | None = None
+    _extra: dict[str, Any] | None = None
+
+    def __post_init__(self):
+        # Initialize _extra as empty dict if None
+        if self._extra is None:
+            object.__setattr__(self, "_extra", {})
+
+    def __getattr__(self, name: str) -> object:
+        """Access extra fields as attributes"""
+        if name in self._extra:
+            return self._extra[name]
+        raise KeyError(f"'{type(self).__name__}' object has no attribute '{name}'")
+
+    def copy_with(
+        self,
+        **changes: dict[str, Any],
+    ) -> "PlotConfig":
+        """Create a copy with specified changes"""
+        # Make it so that changes can override existing data & _extra fields
+        current = {"data": self.data}
+        current.update(self._extra)
+        current.update(changes)
+
+        # Since PlotConfig is instantiated with data and _extra, separate them here
+        data = current.pop("data", None)
+        new_extra = current  # Everything else goes into _extra
+
+        return PlotConfig(data=data, _extra=new_extra)
+
+    def to_kwargs(self) -> dict[str, Any]:
+        """Convert to kwargs dict"""
+        result = {}
+        if self.data is not None:
+            result["data"] = self.data
+        result.update(self._extra)
+        return {k: v for k, v in result.items() if v is not None}
+
+
+def make_scatter_config(data: ad.AnnData | pd.DataFrame, x_column: str, y_column: str, **kwargs) -> PlotConfig:
+    """Create a config for scatter plots
+
+    Parameters
+    ----------
+    data : ad.AnnData | pd.DataFrame
+        Data to plot
+    x_column : str
+        Column for x-axis
+    y_column : str
+        Column for y-axis
+    **kwargs
+        Additional scatter parameters (color, scatter_kwargs, etc.)
+
+    Returns
+    -------
+    PlotConfig
+        Configuration object with all parameters set
+    """
+    extra = {"x_column": x_column, "y_column": y_column}
+    extra.update(kwargs)
+    return PlotConfig(data=data, _extra=extra)
+
+
+def _extract_plot_layer_specs(layer_specs: tuple) -> tuple[str, str | int | list, str, dict]:
+    """Extract (column, value, color_key[, kwargs]) from layer specification.
+
+    Parameters
+    ----------
+    layer_specs : tuple
+        Layer specification with 3-4 elements:
+        - layer_column (str): Column name to filter on
+        - layer_val (str|int|list): Value(s) to match
+        - color_key (str): Key to lookup in color_dict
+        - scatter_kwargs (dict, optional): Additional scatter parameters
+
+    Returns
+    -------
+    tuple
+        (layer_column, layer_val, color_key, scatter_kwargs)
+    """
+    min_required_elements = 3
+    max_allowed_elements = 4
+
+    if len(layer_specs) < min_required_elements:
+        raise ValueError(f"Layer specs must have at least {min_required_elements} elements, got {len(layer_specs)}")
+    if len(layer_specs) > max_allowed_elements:
+        raise ValueError(f"Layer specs must have at most {max_allowed_elements} elements, got {len(layer_specs)}")
+
+    layer_column, layer_val, color_key = layer_specs[:min_required_elements]
+
+    if not isinstance(layer_column, str):
+        raise TypeError(f"layer_column must be str, got {type(layer_column).__name__}")
+    if not isinstance(layer_val, (str, int, list)):
+        raise TypeError(f"layer_val must be str|int|list, got {type(layer_val).__name__}")
+    if not isinstance(color_key, str):
+        raise TypeError(f"color_key must be str, got {type(color_key).__name__}")
+
+    # Get kwargs from the last element if present & validate type
+    scatter_kwargs = {}
+    if len(layer_specs) == max_allowed_elements:
+        scatter_kwargs = layer_specs[min_required_elements]
+        if not isinstance(scatter_kwargs, dict):
+            raise TypeError(f"scatter_kwargs must be dict, got {type(scatter_kwargs).__name__}")
+
+    return layer_column, layer_val, color_key, scatter_kwargs
+
+
 class Plots:
     """Class for creating figures with matplotlib
 
-    Basic configuration for matplotlib plots is loaded from a YAML file
-    and set to generate consistent plots.
+    Configuration for matplotlib plots is loaded from the defaults module
+    as a dictionary and used to generate consistent plots.
+
+    Overview
+    --------
+    The Plots class provides alphapepttools styled visualization methods
+    for proteomics and other biological data. All methods accept either
+    pandas DataFrames or AnnData objects and use column names to specify
+    data to plot.
 
     """
 
@@ -548,6 +841,256 @@ class Plots:
         config: dict = defaults.plot_settings.to_dict(),
     ):
         self.config = config
+
+    @classmethod
+    def layered_plot(
+        cls,
+        ax: plt.Axes,
+        base_config: PlotConfig,
+        layers: list[tuple] | None = None,
+        color_dict: dict[str, str | tuple] | None = None,
+        default_layer_column: str = "__data",
+        default_layer_val: str = "__all",
+        default_color_key: str = "__default_color",
+        default_color: str | tuple = BaseColors.get("blue"),
+        default_layer_kwargs: dict | None = None,
+        lim_padding_factor: float = 1.1,
+        xlims: tuple[float, float] | None = None,
+        ylims: tuple[float, float] | None = None,
+        plotting_callable: Callable | None = None,
+        return_glob_layer_indices: bool = False,  # noqa: FBT001, FBT002
+    ) -> None | list:
+        """Plot multiple layers with defined hierarchy and without datapoint reuse.
+
+        In order to layer multiple levels of plotting layers onto each other (e.g. color points by differential
+        expression, and then highlight extra points on top of that), this function allows for defining multiple
+        plotting layers.
+        The purpose of this is to avoid repetitive specification of shared parameters in the layers list. Points
+        which are not assigned to any layer are plotted in the default layer in the background. A shared color_dict
+        is used by all layers to lookup colors by key.
+
+        Parameters
+        ----------
+        ax
+            Matplotlib axes object to plot on.
+        base_config
+            Base configuration for the plot layers containing data and plot parameters.
+        layers
+            List of layer specifications, each a tuple of (layer_column, layer_val, color_key, layer_kwargs).
+            - layer_column (str): Column name to filter on for this layer
+            - layer_val (str|int|list): Value(s) to match in the layer_column (i.e. this layer will only contain points
+            where data[layer_column] is in layer_val)
+            - color_key (str): Color key in color_dict for this layer
+            - layer_kwargs (dict, optional): Additional parameters for this layer
+            By default None, which results in a single default layer containing all points.
+        color_dict
+            Dictionary mapping color keys to colors. By default None, which results in a single default color.
+        default_layer_column
+            Column name to use for the default layer. By default "__data".
+        default_layer_val
+            Value to use for the default layer. By default "__all".
+        default_color_key
+            Color key to use for the default color. By default "__default_color".
+        default_color
+            Color to use for the default color. By default BaseColors.get("blue").
+        default_layer_kwargs
+            Default scatterplot keyword arguments for the default layer. By default None.
+        lim_padding_factor
+            Factor to pad the x and y limits of the plot. By default 1.1.
+        xlims
+            x-axis limits for the plot. If None, limits are calculated from the data with padding. By default None.
+        ylims
+            y-axis limits for the plot. If None, limits are calculated from the data with padding. By default None.
+        plotting_callable
+            Custom plotting function to use instead of cls.scatter. Should accept ax, data, and other parameters.
+            By default None, which uses cls.scatter.
+        return_glob_layer_indices
+            If True, returns a list of (indices, color, color_key, scatter_kwargs) tuples for each layer.
+            Useful for debugging or further processing of layer assignments. By default False.
+
+        Returns
+        -------
+        None | list
+            If return_glob_layer_indices is False, returns None. Otherwise, returns a list of tuples
+            containing (layer_indices, layer_color, color_key, scatter_kwargs) for each layer.
+
+        Example
+        -------
+        .. code-block:: python
+
+            import numpy as np
+            import pandas as pd
+            import anndata as ad
+            from alphapepttools import pl
+            from alphapepttools.pl import Plots, BaseColors, create_figure, label_axes
+
+            rng = np.random.default_rng(seed=42)
+
+            # example data
+            testx = rng.normal(0, 1, 300)
+            testy = -np.cos(testx) + rng.normal(0, 0.2, 300)
+            testp = 10 ** -(testy - min(testy))
+            vp_data = pd.DataFrame(
+                {
+                    "id": [f"P{10000 + i}" for i in range(300)],
+                    "gene": [f"gene_{i}" for i in range(300)],
+                    "log2fc": testx,
+                    "pval": testp,
+                    "neg_log10pval": -np.log10(testp),
+                }
+            )
+            vp_data.index = vp_data["id"].astype(str)
+
+            example_adata_diff = ad.AnnData(
+                X=vp_data[["log2fc", "pval", "neg_log10pval"]].values,
+                obs=vp_data[["id", "gene"]],
+                var=vp_data[["log2fc", "pval", "neg_log10pval"]].columns.to_frame(),
+            )
+
+            # Add some example categorical and point-of-interest annotations
+            example_adata_diff.obs["diff_exp_status"] = example_adata_diff.to_df()["log2fc"].apply(
+                lambda x: "upregulated" if x > 1 else ("downregulated" if x < -1 else "unchanged")
+            )
+
+            example_adata_diff.obs["pathway"] = rng.choice(
+                ["pathway_A", "pathway_B", "pathway_C", "pathway_D", "pathway_E"], size=example_adata_diff.n_obs
+            )
+            example_adata_diff.obs["poi_status"] = rng.choice(
+                ["poi", "background"], size=example_adata_diff.n_obs, p=[0.01, 0.99]
+            )
+
+            # Specify a custom color dictionary for the categories we want to color
+            color_dict = {
+                "upregulated": BaseColors.get("red"),
+                "downregulated": BaseColors.get("blue"),
+                "unchanged": BaseColors.get("grey"),
+                "poi": BaseColors.get("black"),
+                "pathway_A": BaseColors.get("purple", lighten=0.5),
+            }
+
+            # In order to avoid repeating instructions for each layer, we can summarize the parameters for the whole plot in a configuration
+            layered_plot_config = pl.make_scatter_config(
+                data=example_adata_diff,  # all layers use the same data and numeric columns
+                x_column="log2fc",
+                y_column="neg_log10pval",
+                scatter_kwargs={"alpha": 0.7, "s": 30},  # make the points slightly transparent and set a good size
+            )
+
+            # Define layers: each layer is a tuple of (column to filter on, value to select, color key, optional plotting kwargs)
+            plot_layers = [
+                (
+                    "poi_status",
+                    "poi",
+                    "poi",
+                    {"scatter_kwargs": {"marker": "^", "s": 200}},
+                ),  # this layer gets custom scatterplot settings kwargs
+                ("pathway", "pathway_A", "pathway_A"),
+                ("diff_exp_status", "upregulated", "upregulated"),
+                ("diff_exp_status", "downregulated", "downregulated"),
+                ("diff_exp_status", "unchanged", "unchanged"),
+            ]
+
+            # Visualize the plot with layers
+            fig, axm = create_figure(1, 1, figsize=(6, 6))
+            ax = axm.next()
+            Plots.layered_plot(
+                ax=ax,
+                base_config=layered_plot_config,
+                layers=plot_layers,
+                color_dict=color_dict,
+                ylims=(0, 3),
+                xlims=(-3, 4.5),  # leave some space for labels on the right side
+            )
+
+            # Label axes
+            label_axes(
+                ax,
+                xlabel="log2 Fold Change",
+                ylabel="-log10 p-value",
+                title="Layered Volcano Plot of Differential Expression with Custom Colors and Highlighting",
+            )
+
+        """
+        color_dict = color_dict or {default_color_key: default_color}
+        default_layer_kwargs = default_layer_kwargs or {}
+        base_config = base_config or PlotConfig(data=None)
+        plotting_callable = plotting_callable or cls.scatter
+
+        # Get data from base_config
+        data = base_config.data
+        x_column = base_config.x_column
+        y_column = base_config.y_column
+
+        # By default, all datapoints are in the default layer
+        if layers is None:
+            data[default_layer_column] = data_index_to_array(data, "obs")
+            data[default_layer_column] = default_layer_val
+
+        layers = layers or [(default_layer_column, default_layer_val, default_color_key, default_layer_kwargs)]
+
+        # We need to ensure that we have consistent limits across all layers
+        xlims = xlims or _get_plot_lims(data_column_to_array(data, x_column), lim_padding_factor, sym="max")
+        ylims = ylims or _get_plot_lims(data_column_to_array(data, y_column), lim_padding_factor, sym="max")
+
+        # Prior to plotting, gather indices for each layer, ensuring no datapoint is used twice
+        glob_spent_idxs = []
+        glob_layer_idxs = []
+        entry_indices = np.arange(len(data))
+        for layer_specs in layers:
+            # Flexibly extract layer specifications: layer_kwargs are optional
+            layer_column, layer_val, color_key, layer_kwargs = _extract_plot_layer_specs(layer_specs)
+
+            # Create index mask for current layer
+            layer_column_array = data_column_to_array(data, layer_column)
+            current_layer_mask = np.isin(layer_column_array, _tolist(layer_val))
+
+            # Update the current layer mask to exclude points already assigned to previous layers
+            not_spent = ~np.isin(entry_indices, glob_spent_idxs)
+            current_layer_mask = current_layer_mask & not_spent
+
+            # Save indices for current layer
+            layer_idxs = entry_indices[current_layer_mask].tolist()
+
+            # Lookup color for current layer
+            layer_color = color_dict.get(color_key, default_color)
+            glob_layer_idxs.append((layer_idxs, layer_color, color_key, layer_kwargs))
+
+            # Update spent indices so they are not assigned again
+            glob_spent_idxs.extend(layer_idxs)
+
+        # If any indices are not spent, assign them to the default layer
+        if len(glob_spent_idxs) < len(data):
+            remaining_idxs = list(set(entry_indices) - set(glob_spent_idxs))
+            glob_layer_idxs.append(
+                (
+                    remaining_idxs,
+                    color_dict.get(default_color_key, default_color),
+                    default_color_key,
+                    default_layer_kwargs,
+                )
+            )
+            glob_spent_idxs.extend(remaining_idxs)
+
+        # Check that no points were left unassigned
+        if len(glob_spent_idxs) != len(data):
+            raise ValueError("Some data points were not assigned to any layer in the volcano plot.")
+
+        # Plot each layer in reverse order so that the first layer is on top
+        for layer_idxs, layer_color, _, layer_kwargs in reversed(glob_layer_idxs):
+            if len(layer_idxs) > 0:
+                # Global plotting parameters are retained/updated from the base_config.
+                layer_config = base_config.copy_with(
+                    data=subset_data(data, layer_idxs),
+                    color=layer_color,
+                    **layer_kwargs,
+                )
+                # ax and limits must be passed explicitly
+                plotting_callable(ax=ax, xlim=xlims, ylim=ylims, **layer_config.to_kwargs())
+
+        if return_glob_layer_indices:
+            return glob_layer_idxs
+
+        return None
 
     @classmethod
     def histogram(
@@ -568,39 +1111,127 @@ class Plots:
     ) -> None:
         """Plot a histogram from a DataFrame or AnnData object
 
+        Creates a histogram showing the distribution of values, with optional
+        grouping by a categorical column. When grouping is used, overlapping
+        histograms are created with the same bin edges for easy comparison.
+
         Parameters
         ----------
-        data : pd.DataFrame | ad.AnnData
-            Data to plot, must contain the value_column and optionally the color_column.
-        value_column : str
-            Column in data to plot as histogram. Must contain numeric data.
-        color_map_column : str, optional
-            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by a default filler string. Overrides color parameter. By default None.
-        bins : int, optional
-            Number of bins to use for the histogram. By default 10.
-        color : str, optional
-            Color to use for the histogram. By default "blue".
-        ax : plt.Axes, optional
-            Matplotlib axes object to plot on, if None a new figure is created. By default None.
-        palette : list[tuple], optional
-            List of colors to use for color encoding, if None a default palette is used. By default None.
-        color_dict: dict[str, str | tuple], optional
-            Supercedes palette, a dictionary mapping levels to colors. By default None. If provided, palette is ignored.
-        legend : str | mpl.legend.Legend, optional
-            Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
-        hist_kwargs : dict, optional
-            Additional keyword arguments for the matplotlib hist function. By default None.
-        legend_kwargs : dict, optional
-            Additional keyword arguments for the matplotlib legend function. By default None.
-        xlim : tuple[float, float], optional
-            Limits for the x-axis. By default None.
-        ylim : tuple[float, float], optional
-            Limits for the y-axis. By default None.
+        data
+            Data to plot, must contain the value_column and optionally
+            the color_map_column for grouping.
+        value_column
+            Column containing numeric values to plot in the histogram.
+        color_map_column
+            Column for categorical grouping. Each unique value gets its own
+            colored histogram overlay. NaN values are converted to strings.
+        bins
+            Number of bins for the histogram. Default is 10.
+        ax
+            Matplotlib axes to plot on. If None, a new figure is created.
+        color
+            Single color for ungrouped histogram. Default is "blue".
+        palette
+            Color palette for grouped histograms. Defaults to qualitative palette.
+        color_dict
+            Explicit mapping of groups to colors. Overrides palette if provided.
+        legend
+            If "auto", creates legend for grouped data. Can also pass existing Legend.
+        hist_kwargs
+            Additional arguments for matplotlib.hist() like:
+            - alpha: transparency (0-1)
+            - histtype: 'bar', 'step', 'stepfilled'
+            - edgecolor: outline color
+            - linewidth: outline width
+        legend_kwargs
+            Additional arguments for legend like title, loc, fontsize.
+        xlim
+            X-axis limits as (min, max).
+        ylim
+            Y-axis limits as (min, max).
 
         Returns
         -------
         None
 
+        Examples
+        --------
+        Simple histogram:
+
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            df = pd.DataFrame({"intensity": [1.5, 2.3, 2.8, 1.9, 3.1, 2.5]})
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.histogram(data=df, value_column="intensity", bins=30, color="skyblue", ax=ax)
+
+        Grouped histogram with transparency:
+
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            df = pd.DataFrame(
+                {
+                    "values": [1.5, 2.3, 2.8, 1.9, 3.1, 2.5, 4.2, 3.8],
+                    "condition": ["A", "A", "B", "B", "A", "B", "A", "B"],
+                }
+            )
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.histogram(
+                data=df,
+                value_column="values",
+                color_map_column="condition",
+                bins=20,
+                legend="auto",
+                hist_kwargs={"alpha": 0.7, "histtype": "stepfilled"},
+                legend_kwargs={"title": "Condition"},
+                ax=ax,
+            )
+
+        Custom color mapping:
+
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            example_df = pd.DataFrame(
+                {
+                    "values": [1, 2, 3, 4, 5, 6, 7, 8, 9],
+                    "levels": ["A", "B", "C", "A", "B", "C", "A", "B", "C"],
+                }
+            )
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.histogram(
+                data=example_df,
+                value_column="values",
+                color_map_column="levels",
+                color_dict={"A": "red", "B": "blue", "C": "green"},
+                bins=20,
+                ax=ax,
+                legend="auto",
+                hist_kwargs={"alpha": 0.7, "histtype": "stepfilled", "edgecolor": "k"},
+                legend_kwargs={"title": "Levels", "loc": "upper left"},
+            )
+
+        Notes
+        -----
+        - When grouping data, all groups use the same bin edges for comparison
+        - Unmapped groups in color_dict default to grey
+        - NaN values are excluded from the histogram
         """
         hist_kwargs = hist_kwargs or {}
         legend_kwargs = legend_kwargs or {}
@@ -661,7 +1292,7 @@ class Plots:
     @classmethod
     def scatter(
         cls,
-        data: pd.DataFrame | ad.AnnData,
+        data: ad.AnnData | pd.DataFrame,
         x_column: str,
         y_column: str,
         color: str | None = None,
@@ -673,8 +1304,11 @@ class Plots:
         legend: str | mpl.legend.Legend | None = None,
         scatter_kwargs: dict | None = None,
         legend_kwargs: dict | None = None,
+        figure_kwargs: dict | None = None,
+        default_group: str = "__data",
         xlim: tuple[float, float] | None = None,
         ylim: tuple[float, float] | None = None,
+        order: Literal["color_frequency", "original"] = "color_frequency",
     ) -> None:
         """Plot a scatterplot from a DataFrame or AnnData object
 
@@ -691,58 +1325,194 @@ class Plots:
             - If color_dict is None, and palette is not None: Use palette to automatically assign colors to each level.
             - If color_dict is None and palette is None: Use a repeating default palette to assign colors to each level.
         - color_map_column is numeric:
-            - If palette is a matplotlib colormap: Numerically map values to colors using the colormap. This means that e.g. 1 and 3 will be closer in color than 1 and 10.
+            - If palette is a matplotlib colormap: Quantitatively map values to colors using the colormap. This means that e.g. 1 and 3 will be closer in color than 1 and 10.
             - If palette is not a matplotlib colormap: Treat numeric values as categorical and color as described above.
-
-        - Examples:
-            - color_column="my_colors": Points colored by values in "my_colors" column (must contain valid colors)
-            - color_map_column="cell_type": Categorical mapping of cell types to colors
-            - color_map_column="expression", palette=plt.cm.viridis: Continuous gradient based on expression values
-
 
         Parameters
         ----------
-        data : pd.DataFrame | ad.AnnData
+        data
             Data to plot, must contain the x_column and y_column and optionally the color_column or color_map_column.
-        x_column : str
+        x_column
             Column in data to plot on the x-axis. Must contain numeric data.
-        y_column : str
+        y_column
             Column in data to plot on the y-axis. Must contain numeric data.
-        color : str, optional
+        color
             Color to use for the scatterplot. By default "blue".
-        color_map_column : str, optional
-            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by a default filler string. Overrides color parameter. By default None.
-        color_column : str, optional
-            Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
-        ax : plt.Axes, optional
+        color_map_column
+            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below).
+            Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by
+            a default filler string. Overrides color parameter. By default None.
+        color_column
+            Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.).
+            Overrides color and color_map_column parameters. By default None.
+        ax
             Matplotlib axes object to plot on, if None a new figure is created. By default None.
-        palette : list[str | tuple] | matplotlib.colors.Colormap, optional
-            List of colors to use for color encoding, if None a default palette is used. By default None.
-        color_dict: dict[str, str | tuple], optional
+        palette
+            List of colors to use for color encoding, if None a default palette is used.
+            Can be a matplotlib Colormap for continuous gradients. By default None.
+        color_dict
             Supercedes palette, a dictionary mapping levels to colors. By default None. If provided, palette is ignored.
-        legend : str | mpl.legend.Legend, optional
+        legend
             Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
-        scatter_kwargs : dict, optional
-            Additional keyword arguments for the matplotlib scatter function. By default None.
-        legend_kwargs : dict, optional
+        scatter_kwargs
+            Additional keyword arguments for the matplotlib scatter function (s, alpha, edgecolors, etc.). By default None.
+        legend_kwargs
             Additional keyword arguments for the matplotlib legend function. By default None.
-        xlim : tuple[float, float], optional
+        figure_kwargs : dict | None, optional
+            Additional keyword arguments for figure creation. By default None.
+        xlim
             Limits for the x-axis. By default None.
-        ylim : tuple[float, float], optional
+        ylim
             Limits for the y-axis. By default None.
+        order : str
+            Ordering of plotting data points. If "color_frequency", the rarest occuring colors are plotted on top. This is the default
+            and follows the assumption that rarer categories are more important to the plot's message (e.g. 1000 grey points should not cover 100 green points, which should not cover 10 red points).
+            If "original", the order of the data is kept as is, which is useful for plotting ordered categorical datapoints.
 
         Returns
         -------
         None
 
+        Examples
+        --------
+        Simple scatter with single color:
+
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            df = pd.DataFrame({"x": [1, 2, 3, 4, 5], "y": [2, 4, 1, 3, 5]})
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.scatter(data=df, x_column="x", y_column="y", color="red", ax=ax)
+
+        Categorical coloring with automatic palette:
+
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            df = pd.DataFrame(
+                {
+                    "x": [1, 2, 3, 4, 5],
+                    "y": [2, 4, 1, 3, 5],
+                    "category": ["A", "B", "A", "C", "B"],
+                }
+            )
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.scatter(
+                data=df,
+                x_column="x",
+                y_column="y",
+                color_map_column="category",
+                legend="auto",
+                ax=ax,
+            )
+
+        Custom color dictionary:
+
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            df = pd.DataFrame(
+                {
+                    "x": [1, 2, 3, 4, 5],
+                    "y": [2, 4, 1, 3, 5],
+                    "significance": ["significant", "not_significant", "significant", "not_significant", "significant"],
+                }
+            )
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.scatter(
+                data=df,
+                x_column="x",
+                y_column="y",
+                color_map_column="significance",
+                color_dict={"significant": "red", "not_significant": "gray"},
+                legend="auto",
+                scatter_kwargs={"s": 50, "alpha": 0.7},
+                ax=ax,
+            )
+
+        Quantitative gradient with numeric data:
+
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+            from alphapepttools.pl.colors import BaseColormaps
+
+            df = pd.DataFrame(
+                {
+                    "x": [1, 2, 3, 4, 5],
+                    "y": [2, 4, 1, 3, 5],
+                    "intensity": [1.0, 5.0, 10.0, 15.0, 20.0],
+                }
+            )
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.scatter(
+                data=df,
+                x_column="x",
+                y_column="y",
+                color_map_column="intensity",
+                palette=BaseColormaps.get("sequential"),
+                ax=ax,
+            )
+
+        Direct color values from column:
+
+        .. code-block:: python
+
+            import pandas as pd
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            df = pd.DataFrame(
+                {
+                    "x": [1, 2, 3, 4, 5],
+                    "y": [2, 4, 1, 3, 5],
+                    "my_colors": ["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF"],
+                }
+            )
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.scatter(
+                data=df,
+                x_column="x",
+                y_column="y",
+                color_column="my_colors",
+                ax=ax,
+            )
+
+        Notes
+        -----
+        - Points are ordered by color frequency (most frequent in back) for better visibility
+        - Unmapped values in color_dict default to grey
+        - NaN values in color columns are handled as strings
         """
         scatter_kwargs = scatter_kwargs or {}
         legend_kwargs = legend_kwargs or {}
-        DEFAULT_GROUP = "data"
-        DEFAULT_COLOR = BaseColors.get("blue")
+        figure_kwargs = figure_kwargs or {"figsize": (3, 3)}
+
+        default_color = BaseColors.get("blue")
 
         if ax is None:
-            _, axm = create_figure()
+            _, axm = create_figure(**figure_kwargs)
             ax = axm.next()
 
         # Directly use colors from the color_column
@@ -772,15 +1542,28 @@ class Plots:
 
                 color_values = np.array([color_dict[level] for level in color_map_column_array], dtype=object)
         else:
-            color_dict = {DEFAULT_GROUP: color or DEFAULT_COLOR}
-            color_values = np.array([color_dict[DEFAULT_GROUP]] * len(data))
+            color_dict = {default_group: color or default_color}
+            color_values = np.array([color_dict[default_group]] * len(data))
 
-        # Handle ordering of plotting arrays by string: order by the frequency of the color column
-        counts = Counter([str(cv) for cv in color_values])
-        order = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
-        x_values = data_column_to_array(data, x_column)[order]
-        y_values = data_column_to_array(data, y_column)[order]
-        color_values = np.array(color_values)[order]
+        # Get base arrays
+        x_values = data_column_to_array(data, x_column)
+        y_values = data_column_to_array(data, y_column)
+        color_values = np.array(color_values)
+
+        # Order points by color frequency if needed, so that points that occur only rarely are plotted on top.
+        # This solves issues with e.g. plotting 1000 points and coloring 10 of them red, where presumable the red ones should overplot the grey ones but not vice versa.
+        if order == "color_frequency":
+            counts = Counter([str(cv) for cv in color_values])
+            order_indices = np.argsort([counts[str(cv)] for cv in color_values])[::-1]
+
+            x_values = x_values[order_indices]
+            y_values = y_values[order_indices]
+            color_values = color_values[order_indices]
+
+            # In case users pass an array-like in kwargs, make sure the order is consistent. This concerns e.g. edgecolor, size, etc.
+            iterable_kwargs = find_iterable_kwargs(scatter_kwargs, match_length=len(color_values))
+            for k, v in iterable_kwargs.items():
+                scatter_kwargs[k] = list(np.array(v)[order_indices])
 
         ax.scatter(
             x=x_values,
@@ -797,10 +1580,12 @@ class Plots:
                 **legend_kwargs,
             )
 
-        if xlim:
-            ax.set_xlim(xlim)
-        if ylim:
-            ax.set_ylim(ylim)
+        # TODO: set this to flexible limits with optional symmetric padding
+        _set_optional_axis_limits(
+            ax=ax,
+            xlim=xlim,
+            ylim=ylim,
+        )
 
     @classmethod
     def barplot(
@@ -819,22 +1604,28 @@ class Plots:
         Each bar represents the mean of values within a group, with error bars showing the
         standard deviation. Bars have semi-transparent fill with opaque black outlines.
 
+        Two modes of operation:
+        1. **Grouping mode**: Use grouping_column/value_column to group data by categories
+        2. **Direct mode**: Use direct_columns to compare multiple columns directly
+
         Parameters
         ----------
-        ax : plt.Axes
+        ax
             Matplotlib axes object to plot on.
-        data : ad.AnnData | pd.DataFrame
+        data
             Data containing grouping and value columns or direct columns to plot.
-        grouping_column : list[str] | None, optional
-            Column containing the groups to compare. By default None.
-        value_column : list[str] | None, optional
-            Column whose values should be plotted. By default None.
-        direct_columns : list[str] | None, optional
-            Overrides grouping_column and value_column. Each column becomes a separate
-            bar group. By default None.
-        color : tuple, optional
+        grouping_column
+            Column containing the groups to compare (categorical).
+            Used with value_column for grouped comparisons. By default None.
+        value_column
+            Column whose values should be plotted (numeric).
+            Used with grouping_column for grouped comparisons. By default None.
+        direct_columns
+            List of column names to compare directly. Each column becomes a separate bar.
+            Overrides grouping_column and value_column. By default None.
+        color
             Default color for all bars. By default BaseColors.get("blue").
-        color_dict : dict | None, optional
+        color_dict
             Dictionary mapping group labels to specific colors. Overrides the color
             parameter for specified groups. By default None.
 
@@ -842,6 +1633,57 @@ class Plots:
         -------
         None
 
+        Examples
+        --------
+        Grouped comparison (long format):
+
+        .. code-block:: python
+
+            import pandas as pd
+            import anndata as ad
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            data = pd.DataFrame({"intensity": [1, 2, 3, 4, 5, 6, 7]})
+            obs = pd.DataFrame({"group": ["A", "A", "B", "B", "B", "C", "C"]})
+            adata = ad.AnnData(X=data.values, obs=obs, var=pd.DataFrame(index=data.columns))
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.barplot(
+                ax=ax,
+                data=adata,
+                grouping_column="group",
+                value_column="intensity",
+                color_dict={"A": "red", "B": "green", "C": "blue"},
+            )
+
+        Direct column comparison (wide format):
+
+        .. code-block:: python
+
+            import pandas as pd
+            import anndata as ad
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            data = pd.DataFrame({"protein1": [1, 2, 3], "protein2": [4, 5, 6], "protein3": [7, 8, 9]})
+            adata = ad.AnnData(X=data.values, var=pd.DataFrame(index=data.columns))
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.barplot(
+                ax=ax,
+                data=adata,
+                direct_columns=["protein1", "protein2", "protein3"],
+            )
+
+        Notes
+        -----
+        - Error bars show standard deviation of values within each group
+        - Bars have 50% transparency with opaque black outlines
+        - When using direct_columns, each column's mean is calculated across all rows
+        - Missing values (NaN) are excluded from mean and std calculations
         """
         data, labels, positions = _extract_groupwise_plotting_data(
             data=data,
@@ -889,22 +1731,28 @@ class Plots:
         Each box shows the median, quartiles, and outliers for values within a group.
         Boxes have semi-transparent fill with opaque black outlines, medians, whiskers, and caps.
 
+        Two modes of operation:
+        1. **Grouping mode**: Use grouping_column/value_column to group data by categories
+        2. **Direct mode**: Use direct_columns to compare multiple columns directly
+
         Parameters
         ----------
-        ax : plt.Axes
+        ax
             Matplotlib axes object to plot on.
-        data : ad.AnnData | pd.DataFrame
+        data
             Data containing grouping and value columns or direct columns to plot.
-        grouping_column : list[str] | None, optional
-            Column containing the groups to compare. By default None.
-        value_column : list[str] | None, optional
-            Column whose values should be plotted. By default None.
-        direct_columns : list[str] | None, optional
-            Overrides grouping_column and value_column. Each column becomes a separate
-            box plot. By default None.
-        color : tuple, optional
+        grouping_column
+            Column containing the groups to compare (categorical).
+            Used with value_column for grouped comparisons. By default None.
+        value_column
+            Column whose values should be plotted (numeric).
+            Used with grouping_column for grouped comparisons. By default None.
+        direct_columns
+            List of column names to compare directly. Each column becomes a separate box.
+            Overrides grouping_column and value_column. By default None.
+        color
             Default color for all boxes. By default BaseColors.get("blue").
-        color_dict : dict | None, optional
+        color_dict
             Dictionary mapping group labels to specific colors. Overrides the color
             parameter for specified groups. By default None.
 
@@ -912,6 +1760,58 @@ class Plots:
         -------
         None
 
+        Examples
+        --------
+        Grouped comparison (long format):
+
+        .. code-block:: python
+
+            import pandas as pd
+            import anndata as ad
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            data = pd.DataFrame({"intensity": [1, 2, 3, 4, 5, 6, 7]})
+            obs = pd.DataFrame({"group": ["A", "A", "B", "B", "B", "C", "C"]})
+            adata = ad.AnnData(X=data.values, obs=obs, var=pd.DataFrame(index=data.columns))
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.boxplot(
+                ax=ax,
+                data=adata,
+                grouping_column="group",
+                value_column="intensity",
+                color_dict={"A": "red", "B": "green", "C": "blue"},
+            )
+
+        Direct column comparison (wide format):
+
+        .. code-block:: python
+
+            import pandas as pd
+            import anndata as ad
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            data = pd.DataFrame({"protein1": [1, 2, 3], "protein2": [4, 5, 6], "protein3": [7, 8, 9]})
+            adata = ad.AnnData(X=data.values, var=pd.DataFrame(index=data.columns))
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.boxplot(
+                ax=ax,
+                data=adata,
+                direct_columns=["protein1", "protein2", "protein3"],
+            )
+
+        Notes
+        -----
+        - Boxes show median (center line), quartiles (box edges), and outliers (points)
+        - Whiskers extend to 1.5 * IQR or the most extreme non-outlier point
+        - Boxes have 50% transparency with opaque black outlines
+        - When using direct_columns, each column's distribution is shown separately
+        - Missing values (NaN) are excluded from the distribution calculations
         """
         data, labels, positions = _extract_groupwise_plotting_data(
             data=data,
@@ -970,22 +1870,28 @@ class Plots:
         medians, quartiles, and min/max whiskers. Violins have semi-transparent fill with
         opaque black outlines and internal statistical markers.
 
+        Two modes of operation:
+        1. **Grouping mode**: Use grouping_column/value_column to group data by categories
+        2. **Direct mode**: Use direct_columns to compare multiple columns directly
+
         Parameters
         ----------
-        ax : plt.Axes
+        ax
             Matplotlib axes object to plot on.
-        data : ad.AnnData | pd.DataFrame
+        data
             Data containing grouping and value columns or direct columns to plot.
-        grouping_column : list[str] | None, optional
-            Column containing the groups to compare. By default None.
-        value_column : list[str] | None, optional
-            Column whose values should be plotted. By default None.
-        direct_columns : list[str] | None, optional
-            Overrides grouping_column and value_column. Each column becomes a separate
-            violin plot. By default None.
-        color : tuple, optional
+        grouping_column
+            Column containing the groups to compare (categorical).
+            Used with value_column for grouped comparisons. By default None.
+        value_column
+            Column whose values should be plotted (numeric).
+            Used with grouping_column for grouped comparisons. By default None.
+        direct_columns
+            List of column names to compare directly. Each column becomes a separate violin.
+            Overrides grouping_column and value_column. By default None.
+        color
             Default color for all violins. By default BaseColors.get("blue").
-        color_dict : dict | None, optional
+        color_dict
             Dictionary mapping group labels to specific colors. Overrides the color
             parameter for specified groups. By default None.
 
@@ -993,6 +1899,58 @@ class Plots:
         -------
         None
 
+        Examples
+        --------
+        Grouped comparison (long format):
+
+        .. code-block:: python
+
+            import pandas as pd
+            import anndata as ad
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            data = pd.DataFrame({"intensity": [1, 2, 3, 4, 5, 6, 7]})
+            obs = pd.DataFrame({"group": ["A", "A", "B", "B", "B", "C", "C"]})
+            adata = ad.AnnData(X=data.values, obs=obs, var=pd.DataFrame(index=data.columns))
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.violinplot(
+                ax=ax,
+                data=adata,
+                grouping_column="group",
+                value_column="intensity",
+                color_dict={"A": "red", "B": "green", "C": "blue"},
+            )
+
+        Direct column comparison (wide format):
+
+        .. code-block:: python
+
+            import pandas as pd
+            import anndata as ad
+            from alphapepttools.pl.figure import create_figure
+            from alphapepttools.pl.plots import Plots
+
+            data = pd.DataFrame({"protein1": [1, 2, 3], "protein2": [4, 5, 6], "protein3": [7, 8, 9]})
+            adata = ad.AnnData(X=data.values, var=pd.DataFrame(index=data.columns))
+
+            fig, axm = create_figure(1, 1, figsize=(6, 4))
+            ax = axm.next()
+            Plots.violinplot(
+                ax=ax,
+                data=adata,
+                direct_columns=["protein1", "protein2", "protein3"],
+            )
+
+        Notes
+        -----
+        - Violins show kernel density estimation of the distribution
+        - Internal markers show median, quartiles, and min/max values
+        - Violins have 50% transparency with opaque black outlines
+        - When using direct_columns, each column's distribution is shown separately
+        - Missing values (NaN) are excluded from the distribution calculations
         """
         data, labels, positions = _extract_groupwise_plotting_data(
             data=data,
@@ -1045,34 +2003,72 @@ class Plots:
         legend: str | mpl.legend.Legend | None = None,
         scatter_kwargs: dict | None = None,
     ) -> None:
-        """Plot the ranked protein median intensities across all samples using the scatter method
+        """Rank plot showing median intensities across samples.
+
+        Computes the median intensity for each feature (protein/peptide) across all samples,
+        ranks them from highest to lowest, and creates a scatter plot with rank on the x-axis
+        and median intensity on the y-axis (log-scale). Useful for visualizing the dynamic
+        range of detected features and identifying highly abundant vs low-abundance features.
 
         Parameters
         ----------
-        data : ad.AnnData
-            AnnData to plot.
-        ax : plt.Axes
-            Matplotlib axes object to plot on, add labels and logscale the y-axis.
-        layer : str
-            The AnnData layer to calculate the median value (intensities) across sample. Default is "X"
-        color : str, optional
-            Color to use for the scatterplot. By default "blue".
-        color_map_column : str, optional
-            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by a default filler string. Overrides color parameter. By default None.
-        color_column : str, optional
-            Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
-        palette : list[str | tuple], optional
-            List of colors to use for color encoding, if None a default palette is used. By default None.
-        color_dict: dict[str, str | tuple], optional
-            A dictionary mapping levels to colors. By default None. If provided, palette is ignored.
-        legend : str | mpl.legend.Legend, optional
-            Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
-        scatter_kwargs : dict, optional
-            Additional keyword arguments for the matplotlib scatter function. By default None.
+        data
+            AnnData or DataFrame containing intensity values.
+        ax
+            Matplotlib axes object to plot on.
+        layer
+            The AnnData layer to use for calculating median intensities. Default is "X".
+        color
+            Single color for all points. Overridden by color_map_column or color_column.
+        color_map_column
+            Column in data.var (for AnnData) to use for color encoding. Values are mapped
+            to colors using the palette or color_dict. Overrides the color parameter.
+        color_column
+            Column in data.var (for AnnData) containing actual color values (hex, RGBA, etc.).
+            Overrides both color and color_map_column parameters.
+        palette
+            List of colors to use for color encoding. If None, a default palette is used.
+        color_dict
+            Dictionary mapping category values to specific colors. If provided, palette is ignored.
+        legend
+            Legend specification. Use "auto" to automatically create a legend from color_map_column.
+        scatter_kwargs
+            Additional keyword arguments passed to matplotlib scatter function (e.g., alpha, s).
 
-        Returns
-        -------
-        None
+        Examples
+        --------
+        Basic rank plot with single color:
+
+        .. code-block:: python
+
+            fig, ax = plt.subplots()
+            Plots.rank_median_plot(
+                data=adata,
+                ax=ax,
+                color=BaseColors.get("blue"),
+                scatter_kwargs={"alpha": 0.7},
+            )
+
+        Color by protein category:
+
+        .. code-block:: python
+
+            fig, ax = plt.subplots()
+            Plots.rank_median_plot(
+                data=adata,
+                ax=ax,
+                color_map_column="protein_type",
+                color_dict={"protein_type_A": "red", "protein_type_B": "green", "protein_type_C": "blue"},
+                legend="auto",
+                scatter_kwargs={"s": 20},
+            )
+
+        Notes
+        -----
+        - The y-axis is automatically set to log scale
+        - Features are ranked from highest to lowest median intensity
+        - For AnnData objects, var annotations can be used for coloring via color_map_column
+        - This is a convenience wrapper around the scatter() method with automatic data preparation
 
         """
         scatter_kwargs = scatter_kwargs or {}
@@ -1137,44 +2133,110 @@ class Plots:
         legend: str | mpl.legend.Legend | None = None,
         scatter_kwargs: dict | None = None,
     ) -> None:
-        """Plot the PCs of a PCA analysis using the scatter method
+        """PCA scatter plot showing principal component projections.
+
+        Visualizes PCA results by plotting two principal components against each other.
+        The function retrieves PCA embeddings from the AnnData object based on the dim_space
+        parameter: use "obs" for sample projections (most common, shows how samples relate)
+        or "var" for feature projections (shows how features/genes relate). Axes are
+        automatically labeled with explained variance percentages.
 
         Parameters
         ----------
-        adata : ad.AnnData
-            AnnData to plot.
-        ax : plt.Axes
-            Matplotlib axes object to plot on.
-        x_column : int
-            The PC principal component index to plot on the x axis, by default 1. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
-        y_column : int
-            The principal component index to plot on the y axis, by default 2. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
-        dim_space : str, optional
-            The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
-        embeddings_name : str | None, optional
-            The custom embeddings name used in PCA (given as input for `pca` function in `embeddings_name` ). If None, uses default naming convention. By default None.
-        label: bool,
-            Whether to add labels to the points in the scatter plot. by default False.
-        label_column: str | None = None,
-            Column in data.obs to use for labeling the points. If None, and label is True, data.obs.index labels are added. By default None.
-        color : str, optional
-            Color to use for the scatterplot. By default "blue".
-        color_map_column : str, optional
-            Column in data to use for color encoding. These values are mapped to the palette or the color_dict (see below). Its values cannot contain NaNs, therefore color_map_column is coerced to string and missing values replaced by a default filler string. Overrides color parameter. By default None.
-        color_column : str, optional
-            Column in data to plot the colors. This must contain actual color values (RGBA, hex, etc.). Overrides color and color_map_column parameters. By default None.
-        palette : list[str | tuple], optional
-            List of colors to use for color encoding, if None a default palette is used. By default None.
-        color_dict: dict[str, str | tuple], optional
-            Supercedes palette, a dictionary mapping levels to colors. By default None. If provided, palette is ignored.
-        legend : str | mpl.legend.Legend, optional
-            Legend to add to the plot, by default None. If "auto", a legend is created from the color_column. By default None.
-        scatter_kwargs : dict, optional
-            Additional keyword arguments for the matplotlib scatter function. By default None.
+        data
+            AnnData object containing PCA results (must have run PCA first).
+        x_column
+            Principal component number for x-axis (1-indexed, so 1 = PC1, 2 = PC2, etc.).
+        y_column
+            Principal component number for y-axis (1-indexed).
+        color
+            Single color for all points. Overridden by color_map_column or color_column.
+        color_map_column
+            Column in data.obs (for dim_space="obs") or data.var (for dim_space="var") to use
+            for color encoding. Values are mapped to colors using palette or color_dict.
+            Overrides the color parameter.
+        color_column
+            Column containing actual color values (hex, RGBA, etc.). Overrides both color
+            and color_map_column parameters.
+        dim_space
+            PCA space to visualize:
+            - "obs": Sample projections (default) - shows samples in PC space
+            - "var": Feature projections - shows features/genes in PC space
+        embeddings_name
+            Custom embeddings name if non-default name was used in the PCA function.
+            If None, uses default naming convention ("X_pca_obs" or "X_pca_var").
+        label
+            Whether to add text labels to points in the scatter plot.
+        label_column
+            Column to use for point labels. If None and label=True, uses the index
+            (data.obs.index for dim_space="obs", data.var.index for dim_space="var").
+        ax
+            Matplotlib axes to plot on. If None, a new figure is created.
+        palette
+            List of colors for color encoding. If None, uses default qualitative palette.
+        color_dict
+            Dictionary mapping category values to specific colors. Overrides palette.
+        legend
+            Legend specification. Use "auto" to create legend from color_map_column.
+        scatter_kwargs
+            Additional keyword arguments passed to matplotlib scatter (e.g., s, alpha).
 
-        Returns
-        -------
-        None
+        Examples
+        --------
+        Basic PCA plot with sample coloring:
+
+        .. code-block:: python
+
+            fig, ax = plt.subplots()
+            Plots.plot_pca(
+                data=adata,
+                ax=ax,
+                x_column=1,
+                y_column=2,
+                color_map_column="replicate",
+                legend="auto",
+            )
+
+        PCA with custom PC axes and labels:
+
+        .. code-block:: python
+
+            fig, ax = plt.subplots()
+            Plots.plot_pca(
+                data=adata,
+                ax=ax,
+                x_column=2,  # PC2
+                y_column=3,  # PC3
+                label=True,
+                label_column="sample_id",
+                color_map_column="treatment",
+                color_dict={"Control": "gray", "Drug": "red"},
+            )
+
+        Feature space PCA (var projection):
+
+        .. code-block:: python
+
+            # Show how proteins/genes relate to each other in PC space
+            fig, ax = plt.subplots()
+            Plots.plot_pca(
+                data=adata,
+                ax=ax,
+                x_column=1,
+                y_column=2,
+                dim_space="var",  # Feature projection instead of sample
+                color_map_column="protein_type",
+                scatter_kwargs={"s": 20, "alpha": 0.6},
+            )
+
+        Notes
+        -----
+        - PCA must be run on the AnnData object before calling this function
+        - Axis labels automatically include explained variance percentages (e.g., "PC1 (45.2%)")
+        - dim_space="obs" retrieves sample projections from obsm (most common usage)
+        - dim_space="var" retrieves feature projections from varm (less common)
+        - PC numbers are 1-indexed: x_column=1 corresponds to the first principal component
+        - This is a convenience wrapper around scatter() with automatic PCA data extraction
 
         """
         scatter_kwargs = scatter_kwargs or {}
@@ -1215,11 +2277,18 @@ class Plots:
                 labels = data.obs.index if label_column is None else data_column_to_array(data, label_column)
             else:  # dim_space == "var"
                 labels = data.var.index if label_column is None else data_column_to_array(data, label_column)
+
+            # Create a DataFrame with the PCA coordinates and labels for the new label_plot interface
+            label_df = pd.DataFrame(
+                {"x": adata_pca.X[:, x_column - 1], "y": adata_pca.X[:, y_column - 1], "label": labels}
+            )
+
             label_plot(
                 ax=ax,
-                x_values=adata_pca.X[:, x_column - 1],
-                y_values=adata_pca.X[:, y_column - 1],
-                labels=labels,
+                data=label_df,
+                x_column="x",
+                y_column="y",
+                label_column="label",
                 x_anchors=None,
             )
 
@@ -1237,28 +2306,63 @@ class Plots:
         embeddings_name: str | None = None,
         scatter_kwargs: dict | None = None,
     ) -> None:
-        """Plot the eigenvalues of each of the PCs using the scatter method
+        """Scree plot showing explained variance for each principal component.
+
+        Creates a scatter plot displaying the percentage of variance explained by each
+        principal component. Useful for determining how many PCs capture most of the
+        variation in the data and for deciding how many components to retain for analysis.
 
         Parameters
         ----------
-        adata : ad.AnnData
-            AnnData to plot.
-        ax : plt.Axes
+        adata
+            AnnData object containing PCA results (must have run PCA first).
+        ax
             Matplotlib axes object to plot on.
-        n_pcs : int,
-            number of PCs to plot, by default 20
-        dim_space : str, optional
-            The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
-        color : str, optional
-            Color to use for the scatterplot. By default "blue".
-        embeddings_name : str | None, optional
-            The custom embeddings name used in PCA. If None, uses default naming convention. By default None.
-        scatter_kwargs : dict, optional
-            Additional keyword arguments for the matplotlib scatter function. By default None.
+        n_pcs
+            Number of principal components to plot on the x-axis.
+        dim_space
+            PCA space to retrieve variance from:
+            - "obs": Sample space PCA (default) - variance explained across samples
+            - "var": Feature space PCA - variance explained across features
+        color
+            Color for the scatter points.
+        embeddings_name
+            Custom embeddings name if non-default name was used in the PCA function.
+            If None, uses default naming convention.
+        scatter_kwargs
+            Additional keyword arguments passed to matplotlib scatter (e.g., s, alpha).
 
-        Returns
-        -------
-        None
+        Examples
+        --------
+        Basic scree plot:
+
+        .. code-block:: python
+
+            fig, ax = plt.subplots()
+            Plots.scree_plot(adata=adata, ax=ax, n_pcs=50)
+
+        Scree plot with custom styling:
+
+        .. code-block:: python
+
+            fig, ax = plt.subplots()
+            Plots.scree_plot(adata=adata, ax=ax, n_pcs=30, color="red", scatter_kwargs={"s": 50, "alpha": 0.8})
+
+        Feature space scree plot:
+
+        .. code-block:: python
+
+            # Show variance explained in feature space PCA
+            fig, ax = plt.subplots()
+            Plots.scree_plot(adata=adata, ax=ax, n_pcs=20, dim_space="var")
+
+        Notes
+        -----
+        - PCA must be run on the AnnData object before calling this function
+        - Y-axis shows percentage of total variance explained by each PC
+        - dim_space="obs" shows variance for sample projections (most common)
+        - dim_space="var" shows variance for feature projections
+        - This is a convenience wrapper around scatter() with automatic variance data extraction
 
         """
         scatter_kwargs = scatter_kwargs or {}
@@ -1290,28 +2394,76 @@ class Plots:
         nfeatures: int = 20,
         scatter_kwargs: dict | None = None,
     ) -> None:
-        """Plot the gene loadings of a PC using the scatter method
+        """1D loadings plot showing top features contributing to a principal component.
+
+        Creates a scatter plot displaying the loadings (weights) of the top contributing
+        features for a single principal component. Loadings indicate how much each feature
+        (gene/protein) contributes to the PC. The plot shows the top N features ranked
+        by absolute loading value.
 
         Parameters
         ----------
-        data : ad.AnnData
-            AnnData to plot.
-        ax : plt.Axes
+        data
+            AnnData object containing PCA results (must have run PCA first).
+        ax
             Matplotlib axes object to plot on.
-        dim_space : str, optional
-            The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
-        embeddings_name : str | None, optional
-            The custom embeddings name used in PCA. If None, uses default naming convention. By default None.
-        dim : int
-            The PC number from which to get loadings, by default 1 (1-indexed, i.e. the first PC is 1, not 0).
-        nfeatures : int
-            The number of top absolute loadings features to plot, by default 20
-        scatter_kwargs : dict, optional
-            Additional keyword arguments for the matplotlib scatter function. By default None.
+        dim_space
+            PCA space to retrieve loadings from:
+            - "obs": Sample space PCA (default) - shows which features drive sample separation
+            - "var": Feature space PCA - shows which samples drive feature separation
+        embeddings_name
+            Custom embeddings name if non-default name was used in the PCA function.
+            If None, uses default naming convention.
+        dim
+            Principal component number to show loadings for (1-indexed, so 1 = PC1, 2 = PC2, etc.).
+        nfeatures
+            Number of top features (by absolute loading value) to display.
+        scatter_kwargs
+            Additional keyword arguments passed to matplotlib scatter (e.g., s, alpha).
 
-        Returns
-        -------
-        None
+        Examples
+        --------
+        Basic loadings plot for PC1:
+
+        .. code-block:: python
+
+            fig, ax = plt.subplots()
+            Plots.plot_pca_loadings(
+                data=adata,
+                ax=ax,
+                dim=1,
+                nfeatures=20,
+            )
+
+        Loadings plot for PC3 with more features:
+
+        .. code-block:: python
+
+            fig, ax = plt.subplots()
+            Plots.plot_pca_loadings(data=adata, ax=ax, dim=3, nfeatures=30, scatter_kwargs={"s": 50, "alpha": 0.8})
+
+        Feature space loadings (var projection):
+
+        .. code-block:: python
+
+            # Show which samples most influence feature PC1
+            fig, ax = plt.subplots()
+            Plots.plot_pca_loadings(
+                data=adata,
+                ax=ax,
+                dim=1,
+                dim_space="var",
+                nfeatures=15,
+            )
+
+        Notes
+        -----
+        - PCA must be run on the AnnData object before calling this function
+        - Features are ranked by absolute loading value (magnitude, not sign)
+        - Y-axis shows feature names, X-axis shows loading values
+        - dim_space="obs" shows feature loadings (most common - which proteins/genes matter)
+        - dim_space="var" shows sample loadings (which samples matter)
+        - This is a convenience wrapper around scatter() with automatic loadings data extraction
 
         """
         scatter_kwargs = scatter_kwargs or {}
@@ -1353,34 +2505,62 @@ class Plots:
         add_lines: bool = False,
         scatter_kwargs: dict | None = None,
     ) -> None:
-        """Plot the gene loadings of a PC using the scatter method
+        """2D loadings plot showing top features contributing to two principal components.
+
+        Creates a scatter plot displaying the first two principal component loadings against each other.
+        Loadings indicate how much each feature (gene/protein) contributes to each PC. The plot shows
+        all features used in the PCA as grey points, with the top N features (by absolute loading value)
+        highlighted in blue. Optionally, labels can be added to the top features.
 
         Parameters
         ----------
-        data : ad.AnnData
+        data
             AnnData to plot.
-        ax : plt.Axes
+        ax
             Matplotlib axes object to plot on.
-        dim_space : str, optional
+        dim_space
             The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection. By default "obs".
-        embeddings_name : str | None, optional
+        embeddings_name
             The custom embeddings name used in PCA. If None, uses default naming convention. By default None.
-        pc_x : int
+        pc_x
             The PC principal component index to plot on the x axis, by default 1. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
-        pc_y : int
+        pc_y
             The principal component index to plot on the y axis, by default 2. Corresponds to the principal component order, the first principal is 1 (1-indexed, i.e. the first PC is 1, not 0).
-        nfeatures : int
+        nfeatures
             The number of top absolute loadings features to label from each component, by default 20
-        add_labels : bool
+        add_labels
             Whether to add feature labels of the top `nfeatures` loadings. by default `True`.
-        add_lines : bool
+        add_lines
             If True, draw lines connecting the origin (0,0) to the points representing the top `nfeatures` loadings. Default is `False`.
-        scatter_kwargs : dict, optional
+        scatter_kwargs
             Additional keyword arguments for the matplotlib scatter function. By default None.
 
-        Returns
-        -------
-        None
+        Examples
+        --------
+        Basic 2D PCA loadings plot:
+
+        .. code-block:: python
+
+            fig, ax = plt.supplots()
+            Plots.plot_pca_loadings_2d(
+                data=adata,
+                ax=ax,
+                pc_x=1,
+                pc_y=2,
+                nfeatures=20,
+                add_labels=True,
+                add_lines=True,
+                scatter_kwargs=None,
+            )
+
+        Notes
+        -----
+        - PCA must be run on the AnnData object before calling this function
+        - Features are ranked by absolute loading value (magnitude, not sign)
+        - X and Y axes show loading values for the specified principal components
+        - dim_space="obs" shows feature loadings (most common - which proteins/genes matter)
+        - dim_space="var" shows sample loadings (which samples matter)
+        - This is a convenience wrapper around scatter() with automatic loadings data extraction
 
         """
         scatter_kwargs = scatter_kwargs or {}
@@ -1422,9 +2602,10 @@ class Plots:
         if add_labels:
             label_plot(
                 ax=ax,
-                x_values=loadings_top["dim1_loadings"],
-                y_values=loadings_top["dim2_loadings"],
-                labels=loadings_top["feature"],
+                data=loadings_top,
+                x_column="dim1_loadings",
+                y_column="dim2_loadings",
+                label_column="feature",
                 x_anchors=None,
                 label_kwargs={"fontsize": config["font_sizes"]["medium"], "ha": "center", "va": "bottom"},
                 line_kwargs={"color": BaseColors.get("black"), "linewidth": config["linewidths"]["medium"]},
@@ -1437,3 +2618,305 @@ class Plots:
         # set axis labels
         space_suffix = " (samples)" if dim_space == "obs" else " (features)"
         label_axes(ax, xlabel=f"PC{pc_x}{space_suffix}", ylabel=f"PC{pc_y}{space_suffix}")
+
+    @classmethod
+    def volcano(  # noqa: C901
+        cls,
+        # Required data parameters
+        data: ad.AnnData | pd.DataFrame,
+        x_column: str = "log2fc",
+        y_column: str = "-log10(p_value)",
+        # Core plotting parameters
+        ax: plt.Axes | None = None,
+        layers: list[tuple] | None = None,
+        color_dict: dict[str, str | tuple] | None = None,
+        # Volcano-specific thresholds
+        x_thresholds: float | tuple = (-1, 1),
+        y_thresholds: float | tuple = -np.log10(0.05),
+        # Labeling parameters
+        label_layers: list[str] | None = None,
+        display_id_column: str | None = None,
+        max_labels: int | None = None,
+        x_label_anchors: list[float] | None = None,
+        y_display_start: float = 1,
+        y_padding_factor: float = 4,
+        # Plot limits
+        xlims: tuple[float, float] | None = None,
+        ylims: tuple[float, float] | None = None,
+        # Styling parameters
+        scatter_kwargs: dict | None = None,
+        line_kwargs: dict | None = None,
+        label_kwargs: dict | None = None,
+        legend: str | mpl.legend.Legend | None = None,
+        legend_kwargs: dict | None = None,
+        # Default layer parameters
+        default_color: str | tuple = BaseColors.get("grey"),
+        default_group: str = "data",
+    ) -> None:
+        """Create a volcano plot for differential expression visualization
+
+        Volcano plots visualize differential expression results by plotting fold change (x-axis)
+        against statistical significance (y-axis). This function creates layered scatter plots
+        with threshold lines and optional point labeling.
+
+        Parameters
+        ----------
+        data
+            Data containing expression values and statistics
+        x_column
+            Column name for x-axis values (typically log fold change)
+        y_column
+            Column name for y-axis values (typically -log10 p-value)
+        ax
+            Axes to plot on. If None, creates new figure
+        layers
+            List of layer specifications for hierarchical plotting. Each tuple contains
+            (column_name, value(s), color_key[, scatter_kwargs]). Points are plotted
+            in reverse order (first layer on top). Example:
+            [("gene_type", "housekeeping", "hk_color"),
+             ("significance", "significant", "sig_color", {"s": 100})]
+        color_dict
+            Maps color keys from layers to actual colors. Example:
+            {"hk_color": "blue", "sig_color": "red"}
+        x_thresholds
+            X-axis values for vertical threshold lines. Default (-1, 1) for
+            fold change cutoffs
+        y_thresholds
+            Y-axis values for horizontal threshold lines. Default (-log10(0.05),)
+            for p-value cutoff
+        label_layers
+            Color keys of layers to label. Only points in these layers will have
+            text labels added
+        display_id_column
+            Column containing labels to display. If None, uses data index
+        max_labels
+            Maximum number of labels to show. Labels are prioritized by y-value
+        x_label_anchors
+            X-positions to anchor labels to (for alignment). If None, labels
+            appear at data point positions
+        y_display_start
+            Starting y-position for stacked labels (1=top, 0=bottom). Default 1
+        y_padding_factor
+            Vertical spacing multiplier between stacked labels. Default 4
+        xlims
+            X-axis limits. If None, calculated from data with padding
+        ylims
+            Y-axis limits. If None, calculated from data with padding
+        scatter_kwargs
+            Additional arguments passed to scatter plot (e.g., {"s": 50, "alpha": 0.5})
+        line_kwargs
+            Additional arguments for threshold lines (e.g., {"linewidth": 2, "linestyle": "--"})
+        label_kwargs
+            Additional arguments for axis labels
+        legend
+            Legend specification. If "auto", creates legend from color_dict
+        legend_kwargs
+            Additional arguments for legend
+        default_color
+            Color for points not matching any layer. Default grey
+        default_group
+            Name for the default layer containing unassigned points. Default "data"
+
+        Returns
+        -------
+        None
+
+        See Also
+        --------
+        layered_plot : Core layering functionality
+        add_lines : Add threshold lines
+        label_plot : Add text labels
+
+        Notes
+        -----
+        The layering system ensures each point appears in exactly one layer.
+        Points are assigned to the first matching layer in the list.
+        Unassigned points go to the default layer (plotted in background).
+
+        Examples
+        --------
+        Create a volcano plot with differential expression data:
+
+        .. code-block:: python
+
+            import numpy as np
+            import pandas as pd
+            from alphapepttools.pl import Plots, BaseColors
+
+            # Generate example differential expression data
+            rng = np.random.default_rng(seed=42)
+            testx = rng.normal(0, 1, 300)
+            testy = -np.cos(testx) + rng.normal(0, 0.2, 300)
+            testp = 10 ** -(testy - min(testy))
+
+            data = pd.DataFrame(
+                {
+                    "id": [f"P{10000 + i}" for i in range(300)],
+                    "gene": [f"gene_{i}" for i in range(300)],
+                    "log2fc": testx,
+                    "pval": testp,
+                    "neg_log10pval": -np.log10(testp),
+                }
+            )
+            data.index = data["id"]
+
+            # Add differential expression status
+            data["diff_exp_status"] = data["log2fc"].apply(
+                lambda x: "upregulated" if x > 1 else ("downregulated" if x < -1 else "unchanged")
+            )
+
+            # Mark first 10 genes as proteins of interest
+            data["label"] = "other"
+            data.loc[data.index[:10], "label"] = "POI"
+
+            # Define specific proteins to highlight
+            pois = ["P10291", "P10292", "P10293", "P10294", "P10295"]
+
+            # Define visualization layers (plotted in reverse order)
+            plot_layers = [
+                ("id", pois, "POI_hypothesis"),  # Specific hypothesis proteins on top
+                ("label", "POI", "POI"),  # General POI proteins
+                ("diff_exp_status", "upregulated", "upregulated"),  # Upregulated
+                ("diff_exp_status", "downregulated", "downregulated"),  # Downregulated
+                ("diff_exp_status", "unchanged", "unchanged"),  # Background
+            ]
+
+            # Define colors for each layer
+            color_dict = {
+                "upregulated": BaseColors.get("orange"),
+                "downregulated": BaseColors.get("blue"),
+                "unchanged": BaseColors.get("grey"),
+                "POI": "black",
+                "POI_hypothesis": BaseColors.get("purple", lighten=0.7),
+            }
+
+            # Specify which layers to label
+            label_layers = ["POI", "POI_hypothesis"]
+
+            # Create volcano plot
+            Plots.volcano(
+                data=data,
+                x_column="log2fc",
+                y_column="neg_log10pval",
+                color_dict=color_dict,
+                layers=plot_layers,
+                label_layers=label_layers,
+                x_label_anchors=[-3.5, 3.5],  # Anchor labels to left/right
+                y_padding_factor=1.7,  # Vertical spacing between labels
+                y_display_start=0.75,  # Start labels at 75% from bottom
+                xlims=(-6, 6),
+            )
+
+        This creates a volcano plot where:
+
+        - Background points (unchanged) appear in grey
+        - Differentially expressed genes are colored orange (up) or blue (down)
+        - Proteins of interest (POI) are highlighted in black
+        - Specific hypothesis proteins are emphasized in purple on top
+        - Only POI and hypothesis proteins receive text labels
+
+        """
+        data = data.copy()
+
+        label_kwargs = label_kwargs or {}
+        scatter_kwargs = scatter_kwargs or {}
+        line_kwargs = line_kwargs or {}
+        legend_kwargs = legend_kwargs or {}
+        x_thresholds = (x_thresholds,) if isinstance(x_thresholds, (int, float)) else x_thresholds
+        y_thresholds = (y_thresholds,) if isinstance(y_thresholds, (int, float)) else y_thresholds
+
+        # Generate a plotting config
+        plot_config = make_scatter_config(
+            data=data,
+            x_column=x_column,
+            y_column=y_column,
+            scatter_kwargs=scatter_kwargs,
+        )
+
+        # get limits
+        if xlims is None:
+            xlims = _get_plot_lims(
+                data_column_to_array(data, x_column),
+                padding_factor=1.1,
+                sym="max",
+            )
+        if ylims is None:
+            ylims = _get_plot_lims(
+                data_column_to_array(data, y_column),
+                padding_factor=1.1,
+                set_left=0,
+            )
+
+        # Initialize alphapepttools style figure and axes if not provided
+        if ax is None:
+            _, axm = create_figure()
+            ax = axm.next()
+
+        # Add decoration to volcanoplot prior to setting limits
+        add_lines(ax=ax, linetype="vline", intercepts=list(x_thresholds), line_kwargs=line_kwargs)
+        add_lines(ax=ax, linetype="hline", intercepts=list(y_thresholds), line_kwargs=line_kwargs)
+
+        # Visualize & keep track of display layers for labelling
+        global_layer_indices = cls.layered_plot(
+            ax=ax,
+            base_config=plot_config,
+            layers=layers,
+            color_dict=color_dict,
+            xlims=xlims,
+            ylims=ylims,
+            return_glob_layer_indices=True,
+            default_color=default_color,
+            default_color_key=default_group,
+        )
+
+        # Labeling
+        if label_layers is not None:
+            idxs_to_label = []
+            for layer_idxs, _, color_key, _ in global_layer_indices:
+                if color_key in label_layers:
+                    idxs_to_label.extend(layer_idxs)
+
+            if idxs_to_label:
+                # Extract points for labeling
+                label_df = coerce_to_dataframe(subset_data(data, idxs_to_label))
+
+                # Sort by y values (descending) to minimize crossing lines between labels and points
+                label_df = label_df.sort_values(y_column, ascending=False)
+
+                # Get display labels, fall back to index if no display_id_column is provided
+                if display_id_column is not None:
+                    label_df["__label__"] = data_column_to_array(label_df, display_id_column)
+                else:
+                    label_df["__label__"] = data_index_to_array(label_df, "obs")
+
+                # Apply max_labels if specified
+                if max_labels is not None and len(label_df) > max_labels:
+                    label_df = label_df.head(max_labels)
+
+                label_plot(
+                    ax=ax,
+                    data=label_df,
+                    x_column=x_column,
+                    y_column=y_column,
+                    label_column="__label__",
+                    y_display_start=y_display_start,
+                    x_anchors=x_label_anchors,
+                    y_padding_factor=y_padding_factor,
+                )
+
+        # Sensible default axis labeling
+        label_axes(
+            ax=ax,
+            xlabel=x_column,
+            ylabel=y_column,
+            title="Volcano Plot",
+            **label_kwargs,
+        )
+
+        # Add legend from color dict
+        if legend is not None and color_dict is not None:
+            add_legend_to_axes(
+                ax=ax,
+                levels=color_dict,
+                **legend_kwargs,
+            )

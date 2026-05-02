@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from alphapepttools.metrics import pooled_coefficient_of_variation, pooled_median_absolute_deviation
-from alphapepttools.metrics._group_level import _compute_groupwise_metric, _pcv, _pmad, _set_nested_dict
+from alphapepttools.metrics.group_level import _compute_groupwise_metric, _pcv, _pmad, _set_nested_dict
 
 
 class TestSetNestedDict:

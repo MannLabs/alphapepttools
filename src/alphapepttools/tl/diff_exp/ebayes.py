@@ -5,7 +5,13 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import patsy
-from inmoose import limma
+
+try:
+    from inmoose import limma
+
+    _HAS_INMOOSE = True
+except ModuleNotFoundError:
+    _HAS_INMOOSE = False
 
 from alphapepttools.pp.data import filter_data_completeness
 from alphapepttools.tl import tl_defaults
@@ -24,7 +30,7 @@ def _generate_patsy_design_matrix(
     level_1: str,
     level_2: str,
 ) -> tuple:
-    """Generate Patsy design matrix with correct column ordering
+    """Generate Patsy design matrix with correct column ordering.
 
     Patsy automatically sorts columns alphabetically, which can cause issues with
     contrast specifications. This function creates a design matrix and returns
@@ -32,20 +38,19 @@ def _generate_patsy_design_matrix(
 
     Parameters
     ----------
-    adata_subset : ad.AnnData
-        AnnData object filtered to only include samples from the comparison
-    between_column : str
-        Column name in adata.obs containing the contrast levels
-    level_1 : str
-        First level (treatment)
-    level_2 : str
-        Second level (control)
+    adata_subset
+        AnnData object filtered to only include samples from the comparison.
+    between_column
+        Column name in adata.obs containing the contrast levels.
+    level_1
+        First level (treatment).
+    level_2
+        Second level (control).
 
     Returns
     -------
     tuple
-        Design matrix and ordered column names
-
+        Design matrix and ordered column names.
     """
     # Create design dataframe with condition as categorical factor
     design_df = pd.DataFrame(
@@ -69,23 +74,22 @@ def _standardize_limma_results(
     comparison_key: str,
     result_df: pd.DataFrame,
 ) -> pd.DataFrame:
-    """Standardize Limma eBayes result columns
+    """Standardize Limma eBayes result columns.
 
     To harmonize the output of Limma with other methods, we rename some columns and
-    add columns for context
+    add columns for context.
 
     Parameters
     ----------
-    comparison_key : str
+    comparison_key
         Identifier for the comparison, e.g. "group1_VS_group2".
-    result_df : pd.DataFrame
+    result_df
         DataFrame with ttest results.
 
     Returns
     -------
     pd.DataFrame
         DataFrame with Limma eBayes differential expression results.
-
     """
     result_df = result_df.copy()
     diff_exp_columns = tl_defaults.DIFF_EXP_COLS.copy()
@@ -116,21 +120,30 @@ def diff_exp_ebayes(
     between_column: str,
     comparison: tuple[str, str],
 ) -> tuple[str, pd.DataFrame]:
-    """Run Limma eBayes moderated ttest for differential expression
+    """Run Limma eBayes moderated ttest for differential expression.
 
     Parameters
     ----------
-    adata : ad.AnnData
-        AnnData object with expression data in .X and sample metadata in .obs
-    between_column : str
-        Column name in adata.obs containing the contrast levels
-    comparison : tuple
-        Two levels to compare, meant to follow the convention (treatment, control)
+    adata
+        AnnData object with expression data in .X and sample metadata in .obs.
+    between_column
+        Column name in adata.obs containing the contrast levels.
+    comparison
+        Two levels to compare, meant to follow the convention (treatment, control).
 
     Returns
     -------
-    pd.DataFrame | None
-        DataFrame with Limma eBayes differential expression results.
+    tuple[str, pd.DataFrame]
+        Tuple containing:
+        - comparison_key: String identifier for the comparison (e.g., "treatment_VS_control")
+        - result_df: DataFrame with standardized Limma eBayes differential expression results.
+
+    Raises
+    ------
+    ImportError
+        If inmoose is not installed.
+    ValueError
+        If specified levels are not found in the between_column.
 
     Notes
     -----
@@ -139,7 +152,27 @@ def diff_exp_ebayes(
     values should be retained, their missing values must be imputed prior to running
     this function.
 
+    Examples
+    --------
+    Run empirical Bayes moderated t-test between treatment groups:
+
+    .. code-block:: python
+
+        comparison_key, ebayes_results = at.tl.diff_exp_ebayes(
+            adata=adata_precursor,
+            between_column="treatment",
+            comparison=("treated", "control"),
+        )
+
+        # Access significant proteins
+        significant = ebayes_results[ebayes_results["fdr"] < 0.05]
+
     """
+    if not _HAS_INMOOSE:
+        raise ImportError(
+            "inmoose is required for diff_exp_ebayes(). Install it through pip or install alphapepttools with the 'full'/'full-stable' extra."
+        )
+
     logger.info("Running Limma eBayes differential expression analysis via inmoose")
 
     # Validate inputs (simplified without min_valid_values)

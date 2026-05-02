@@ -1,5 +1,6 @@
 """Pooled median absolute deviation"""
 
+import numbers
 from collections.abc import Callable
 
 import anndata as ad
@@ -7,7 +8,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import median_abs_deviation
 
-from ._feature_level import _cv
+from .feature_level import _cv
 
 METRICS_KEY = "metrics"
 PMAD_KEY = "pmad"
@@ -75,8 +76,18 @@ def _compute_groupwise_metric(
 
     Returns
     -------
-    dict[str, float]
-        Per group the computed aggregated metric
+    Per group the computed aggregated metric
+
+    Examples
+    --------
+    .. code-block:: python
+
+        from alphapepttools.metrics.group_level import _compute_groupwise_metric, _pcv
+
+        # Compute pooled CV for each experimental condition
+        pcv_groupwise = _compute_groupwise_metric(adata=adata, func=_pcv, group_key="condition", min_valid=3)
+        print(pcv_groupwise)  # {'control': 0.25, 'treated': 0.31}
+
     """
     groups = adata.obs.groupby(group_key)
     data = adata.X if layer is None else adata.layers[layer]
@@ -85,8 +96,9 @@ def _compute_groupwise_metric(
     for group_name, indices in groups.indices.items():
         result = func(data[indices, :], **kwargs)
 
-        if not isinstance(result, (float, int)):
-            raise TypeError(f"`func` needs to return a numeric value (float, int), but returned {type(result)}")
+        # Check if result is a numeric scalar (handles numpy types and python built-ins)
+        if not isinstance(result, numbers.Real):
+            raise TypeError(f"`func` needs to return a numeric value, but returned {type(result).__name__}: {result}")
 
         metrics[group_name] = result
 
@@ -111,8 +123,20 @@ def _pmad(x: np.ndarray) -> float:
 
     Returns
     -------
-    float
-        Pooled median absolute deviation over features
+    Pooled median absolute deviation over features
+
+    Examples
+    --------
+    .. code-block:: python
+
+        import numpy as np
+        from alphapepttools.metrics.group_level import _pmad
+
+        # Data for one group (5 samples, 3 features)
+        data = np.array([[1, 2, 3], [1.1, 2.2, 3.1], [0.9, 1.9, 2.8], [1.2, 2.1, 3.2], [0.8, 2.0, 3.0]])
+        pmad_value = _pmad(data)
+        print(f"PMAD: {pmad_value:.3f}")
+
     """
     # Compute feature-wise MAD (axis=0) and aggregate over all features
     mad = median_abs_deviation(x, axis=0)
@@ -134,11 +158,25 @@ def _pcv(x: np.ndarray, min_valid: int) -> float:
     ----------
     x
         Count data of shape (observations, features)
+    min_valid
+        Minimum number of valid values required for CV computation
 
     Returns
     -------
-    float
-        Pooled coefficient of variation over features while ignoring nans.
+    Pooled coefficient of variation over features while ignoring nans
+
+    Examples
+    --------
+    .. code-block:: python
+
+        import numpy as np
+        from alphapepttools.metrics.group_level import _pcv
+
+        # Data for one group (5 samples, 3 features)
+        data = np.array([[10, 20, 30], [11, 22, 31], [9, 19, 28], [12, 21, 32], [8, 20, 30]])
+        pcv_value = _pcv(data, min_valid=3)
+        print(f"PCV: {pcv_value:.3f}")
+
     """
     # Compute feature-wise CV (axis=0) and aggregate over all features
     cv = _cv(x, min_valid=min_valid, axis=0)
@@ -168,23 +206,45 @@ def pooled_coefficient_of_variation(
 
     Parameters
     ----------
-    adata : AnnData
-        Annotated data matrix.
+    adata
+        Annotated data matrix
     group_key
-        Column in `adata.obs` that defines the sample groups to evaluate (e.g., biological replicates or batches).
+        Column in `adata.obs` that defines the sample groups to evaluate (e.g., biological replicates or batches)
     min_valid
-        Minimal number of valid samples to
+        Minimal number of valid samples to compute CV
     layer
-        Layer for which the metric is computed.
+        Layer for which the metric is computed
     inplace
-        If `True`, the results are added to `adata.uns['pmad']`. The object is changed in place
-        If `False`, a :class:`pandas.DataFrame` with the PMAD values is returned.
+        If `True`, the results are added to `adata.uns['metrics']['pcv']`. The object is changed in place.
+        If `False`, a DataFrame with the PCV values is returned
 
     Returns
     -------
-    AnnData or pandas.DataFrame
-        If `inplace=True`, modifies the input `adata` with PCV values stored in `adata.uns["metrics"]["pcv"]`.
-        If `inplace=False`, returns a DataFrame containing PCV values per group.
+    If `inplace=True`, modifies the input `adata` with PCV values stored in `adata.uns["metrics"]["pcv"]`.
+    If `inplace=False`, returns a DataFrame containing PCV values per group
+
+    Examples
+    --------
+    .. code-block:: python
+
+        import numpy as np
+        import anndata as ad
+        import pandas as pd
+        import alphapepttools as at
+
+        # Create example data
+        adata = ad.AnnData(
+            X=np.array([[1, 2], [5, 1], [6, 6], [9, 3], [4, 8], [7, 4]]),
+            obs=pd.DataFrame({"replicate_group": ["A", "A", "A", "B", "B", "B"]}),
+            var=pd.DataFrame(index=["feature1", "feature2"]),
+        )
+
+        # Compute PCV for technical replicates
+        at.metrics.pooled_coefficient_of_variation(adata, group_key="replicate_group")
+
+        # Access results
+        print(adata.uns["metrics"]["pcv"])
+        # # {'A': 0.63, 'B': 0.37}
 
     See Also
     --------
@@ -228,21 +288,43 @@ def pooled_median_absolute_deviation(
 
     Parameters
     ----------
-    adata : AnnData
-        Annotated data matrix.
+    adata
+        Annotated data matrix
     group_key
-        Column in `adata.obs` that defines the sample groups to evaluate (e.g., biological replicates or batches).
+        Column in `adata.obs` that defines the sample groups to evaluate (e.g., biological replicates or batches)
     layer
-        Layer for which the metric is computed.
+        Layer for which the metric is computed
     inplace
-        If `True`, the results are added to `adata.uns['pmad']`. The object is changed in place
-        If `False`, a :class:`pandas.DataFrame` with the PMAD values is returned.
+        If `True`, the results are added to `adata.uns['metrics']['pmad']`. The object is changed in place.
+        If `False`, a DataFrame with the PMAD values is returned
 
     Returns
     -------
-    AnnData or pandas.DataFrame
-        If `inplace=True`, modifies the input `adata` with PMAD values stored in `adata.uns["metrics"]["pmad"]`.
-        If `inplace=False`, returns a DataFrame containing PMAD values per group.
+    If `inplace=True`, modifies the input `adata` with PMAD values stored in `adata.uns["metrics"]["pmad"]`.
+    If `inplace=False`, returns a DataFrame containing PMAD values per group
+
+    Examples
+    --------
+    .. code-block:: python
+
+        import numpy as np
+        import anndata as ad
+        import pandas as pd
+        import alphapepttools as at
+
+        # Create example data
+        adata = ad.AnnData(
+            X=np.array([[1, 2], [5, 1], [6, 6], [9, 3], [4, 8], [7, 4]]),
+            obs=pd.DataFrame({"condition": ["ctrl", "ctrl", "ctrl", "treat", "treat", "treat"]}),
+            var=pd.DataFrame(index=["feature1", "feature2"]),
+        )
+
+        # Compute PMAD for biological conditions
+        at.metrics.pooled_median_absolute_deviation(adata, group_key="condition")
+
+        # Access results
+        print(adata.uns["metrics"]["pmad"])
+        # {'ctrl': 1, 'treat': 1.5}
 
     Notes
     -----
