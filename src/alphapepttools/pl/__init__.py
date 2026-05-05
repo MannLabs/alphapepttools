@@ -2,7 +2,7 @@ from .colors import BaseColormaps, BaseColors, BasePalettes, get_color_mapping
 from .figure import create_figure, label_axes, save_figure
 from .plots import (
     PlotConfig,
-    Plots,  # Kept here for backward compatibility, Plots leads to a deprecation warning.
+    Plots,  # Kept here for backward compatibility, using Plots raises and alerts the user about the deprecation and how to upgrade.
     add_legend_to_axes,
     add_legend_to_axes_from_patches,
     add_lines,
