@@ -21,6 +21,7 @@
     pp.impute_knn
     pp.impute_bpca
     pp.scanpy_pycombat
+    pp.drop_singleton_batches
 
 ```
 
@@ -39,14 +40,14 @@
     tl.nan_safe_ttest_ind
     tl.diff_exp_ttest
     tl.diff_exp_alphaquant
+    tl.diff_exp_ebayes
     tl.pca
     tl.bpca
-    tl.diff_exp_ebayes
     tl.extract_pca_anndata
     tl.prepare_pca_1d_loadings_data_to_plot
     tl.prepare_pca_2d_loadings_data_to_plot
     tl.prepare_scree_data_to_plot
-    tl.prepare_pca_1d_loadings_data_to_plot
+    tl.tl_defaults
 ```
 
 ## Metrics
@@ -84,6 +85,8 @@
     pl.BaseColormaps
     pl.BaseColors
     pl.BasePalettes
+    pl.MappedColormaps
+    pl.show_rgba_color_list
     pl.PlotConfig
     pl.make_scatter_config
     pl.add_legend_to_axes
