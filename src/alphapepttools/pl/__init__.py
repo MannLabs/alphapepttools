@@ -1,4 +1,4 @@
-from .colors import BaseColormaps, BaseColors, BasePalettes, get_color_mapping
+from .colors import BaseColormaps, BaseColors, BasePalettes, MappedColormaps, get_color_mapping, show_rgba_color_list
 from .figure import create_figure, label_axes, save_figure
 from .plots import (
     PlotConfig,
@@ -26,6 +26,7 @@ __all__ = [
     "BaseColormaps",
     "BaseColors",
     "BasePalettes",
+    "MappedColormaps",
     "PlotConfig",
     "Plots",
     "add_legend_to_axes",
@@ -47,6 +48,7 @@ __all__ = [
     "save_figure",
     "scatter",
     "scree_plot",
+    "show_rgba_color_list",
     "violinplot",
     "volcano",
 ]
