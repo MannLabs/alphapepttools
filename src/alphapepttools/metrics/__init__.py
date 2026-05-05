@@ -6,7 +6,7 @@ from .feature_level import (
     pooled_median_absolute_deviation,
 )
 from .principal_component_regression import principal_component_regression
-from .qc import (
+from .sample_and_feature_level import (
     calculate_qc_metrics,
     fraction_complete,
     number_detected,

@@ -1,4 +1,4 @@
-"""Quality control summary metrics over observations and features"""
+"""Summary metrics that operate on observations or features"""
 
 import warnings
 
