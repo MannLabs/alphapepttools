@@ -32,9 +32,7 @@ def _cv(data: np.ndarray, *, min_valid: int = 3, axis: int = 0) -> np.ndarray:
     number of non-na values is smaller than min_valid
 
     """
-    # Slices with zero (or, for std, ≤1) valid values produce harmless RuntimeWarnings
-    # from nanmean/nanstd. The resulting NaNs are then masked out by `min_valid` below,
-    # so the warnings carry no information for the caller.
+    # Silence runtime warnings from nanmean/nanstd. The NaNs are anyway masked out by `min_valid` below so the warnings carry no information for the caller.
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", category=RuntimeWarning, message="Mean of empty slice")
         warnings.filterwarnings("ignore", category=RuntimeWarning, message="Degrees of freedom <= 0")
@@ -119,7 +117,7 @@ def coefficient_of_variation(
         import numpy as np
         import anndata as ad
         import pandas as pd
-        import alphapepttools as at
+        import alphapepttools as apt
 
         adata = ad.AnnData(
             X=np.array([[1, 2], [5, 1], [6, 6], [9, 3], [4, 8], [7, 4]]),
@@ -127,14 +125,14 @@ def coefficient_of_variation(
             var=pd.DataFrame(index=["protein1", "protein2"]),
         )
 
-        at.metrics.coefficient_of_variation(adata)
+        apt.metrics.coefficient_of_variation(adata)
         print(adata.var["cv"])  # one CV per feature across all samples
 
     Compute one CV per feature per group, e.g. for replicate groups:
 
     .. code-block:: python
 
-        at.metrics.coefficient_of_variation(adata, group_column="group")
+        apt.metrics.coefficient_of_variation(adata, group_column="group")
         print(adata.varm["cv"])
         # DataFrame indexed by var_names, columns are group labels:
         #            A    B
@@ -351,7 +349,7 @@ def pooled_coefficient_of_variation(
         import numpy as np
         import anndata as ad
         import pandas as pd
-        import alphapepttools as at
+        import alphapepttools as apt
 
         # Create example data
         adata = ad.AnnData(
@@ -361,7 +359,7 @@ def pooled_coefficient_of_variation(
         )
 
         # Compute PCV for technical replicates
-        at.metrics.pooled_coefficient_of_variation(adata, group_column="replicate_group")
+        apt.metrics.pooled_coefficient_of_variation(adata, group_column="replicate_group")
 
         # Access results
         print(adata.uns["metrics"]["pcv"])
@@ -473,7 +471,7 @@ def pooled_median_absolute_deviation(
         import numpy as np
         import anndata as ad
         import pandas as pd
-        import alphapepttools as at
+        import alphapepttools as apt
 
         # Create example data
         adata = ad.AnnData(
@@ -483,7 +481,7 @@ def pooled_median_absolute_deviation(
         )
 
         # Compute PMAD for biological conditions
-        at.metrics.pooled_median_absolute_deviation(adata, group_column="condition")
+        apt.metrics.pooled_median_absolute_deviation(adata, group_column="condition")
 
         # Access results
         print(adata.uns["metrics"]["pmad"])
