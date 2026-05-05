@@ -47,7 +47,6 @@
     tl.prepare_pca_1d_loadings_data_to_plot
     tl.prepare_pca_2d_loadings_data_to_plot
     tl.prepare_scree_data_to_plot
-    tl.tl_defaults
 ```
 
 ## Metrics
