@@ -2702,11 +2702,14 @@ class Plots:
         ax
             Axes to plot on. If None, creates new figure
         layers
-            List of layer specifications for hierarchical plotting. Each tuple contains
-            (column_name, value(s), color_key[, scatter_kwargs]). Points are plotted
-            in reverse order (first layer on top). Example:
-            [("gene_type", "housekeeping", "hk_color"),
-             ("significance", "significant", "sig_color", {"s": 100})]
+            List of tuples where each tuple specifies a plotting layer. Each tuple contains
+
+            - column name to filter on
+            - filter value(s) in the column (single value or list of values)
+            - color_key in the color_dict
+
+            For example, layers = [("gene_type", ["housekeeping", "essential"], "hk_color")] uses the column "gene_type", filters for values "housekeeping" and "essential", and colors with the "hk_color" from the color_dict. A scatter_kwargs dict can be added to each tuple for custom layer styling (e.g., {"s": 50, "alpha": 0.7}). All points not included in any layer are assigned to the default layer.
+
         color_dict
             Maps color keys from layers to actual colors. Example:
             {"hk_color": "blue", "sig_color": "red"}
