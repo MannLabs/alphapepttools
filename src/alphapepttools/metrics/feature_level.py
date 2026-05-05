@@ -136,8 +136,8 @@ def coefficient_of_variation(
         print(adata.varm["cv"])
         # DataFrame indexed by var_names, columns are group labels:
         #            A    B
-        # protein1  ...  ...
-        # protein2  ...  ...
+        # protein1  0.540062  0.308221
+        # protein2  0.720082  0.432049
 
     Notes
     -----
