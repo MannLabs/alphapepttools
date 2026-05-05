@@ -40,12 +40,12 @@ def test_pca__default(toy_adata):
 
     # Check default storage locations for obs space PCA
     assert "X_pca_obs" in toy_adata.obsm
-    assert "PCs_obs" in toy_adata.varm
+    assert "PCs_pca_obs" in toy_adata.varm
     assert "variance_pca_obs" in toy_adata.uns
 
     # Check shapes
     assert toy_adata.obsm["X_pca_obs"].shape[0] == toy_adata.n_obs
-    assert toy_adata.varm["PCs_obs"].shape[0] == toy_adata.n_vars
+    assert toy_adata.varm["PCs_pca_obs"].shape[0] == toy_adata.n_vars
 
     # Check variance information
     assert "variance_ratio" in toy_adata.uns["variance_pca_obs"]
@@ -58,17 +58,17 @@ def test_pca__copy(toy_adata) -> None:
 
     # Check that original data was not modified
     assert "X_pca_obs" not in toy_adata.obsm
-    assert "PCs_obs" not in toy_adata.varm
+    assert "PCs_pca_obs" not in toy_adata.varm
     assert "variance_pca_obs" not in toy_adata.uns
 
     # Check default storage locations for obs space PCA
     assert "X_pca_obs" in new_adata.obsm
-    assert "PCs_obs" in new_adata.varm
+    assert "PCs_pca_obs" in new_adata.varm
     assert "variance_pca_obs" in new_adata.uns
 
     # Check shapes
     assert new_adata.obsm["X_pca_obs"].shape[0] == new_adata.n_obs
-    assert new_adata.varm["PCs_obs"].shape[0] == new_adata.n_vars
+    assert new_adata.varm["PCs_pca_obs"].shape[0] == new_adata.n_vars
 
     # Check variance information
     assert "variance_ratio" in new_adata.uns["variance_pca_obs"]
@@ -81,12 +81,12 @@ def test_pca__var_space(toy_adata):
 
     # Check storage locations for var space PCA
     assert "X_pca_var" in toy_adata.varm
-    assert "PCs_var" in toy_adata.obsm
+    assert "PCs_pca_var" in toy_adata.obsm
     assert "variance_pca_var" in toy_adata.uns
 
     # Check shapes
     assert toy_adata.varm["X_pca_var"].shape[0] == toy_adata.n_vars
-    assert toy_adata.obsm["PCs_var"].shape[0] == toy_adata.n_obs
+    assert toy_adata.obsm["PCs_pca_var"].shape[0] == toy_adata.n_obs
 
 
 def test_pca__with_layer(toy_adata_with_layers):
@@ -95,7 +95,7 @@ def test_pca__with_layer(toy_adata_with_layers):
 
     # Check that PCA results exist
     assert "X_pca_obs" in toy_adata_with_layers.obsm
-    assert "PCs_obs" in toy_adata_with_layers.varm
+    assert "PCs_pca_obs" in toy_adata_with_layers.varm
     assert "variance_pca_obs" in toy_adata_with_layers.uns
 
 
@@ -116,11 +116,11 @@ def test_pca__with_mask(toy_adata_with_mask):
 
     # Check that PCA results exist
     assert "X_pca_obs" in toy_adata_with_mask.obsm
-    assert "PCs_obs" in toy_adata_with_mask.varm
+    assert "PCs_pca_obs" in toy_adata_with_mask.varm
     assert "variance_pca_obs" in toy_adata_with_mask.uns
 
     # Check that loadings have NaN for masked features
-    loadings = toy_adata_with_mask.varm["PCs_obs"]
+    loadings = toy_adata_with_mask.varm["PCs_pca_obs"]
     mask = toy_adata_with_mask.var["feature_mask"].values
 
     # Features not in mask should have NaN loadings
@@ -135,7 +135,7 @@ def test_pca__var_space_with_mask(toy_adata_with_mask):
 
     # Check that PCA results exist in correct locations
     assert "X_pca_var" in toy_adata_with_mask.varm
-    assert "PCs_var" in toy_adata_with_mask.obsm
+    assert "PCs_pca_var" in toy_adata_with_mask.obsm
     assert "variance_pca_var" in toy_adata_with_mask.uns
 
     # Check that coordinates have NaN for masked features
@@ -157,10 +157,10 @@ def test_pca__legacy(toy_adata):
     # Assertions for Expected Outputs (checking default obs space)
     assert "X_pca_obs" in toy_adata.obsm, "PCA results not found in obsm"
     assert "variance_pca_obs" in toy_adata.uns, "PCA metadata not found in uns"
-    assert "PCs_obs" in toy_adata.varm, "Principal components not found in varm"
+    assert "PCs_pca_obs" in toy_adata.varm, "Principal components not found in varm"
 
     # Check for API consistency
-    required_attrs = {"X_pca_obs", "variance_pca_obs", "PCs_obs"}
+    required_attrs = {"X_pca_obs", "variance_pca_obs", "PCs_pca_obs"}
     existing_attrs = set(toy_adata.obsm.keys()).union(toy_adata.uns.keys(), toy_adata.varm.keys())
     missing_attrs = required_attrs - existing_attrs
     assert not missing_attrs, f"Expected attributes missing: {missing_attrs}"

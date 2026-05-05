@@ -7,6 +7,7 @@ and organize them into DataFrames for use in scatter plotting.
 """
 
 import logging
+from typing import Literal
 
 import anndata as ad
 import numpy as np
@@ -125,7 +126,7 @@ def _validate_pca_loadings_plot_inputs(
     adata
         The AnnData object containing PCA loadings data.
     loadings_name
-        The key that stores PCA feature loadings (e.g., "PCs").
+        The key that stores PCA feature loadings (e.g., "PCs_pca").
     dim
         The principal component index (1-based) to extract loadings for.
     dim2
@@ -206,18 +207,22 @@ def extract_pca_anndata(
     adata: ad.AnnData,
     dim_space: str = "obs",
     embeddings_name: str | None = None,
+    method: Literal["pca", "bpca"] = "pca",
     expression_columns: list[str] | None = None,
 ) -> ad.AnnData:
-    """Extract PCA data required for PCA plotting from an AnnData object.
+    """Extract PCA/BPCA data required for plotting from an AnnData object.
 
     Parameters
     ----------
     adata
-        AnnData object containing PCA results.
+        AnnData object containing PCA/BPCA results.
     dim_space
-        Either "obs" or "var", indicating the PCA projection space.
+        Either "obs" or "var", indicating the PCA/BPCA projection space.
     embeddings_name
         Custom embeddings name or None to use the default naming scheme.
+    method
+        The method used for dimensionality reduction. Options are "pca" or "bpca" with "pca" as the default.
+        This is used to construct the default keys if `embeddings_name` is None.
     expression_columns
         List of `var_names` to include as additional numerical column(s) in
         the returned AnnData's `.obs` for coloring PCA plots by expression.
@@ -322,8 +327,8 @@ def extract_pca_anndata(
 
     """
     # Resolve PCA keys
-    pca_coors_key = f"X_pca_{dim_space}" if embeddings_name is None else embeddings_name
-    pca_var_key = f"variance_pca_{dim_space}" if embeddings_name is None else embeddings_name
+    pca_coors_key = f"X_{method}_{dim_space}" if embeddings_name is None else embeddings_name
+    pca_var_key = f"variance_{method}_{dim_space}" if embeddings_name is None else embeddings_name
 
     # Validate inputs
     _validate_pca_plot_input(adata, pca_coors_key, pca_var_key, dim_space)
@@ -359,7 +364,11 @@ def extract_pca_anndata(
 
 
 def prepare_scree_data_to_plot(
-    adata: ad.AnnData, n_pcs: int, dim_space: str, embeddings_name: str | None = None
+    adata: ad.AnnData,
+    n_pcs: int,
+    dim_space: str,
+    embeddings_name: str | None = None,
+    method: Literal["pca", "bpca"] = "pca",
 ) -> pd.DataFrame:
     """Prepare scree plot data from AnnData object.
 
@@ -373,6 +382,9 @@ def prepare_scree_data_to_plot(
         The dimension space used in PCA. Can be either "obs" or "var".
     embeddings_name
         Custom embeddings name or None for default.
+    method
+        The method used for dimensionality reduction. Options are "pca" or "bpca" with "pca" as the default.
+        This is used to construct the default keys if `embeddings_name` is None.
 
     Returns
     -------
@@ -421,7 +433,7 @@ def prepare_scree_data_to_plot(
 
     """
     # Generate the correct variance key name
-    variance_key = f"variance_pca_{dim_space}" if embeddings_name is None else embeddings_name
+    variance_key = f"variance_{method}_{dim_space}" if embeddings_name is None else embeddings_name
 
     # Input checks
     _validate_scree_plot_input(adata, n_pcs, dim_space, variance_key)
@@ -446,6 +458,7 @@ def prepare_pca_1d_loadings_data_to_plot(
     dim: int,
     nfeatures: int,
     embeddings_name: str | None = None,
+    method: Literal["pca", "bpca"] = "pca",
 ) -> pd.DataFrame:
     """Prepare the gene loadings (1d) of a PC for plotting.
 
@@ -461,6 +474,9 @@ def prepare_pca_1d_loadings_data_to_plot(
         The number of top absolute loadings features to plot.
     embeddings_name
         The custom embeddings name used in PCA. If None, uses default naming convention.
+    method
+        The method used for dimensionality reduction. Options are "pca" or "bpca" with "pca" as the default.
+        This is used to construct the default keys if `embeddings_name` is None.
 
     Returns
     -------
@@ -515,7 +531,7 @@ def prepare_pca_1d_loadings_data_to_plot(
 
     """
     # Generate the correct loadings key name
-    loadings_key = f"PCs_{dim_space}" if embeddings_name is None else embeddings_name
+    loadings_key = f"PCs_{method}_{dim_space}" if embeddings_name is None else embeddings_name
 
     # Determine which attribute to use for loadings based on dim_space
     loadings_attr = "varm" if dim_space == "obs" else "obsm"
@@ -545,7 +561,13 @@ def prepare_pca_1d_loadings_data_to_plot(
 
 
 def prepare_pca_2d_loadings_data_to_plot(
-    data: ad.AnnData, loadings_name: str, pc_x: int, pc_y: int, nfeatures: int, dim_space: str
+    data: ad.AnnData,
+    pc_x: int,
+    pc_y: int,
+    nfeatures: int,
+    dim_space: str,
+    embeddings_name: str | None = None,
+    method: Literal["pca", "bpca"] = "pca",
 ) -> pd.DataFrame:
     """Prepare a DataFrame with PCA feature loadings for the 2D plotting.
 
@@ -557,8 +579,11 @@ def prepare_pca_2d_loadings_data_to_plot(
     ----------
     data
         The AnnData object containing PCA results.
-    loadings_name
-        The key where PCA loadings are stored.
+    embiddings_name
+        The custom embeddings name used in PCA. If None, uses default naming convention.
+    method
+        The method used for dimensionality reduction. Options are "pca" or "bpca" with "pca" as the default.
+        This is used to construct the default keys if `embeddings_name` is None.
     pc_x
         The first principal component index (1-based) to extract loadings for.
     pc_y
@@ -608,7 +633,6 @@ def prepare_pca_2d_loadings_data_to_plot(
         # Get loadings for PC1 vs PC2 with top 2 features highlighted
         loadings_2d = at.tl.prepare_pca_2d_loadings_data_to_plot(
             adata,
-            loadings_name="PCs_obs",  # Default loadings key
             pc_x=1,  # PC1
             pc_y=2,  # PC2
             nfeatures=2,  # Top 2 features per PC
@@ -624,8 +648,10 @@ def prepare_pca_2d_loadings_data_to_plot(
         # - is_top: Boolean flag for top features in either dimension
 
     """
+    loadings_key = f"PCs_{method}_{dim_space}" if embeddings_name is None else embeddings_name
+
     _validate_pca_loadings_plot_inputs(
-        adata=data, loadings_name=loadings_name, dim=pc_x, dim2=pc_y, nfeatures=nfeatures, dim_space=dim_space
+        adata=data, loadings_name=loadings_key, dim=pc_x, dim2=pc_y, nfeatures=nfeatures, dim_space=dim_space
     )
 
     dim1_z = pc_x - 1  # convert to 0-based index
@@ -633,7 +659,7 @@ def prepare_pca_2d_loadings_data_to_plot(
 
     # Determine which attribute to use based on dim_space
     loadings_attr = "varm" if dim_space == "obs" else "obsm"
-    orig_loadings = getattr(data, loadings_attr)[loadings_name]
+    orig_loadings = getattr(data, loadings_attr)[loadings_key]
 
     loadings = pd.DataFrame(
         {
