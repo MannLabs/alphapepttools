@@ -70,14 +70,25 @@ def read_pg_table(
 
     .. code-block:: python
 
-        from alphapepttools.io import read_pg_table
+        import alphapepttools as apt
 
         alphadia_path = ...
-        adata = read_pg_table(alphadia_path, search_engine="alphadia")
+        adata = apt.io.read_pg_table(alphadia_path, search_engine="alphadia")
 
         maxquant_path = ...
         # Read LFQ values from MaxQuant report
-        adata = read_pg_table(maxquant_path, search_engine="maxquant", measurement_regex="lfq")
+        adata = apt.io.read_pg_table(maxquant_path, search_engine="maxquant", measurement_regex="lfq")
+
+    If a specific column is missing in the output, you can add it via the `add_column_mapping` argument:
+
+    .. code-block:: python
+
+        # Users can customize the columns in spectronaut reports, they might be missing in alphabase
+        spectronaut_path = ...
+        apt.io.read_pg_table(
+            spectronaut_path, search_engine="spectronaut", additional_column_mapping={"new_name": "name_in_pg_table"}
+        )
+
 
     Get available regular expressions
 
