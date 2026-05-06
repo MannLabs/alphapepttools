@@ -39,7 +39,8 @@ def read_pg_table(
     search_engine
         Name of engine output, pass the method name of the corresponding reader.
     additional_column_mapping
-        A dictionary of mapping the new column key to the corresponding columns in the
+        Extend the default mapping of protein group table columns to standardized alphabase columns with custom columns.
+        Passed as a dictionary of mapping the new column key to the corresponding columns in the
         search engine protein group table (values)
     reader_provider_kwargs
         Passed to :meth:`alphabase.pg_reader.pg_reader_provider.get_reader`, especially:
