@@ -83,7 +83,7 @@ def read_pg_table(
 
     .. code-block:: python
 
-        # Users can customize the columns in spectronaut reports, they might be missing in alphabase
+        # Spectronaut reports can contain custom columns, they might be missing in the alphabase default mapping
         spectronaut_path = ...
         apt.io.read_pg_table(
             spectronaut_path, search_engine="spectronaut", additional_column_mapping={"new_name": "name_in_pg_table"}
