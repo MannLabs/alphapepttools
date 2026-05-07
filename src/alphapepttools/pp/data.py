@@ -3,6 +3,7 @@
 import logging
 import numbers
 import warnings
+from typing import Literal
 
 import anndata as ad
 import numpy as np
@@ -927,6 +928,7 @@ def filter_data_completeness(
     max_missing: float,
     group_column: str | None = None,
     groups: list[str] | None = None,
+    keep_strategy: Literal["any", "all"] = "all",
     action: str = "flag",
     var_colname: str = "passed_threshold_missing_values",
 ) -> ad.AnnData:
@@ -943,17 +945,23 @@ def filter_data_completeness(
 
     Parameters
     ----------
+    adata
+        AnnData object
     max_missing
-        Maximum fraction of missing values allowed. Compared with the fraction of missing values
-        in a "greater than" fashion, i.e. if max_missing is 0.6 and the fraction of missing values
-        is 0.6, the sample or feature is kept. Greater than comparison is used here since the
-        missing fraction may be 0.0, which equals filtering for 100 % data completeness.
+        Maximum fraction of missing values allowed to pass filtering.
     group_column
-        Column in obs to determine groups for filtering.
+        Column name in `adata.obs` defining groups for group-wise filtering.
+        If `None` (default), computes missingness across all samples.
+        If specified, computes statistics separately for each group.
+        This is useful to retain features that are exclusive for a specific sample group.
     groups
         List of levels of the group_column to consider in filtering. E.g. if the column has the levels
         ['A', 'B', 'C'], and groups = ['A', 'B'], only missingness of features in these
         groups is considered. If None, all groups are considered.
+    keep_strategy
+        Only relevant for groupwise filtering
+        - `any` : keep a feature if it passes the threshold in at least one group.
+        - `all` : keep a feature only if it passes in every group. This is useful in highly unbalanced designs.
     action
         Action to perform. can be 'flag' (default) or 'drop'. If 'flag', a boolean column in `adata.var`
         is added to indicate whether the feature passed the missingness threshold. If 'drop',
