@@ -3,6 +3,8 @@ from typing import Literal
 import anndata as ad
 import numpy as np
 
+from ._utils import _raise_on_nan_values
+
 STRATEGIES = ["total_mean", "total_median"]
 
 
@@ -118,6 +120,7 @@ def normalize(
     adata: ad.AnnData,
     layer: str | None = None,
     strategy: Literal["total_mean", "total_median"] = "total_mean",
+    group_column: str | None = None,
     key_added: str | None = None,
     *,
     copy: bool = False,
@@ -137,6 +140,11 @@ def normalize(
             total sample intensity is equal to the mean of the total sample intensities across all samples
             - *total_median* The intensity of each feature is adjusted by a normalizing factor so that the
             total sample intensity is equal to the median of the total sample intensities across all samples
+    group_column
+        Column name in `adata.obs` defining groups for group-wise normalization.
+        If `None` (default), computes statistics across all samples.
+        If specified, computes statistics separately for each group.
+        This is useful when working with data from different batches with vastly different intensity distributions.
     key_added
         If not None, adds normalization factors to column in `adata.obs`
     copy
@@ -199,10 +207,24 @@ def normalize(
 
     data = adata.layers[layer] if layer is not None else adata.X
 
-    if strategy == "total_mean":
-        normalized_data, norm_factors = _total_mean_normalization(data)
-    elif strategy == "total_median":
-        normalized_data, norm_factors = _total_median_normalization(data)
+    norm_func = _total_mean_normalization if strategy == "total_mean" else _total_median_normalization
+
+    if group_column is None:
+        normalized_data, norm_factors = norm_func(data)
+    else:
+        _raise_on_nan_values(
+            adata.obs[group_column],
+            mode="any",
+            custom_message=f"`group_column` {group_column} contains nans. Cannot normalize groups with missing values, please drop these observations prior to normalization.",
+        )
+        groups = adata.obs.groupby(group_column, dropna=True).indices
+
+        normalized_data = np.empty_like(data)
+        norm_factors = np.empty(data.shape[0])
+        for group_indices in groups.values():
+            group_normalized, group_factors = norm_func(data[group_indices])
+            normalized_data[group_indices, :] = group_normalized
+            norm_factors[group_indices] = group_factors
 
     # Reassign to anndata
     if layer is None:
