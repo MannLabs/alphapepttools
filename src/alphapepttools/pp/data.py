@@ -1042,7 +1042,7 @@ def filter_data_completeness(
     if action == "drop":
         adata = adata[:, keep_mask].copy()
     else:
-        adata.var[var_colname] = ~keep_mask
+        adata.var[var_colname] = keep_mask
 
     n_dropped = (~keep_mask).sum()
     logging.info(
