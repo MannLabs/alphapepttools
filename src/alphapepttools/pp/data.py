@@ -959,7 +959,7 @@ def filter_data_completeness(
         ['A', 'B', 'C'], and groups = ['A', 'B'], only missingness of features in these
         groups is considered. If None, all groups are considered.
     keep_strategy
-        Only relevant for groupwise filtering
+        Only relevant for groupwise filtering.
         - `any` : keep a feature if it passes the threshold in at least one group.
         - `all` : keep a feature only if it passes in every group. This is useful in highly unbalanced designs.
     action
@@ -1023,8 +1023,8 @@ def filter_data_completeness(
     else:
         available_groups = adata.obs.groupby(group_column, dropna=True).indices
 
-        selected_groups = set(groups) if groups else set(available_groups.keys())
-        if not selected_groups.issubset(set(available_groups.keys())):
+        selected_groups = groups or list(available_groups.keys())
+        if not set(selected_groups).issubset(set(available_groups.keys())):
             raise ValueError(f"Some groups in {groups} not found in '{group_column}'.")
 
         keep_mask = np.full(shape=(len(selected_groups), adata.n_vars), fill_value=True, dtype=bool)
@@ -1040,13 +1040,12 @@ def filter_data_completeness(
 
     # depending on action, either flag or drop features
     if action == "drop":
-        if keep_mask.any():
-            adata = adata[:, keep_mask].copy()
+        adata = adata[:, keep_mask].copy()
     else:
-        adata.var[var_colname] = keep_mask
+        adata.var[var_colname] = ~keep_mask
 
     n_dropped = (~keep_mask).sum()
     logging.info(
-        f"pp.filter_data_completeness(): {action} {n_dropped} / {keep_mask.size} features with >{max_missing:.2f} missing in any group."
+        f"pp.filter_data_completeness(): {action} {n_dropped} / {keep_mask.size} features with >{max_missing:.2f} missing."
     )
     return adata
