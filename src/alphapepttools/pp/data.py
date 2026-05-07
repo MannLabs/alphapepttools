@@ -1027,12 +1027,10 @@ def filter_data_completeness(
         if not selected_groups.issubset(set(available_groups.keys())):
             raise ValueError(f"Some groups in {groups} not found in '{group_column}'.")
 
-        keep_mask = np.full(shape=(len(available_groups), adata.n_vars), fill_value=True, dtype=bool)
+        keep_mask = np.full(shape=(len(selected_groups), adata.n_vars), fill_value=True, dtype=bool)
 
-        for group_nr, (group, group_indices) in enumerate(available_groups.items()):
-            if (groups is not None) and (group not in groups):
-                continue
-
+        for group_nr, group in enumerate(selected_groups):
+            group_indices = available_groups[group]
             keep_mask[group_nr, :] = np.isnan(adata.X[group_indices, :]).mean(axis=0) <= max_missing
 
         # Aggregate to decision
@@ -1049,6 +1047,6 @@ def filter_data_completeness(
 
     n_dropped = (~keep_mask).sum()
     logging.info(
-        f"pp.filter_data_completeness(): {action} {n_dropped} / {adata.n_vars} features with >{max_missing:.2f} missing in any group."
+        f"pp.filter_data_completeness(): {action} {n_dropped} / {keep_mask.size} features with >{max_missing:.2f} missing in any group."
     )
     return adata
