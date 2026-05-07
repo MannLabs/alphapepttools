@@ -8,11 +8,35 @@ import numpy as np
 from alphapepttools.pp.transform import detect_special_values
 
 
+def _resolve_axis(axis: str | int) -> str:
+    """Normalize an axis specifier to the canonical "obs" / "var" string.
+
+    Accepts ``"obs"`` or ``0`` for observations (rows), ``"var"`` or ``1`` for features (columns).
+
+    Parameters
+    ----------
+    axis
+        Axis specifier.
+
+    Returns
+    -------
+    Either ``"obs"`` or ``"var"``.
+
+    Raises
+    ------
+    ValueError
+        If ``axis`` is not one of ``{"obs", "var", 0, 1}``.
+    """
+    if axis not in ("obs", "var", 0, 1):
+        raise ValueError(f"axis must be 'obs', 'var', 0, or 1, got '{axis}'")
+    return "obs" if axis in ("obs", 0) else "var"
+
+
 def total_intensity(
     adata: ad.AnnData,
     *,
     layer: str | None = None,
-    axis: str = "obs",
+    axis: str | int = "obs",
     features: list[str] | None = None,
     column: str = "total_intensity",
     inplace: bool = True,
@@ -27,9 +51,9 @@ def total_intensity(
         Name of the layer to compute the sum on. If None (default), the data matrix X is used.
     axis
         Axis along which to calculate the sum.
-        - "obs" (default): Calculate total intensity per observation.
+        - "obs" or 0 (default): Calculate total intensity per observation.
           Result is added to adata.obs if `inplace=True`.
-        - "var": Calculate total intensity per feature.
+        - "var" or 1: Calculate total intensity per feature.
           Result is added to adata.var if `inplace=True`.
     features
         Optional list of specific features (var_names) to include in the sum.
@@ -46,8 +70,7 @@ def total_intensity(
         If inplace is False, returns the sum values as an array.
         If inplace is True, modifies adata inplace and returns None.
     """
-    if axis not in ("obs", "var"):
-        raise ValueError(f"axis must be 'obs' or 'var', got '{axis}'")
+    axis = _resolve_axis(axis)
 
     if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
@@ -78,7 +101,7 @@ def number_detected(
     adata: ad.AnnData,
     *,
     layer: str | None = None,
-    axis: str = "obs",
+    axis: str | int = "obs",
     column: str = "number_detected",
     inplace: bool = True,
 ) -> np.ndarray | None:
@@ -95,9 +118,9 @@ def number_detected(
         Name of the layer to use. If None (default), the data matrix X is used.
     axis
         Axis along which to calculate the count.
-        - "obs" (default): Count detected features per observation.
+        - "obs" or 0 (default): Count detected features per observation.
           Result is added to adata.obs.
-        - "var": Count detected observations per feature.
+        - "var" or 1: Count detected observations per feature.
           Result is added to adata.var.
     column
         Name of the column to add. Default is "number_detected".
@@ -111,8 +134,7 @@ def number_detected(
         If inplace is False, returns the count values as an array.
         If inplace is True, modifies adata inplace and returns None.
     """
-    if axis not in ("obs", "var"):
-        raise ValueError(f"axis must be 'obs' or 'var', got '{axis}'")
+    axis = _resolve_axis(axis)
 
     if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
@@ -135,7 +157,7 @@ def fraction_complete(
     adata: ad.AnnData,
     *,
     layer: str | None = None,
-    axis: str = "obs",
+    axis: str | int = "obs",
     column: str = "fraction_complete",
     inplace: bool = True,
 ) -> np.ndarray | None:
@@ -152,9 +174,9 @@ def fraction_complete(
         Name of the layer to use. If None (default), the data matrix X is used.
     axis
         Axis along which to calculate the fraction.
-        - "obs" (default): Calculate fraction of detected features per observation.
+        - "obs" or 0 (default): Calculate fraction of detected features per observation.
           Result is added to adata.obs.
-        - "var": Calculate fraction of detected observations per feature.
+        - "var" or 1: Calculate fraction of detected observations per feature.
           Result is added to adata.var.
     column
         Name of the column to add. Default is "fraction_complete".
@@ -168,8 +190,7 @@ def fraction_complete(
         If inplace is False, returns the fraction values as an array.
         If inplace is True, modifies adata inplace and returns None.
     """
-    if axis not in ("obs", "var"):
-        raise ValueError(f"axis must be 'obs' or 'var', got '{axis}'")
+    axis = _resolve_axis(axis)
 
     if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
@@ -177,16 +198,9 @@ def fraction_complete(
     data = adata.X if layer is None else adata.layers[layer]
     special_values_mask = detect_special_values(data, verbosity=0)
 
-    if axis == "obs":
-        # Per observation: count detected features / total features
-        n_detected = np.sum(~special_values_mask, axis=1)
-        n_total = adata.shape[1]
-    else:  # axis == "var"
-        # Per feature: count detected observations / total observations
-        n_detected = np.sum(~special_values_mask, axis=0)
-        n_total = adata.shape[0]
-
-    result = n_detected / n_total
+    # Fraction of detected features per feature or observation
+    sum_axis = 1 if axis == "obs" else 0
+    result = np.mean(~special_values_mask, axis=sum_axis)
 
     if inplace:
         if axis == "obs":

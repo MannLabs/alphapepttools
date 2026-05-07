@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from alphapepttools.metrics.sample_and_feature_level import (
+    _resolve_axis,
     calculate_qc_metrics,
     fraction_complete,
     number_detected,
@@ -27,6 +28,17 @@ def qc_adata():
         ]
     )
     return ad.AnnData(X=data, layers={"raw": data.copy()})
+
+
+class TestResolveAxis:
+    @pytest.mark.parametrize(("axis", "expected"), [("obs", "obs"), (0, "obs"), ("var", "var"), (1, "var")])
+    def test_valid(self, axis, expected):
+        assert _resolve_axis(axis) == expected
+
+    @pytest.mark.parametrize("bad_axis", ["invalid", 2, -1, "0", None])
+    def test_invalid(self, bad_axis):
+        with pytest.raises(ValueError, match="axis must be 'obs', 'var', 0, or 1"):
+            _resolve_axis(bad_axis)
 
 
 class TestTotalIntensity:
@@ -94,10 +106,29 @@ class TestTotalIntensity:
         assert np.allclose(result, expected)
         assert "total_intensity" not in qc_adata.var.columns
 
-    def test_total_intensity_invalid_axis(self, qc_adata):
-        """Test total_intensity raises error for invalid axis."""
-        with pytest.raises(ValueError, match="axis must be 'obs' or 'var'"):
-            total_intensity(qc_adata, axis="invalid")
+    def test_total_intensity_axis_int_obs(self, qc_adata):
+        """`axis=0` is an alias for `axis='obs'` and writes to adata.obs."""
+        expected = np.array([6.0, 2.0, 1.0])
+
+        total_intensity(qc_adata, axis=0)
+
+        assert "total_intensity" in qc_adata.obs.columns
+        assert np.allclose(qc_adata.obs["total_intensity"].values, expected)
+
+    def test_total_intensity_axis_int_var(self, qc_adata):
+        """`axis=1` is an alias for `axis='var'` and writes to adata.var."""
+        expected = np.array([2.0, 4.0, 3.0])
+
+        total_intensity(qc_adata, axis=1)
+
+        assert "total_intensity" in qc_adata.var.columns
+        assert np.allclose(qc_adata.var["total_intensity"].values, expected)
+
+    @pytest.mark.parametrize("bad_axis", ["invalid", 2, -1, "0"])
+    def test_total_intensity_invalid_axis(self, qc_adata, bad_axis):
+        """Anything outside {'obs', 'var', 0, 1} raises with the new error message."""
+        with pytest.raises(ValueError, match="axis must be 'obs', 'var', 0, or 1"):
+            total_intensity(qc_adata, axis=bad_axis)
 
 
 class TestNumberDetected:
@@ -172,10 +203,29 @@ class TestNumberDetected:
         assert np.array_equal(result, expected)
         assert "number_detected" not in qc_adata.var.columns
 
-    def test_number_detected_invalid_axis(self, qc_adata):
-        """Test number_detected raises error for invalid axis."""
-        with pytest.raises(ValueError, match="axis must be 'obs' or 'var'"):
-            number_detected(qc_adata, axis="invalid")
+    def test_number_detected_axis_int_obs(self, qc_adata):
+        """`axis=0` is an alias for `axis='obs'` and writes to adata.obs."""
+        expected = np.array([3, 1, 1])
+
+        number_detected(qc_adata, axis=0)
+
+        assert "number_detected" in qc_adata.obs.columns
+        assert np.array_equal(qc_adata.obs["number_detected"].values, expected)
+
+    def test_number_detected_axis_int_var(self, qc_adata):
+        """`axis=1` is an alias for `axis='var'` and writes to adata.var."""
+        expected = np.array([2, 2, 1])
+
+        number_detected(qc_adata, axis=1)
+
+        assert "number_detected" in qc_adata.var.columns
+        assert np.array_equal(qc_adata.var["number_detected"].values, expected)
+
+    @pytest.mark.parametrize("bad_axis", ["invalid", 2, -1, "0"])
+    def test_number_detected_invalid_axis(self, qc_adata, bad_axis):
+        """Anything outside {'obs', 'var', 0, 1} raises with the new error message."""
+        with pytest.raises(ValueError, match="axis must be 'obs', 'var', 0, or 1"):
+            number_detected(qc_adata, axis=bad_axis)
 
 
 class TestFractionComplete:
@@ -244,10 +294,29 @@ class TestFractionComplete:
         assert np.allclose(result, expected)
         assert "fraction_complete" not in qc_adata.var.columns
 
-    def test_fraction_complete_invalid_axis(self, qc_adata):
-        """Test fraction_complete raises error for invalid axis."""
-        with pytest.raises(ValueError, match="axis must be 'obs' or 'var'"):
-            fraction_complete(qc_adata, axis="invalid")
+    def test_fraction_complete_axis_int_obs(self, qc_adata):
+        """`axis=0` is an alias for `axis='obs'` and writes to adata.obs."""
+        expected = np.array([1.0, 1 / 3, 1 / 3])
+
+        fraction_complete(qc_adata, axis=0)
+
+        assert "fraction_complete" in qc_adata.obs.columns
+        assert np.allclose(qc_adata.obs["fraction_complete"].values, expected)
+
+    def test_fraction_complete_axis_int_var(self, qc_adata):
+        """`axis=1` is an alias for `axis='var'` and writes to adata.var."""
+        expected = np.array([2 / 3, 2 / 3, 1 / 3])
+
+        fraction_complete(qc_adata, axis=1)
+
+        assert "fraction_complete" in qc_adata.var.columns
+        assert np.allclose(qc_adata.var["fraction_complete"].values, expected)
+
+    @pytest.mark.parametrize("bad_axis", ["invalid", 2, -1, "0"])
+    def test_fraction_complete_invalid_axis(self, qc_adata, bad_axis):
+        """Anything outside {'obs', 'var', 0, 1} raises with the new error message."""
+        with pytest.raises(ValueError, match="axis must be 'obs', 'var', 0, or 1"):
+            fraction_complete(qc_adata, axis=bad_axis)
 
     def test_fraction_complete_invalid_layer(self, qc_adata):
         """Test fraction_complete raises error for invalid layer."""
