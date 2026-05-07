@@ -935,10 +935,10 @@ def filter_data_completeness(
     """Filter features based on missing values.
 
     Filters AnnData features (columns) based on the fraction of missing values.
-    If group_column and groups are provided, only missingness of certain metadata
-    levels is considered. This is especially useful for imbalanced classes, where
-    filtering by global missingness may leave too many missing values in the smaller
-    class.
+    Without `group_column`, missingness is computed across the full dataset.
+    With `group_column`, missingness is computed per group and aggregated via
+    `keep_strategy` (`"all"` = logical AND, `"any"` = logical OR). See examples
+    for concrete behavior.
 
     (In case rows should be filtered, it is recommended to transpose the adata
     object prior to calling this function and reverting the transpose afterwards.)
@@ -984,7 +984,7 @@ def filter_data_completeness(
         import anndata as ad
         import pandas as pd
         import numpy as np
-        from alphapepttools.pp.data import filter_data_completeness
+        import alphapepttools as apt
 
         # Create data with missing values
         X = np.array(
@@ -997,17 +997,29 @@ def filter_data_completeness(
         )
 
         # Flag features with >30% missing values
-        adata = filter_data_completeness(adata, max_missing=0.3, action="flag")
+        adata = apt.pp.filter_data_completeness(adata, max_missing=0.3, action="flag")
 
         # Drop features with >30% missing in group A only
-        adata = filter_data_completeness(adata, max_missing=0.3, group_column="group", groups=["A"], action="drop")
+        adata = apt.pp.filter_data_completeness(
+            adata, max_missing=0.3, group_column="group", groups=["A"], action="drop"
+        )
 
-    Filter by group-specific completeness:
+    Groupwise filtering — `keep_strategy` controls how per-group results are combined:
 
     .. code-block:: python
 
-        # Consider missingness only in specific groups
-        adata = filter_data_completeness(adata, max_missing=0.5, group_column="group", groups=["A", "B"], action="flag")
+        # No grouping: keep features ≥50% complete across the whole study
+        apt.pp.filter_data_completeness(adata, max_missing=0.5)
+
+        # Logical AND (default): keep features ≥50% complete in *every* condition.
+        # A feature with 0/5 in condition A and 995/995 in condition B is removed
+        # despite being 99.5% complete overall.
+        apt.pp.filter_data_completeness(adata, max_missing=0.5, group_column="condition", keep_strategy="all")
+
+        # Logical OR: keep features ≥50% complete in *at least one* condition.
+        # Retains condition-specific features, which are often the most interesting
+        # candidates in clinical studies.
+        apt.pp.filter_data_completeness(adata, max_missing=0.5, group_column="condition", keep_strategy="any")
 
     """
     if max_missing < 0 or max_missing > 1:
