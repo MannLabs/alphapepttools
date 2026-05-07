@@ -1013,38 +1013,42 @@ def filter_data_completeness(
     if max_missing < 0 or max_missing > 1:
         raise ValueError("Threshold must be between 0 and 1.")
 
+    if keep_strategy not in ("all", "any"):
+        raise ValueError(f"Supported keep_strategies are `all` and `any`, passed {keep_strategy}")
+
     _validate_adata_for_completeness_filter(adata, action, var_colname)
 
-    # Resolve group indices
-    if group_column:
-        if group_column not in adata.obs.columns:
-            raise ValueError(f"Group column '{group_column}' not found in obs, available: {adata.obs.columns}.")
+    if group_column is None:
+        keep_mask = np.isnan(adata.X).mean(axis=0) <= max_missing
+    else:
+        available_groups = adata.obs.groupby(group_column, dropna=True).indices
 
-        available_groups = set(adata.obs[group_column].unique())
-        selected_groups = set(groups) if groups else available_groups
-
-        if not selected_groups.issubset(available_groups):
+        selected_groups = set(groups) if groups else set(available_groups.keys())
+        if not selected_groups.issubset(set(available_groups.keys())):
             raise ValueError(f"Some groups in {groups} not found in '{group_column}'.")
 
-        group_indices = {group: adata.obs.index[adata.obs[group_column] == group] for group in selected_groups}
-    else:
-        group_indices = {"all": adata.obs.index}
+        keep_mask = np.full(shape=(len(available_groups), adata.n_vars), fill_value=True, dtype=bool)
 
-    # Calculate missingness for each group
-    drop_mask = np.array([False] * adata.shape[1])
-    for indices in group_indices.values():
-        missing_fraction = np.isnan(adata[indices, :].X).mean(axis=0)
-        drop_mask |= missing_fraction > max_missing
-        n_dropped = drop_mask.sum()
+        for group_nr, (group, group_indices) in enumerate(available_groups.items()):
+            if (groups is not None) and (group not in groups):
+                continue
+
+            keep_mask[group_nr, :] = np.isnan(adata.X[group_indices, :]).mean(axis=0) <= max_missing
+
+        # Aggregate to decision
+        # - any: Any group passes
+        # - all: All groups pass
+        keep_mask = keep_mask.any(axis=0) if keep_strategy == "any" else keep_mask.all(axis=0)
 
     # depending on action, either flag or drop features
     if action == "drop":
-        if drop_mask.any():
-            adata = adata[:, ~drop_mask].copy()
+        if keep_mask.any():
+            adata = adata[:, keep_mask].copy()
     else:
-        adata.var[var_colname] = ~drop_mask
+        adata.var[var_colname] = keep_mask
 
+    n_dropped = (~keep_mask).sum()
     logging.info(
-        f"pp.filter_data_completeness(): {action} {n_dropped} / {drop_mask.size} features with >{max_missing:.2f} missing in any group."
+        f"pp.filter_data_completeness(): {action} {n_dropped} / {adata.n_vars} features with >{max_missing:.2f} missing in any group."
     )
     return adata
