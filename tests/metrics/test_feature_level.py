@@ -1,16 +1,24 @@
 """Test feature-level metrics"""
 
+import warnings
+from typing import Any
+
 import anndata as ad
 import numpy as np
+import pandas as pd
 import pytest
 
-from alphapepttools.metrics import coefficient_of_variation
+from alphapepttools.metrics import (
+    coefficient_of_variation,
+    pooled_coefficient_of_variation,
+    pooled_median_absolute_deviation,
+)
 from alphapepttools.metrics.feature_level import (
+    _compute_pooled_groupwise_metric,
     _cv,
-    calculate_qc_metrics,
-    fraction_complete,
-    number_detected,
-    total_intensity,
+    _pcv,
+    _pmad,
+    _set_nested_dict,
 )
 
 
@@ -46,6 +54,18 @@ class TestCV:
         results = _cv(data=data, min_valid=min_valid, axis=0)
 
         assert np.allclose(ground_truth, results, atol=0.001, equal_nan=True)
+
+    def test__cv_silent_on_empty_slices(self):
+        """All-NaN columns must not raise nanmean/nanstd RuntimeWarnings."""
+        # Column 0 has 2 valid values; column 1 is all-NaN.
+        data = np.array([[1.0, np.nan], [2.0, np.nan]])
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("error", category=RuntimeWarning, message="Mean of empty slice")
+            warnings.filterwarnings("error", category=RuntimeWarning, message="Degrees of freedom <= 0")
+            result = _cv(data, min_valid=2, axis=0)
+
+        assert np.isnan(result[1])  # all-NaN column → NaN result
 
 
 class TestCoefficientOfVariation:
@@ -83,294 +103,257 @@ class TestCoefficientOfVariation:
 
 
 @pytest.fixture
-def qc_adata():
-    """Example data for QC metrics testing."""
-    # Data with NaN, zeros, and valid values
-    # Row 0: [1, 2, 3] -> sum=6, detected=3, frac=1.0
-    # Row 1: [0, 2, np.nan] -> sum=2, detected=1, frac=1/3
-    # Row 2: [1, 0, 0] -> sum=1, detected=1, frac=1/3
-    data = np.array(
+def grouped_adata() -> tuple[ad.AnnData, pd.DataFrame]:
+    """AnnData with two groups (A, B) and hand-computed per-feature, per-group CVs."""
+    # Group A rows -> feature1: mean=2, std=sqrt(2/3); feature2: mean=2, std=sqrt(8/3)
+    # Group B rows -> feature1: mean=4, std=sqrt(2/3); feature2: mean=2, std=sqrt(8/3)
+    X = np.array(
         [
-            [1.0, 2.0, 3.0],
-            [0.0, 2.0, np.nan],
-            [1.0, 0.0, 0.0],
+            [1.0, 0.0],
+            [2.0, 2.0],
+            [3.0, 4.0],
+            [3.0, 0.0],
+            [4.0, 2.0],
+            [5.0, 4.0],
         ]
     )
-    return ad.AnnData(X=data, layers={"raw": data.copy()})
+    obs = pd.DataFrame({"group": ["A", "A", "A", "B", "B", "B"]}, index=[f"s{i}" for i in range(6)])
+    adata = ad.AnnData(X=X, layers={"layer": X * 2}, obs=obs)
+    adata.var_names = ["feature1", "feature2"]
+
+    expected = pd.DataFrame(
+        {
+            "A": [np.std(X[:3, 0]) / np.mean(X[:3, 0]), np.std(X[:3, 1]) / np.mean(X[:3, 1])],
+            "B": [np.std(X[3:, 0]) / np.mean(X[3:, 0]), np.std(X[3:, 1]) / np.mean(X[3:, 1])],
+        },
+        index=adata.var_names,
+    )
+    return adata, expected
 
 
-class TestTotalIntensity:
-    def test_total_intensity_expected_values(self, qc_adata):
-        """Test total_intensity computes correct values."""
-        expected = np.array([6.0, 2.0, 1.0])
+class TestCoefficientOfVariationGrouped:
+    @pytest.mark.parametrize("layer", [None, "layer"])
+    def test_grouped_writes_to_varm(self, grouped_adata, layer: str | None) -> None:
+        """Grouped CV writes a DataFrame to adata.varm[key_added] with shape (n_features, n_groups)"""
+        adata, expected = grouped_adata
+        # Layer is X*2, so the CV (scale-invariant) is identical to the X-based expectation.
+        coefficient_of_variation(adata, group_column="group", layer=layer)
 
-        total_intensity(qc_adata)
+        assert "cv" in adata.varm
+        result = adata.varm["cv"]
+        assert isinstance(result, pd.DataFrame)
+        assert list(result.columns) == ["A", "B"]
+        assert list(result.index) == list(adata.var_names)
+        np.testing.assert_allclose(result.values, expected.values, atol=1e-6)
+        # Ungrouped slot is untouched
+        assert "cv" not in adata.var.columns
 
-        assert "total_intensity" in qc_adata.obs.columns
-        assert np.allclose(qc_adata.obs["total_intensity"].values, expected)
+    def test_grouped_custom_key(self, grouped_adata) -> None:
+        """key_added controls the varm key when grouped"""
+        adata, _ = grouped_adata
+        coefficient_of_variation(adata, group_column="group", key_added="my_cv")
 
-    def test_total_intensity_custom_col_name(self, qc_adata):
-        """Test total_intensity with custom column name."""
-        total_intensity(qc_adata, column="custom_total_intensity")
+        assert "my_cv" in adata.varm
+        assert "cv" not in adata.varm
 
-        assert "custom_total_intensity" in qc_adata.obs.columns
-        assert "total_intensity" not in qc_adata.obs.columns
-
-    def test_total_intensity_return_value(self, qc_adata):
-        """Test total_intensity returns values when inplace=False."""
-        expected = np.array([6.0, 2.0, 1.0])
-
-        result = total_intensity(qc_adata, inplace=False)
-
-        assert result is not None
-        assert np.allclose(result, expected)
-        assert "total_intensity" not in qc_adata.obs.columns
-
-    @pytest.mark.parametrize("layer", [None, "raw"])
-    def test_total_intensity_layer(self, qc_adata, layer):
-        """Test total_intensity works with different layers."""
-        total_intensity(qc_adata, layer=layer)
-
-        assert "total_intensity" in qc_adata.obs.columns
-
-    def test_total_intensity_invalid_layer(self, qc_adata):
-        """Test total_intensity raises error for invalid layer."""
-        with pytest.raises(ValueError, match="not found in adata.layers"):
-            total_intensity(qc_adata, layer="nonexistent")
-
-    def test_total_intensity_axis_var_expected_values(self, qc_adata):
-        """Test total_intensity with axis='var' computes correct values."""
-        expected = np.array([2.0, 4.0, 3.0])
-
-        total_intensity(qc_adata, axis="var")
-
-        assert "total_intensity" in qc_adata.var.columns
-        assert np.allclose(qc_adata.var["total_intensity"].values, expected)
-
-    def test_total_intensity_axis_var_custom_col_name(self, qc_adata):
-        """Test total_intensity with axis='var' and custom column name."""
-        total_intensity(qc_adata, axis="var", column="custom_total")
-
-        assert "custom_total" in qc_adata.var.columns
-        assert "total_intensity" not in qc_adata.var.columns
-
-    def test_total_intensity_axis_var_return_value(self, qc_adata):
-        """Test total_intensity with axis='var' returns values when inplace=False."""
-        expected = np.array([2.0, 4.0, 3.0])
-
-        result = total_intensity(qc_adata, axis="var", inplace=False)
+    def test_grouped_copy_does_not_modify_original(self, grouped_adata) -> None:
+        """copy=True returns a modified copy and leaves the original alone"""
+        adata, _ = grouped_adata
+        result = coefficient_of_variation(adata, group_column="group", copy=True)
 
         assert result is not None
-        assert np.allclose(result, expected)
-        assert "total_intensity" not in qc_adata.var.columns
+        assert "cv" in result.varm
+        assert "cv" not in adata.varm
 
-    def test_total_intensity_invalid_axis(self, qc_adata):
-        """Test total_intensity raises error for invalid axis."""
-        with pytest.raises(ValueError, match="axis must be 'obs' or 'var'"):
-            total_intensity(qc_adata, axis="invalid")
+    def test_grouped_raises_on_nan_group(self, grouped_adata) -> None:
+        """NaN values in group_column raise ValueError"""
+        adata, _ = grouped_adata
+        adata.obs["group"] = adata.obs["group"].astype(object)
+        adata.obs.loc[adata.obs.index[0], "group"] = np.nan
 
+        with pytest.raises(ValueError, match="contains NaNs"):
+            coefficient_of_variation(adata, group_column="group")
 
-class TestNumberDetected:
-    def test_number_detected_expected_values(self, qc_adata):
-        """Test number_detected computes correct values."""
-        # detected = not (NaN, zero, negative, inf)
-        # Row 0: [1, 2, 3] -> 3 detected
-        # Row 1: [0, 2, nan] -> 1 detected
-        # Row 2: [1, 0, 0] -> 1 detected
-        expected = np.array([3, 1, 1])
+    def test_grouped_min_valid_propagates(self, grouped_adata) -> None:
+        """Groups smaller than min_valid produce NaN CVs for all features in that group"""
+        adata, _ = grouped_adata
+        # Each group has 3 samples; setting min_valid=4 forces NaN everywhere
+        coefficient_of_variation(adata, group_column="group", min_valid=4)
 
-        number_detected(qc_adata)
-
-        assert "number_detected" in qc_adata.obs.columns
-        assert np.array_equal(qc_adata.obs["number_detected"].values, expected)
-
-    def test_number_detected_custom_col_name(self, qc_adata):
-        """Test number_detected with custom column name."""
-        number_detected(qc_adata, column="custom_num")
-
-        assert "custom_num" in qc_adata.obs.columns
-        assert "number_detected" not in qc_adata.obs.columns
-
-    def test_number_detected_return_value(self, qc_adata):
-        """Test number_detected returns values when inplace=False."""
-        expected = np.array([3, 1, 1])
-
-        result = number_detected(qc_adata, inplace=False)
-
-        assert result is not None
-        assert np.array_equal(result, expected)
-        assert "number_detected" not in qc_adata.obs.columns
-
-    @pytest.mark.parametrize("layer", [None, "raw"])
-    def test_number_detected_layer(self, qc_adata, layer):
-        """Test number_detected works with different layers."""
-        number_detected(qc_adata, layer=layer)
-
-        assert "number_detected" in qc_adata.obs.columns
-
-    def test_number_detected_invalid_layer(self, qc_adata):
-        """Test number_detected raises error for invalid layer."""
-        with pytest.raises(ValueError, match="not found in adata.layers"):
-            number_detected(qc_adata, layer="nonexistent")
-
-    def test_number_detected_axis_var_expected_values(self, qc_adata):
-        """Test number_detected with axis='var' computes correct values."""
-        # Col 0: [1, 0, 1] -> 2 detected
-        # Col 1: [2, 2, 0] -> 2 detected
-        # Col 2: [3, nan, 0] -> 1 detected
-        expected = np.array([2, 2, 1])
-
-        number_detected(qc_adata, axis="var")
-
-        assert "number_detected" in qc_adata.var.columns
-        assert np.array_equal(qc_adata.var["number_detected"].values, expected)
-
-    def test_number_detected_axis_var_custom_col_name(self, qc_adata):
-        """Test number_detected with axis='var' and custom column name."""
-        number_detected(qc_adata, axis="var", column="custom_num")
-
-        assert "custom_num" in qc_adata.var.columns
-        assert "number_detected" not in qc_adata.var.columns
-
-    def test_number_detected_axis_var_return_value(self, qc_adata):
-        """Test number_detected with axis='var' returns values when inplace=False."""
-        expected = np.array([2, 2, 1])
-
-        result = number_detected(qc_adata, axis="var", inplace=False)
-
-        assert result is not None
-        assert np.array_equal(result, expected)
-        assert "number_detected" not in qc_adata.var.columns
-
-    def test_number_detected_invalid_axis(self, qc_adata):
-        """Test number_detected raises error for invalid axis."""
-        with pytest.raises(ValueError, match="axis must be 'obs' or 'var'"):
-            number_detected(qc_adata, axis="invalid")
+        result = adata.varm["cv"]
+        assert result.isna().all().all()
 
 
-class TestFractionComplete:
-    def test_fraction_complete_expected_values(self, qc_adata):
-        """Test fraction_complete computes correct values."""
-        # Row 0: 3/3 = 1.0
-        # Row 1: 1/3 = 0.333...
-        # Row 2: 1/3 = 0.333...
-        expected = np.array([1.0, 1 / 3, 1 / 3])
+class TestSetNestedDict:
+    @pytest.mark.parametrize(
+        ("dictionary", "keys", "value", "reference"),
+        [
+            # Initial test
+            ({}, ["key1"], "value", {"key1": "value"}),
+            # Do not overwrite existing keys
+            (
+                {"existing_key": "existing_value"},
+                ["key1"],
+                "value",
+                {"existing_key": "existing_value", "key1": "value"},
+            ),
+            # Multiple keys
+            ({}, ["key1", "key2"], "value", {"key1": {"key2": "value"}}),
+            # Write non-string values
+            ({}, ["key1", "key2"], [], {"key1": {"key2": []}}),
+        ],
+    )
+    def test__set_nested_dict(
+        self, dictionary: dict[str, Any], value: Any, keys: list[str], reference: dict[str, Any]
+    ) -> None:
+        """Test recursively setting dictionary keys in a dictionary"""
+        result = _set_nested_dict(dictionary=dictionary, keys=keys, value=value)
 
-        fraction_complete(qc_adata)
-
-        assert "fraction_complete" in qc_adata.obs.columns
-        assert np.allclose(qc_adata.obs["fraction_complete"].values, expected)
-
-    def test_fraction_complete_custom_col_name(self, qc_adata):
-        """Test fraction_complete with custom column name."""
-        fraction_complete(qc_adata, column="custom_frac")
-
-        assert "custom_frac" in qc_adata.obs.columns
-        assert "fraction_complete" not in qc_adata.obs.columns
-
-    def test_fraction_complete_return_value(self, qc_adata):
-        """Test fraction_complete returns values when inplace=False."""
-        expected = np.array([1.0, 1 / 3, 1 / 3])
-
-        result = fraction_complete(qc_adata, inplace=False)
-
-        assert result is not None
-        assert np.allclose(result, expected)
-        assert "fraction_complete" not in qc_adata.obs.columns
-
-    @pytest.mark.parametrize("layer", [None, "raw"])
-    def test_fraction_complete_layer(self, qc_adata, layer):
-        """Test fraction_complete works with different layers."""
-        fraction_complete(qc_adata, layer=layer)
-
-        assert "fraction_complete" in qc_adata.obs.columns
-
-    def test_fraction_complete_axis_var_expected_values(self, qc_adata):
-        """Test fraction_complete with axis='var' computes correct values."""
-        # Col 0: [1, 0, 1] -> 2 detected out of 3 obs -> 2/3
-        # Col 1: [2, 2, 0] -> 2 detected out of 3 obs -> 2/3
-        # Col 2: [3, nan, 0] -> 1 detected out of 3 obs -> 1/3
-        expected = np.array([2 / 3, 2 / 3, 1 / 3])
-
-        fraction_complete(qc_adata, axis="var")
-
-        assert "fraction_complete" in qc_adata.var.columns
-        assert np.allclose(qc_adata.var["fraction_complete"].values, expected)
-
-    def test_fraction_complete_axis_var_custom_col_name(self, qc_adata):
-        """Test fraction_complete with axis='var' and custom column name."""
-        fraction_complete(qc_adata, axis="var", column="custom_frac")
-
-        assert "custom_frac" in qc_adata.var.columns
-        assert "fraction_complete" not in qc_adata.var.columns
-
-    def test_fraction_complete_axis_var_return_value(self, qc_adata):
-        """Test fraction_complete with axis='var' returns values when inplace=False."""
-        expected = np.array([2 / 3, 2 / 3, 1 / 3])
-
-        result = fraction_complete(qc_adata, axis="var", inplace=False)
-
-        assert result is not None
-        assert np.allclose(result, expected)
-        assert "fraction_complete" not in qc_adata.var.columns
-
-    def test_fraction_complete_invalid_axis(self, qc_adata):
-        """Test fraction_complete raises error for invalid axis."""
-        with pytest.raises(ValueError, match="axis must be 'obs' or 'var'"):
-            fraction_complete(qc_adata, axis="invalid")
-
-    def test_fraction_complete_invalid_layer(self, qc_adata):
-        """Test fraction_complete raises error for invalid layer."""
-        with pytest.raises(ValueError, match="not found in adata.layers"):
-            fraction_complete(qc_adata, layer="nonexistent")
+        assert result == reference
 
 
-class TestCalculateQCMetrics:
-    def test_calculate_qc_metrics_adds_all_columns(self, qc_adata):
-        """Test calculate_qc_metrics adds all expected columns."""
-        calculate_qc_metrics(qc_adata)
+class TestComputePooledGroupwiseMetric:
+    """Test that aggregation function returns correct values"""
 
-        # obs columns
-        assert "total_sample_intensity" in qc_adata.obs.columns
-        assert "num_features_detected" in qc_adata.obs.columns
-        assert "fraction_detected_features" in qc_adata.obs.columns
-        # var columns
-        assert "total_feature_intensity" in qc_adata.var.columns
-        assert "num_samples_detected" in qc_adata.var.columns
-        assert "fraction_detected_samples" in qc_adata.var.columns
+    @pytest.fixture
+    def adata_grouped(self) -> ad.AnnData:
+        """AnnData with two groups, each with distinct values"""
+        X = np.array([[1.0, 2.0], [3.0, 4.0], [10.0, 20.0], [30.0, 40.0]])
+        obs = pd.DataFrame({"group": ["A", "A", "B", "B"]})
+        return ad.AnnData(X=X, layers={"layer": X * 2}, obs=obs)
 
-    def test_calculate_qc_metrics_correct_values(self, qc_adata):
-        """Test calculate_qc_metrics computes correct values."""
-        # obs expected values
-        expected_total_obs = np.array([6.0, 2.0, 1.0])
-        expected_num_obs = np.array([3, 1, 1])
-        expected_frac_obs = np.array([1.0, 1 / 3, 1 / 3])
-        # var expected values
-        expected_total_var = np.array([2.0, 4.0, 3.0])
-        expected_num_var = np.array([2, 2, 1])
-        expected_frac_var = np.array([2 / 3, 2 / 3, 1 / 3])
+    def test__compute_pooled_groupwise_metric(self, adata_grouped: ad.AnnData) -> None:
+        """Test groupwise metric computation with a simple mean function"""
+        result = _compute_pooled_groupwise_metric(adata_grouped, func=lambda x: np.mean(x), group_column="group")
+        # Group A: mean([[1,2],[3,4]]) = 2.5, Group B: mean([[10,20],[30,40]]) = 25.0
+        assert result == {"A": 2.5, "B": 25.0}
 
-        calculate_qc_metrics(qc_adata)
+    def test__compute_pooled_groupwise_metric_layer(self, adata_grouped: ad.AnnData) -> None:
+        """Test groupwise metric computation using a layer"""
+        result = _compute_pooled_groupwise_metric(
+            adata_grouped, func=lambda x: np.mean(x), group_column="group", layer="layer"
+        )
+        assert result == {"A": 5.0, "B": 50.0}
 
-        # obs assertions
-        assert np.allclose(qc_adata.obs["total_sample_intensity"].values, expected_total_obs)
-        assert np.array_equal(qc_adata.obs["num_features_detected"].values, expected_num_obs)
-        assert np.allclose(qc_adata.obs["fraction_detected_features"].values, expected_frac_obs)
-        # var assertions
-        assert np.allclose(qc_adata.var["total_feature_intensity"].values, expected_total_var)
-        assert np.array_equal(qc_adata.var["num_samples_detected"].values, expected_num_var)
-        assert np.allclose(qc_adata.var["fraction_detected_samples"].values, expected_frac_var)
+    def test__compute_pooled_groupwise_metric_kwargs(self, adata_grouped: ad.AnnData) -> None:
+        """Test that kwargs are passed to the aggregation function"""
+        result = _compute_pooled_groupwise_metric(
+            adata_grouped, func=lambda _, return_value: return_value, group_column="group", return_value=10.0
+        )
+        assert result == {"A": 10.0, "B": 10.0}
 
-    @pytest.mark.parametrize("layer", [None, "raw"])
-    def test_calculate_qc_metrics_layer(self, qc_adata, layer):
-        """Test calculate_qc_metrics works with different layers."""
-        calculate_qc_metrics(qc_adata, layer=layer)
+    def test__compute_pooled_groupwise_metric_invalid_return_type(self, adata_grouped: ad.AnnData) -> None:
+        """Test that non-float return raises TypeError"""
+        with pytest.raises(TypeError, match="needs to return a numeric value"):
+            _compute_pooled_groupwise_metric(adata_grouped, func=lambda _: "not a number", group_column="group")
 
-        # obs columns
-        assert "total_sample_intensity" in qc_adata.obs.columns
-        assert "num_features_detected" in qc_adata.obs.columns
-        assert "fraction_detected_features" in qc_adata.obs.columns
-        # var columns
-        assert "total_feature_intensity" in qc_adata.var.columns
-        assert "num_samples_detected" in qc_adata.var.columns
-        assert "fraction_detected_samples" in qc_adata.var.columns
+
+@pytest.fixture
+def count_data_pmad() -> tuple[np.ndarray, float]:
+    """Generate count data with known PMAD"""
+    X = np.arange(0, 9, 1).reshape(3, 3)
+    return X, 3.0
+
+
+class TestPmad:
+    def test__pmad(self, count_data_pmad) -> None:
+        X, pmad = count_data_pmad
+
+        assert _pmad(x=X) == pmad
+
+
+class TestPooledMedianAbsoluteDeviation:
+    @pytest.fixture
+    def adata_pmad(self, count_data_pmad) -> tuple[np.ndarray, float]:
+        """Generate count data with known PMAD"""
+        # Concatenate the same count matrix with known PMADs for 3 different sample groups
+        X, pmad = count_data_pmad
+        n_obs = X.shape[0]
+
+        sample_types = ["A"] * n_obs + ["B"] * n_obs + ["C"] * n_obs
+        X = np.concatenate([X for _ in range(3)], axis=0)
+
+        adata = ad.AnnData(X=X, layers={"layer": X}, obs=pd.DataFrame({"sample_type": sample_types}))
+
+        return {"adata": adata, "pmad": {"A": pmad, "B": pmad, "C": pmad}, "group_column": "sample_type"}
+
+    @pytest.mark.parametrize("layer", [None, "layer"])
+    def test_pooled_median_absolute_deviation_return(self, adata_pmad: ad.AnnData, layer: str | None) -> None:
+        """Test if `pooled_median_absolute_deviation` computes group-wise PMAD correctly"""
+        reference = pd.DataFrame.from_dict(adata_pmad["pmad"], orient="index", columns=["pmad"])
+
+        pmad = pooled_median_absolute_deviation(
+            adata_pmad["adata"], group_column=adata_pmad["group_column"], layer=layer, inplace=False
+        )
+
+        pd.testing.assert_frame_equal(pmad, reference)
+
+    @pytest.mark.parametrize("layer", [None, "layer"])
+    def test_pooled_median_absolute_deviation_inplace(self, adata_pmad: ad.AnnData, layer: str | None) -> None:
+        """Test if `pooled_median_absolute_deviation` sets PMAD correctly in anndata object"""
+        reference = adata_pmad["pmad"]
+        adata = adata_pmad["adata"].copy()
+
+        pooled_median_absolute_deviation(adata, group_column=adata_pmad["group_column"], layer=layer, inplace=True)
+
+        assert adata.uns.get("metrics").get("pmad") == reference
+
+
+@pytest.fixture
+def count_data_pcv() -> tuple[np.ndarray, float]:
+    """Generate count data with known PCV"""
+    # STD: 0.5, MEAN: 0.5, 1.5, 2.5, 3.5
+    # CVs: 1, 1/3, 1/5, 1/7
+    # mean feature-wise CV: (1 + 1/3 + 1/5 + 1/7)/4
+    X = np.array([[0, 1, 2, 3], [1, 2, 3, 4], [0, 1, 2, 3], [1, 2, 3, 4]])
+    return X, 0.419047
+
+
+class TestPcv:
+    def test__pcv(self, count_data_pcv) -> None:
+        X, pcv = count_data_pcv
+
+        result = _pcv(x=X, min_valid=3)
+        assert np.allclose(result, pcv, atol=1e-4)
+
+
+class TestPooledCoefficientOfVariation:
+    @pytest.fixture
+    def adata_pcv(self, count_data_pcv) -> tuple[np.ndarray, float]:
+        """Generate count data with known PCV"""
+        # Concatenate the same count matrix with known PCVs for 3 different sample groups
+        X, pcv = count_data_pcv
+        n_obs = X.shape[0]
+
+        sample_types = ["A"] * n_obs + ["B"] * n_obs + ["C"] * n_obs
+        X = np.concatenate([X for _ in range(3)], axis=0)
+
+        adata = ad.AnnData(X=X, layers={"layer": X}, obs=pd.DataFrame({"sample_type": sample_types}))
+
+        return {"adata": adata, "pcv": {"A": pcv, "B": pcv, "C": pcv}, "group_column": "sample_type"}
+
+    @pytest.mark.parametrize("layer", [None, "layer"])
+    def test_pooled_coefficient_of_variation_return(self, adata_pcv: ad.AnnData, layer: str | None) -> None:
+        """Test if `pooled_coefficient_of_variation` computes group-wise PCV correctly"""
+        reference = pd.DataFrame.from_dict(adata_pcv["pcv"], orient="index", columns=["pcv"])
+
+        pcv = pooled_coefficient_of_variation(
+            adata_pcv["adata"], group_column=adata_pcv["group_column"], layer=layer, inplace=False
+        )
+
+        pd.testing.assert_frame_equal(pcv, reference, atol=1e-4)
+
+    @pytest.mark.parametrize("layer", [None, "layer"])
+    def test_pooled_coefficient_of_variation_inplace(self, adata_pcv: ad.AnnData, layer: str | None) -> None:
+        """Test if `pooled_coefficient_of_variation` sets PCV correctly in anndata object"""
+        reference = adata_pcv["pcv"]
+        adata = adata_pcv["adata"].copy()
+
+        pooled_coefficient_of_variation(adata, group_column=adata_pcv["group_column"], layer=layer, inplace=True)
+        result = adata.uns.get("metrics").get("pcv")
+
+        assert all(key == ref_key for key, ref_key in zip(result.keys(), reference.keys(), strict=True))
+        assert all(
+            np.isclose(value, ref_value, atol=1e-4)
+            for value, ref_value in zip(result.values(), reference.values(), strict=True)
+        )
