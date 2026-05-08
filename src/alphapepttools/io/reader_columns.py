@@ -11,7 +11,7 @@ FEATURE_LEVEL_CONFIG = {
         "feature_id_column": PsmDfCols.PROTEINS,
         "sample_id_column": PsmDfCols.RAW_NAME,
     },
-    "precursor": {
+    "precursors": {
         "intensity_column": PsmDfCols.PRECURSOR_INTENSITY,
         "feature_id_column": PsmDfCols.PRECURSOR_ID,
         "sample_id_column": PsmDfCols.RAW_NAME,
