@@ -115,7 +115,7 @@ def drop_singleton_batches(
 
 
 def scanpy_pycombat(
-    adata: ad.AnnData, batch: str, covariates: None | list[str], layer: str | None = None, *, copy: bool = False
+    adata: ad.AnnData, batch: str, covariates: None | list[str] = None, layer: str | None = None, *, copy: bool = False
 ) -> ad.AnnData:
     """Correct batch effects using the ComBat method :cite:`Johnson.2007`.
 
