@@ -114,7 +114,9 @@ def drop_singleton_batches(
     return adata
 
 
-def scanpy_pycombat(adata: ad.AnnData, batch: str, layer: str | None = None, *, copy: bool = False) -> ad.AnnData:
+def scanpy_pycombat(
+    adata: ad.AnnData, batch: str, covariates: None | list[str], layer: str | None = None, *, copy: bool = False
+) -> ad.AnnData:
     """Correct batch effects using the ComBat method :cite:`Johnson.2007`.
 
     Applies empirical Bayes batch correction to remove systematic
@@ -131,6 +133,8 @@ def scanpy_pycombat(adata: ad.AnnData, batch: str, layer: str | None = None, *, 
     batch
         Name of the batch feature in obs, the variation associated with this feature will be corrected.
         Missing values in this column will be replaced by one single "NA" batch
+    covariates
+        Columns in `adata.obs` indicating real biological variation. Variation associated with these columns will be retained.
     layer
         Name of the layer to batch correct. If None (default), the attribute adata.X is used
     copy
@@ -202,7 +206,7 @@ def scanpy_pycombat(adata: ad.AnnData, batch: str, layer: str | None = None, *, 
         raise ValueError(" scanpy_pycombat: At least one batch contains only one single sample.")
 
     # Adjust to scanpy API
-    batch_corrected_result = scanpy.pp.combat(adata, key=batch, inplace=False)
+    batch_corrected_result = scanpy.pp.combat(adata, key=batch, covariates=covariates, inplace=False)
 
     if layer is None:
         adata.X = batch_corrected_result
