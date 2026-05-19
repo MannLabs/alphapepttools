@@ -134,7 +134,7 @@ def scanpy_pycombat(
         Name of the batch feature in obs, the variation associated with this feature will be corrected.
         Missing values in this column will be replaced by one single "NA" batch
     covariates
-        Columns in `adata.obs` indicating real biological variation. Variation associated with these columns will be retained.
+        Columns in `adata.obs` indicating biological variation. Variation associated with these columns will be retained.
     layer
         Name of the layer to batch correct. If None (default), the attribute adata.X is used
     copy
