@@ -1,5 +1,5 @@
 from .colors import BaseColormaps, BaseColors, BasePalettes, MappedColormaps, get_color_mapping, show_rgba_color_list
-from .figure import create_figure, label_axes, save_figure
+from .figure import AxisManager, create_figure, label_axes, save_figure
 from .plots import (
     PlotConfig,
     Plots,  # Kept here for backward compatibility, using Plots raises and alerts the user about the deprecation and how to upgrade.
@@ -23,6 +23,7 @@ from .plots import (
 )
 
 __all__ = [
+    "AxisManager",
     "BaseColormaps",
     "BaseColors",
     "BasePalettes",
