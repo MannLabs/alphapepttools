@@ -223,10 +223,9 @@ def normalize(
 
 def irs(
     adata: ad.AnnData,
-    group_column: str | None = None,
+    group_column: str,
     reference_column: str | None = None,
     reference_value: str | None = None,
-    key_added: str | None = None,
     *,
     layer: str | None = None,
     copy: bool = False,
@@ -287,32 +286,32 @@ def irs(
         mode="any",
         custom_message=f"`group_column` {group_column} contains nans. Cannot normalize groups with missing values, please drop these observations prior to normalization.",
     )
+
     groups = adata.obs.groupby(group_column, dropna=True)
 
-    # NaN-init so any sample not assigned to a group surfaces as NaN downstream
-    # rather than silently multiplying by uninitialized memory.
-    ref_values = np.full_like(data, np.nan, dtype=float)
+    sample_ref_values = np.full_like(data, np.nan, dtype=float)
+    group_ref_values = np.full(shape=(len(groups), adata.n_vars), fill_value=np.nan, dtype=float)
 
-    per_group_refs = []
-    for group_name, group_indices in groups.indices.items():
+    # The internal reference value is either computed from the internal reference samples, as indicated by the reference column,
+    # or it is computed as the mean of all channels in the respective run.
+    for group_idx, (group_name, group_indices) in enumerate(groups.indices.items()):
         if reference_column is not None:
             group_metadata: pd.DataFrame = groups.get_group(group_name)
             ref_indices = np.where(group_metadata[reference_column] == reference_value)[0]
-            # Subset to references in the group
-            ref_value = np.nanmean(data[group_indices, :][ref_indices, :], axis=0).squeeze()
+            ref_data = data[group_indices, :][ref_indices, :]
         else:
-            ref_value = np.nanmean(data[group_indices, :], axis=0).squeeze()
+            ref_data = data[group_indices, :]
 
-        per_group_refs.append(ref_value)
-        ref_values[group_indices] = ref_value
+        ref_value = np.nanmean(ref_data, axis=0).squeeze()
 
-    target_value = gmean(np.stack(per_group_refs), axis=0)
-    norm_factors = target_value / ref_values
+        group_ref_values[group_idx] = ref_value
+        sample_ref_values[group_indices] = ref_value
+
+    target_value = gmean(np.stack(group_ref_values), axis=0)
+    norm_factors = target_value / sample_ref_values
     data = data * norm_factors
 
-    if key_added is not None:
-        adata.layers[key_added] = data
-    elif layer is None:
+    if layer is None:
         adata.X = data
     else:
         adata.layers[layer] = data
