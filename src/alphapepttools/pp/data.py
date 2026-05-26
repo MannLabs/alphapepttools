@@ -929,45 +929,39 @@ def filter_data_completeness(
     group_column: str | None = None,
     groups: list[str] | None = None,
     keep_strategy: Literal["any", "all"] = "all",
-    action: str = "flag",
+    action: Literal["flag", "drop"] = "flag",
     var_colname: str = "passed_threshold_missing_values",
 ) -> ad.AnnData:
     """Filter features based on missing values.
 
-    Filters AnnData features (columns) based on the fraction of missing values.
-    Without `group_column`, missingness is computed across the full dataset.
-    With `group_column`, missingness is computed per group and aggregated via
-    `keep_strategy` (`"all"` = logical AND, `"any"` = logical OR). See examples
-    for concrete behavior.
-
-    (In case rows should be filtered, it is recommended to transpose the adata
-    object prior to calling this function and reverting the transpose afterwards.)
+    Operates globally, or per-group when group_column is set.
 
     Parameters
     ----------
     adata
         AnnData object
     max_missing
-        Maximum fraction of missing values allowed to pass filtering.
+        Maximum fraction of missing values allowed to pass filtering in the interval [0.0, 1.0].
+        Features with a fraction of missing values greater than (`>`) `max_missing` are filtered out.
     group_column
         Column name in `adata.obs` defining groups for group-wise filtering.
         If `None` (default), computes missingness across all samples.
         If specified, computes statistics separately for each group.
-        This is useful to retain features that are exclusive for a specific sample group.
+        This is useful to retain features that are exclusive to a specific sample group.
     groups
         List of levels of the group_column to consider in filtering. E.g. if the column has the levels
-        ['A', 'B', 'C'], and groups = ['A', 'B'], only missingness of features in these
-        groups is considered. If None, all groups are considered.
+        `['A', 'B', 'C']`, and `groups = ['A', 'B']`, only missingness of features in these
+        groups is considered. If `None`, all groups are considered.
     keep_strategy
         Only relevant for groupwise filtering.
+        - `all` : keep a feature only if it passes in every group.
         - `any` : keep a feature if it passes the threshold in at least one group.
-        - `all` : keep a feature only if it passes in every group. This is useful in highly unbalanced designs.
     action
-        Action to perform. can be 'flag' (default) or 'drop'. If 'flag', a boolean column in `adata.var`
-        is added to indicate whether the feature passed the missingness threshold. If 'drop',
+        Action to perform. Can be `flag` (default) or `drop`. If `flag`, a boolean column in `adata.var`
+        is added to indicate whether the feature passed the missingness threshold. If `drop`,
         features that do not pass the threshold are dropped from the AnnData object.
     var_colname
-        Name of the `adata.var` boolean column to add if action is 'flag'. Default is 'passed_threshold_missing_values'.
+        Name of the `adata.var` boolean column to add if action is `flag`.
 
     Returns
     -------
@@ -1008,19 +1002,18 @@ def filter_data_completeness(
 
     .. code-block:: python
 
-        # No grouping: keep features ≥50% complete across the whole study
+        # No grouping: keep features with ≤50% missingness across the whole study
         apt.pp.filter_data_completeness(adata, max_missing=0.5)
 
-        # Logical AND (default): keep features ≥50% complete in *every* condition.
-        # A feature with 0/5 in condition A and 995/995 in condition B is removed
+        # Logical AND (default): keep features with ≤50% missingness in *every* condition.
+        # A feature with 5/5 missing in condition A and 0/995 missing in condition B is removed
         # despite being 99.5% complete overall.
         apt.pp.filter_data_completeness(adata, max_missing=0.5, group_column="condition", keep_strategy="all")
 
-        # Logical OR: keep features ≥50% complete in *at least one* condition.
+        # Logical OR: keep features with ≤50% missingness in *at least one* condition.
         # Retains condition-specific features, which are often the most interesting
         # candidates in clinical studies.
         apt.pp.filter_data_completeness(adata, max_missing=0.5, group_column="condition", keep_strategy="any")
-
     """
     if max_missing < 0 or max_missing > 1:
         raise ValueError("Threshold must be between 0 and 1.")
