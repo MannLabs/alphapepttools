@@ -1,8 +1,9 @@
 import anndata as ad
 import numpy as np
+import pandas as pd
 import pytest
 
-from alphapepttools.pp import normalize
+from alphapepttools.pp import irs, normalize
 from alphapepttools.pp.norm import _total_mean_normalization, _total_median_normalization, _validate_strategies
 
 
@@ -162,3 +163,141 @@ class TestNormalizeFunction:
         assert np.isclose(
             modified_adata.obs["norm_factors"], expected_norm_factors[strategy], atol=1e-6, equal_nan=True
         ).all()
+
+
+class TestIRS:
+    @pytest.fixture
+    def irs_data__reference_values(self):
+        """TMT dataset with 3 runs + 2 channels"""
+        # geometric mean of feature 0 in reference channels: 1.0
+        # geometric mean of feature 1 in reference channels: 2.0
+        X = np.array(
+            [
+                [0, 0],  # Run 0 - Sample
+                [1, 1],  # Run 0 - Ref
+                [1, 1],  # Run 1 - Sample
+                [1, 2],  # Run 1 - Ref
+                [2, 2],  # Run 2 - Sample
+                [1, 4],  # Run 2 - Ref
+            ],
+            dtype=np.float32,
+        )
+
+        obs = pd.DataFrame(
+            {
+                "tmt_plex": [0, 0, 1, 1, 2, 2],
+                "tmt_channel": [0, 1, 0, 1, 0, 1],
+                "is_reference": [False, True, False, True, False, True],
+            }
+        )
+
+        norm_factors = np.array([[1, 2], [1, 2], [1, 1], [1, 1], [1, 0.5], [1, 0.5]])
+
+        ref = X * norm_factors
+
+        irs_kwargs = {
+            "group_column": "tmt_plex",
+        }
+
+        return ad.AnnData(X=X, obs=obs, layers={"new_layer": X.copy()}), irs_kwargs, ref
+
+    @pytest.fixture
+    def irs_data__mean_reference(self):
+        """TMT dataset with 3 runs + 2 channels"""
+        # geometric mean of feature 0 in reference channels: 1.0
+        # geometric mean of feature 1 in reference channels: 2.0
+        X = np.array(
+            [
+                [1, 1],  # Run 0 - Sample 0
+                [1, 1],  # Run 0 - Sample 1
+                [1, 2],  # Run 1 - Sample 0
+                [1, 2],  # Run 1 - Sample 1
+                [1, 4],  # Run 2 - Sample 0
+                [1, 4],  # Run 2 - Sample 1
+            ],
+            dtype=np.float32,
+        )
+
+        obs = pd.DataFrame(
+            {
+                "tmt_plex": [0, 0, 1, 1, 2, 2],
+                "tmt_channel": [0, 1, 0, 1, 0, 1],
+                "is_reference": [False, False, False, False, False, False],
+            }
+        )
+
+        norm_factors = np.array([[1, 2], [1, 2], [1, 1], [1, 1], [1, 0.5], [1, 0.5]])
+
+        ref = X * norm_factors
+
+        irs_kwargs = {
+            "group_column": "tmt_plex",
+            "reference_column": None,
+            "reference_value": None,
+        }
+
+        return ad.AnnData(X=X, obs=obs, layers={"new_layer": X.copy()}), irs_kwargs, ref
+
+    @pytest.mark.parametrize("copy", [False, True])
+    @pytest.mark.parametrize("layer", [None, "new_layer"])
+    @pytest.mark.parametrize(
+        "reference_kwargs",
+        [
+            {"reference_column": "tmt_channel", "reference_value": 1},
+            {"reference_column": "is_reference", "reference_value": True},
+        ],
+    )
+    def test_irs__reference_values(
+        self,
+        irs_data__reference_values: tuple[ad.AnnData, np.ndarray],
+        *,
+        reference_kwargs,
+        layer: str | None,
+        copy: bool,
+    ) -> None:
+        """Test internal reference scaling"""
+        adata, irs_kwargs, expected_array = irs_data__reference_values
+
+        adata = adata.copy()
+
+        assert isinstance(adata, ad.AnnData)
+
+        result = irs(adata, **reference_kwargs, **irs_kwargs, copy=copy, layer=layer)
+
+        if copy:
+            assert isinstance(result, ad.AnnData)
+            modified_adata = result
+
+        else:
+            assert result is None
+            modified_adata = adata
+
+        modified_layer = modified_adata.X if layer is None else modified_adata.layers[layer]
+
+        assert np.isclose(modified_layer, expected_array, atol=1e-6, equal_nan=True).all()
+
+    @pytest.mark.parametrize("copy", [False, True])
+    @pytest.mark.parametrize("layer", [None, "new_layer"])
+    def test_irs__mean_reference(
+        self, irs_data__mean_reference: tuple[ad.AnnData, np.ndarray], *, layer: str | None, copy: bool
+    ) -> None:
+        """Test internal reference scaling"""
+        adata, irs_kwargs, expected_array = irs_data__mean_reference
+
+        adata = adata.copy()
+
+        assert isinstance(adata, ad.AnnData)
+
+        result = irs(adata, **irs_kwargs, copy=copy, layer=layer)
+
+        if copy:
+            assert isinstance(result, ad.AnnData)
+            modified_adata = result
+
+        else:
+            assert result is None
+            modified_adata = adata
+
+        modified_layer = modified_adata.X if layer is None else modified_adata.layers[layer]
+
+        assert np.isclose(modified_layer, expected_array, atol=1e-6, equal_nan=True).all()
