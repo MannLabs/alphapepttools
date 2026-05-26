@@ -232,14 +232,16 @@ def irs(
 ) -> ad.AnnData:
     """Internal Reference Scaling (IRS) normalization.
 
-    This normalization is commonly performed in isobaric labelling experiments :cite:`Plubell.2017`.
-    For each individual run (i.e. 'plex'), compute a per-feature reference profile from
-    samples matching ``reference_column == reference_value``, then rescale every
-    sample (i.e. TMT channel) in that group so its reference profile equals the geometric-mean
-    reference profile taken across groups. NaNs are propagated.
+    Normalize features across multiple runs (e.g. TMT plexes) using a shared
+    internal reference, as commonly performed in isobaric labelling experiments
+    :cite:`Plubell.2017`. For each run defined by `group_column`, a per-feature
+    reference profile is computed from the samples where
+    `reference_column == reference_value`. Every sample in that run is then
+    rescaled so its reference profile matches the geometric mean of reference
+    profiles taken across all runs. NaNs are propagated.
 
-    If ``reference_column`` is None, the per-group mean across all samples is
-    used as the "reference"; this is per-group mean centering, not IRS proper.
+    If `reference_column` is `None`, the per-run arithmetic mean across all
+    samples is used in place of an explicit reference.
 
     Parameters
     ----------
@@ -248,18 +250,19 @@ def irs(
     layer
         Layer in anndata object to normalize
     group_column
-        Column in ``adata.obs`` that defines the individual runs.
+        Column in `adata.obs` that defines the individual runs.
     reference_column
-        Column in ``adata.obs`` that defines the column in which the reference sample is indicated.
-        If `None`, a virtual reference sample is constructed from the arithmic mean
+        Column in `adata.obs` indicating which samples are reference channels.
+        If `None`, a virtual reference is constructed from the arithmetic mean
+        of all samples within each run.
     reference_value
-        Value that indicates the reference sample.
+        Value in `reference_column` that marks the reference sample(s) within
+        each run. Ignored when `reference_column` is `None`.
     layer
-        Layer that will be normalized. If `None` uses `anndata.AnnData.X`
+        Layer in `adata` to normalize. If `None`, uses `adata.X`.
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
-
 
     Reference
     ---------
