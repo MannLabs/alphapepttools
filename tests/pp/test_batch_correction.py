@@ -61,6 +61,7 @@ def test_convert_na_to_batch():
 
 @pytest.mark.parametrize("copy", [False, True])
 @pytest.mark.parametrize("layer", [False, True])
+@pytest.mark.parametrize("covariates", [None])
 @pytest.mark.parametrize(
     ("datatype"),
     [
@@ -70,7 +71,9 @@ def test_convert_na_to_batch():
         ("complex"),
     ],
 )
-def test_scanpy_pycombat(datatype, pycombat_test_data_simple, pycombat_test_data_complex, layer: str, *, copy: bool):
+def test_scanpy_pycombat(
+    datatype, pycombat_test_data_simple, pycombat_test_data_complex, covariates, layer: str, *, copy: bool
+):
     """
     Test the scanpy_pycombat function with various scenarios.
     """
@@ -87,10 +90,10 @@ def test_scanpy_pycombat(datatype, pycombat_test_data_simple, pycombat_test_data
 
     # Compute expected results
     expected_adata = adata.copy()
-    scanpy.pp.combat(expected_adata, key="batch", inplace=True)
+    scanpy.pp.combat(expected_adata, key="batch", covariates=covariates, inplace=True)
 
     # Get comparison data from wrapper
-    result = scanpy_pycombat(adata, batch="batch", layer=layer, copy=copy)
+    result = scanpy_pycombat(adata, batch="batch", covariates=covariates, layer=layer, copy=copy)
 
     if copy:
         assert isinstance(result, ad.AnnData)
