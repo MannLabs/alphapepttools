@@ -1,7 +1,12 @@
+import warnings
 from typing import Literal
 
 import anndata as ad
 import numpy as np
+import pandas as pd
+from scipy.stats import gmean
+
+from ._utils import _raise_on_nan_values
 
 STRATEGIES = ["total_mean", "total_median"]
 
@@ -212,5 +217,104 @@ def normalize(
 
     if key_added is not None:
         adata.obs[key_added] = norm_factors
+
+    return adata if copy else None
+
+
+def irs(
+    adata: ad.AnnData,
+    group_column: str | None = None,
+    reference_column: str | None = None,
+    reference_value: str | None = None,
+    key_added: str | None = None,
+    *,
+    layer: str | None = None,
+    copy: bool = False,
+) -> ad.AnnData:
+    """Internal Reference Scaling (IRS) normalization.
+
+    This normalization is commonly performed in isobaric labelling experiments :cite:`Plubell.2017`.
+    For each individual run (i.e. 'plex'), compute a per-feature reference profile from
+    samples matching ``reference_column == reference_value``, then rescale every
+    sample (i.e. TMT channel) in that group so its reference profile equals the geometric-mean
+    reference profile taken across groups. NaNs are propagated.
+
+    If ``reference_column`` is None, the per-group mean across all samples is
+    used as the "reference"; this is per-group mean centering, not IRS proper.
+
+    Parameters
+    ----------
+    adata
+        AnnData object
+    layer
+        Layer in anndata object to normalize
+    group_column
+        Column in ``adata.obs`` that defines the individual runs.
+    reference_column
+        Column in ``adata.obs`` that defines the column in which the reference sample is indicated.
+        If `None`, a virtual reference sample is constructed from the arithmic mean
+    reference_value
+        Value that indicates the reference sample.
+    layer
+        Layer that will be normalized. If `None` uses `anndata.AnnData.X`
+    copy
+        Whether to return a modified copy (True) of the anndata object. If False (default)
+        modifies the object inplace
+
+
+    Reference
+    ---------
+    - Plubell, D. L. et al. Extended Multiplexing of Tandem Mass Tags (TMT) Labeling Reveals Age and High Fat Diet Specific Proteome Changes in Mouse Epididymal Adipose Tissue. Mol Cell Proteomics 16, 873-890 (2017).
+    - Phillip Wilmarth. Thorough Testing of Internal Reference Scaling (IRS) [Website]. https://pwilmart.github.io/TMT_analysis_examples/IRS_validation.html. (2019)
+    """
+    if (reference_column is not None) and (reference_value is None):
+        warnings.warn(
+            "`reference_value` is None while `reference_column` is set - is this intended?",
+            stacklevel=2,
+        )
+    if (reference_column is None) and (reference_value is not None):
+        warnings.warn(
+            "`reference_value` is set while `reference_column` is None - it will be ignored.",
+            stacklevel=2,
+        )
+
+    adata = adata.copy() if copy else adata
+
+    data = adata.layers[layer].copy() if layer is not None else adata.X.copy()
+
+    _raise_on_nan_values(
+        adata.obs[group_column],
+        mode="any",
+        custom_message=f"`group_column` {group_column} contains nans. Cannot normalize groups with missing values, please drop these observations prior to normalization.",
+    )
+    groups = adata.obs.groupby(group_column, dropna=True)
+
+    # NaN-init so any sample not assigned to a group surfaces as NaN downstream
+    # rather than silently multiplying by uninitialized memory.
+    ref_values = np.full_like(data, np.nan, dtype=float)
+
+    per_group_refs = []
+    for group_name, group_indices in groups.indices.items():
+        if reference_column is not None:
+            group_metadata: pd.DataFrame = groups.get_group(group_name)
+            ref_indices = np.where(group_metadata[reference_column] == reference_value)[0]
+            # Subset to references in the group
+            ref_value = np.nanmean(data[group_indices, :][ref_indices, :], axis=0).squeeze()
+        else:
+            ref_value = np.nanmean(data[group_indices, :], axis=0).squeeze()
+
+        per_group_refs.append(ref_value)
+        ref_values[group_indices] = ref_value
+
+    target_value = gmean(np.stack(per_group_refs), axis=0)
+    norm_factors = target_value / ref_values
+    data = data * norm_factors
+
+    if key_added is not None:
+        adata.layers[key_added] = data
+    elif layer is None:
+        adata.X = data
+    else:
+        adata.layers[layer] = data
 
     return adata if copy else None
