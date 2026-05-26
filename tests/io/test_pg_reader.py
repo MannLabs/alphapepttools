@@ -11,7 +11,7 @@ class TestReadPGTable:
     """Test suite for read_pg_table function."""
 
     @patch("alphapepttools.io.pg_reader.pg_reader_provider")
-    def test_read_pg_table_default(self, mock_reader_provider):
+    def test_read_pg_table__default(self, mock_reader_provider):
         """Test that `read_pg_table` properly delegates to alphabase readers with correct default arguments."""
         mock_reader = Mock()
         mock_reader.import_file.return_value = pd.DataFrame()
@@ -24,7 +24,7 @@ class TestReadPGTable:
         mock_reader.import_file.assert_called_once_with("/path/to/file.tsv")
 
     @patch("alphapepttools.io.pg_reader.pg_reader_provider")
-    def test_read_pg_table_custom_arguments(self, mock_reader_provider):
+    def test_read_pg_table__custom_arguments(self, mock_reader_provider):
         """Test that `read_pg_table` properly delegates to alphabase readers with correct custom arguments."""
         mock_reader = Mock()
         mock_reader.import_file.return_value = pd.DataFrame()
@@ -38,4 +38,26 @@ class TestReadPGTable:
         mock_reader_provider.get_reader.assert_called_once_with(
             "alphadia", column_mapping={"a": "b"}, measurement_regex="test"
         )
+        mock_reader.import_file.assert_called_once_with("/path/to/file.tsv")
+
+    @patch("alphapepttools.io.pg_reader.pg_reader_provider")
+    def test_read_pg_table__add_column_mapping(self, mock_reader_provider):
+        """Test that `read_pg_table` properly delegates to alphabase readers with correct custom arguments."""
+        mock_reader = Mock()
+        mock_reader.import_file.return_value = pd.DataFrame()
+        mock_reader_provider.get_reader.return_value = mock_reader
+
+        # Test basic usage
+        _ = read_pg_table(
+            path="/path/to/file.tsv",
+            search_engine="alphadia",
+            additional_column_mapping={"custom_new_name": "specific_report_column"},
+            column_mapping={"a": "b"},
+            measurement_regex="test",
+        )
+
+        mock_reader_provider.get_reader.assert_called_once_with(
+            "alphadia", column_mapping={"a": "b"}, measurement_regex="test"
+        )
+        mock_reader.add_column_mapping.assert_called_once_with({"custom_new_name": "specific_report_column"})
         mock_reader.import_file.assert_called_once_with("/path/to/file.tsv")

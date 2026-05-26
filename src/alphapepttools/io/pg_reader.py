@@ -11,8 +11,7 @@ def read_pg_table(
     path: str,
     search_engine: str,
     *,
-    column_mapping: dict[str, Any] | None = None,
-    measurement_regex: str | None = None,
+    additional_column_mapping: dict[str, Any] | None = None,
     **reader_provider_kwargs,
 ) -> ad.AnnData:
     """Read protein group table to the :class:`anndata.AnnData` format
@@ -39,18 +38,20 @@ def read_pg_table(
         Path to protein group matrix
     search_engine
         Name of engine output, pass the method name of the corresponding reader.
-    column_mapping
-        Passed to :meth:`alphabase.pg_reader.pg_reader_provider.get_reader`.
-        A dictionary of mapping alphabase columns (keys) to the corresponding columns in the other
-        search engine (values). If `None` will be loaded from the `column_mapping` key of the respective
-        search engine in `pg_reader.yaml`.
-    measurement_regex
-        Passed to :meth:`alphabase.pg_reader.pg_reader_provider.get_reader`.
-        Regular expression that identifies correct measurement type. Only relevant if PG matrix contains multiple
-        measurement types. For example, alphapept returns the raw protein intensity per sample in column `A` and the
-        LFQ corrected value in `A_LFQ`. If `None` loads raw intensities.
+    additional_column_mapping
+        Extend the default mapping of protein group table columns to standardized alphabase columns with custom columns.
+        Passed as a dictionary of mapping the new column key to the corresponding columns in the
+        search engine protein group table (values)
     reader_provider_kwargs
-        Passed to :meth:`alphabase.pg_reader.pg_reader_provider.get_reader`
+        Passed to :meth:`alphabase.pg_reader.pg_reader_provider.get_reader`, especially:
+        - column_mapping
+            A dictionary of mapping alphabase columns (keys) to the corresponding columns in the other
+            search engine (values). If `None` will be loaded from the `column_mapping` key of the respective
+            search engine in `pg_reader.yaml`.
+        - measurement_regex
+            Regular expression that identifies correct measurement type. Only relevant if PG matrix contains multiple
+            measurement types. For example, alphapept returns the raw protein intensity per sample in column `A` and the
+            LFQ corrected value in `A_LFQ`. If `None` loads raw intensities.
 
     Returns
     -------
@@ -69,14 +70,25 @@ def read_pg_table(
 
     .. code-block:: python
 
-        from alphapepttools.io import read_pg_table
+        import alphapepttools as apt
 
         alphadia_path = ...
-        adata = read_pg_table(alphadia_path, search_engine="alphadia")
+        adata = apt.io.read_pg_table(alphadia_path, search_engine="alphadia")
 
         maxquant_path = ...
         # Read LFQ values from MaxQuant report
-        adata = read_pg_table(maxquant_path, search_engine="maxquant", measurement_regex="lfq")
+        adata = apt.io.read_pg_table(maxquant_path, search_engine="maxquant", measurement_regex="lfq")
+
+    If a specific column is missing in the output, you can add it via the `add_column_mapping` argument:
+
+    .. code-block:: python
+
+        # Spectronaut reports can contain custom columns, they might be missing in the alphabase default mapping
+        spectronaut_path = ...
+        apt.io.read_pg_table(
+            spectronaut_path, search_engine="spectronaut", additional_column_mapping={"new_name": "name_in_pg_table"}
+        )
+
 
     Get available regular expressions
 
@@ -92,14 +104,10 @@ def read_pg_table(
     --------
     :mod:`alphabase.pg_reader`
     """
-    # Build reader_provider_kwargs
-    # This assures that the default values of the readers are considered (e.g. if `column_mapping="raw"`)
-    if column_mapping is not None:
-        reader_provider_kwargs["column_mapping"] = column_mapping
-    if measurement_regex is not None:
-        reader_provider_kwargs["measurement_regex"] = measurement_regex
-
     reader = pg_reader_provider.get_reader(search_engine, **reader_provider_kwargs)
+
+    if additional_column_mapping is not None:
+        reader.add_column_mapping(additional_column_mapping)
 
     # Features x Observations
     df = reader.import_file(path)
