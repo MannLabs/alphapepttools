@@ -142,7 +142,7 @@
   data_type: annotation
   description: "File to convert Uniprot IDs (Swiss-Prot) into Gene Symbols (same version used in study)."
 
-- name:
+- name: khan2018
   url: https://datashare.biochem.mpg.de/s/943T3jg7g9HBaiN
   search_engine: none
   data_type: anndata
