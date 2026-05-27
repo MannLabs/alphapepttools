@@ -33,6 +33,7 @@ class StudyData:
             - 'psm': Peptide spectrum match (PSM) table
             - 'study_psm': Full study data (metadata + PSM table)
             - 'study_pg': Full study data (metadata + PG table)
+            - 'anndata': AnnData object
     citation
         Citation reference for the study, optional
     description
@@ -65,7 +66,7 @@ class StudyData:
     name: str
     url: str
     search_engine: str
-    data_type: Literal["pg", "psm", "study_psm", "study_pg"]
+    data_type: Literal["pg", "psm", "study_psm", "study_pg", "anndata"]
     citation: str | None = None
     description: str | None = None
 
