@@ -247,8 +247,6 @@ def irs(
     ----------
     adata
         AnnData object
-    layer
-        Layer in anndata object to normalize
     group_column
         Column in `adata.obs` that defines the individual runs.
     reference_column
