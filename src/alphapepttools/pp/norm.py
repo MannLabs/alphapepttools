@@ -225,7 +225,7 @@ def irs(
     adata: ad.AnnData,
     group_column: str,
     reference_column: str | None = None,
-    reference_value: str | None = None,
+    reference_value: object | None = None,
     *,
     layer: str | None = None,
     copy: bool = False,
