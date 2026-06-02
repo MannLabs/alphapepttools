@@ -229,7 +229,7 @@ def irs(
     *,
     layer: str | None = None,
     copy: bool = False,
-) -> ad.AnnData:
+) -> None | ad.AnnData:
     """Internal Reference Scaling (IRS) normalization.
 
     Normalize features across multiple runs (e.g. TMT plexes) using a shared
