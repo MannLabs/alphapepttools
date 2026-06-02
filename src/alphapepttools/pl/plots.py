@@ -123,7 +123,7 @@ def _extract_groupwise_plotting_data(
         if not group_data.empty:
             data_lists.append(group_data.tolist())
             labels.append(group)
-            positions.append(i + 1)
+            positions.append(i)
 
     return data_lists, labels, positions
 
