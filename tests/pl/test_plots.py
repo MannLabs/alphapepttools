@@ -257,7 +257,7 @@ def test_data_columns_to_df_failures(which_data, example_data, example_sample_me
             None,
             [[2.0], [3.0]],  # NaN is dropped, grouped by batch [1,1,2]
             [1, 2],
-            [1, 2],
+            [0, 1],
         ),
         (
             "batch",
@@ -265,7 +265,7 @@ def test_data_columns_to_df_failures(which_data, example_data, example_sample_me
             None,
             [[4.0, 5.0], [6.0]],  # First two cells in batch 1, last in batch 2
             [1, 2],
-            [1, 2],
+            [0, 1],
         ),
         # Case with direct column usage and dropping NaNs
         (
@@ -274,7 +274,7 @@ def test_data_columns_to_df_failures(which_data, example_data, example_sample_me
             ["A", "B", "age"],
             [[2.0, 3.0], [4.0, 5.0, 6.0], [10.0, 20.0, 30.0]],
             ["A", "B", "age"],
-            [1, 2, 3],
+            [0, 1, 2],
         ),
     ],
 )
