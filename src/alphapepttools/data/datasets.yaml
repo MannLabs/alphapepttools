@@ -141,3 +141,31 @@
   search_engine: none
   data_type: annotation
   description: File to convert Uniprot IDs (Swiss-Prot) into Gene Symbols (same version used in study).
+
+- name: lehtioe2021_pg
+  url: "https://datashare.biochem.mpg.de/s/4EPk8ZZK3CAm2Zg"
+  search_engine: custom
+  data_type: pg
+  citation: "Lehtiö, J. et al. Proteogenomics of non-small cell lung cancer reveals molecular subtypes associated with specific therapeutic targets and immune-evasion mechanisms. Nat Cancer 2, 1224-1242 (2021)"
+  description: "DDA TMT proteomics data of 141 NSLC samples."
+
+- name: lehtioe2021_metadata
+  url: "https://datashare.biochem.mpg.de/s/x5gMNoZnagZAonT"
+  search_engine: none
+  data_type: annotation
+  citation: "Lehtiö, J. et al. Proteogenomics of non-small cell lung cancer reveals molecular subtypes associated with specific therapeutic targets and immune-evasion mechanisms. Nat Cancer 2, 1224-1242 (2021)"
+  description: "Metadata describing the clinical NSLC cohort by Lehtiö et al, 2021"
+
+- name: lehtioe2021_methylation
+  url: "https://datashare.biochem.mpg.de/s/WoNn3aXPA2r6BAy"
+  search_engine: none
+  data_type: anndata
+  citation: "Lehtiö, J. et al. Proteogenomics of non-small cell lung cancer reveals molecular subtypes associated with specific therapeutic targets and immune-evasion mechanisms. Nat Cancer 2, 1224-1242 (2021)"
+  description: "Methylation data of 113 NSLC samples, partially matched with `lehtio2021_pg`."
+
+- name: lehtioe2021_rna
+  url: "https://datashare.biochem.mpg.de/s/AYJTCimj7R4bZYx"
+  search_engine: none
+  data_type: anndata
+  citation: "Lehtiö, J. et al. Proteogenomics of non-small cell lung cancer reveals molecular subtypes associated with specific therapeutic targets and immune-evasion mechanisms. Nat Cancer 2, 1224-1242 (2021)"
+  description: "DDA TMT RNA data of 118 NSLC samples, partially matched with `lehtio2021_pg`."
