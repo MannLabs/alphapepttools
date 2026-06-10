@@ -1,4 +1,5 @@
 from .anndata_factory import AnnDataFactory
+from .mulink_reader import mulink_from_anndatas
 from .pg_reader import read_pg_table
 from .psm_reader import read_psm_table
 from .utils import list_available_reader
