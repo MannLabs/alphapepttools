@@ -4,6 +4,7 @@ from typing import Literal
 
 import anndata as ad
 import mudata as md
+import mulink  # noqa: F401  -- registers the .link accessor on MuData via a side-effect import
 import networkx as nx
 import numpy as np
 import pandas as pd
