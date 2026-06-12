@@ -11,14 +11,12 @@ import pandas as pd
 from scipy.sparse import csr_matrix
 from tqdm import tqdm
 
-from alphapepttools.io.reader_columns import FEATURE_LEVEL_CONFIG
+from alphapepttools.io.reader_columns import ALPHAPEPTTOOLS_FEATURE_ID_NAME, FEATURE_LEVEL_CONFIG
 
-# Port from https://github.com/lucas-diedrich/mulink/blob/main/docs/notebooks/protein-data.ipynb?short_path=4fbb043
-
-ALPHAPEPTTOOLS_FEATURE_ID_NAME = "feature_id_column"
+# Port from https://github.com/lucas-diedrich/mulink/blob/main/docs/notebooks/protein-data.ipynb?short_path=4fbb043, with adjustments to build a MuLink instance from a set of AnnData objects rather than a PSM-table
 
 
-def sparse_matrix_mapping(
+def _sparse_matrix_mapping(
     mapping_df: pd.DataFrame,
     columns: list[str] | None = None,
     *,
@@ -54,7 +52,7 @@ def sparse_matrix_mapping(
     )
 
 
-def reindex_adjacency(df: pd.DataFrame, new_index: pd.Index) -> csr_matrix:
+def _reindex_adjacency_matrix(df: pd.DataFrame, new_index: pd.Index) -> csr_matrix:
     """Reindex a sparse adjacency-matrix DataFrame to `new_index` along both axes
 
     Labels in `new_index` not present in `df.index` become all-zero
@@ -91,7 +89,7 @@ def reindex_adjacency(df: pd.DataFrame, new_index: pd.Index) -> csr_matrix:
 
 
 def mulink_from_anndatas(
-    anndatas: dict[Literal["proteins", "precursors", "peptides", "genes"], ad.AnnData],
+    anndatas: dict[Literal["genes", "proteins", "peptides", "precursors"], ad.AnnData],
     *,
     transitive_closure: bool = True,
 ) -> md.MuData:
@@ -99,11 +97,11 @@ def mulink_from_anndatas(
 
     Combines one AnnData per feature level (genes, proteins, peptides, precursors) into a single
     MuData and attaches a sparse adjacency matrix to ``.varp["feature_mapping"]`` that links
-    features across levels. The resulting object can be queried with :mod:`mulink` to filter the
+    features across levels. The resulting object can be queried with :mod:`link` to filter the
     hierarchy by ancestors or descendants of a set of features (see Examples).
 
     The cross-level mapping is reconstructed entirely from each AnnData's ``.var``: each
-    non-coarsest level must carry the next-coarser level's feature-id column. When the AnnData
+    non-coarsest level must carry the higher, i.e. coarser level's feature-id column. When the AnnData
     objects come from :func:`alphapepttools.io.read_psm_table`, this is controlled by the
     ``var_columns`` argument of that function. The original ``.var``, ``.obs``, and ``.X`` of
     each input AnnData are preserved unchanged on the corresponding modality of the returned
@@ -116,7 +114,8 @@ def mulink_from_anndatas(
         ``{"genes", "proteins", "peptides", "precursors"}``. Each AnnData's ``var`` index name
         must equal the level's feature-id column (e.g. ``"proteins"`` for the proteins level),
         and each non-coarsest level must include the next-coarser level's id as a column in
-        ``.var``.
+        ``.var``, e.g. `precursors.var` must contain a column named `proteins` if it is to be linked to
+        a protein-level AnnData object.
     transitive_closure
         If True (default), the linkage matrix encodes all reachable (u, v) pairs across levels,
         so e.g. precursors are directly linked to genes without going through peptides or
@@ -138,6 +137,8 @@ def mulink_from_anndatas(
 
         import alphapepttools as apt
 
+        data_path = apt.data.get_data("bader2020_psm_diann")
+
         adata_precursor = apt.io.read_psm_table(
             file_paths=data_path / "top20_report.parquet",
             search_engine="diann",
@@ -152,28 +153,20 @@ def mulink_from_anndatas(
             var_columns="genes",
         )
 
-        adata_gene = apt.io.read_psm_table(
-            file_paths=data_path / "top20_report.parquet",
-            search_engine="diann",
-            level="genes",
-        )
-
         mlink = apt.io.mulink_from_anndatas(
             anndatas={
                 "precursors": adata_precursor,
                 "proteins": adata_protein,
-                "genes": adata_gene,
             }
         )
 
-    Filter the MuData down to features linked to a set of genes via the mulink query accessor.
+    Filter the MuData down to features linked to a set of genes via the link query accessor.
     Each ``.mod[level]`` is the original AnnData restricted to the matched features, with
     ``.obs`` and ``.var`` intact:
 
     .. code-block:: python
 
         filtered = mlink.link.query.ancestors(["TF", "SERPINA3"])
-        filtered_genes = filtered.mod["genes"]
         filtered_proteins = filtered.mod["proteins"]
         filtered_precursors = filtered.mod["precursors"]
 
@@ -236,7 +229,7 @@ def mulink_from_anndatas(
         shared_col = right.columns[0]  # own_id of current_level
         mapping_df = mapping_df.merge(right, on=shared_col, how="left")
 
-    adjancency_matrix = sparse_matrix_mapping(
+    adjancency_matrix = _sparse_matrix_mapping(
         mapping_df,
         columns=[FEATURE_LEVEL_CONFIG[level][ALPHAPEPTTOOLS_FEATURE_ID_NAME] for level in levels_fine_to_coarse],
         transitive_closure=transitive_closure,
@@ -249,7 +242,7 @@ def mulink_from_anndatas(
         mdata = md.MuData(data=anndatas)
 
     # IMPORTANT: features in the adjacency matrix need to be aligned with the variable order in the mdata object
-    adjancency_matrix = reindex_adjacency(adjancency_matrix, new_index=mdata.var_names)
+    adjancency_matrix = _reindex_adjacency_matrix(adjancency_matrix, new_index=mdata.var_names)
 
     mdata.link.add_link(adjancency_matrix)
 
