@@ -171,7 +171,7 @@ def mulink_from_anndatas(
         filtered_precursors = filtered.mod["precursors"]
 
     """
-    available_feature_levels = ("genes", "proteins", "peptides", "precursors")
+    available_feature_levels = FEATURE_LEVEL_CONFIG.keys()
 
     # validate feature levels against alphapepttools reference config
     for feature_level in anndatas:
@@ -190,13 +190,12 @@ def mulink_from_anndatas(
                 f"objects were created from the same reference PSM table and that the index name was not modified."
             )
 
-    # inference of hierarchy without psm table:
+    # inference of hierarchy without psm table & enforcing correct order
     actual_feature_levels = [feature_level for feature_level in available_feature_levels if feature_level in anndatas]
 
-    # For each non-coarsest included level, pull only the next-coarser id column out of
-    # .var and reset_index so we get a clean 2-column [own_id, next_coarser_id] frame.
-    # own_id comes from the (named) index, so no mutation of the caller's .var. Skipped
-    # intermediate levels are bridged by joining directly to the next included one.
+    # For each non-coarsest included level get a 2-column [own_id, next_coarser_id] frame.
+    # own_id comes from the (named) index. It's possible that levels are skipped, so long as
+    # the next coarser level's id column is present in the var of the finer level.
     pairwise_mappings: dict[str, pd.DataFrame] = {}
     for idx, current_level in enumerate(actual_feature_levels):
         # coarsest included level has no coarser link to bring in
@@ -223,7 +222,7 @@ def mulink_from_anndatas(
     mapping_df = pairwise_mappings[finest_level].copy()
     for current_level in levels_fine_to_coarse[1:]:
         if current_level not in pairwise_mappings:
-            # coarsest included level: already pulled in via the previous-finer merge
+            # coarsest included level: column already pulled in via the previous-finer merge
             continue
         right = pairwise_mappings[current_level]
         shared_col = right.columns[0]  # own_id of current_level
