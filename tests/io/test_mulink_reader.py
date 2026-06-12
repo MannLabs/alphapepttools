@@ -14,18 +14,6 @@ from alphapepttools.io.mulink_reader import mulink_from_anndatas
 
 # Small hierarchy mirroring the tutorial example (TF / SERPINA3 / ALB).
 # genes -> proteins -> peptides -> precursors, coarsest to finest.
-GENES = ["TF", "SERPINA3", "ALB"]
-PROTEINS_TO_GENES = {
-    "P02787": "TF",
-    "P01011": "SERPINA3",
-    "P02768": "ALB",
-}
-PEPTIDES_TO_PROTEINS = {
-    "PEPTF1": "P02787",
-    "PEPTF2": "P02787",
-    "PEPSER1": "P01011",
-    "PEPALB1": "P02768",
-}
 PRECURSORS_TO_PEPTIDES = {
     "PEPTF1_2": "PEPTF1",
     "PEPTF1_3": "PEPTF1",
@@ -33,6 +21,18 @@ PRECURSORS_TO_PEPTIDES = {
     "PEPSER1_2": "PEPSER1",
     "PEPALB1_2": "PEPALB1",
 }
+PEPTIDES_TO_PROTEINS = {
+    "PEPTF1": "P02787",
+    "PEPTF2": "P02787",
+    "PEPSER1": "P01011",
+    "PEPALB1": "P02768",
+}
+PROTEINS_TO_GENES = {
+    "P02787": "TF",
+    "P01011": "SERPINA3",
+    "P02768": "ALB",
+}
+GENES = ["TF", "SERPINA3", "ALB"]
 SAMPLES = ["sample1", "sample2", "sample3"]
 
 
