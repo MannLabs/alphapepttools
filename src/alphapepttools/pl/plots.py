@@ -146,7 +146,7 @@ def add_lines(
     linetype: str = "vline",
     color: str = "black",
     linestyle: str = "--",
-    linewidth: float = 1,
+    linewidth: float | None = None,
     line_kwargs: dict | None = None,
 ) -> None:
     """Add vertical or horizontal reference lines to a plot
@@ -194,6 +194,9 @@ def add_lines(
     if linetype not in ["vline", "hline"]:
         raise ValueError("linetype must be 'vline' or 'hline'")
     line_func = ax.axvline if linetype == "vline" else ax.axhline
+
+    if linewidth is None:
+        linewidth = config["linewidths"]["medium"]
 
     if not isinstance(intercepts, (list | float | int)):
         raise TypeError("intercepts must be a float, int, or list of floats/ints")
