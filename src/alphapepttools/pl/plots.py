@@ -167,7 +167,7 @@ def add_lines(
     linestyle
         Line style (e.g., `"--"`, `"-"`, `":"`)
     linewidth
-        Line width, defaults to `config["linewidths"]["medium"]`
+        Line width, defaults to `config["linewidths"]["large"]`
     line_kwargs
         Additional matplotlib line arguments. Note: explicit color, linestyle,
         and linewidth parameters take precedence
@@ -196,7 +196,7 @@ def add_lines(
     line_func = ax.axvline if linetype == "vline" else ax.axhline
 
     if linewidth is None:
-        linewidth = config["linewidths"]["medium"]
+        linewidth = config["linewidths"]["large"]
 
     if not isinstance(intercepts, (list | float | int)):
         raise TypeError("intercepts must be a float, int, or list of floats/ints")
