@@ -15,11 +15,11 @@ class PlotSettings:
     Attributes
     ----------
     font_sizes
-        Font size presets with keys 'small' (8pt), 'medium' (10pt), 'large' (12pt)
+        Font size presets with keys 'small' (5pt), 'medium' (6pt), 'large' (7pt)
     axes
-        Axes-specific settings for title_size, label_size, and tick_size (all 10pt)
+        Axes-specific settings for title_size (7pt), label_size (6pt), tick_size (6pt)
     legend
-        Legend settings for font_size and title_size (both 10pt)
+        Legend settings for font_size and title_size (both 6pt)
     marker_sizes
         Marker size presets with keys 'small' (5), 'medium' (10), 'large' (15)
     linewidths
@@ -51,7 +51,7 @@ class PlotSettings:
         from alphapepttools.pl import defaults
 
         # Access current settings
-        print(defaults.plot_settings.font_sizes["large"])  # 12
+        print(defaults.plot_settings.font_sizes["large"])  # 7
 
     Export settings for inspection or serialization:
 
@@ -82,20 +82,20 @@ class PlotSettings:
 
     def __init__(self):
         self.font_sizes = {
-            "small": 8,
-            "medium": 10,
-            "large": 12,
+            "small": 5,
+            "medium": 6,
+            "large": 7,
         }
 
         self.axes = {
-            "title_size": 10,
-            "label_size": 10,
-            "tick_size": 10,
+            "title_size": 7,
+            "label_size": 6,
+            "tick_size": 6,
         }
 
         self.legend = {
-            "font_size": 10,
-            "title_size": 10,
+            "font_size": 6,
+            "title_size": 6,
         }
 
         self.marker_sizes = {
@@ -155,7 +155,7 @@ class PlotSettings:
             from alphapepttools.pl import defaults
 
             config = defaults.plot_settings.to_dict()
-            print(config["font_sizes"])  # {'small': 8, 'medium': 10, 'large': 12}
+            print(config["font_sizes"])  # {'small': 5, 'medium': 6, 'large': 7}
 
         Use settings for custom configuration:
 
