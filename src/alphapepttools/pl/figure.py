@@ -639,7 +639,7 @@ def create_figure(
             "svg.fonttype": "none",
             "pdf.fonttype": 42,
             "ps.fonttype": 42,
-            "axes.linewidth": config["linewidths"]["small"],
+            "axes.linewidth": config["linewidths"]["medium"],
             "grid.linewidth": config["linewidths"]["small"],
             "xtick.major.width": config["linewidths"]["small"],
             "ytick.major.width": config["linewidths"]["small"],
