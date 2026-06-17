@@ -23,7 +23,7 @@ class PlotSettings:
     marker_sizes
         Marker size presets with keys 'small' (5), 'medium' (10), 'large' (15)
     linewidths
-        Line width presets with keys 'small' (0.25), 'medium' (0.5), 'large' (1.25)
+        Line width presets with keys 'small' (0.17), 'medium' (0.33), 'large' (0.83)
     highlight_colors
         Color presets for highlighting with keys 'high' (#9ecae1), 'low' (#fdae6b),
         'general' (#5ec962)
@@ -105,9 +105,9 @@ class PlotSettings:
         }
 
         self.linewidths = {
-            "small": 0.25,
-            "medium": 0.5,
-            "large": 1.25,
+            "small": 0.17,
+            "medium": 0.33,
+            "large": 0.83,
         }
 
         self.highlight_colors = {
