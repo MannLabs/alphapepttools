@@ -61,3 +61,40 @@ class TestReadPGTable:
         )
         mock_reader.add_column_mapping.assert_called_once_with({"custom_new_name": "specific_report_column"})
         mock_reader.import_file.assert_called_once_with("/path/to/file.tsv")
+
+    @patch("alphapepttools.io.pg_reader.pg_reader_provider")
+    def test_read_pg_table__multiindex_unique_first_level(self, mock_reader_provider):
+        """MultiIndex with unique first level: use it as var index, remaining levels as var columns."""
+        mock_reader = Mock()
+        mock_reader.import_file.return_value = pd.DataFrame(
+            {"sample1": [100.0, 200.0], "sample2": [150.0, 250.0]},
+            index=pd.MultiIndex.from_tuples(
+                [("protein1", "gene_a"), ("protein2", "gene_b")],
+                names=["protein_id", "gene_name"],
+            ),
+        )
+        mock_reader_provider.get_reader.return_value = mock_reader
+
+        adata = read_pg_table("/path/to/file.tsv", "alphadia")
+
+        # Features (df rows) become var; samples (df cols) become obs
+        assert adata.var_names.tolist() == ["protein1", "protein2"]
+        assert adata.var["gene_name"].tolist() == ["gene_a", "gene_b"]
+        assert adata.obs_names.tolist() == ["sample1", "sample2"]
+
+    @patch("alphapepttools.io.pg_reader.pg_reader_provider")
+    def test_read_pg_table__non_unique_first_level(self, mock_reader_provider):
+        """Non-unique first level: flatten all index levels to var columns with integer var index."""
+        mock_reader = Mock()
+        mock_reader.import_file.return_value = pd.DataFrame(
+            {"sample1": [100.0, 200.0, 300.0], "sample2": [150.0, 250.0, 350.0]},
+            index=pd.Index(["protein1", "protein1", "protein2"], name="protein_id"),
+        )
+        mock_reader_provider.get_reader.return_value = mock_reader
+
+        adata = read_pg_table("/path/to/file.tsv", "alphadia")
+
+        # Non-unique → original index becomes a var column; var index falls back to integers
+        assert len(adata.var) == 3  # noqa: PLR2004
+        assert adata.var["protein_id"].tolist() == ["protein1", "protein1", "protein2"]
+        assert adata.obs_names.tolist() == ["sample1", "sample2"]
