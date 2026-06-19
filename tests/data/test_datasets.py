@@ -322,3 +322,36 @@ def test_study_collection_df_property_should_concatenate_all_studies(
 
     # then
     pd.testing.assert_frame_equal(result_df, expected_df)
+
+
+### Test display/repr methods ###
+
+
+def test_study_data_repr_html_contains_key_fields(full_study) -> None:
+    """`_repr_html_` should include name, data type, search engine, citation, and description when set."""
+    html = full_study._repr_html_()
+
+    assert full_study.name in html
+    assert full_study.data_type in html
+    assert full_study.search_engine in html
+    assert full_study.citation in html
+    assert full_study.description in html
+
+
+def test_study_data_repr_html_omits_optional_fields_when_missing(minimal_study) -> None:
+    """`_repr_html_` should skip the citation and description blocks when those fields are None."""
+    html = minimal_study._repr_html_()
+
+    assert minimal_study.name in html
+    assert "Citation:" not in html
+    assert "Description:" not in html
+
+
+def test_study_collection_repr(populated_collection) -> None:
+    """`__repr__` should delegate to the underlying dataframe's repr."""
+    assert repr(populated_collection) == repr(populated_collection.df)
+
+
+def test_study_collection_repr_html(populated_collection) -> None:
+    """`_repr_html_` should delegate to the dataframe's `to_html()`."""
+    assert populated_collection._repr_html_() == populated_collection.df.to_html()
