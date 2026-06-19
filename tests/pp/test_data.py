@@ -6,7 +6,14 @@ import pandas as pd
 import pytest
 
 import alphapepttools as apt
-from alphapepttools.pp.data import _handle_overlapping_columns, _to_anndata, coerce_to_dataframe, data_column_to_array
+from alphapepttools.pp.data import (
+    _handle_overlapping_columns,
+    _to_anndata,
+    coerce_to_dataframe,
+    data_column_to_array,
+    data_index_to_array,
+    subset_data,
+)
 
 
 # example data
@@ -1145,6 +1152,79 @@ def test_data_column_to_array(
 
     # then
     assert np.all(array == expected_array)
+
+
+### Test data_index_to_array ###
+
+
+@pytest.mark.parametrize(
+    ("input_type", "dim_space", "expected"),
+    [
+        ("dataframe", "obs", np.array(["cell1", "cell2", "cell3"])),
+        ("dataframe", "var", np.array(["G1", "G2", "G3"])),
+        ("anndata", "obs", np.array(["cell1", "cell2", "cell3"])),
+        ("anndata", "var", np.array(["G1", "G2", "G3"])),
+    ],
+)
+def test_data_index_to_array(example_data, input_type, dim_space, expected):
+    # given
+    data = example_data if input_type == "dataframe" else _to_anndata(example_data)
+
+    # when
+    result = data_index_to_array(data, dim_space=dim_space)
+
+    # then
+    assert isinstance(result, np.ndarray)
+    assert np.array_equal(result, expected)
+
+
+def test_data_index_to_array_invalid_dim_space(example_data):
+    with pytest.raises(ValueError, match="dim_space must be"):
+        data_index_to_array(example_data, dim_space="invalid")
+
+
+def test_data_index_to_array_invalid_type():
+    with pytest.raises(TypeError, match="Expected pd.DataFrame or ad.AnnData"):
+        data_index_to_array([1, 2, 3], dim_space="obs")
+
+
+### Test subset_data ###
+
+
+@pytest.mark.parametrize(
+    ("input_type", "idxs", "expected_index"),
+    [
+        ("dataframe", [0, 2], ["cell1", "cell3"]),
+        ("dataframe", [1], ["cell2"]),
+        ("anndata", [0, 2], ["cell1", "cell3"]),
+        ("anndata", [1], ["cell2"]),
+    ],
+)
+def test_subset_data(example_data, input_type, idxs, expected_index):
+    # given
+    data = example_data if input_type == "dataframe" else _to_anndata(example_data)
+
+    # when
+    result = subset_data(data, idxs)
+
+    # then
+    assert list(result.index if isinstance(result, pd.DataFrame) else result.obs_names) == expected_index
+
+
+def test_subset_data_returns_copy(example_data):
+    # given
+    df = example_data.copy()
+    adata = _to_anndata(example_data)
+
+    # when
+    df_sub = subset_data(df, [0])
+    adata_sub = subset_data(adata, [0])
+
+    # then — mutating the subset must not affect the original
+    df_sub.iloc[0, 0] = 999
+    adata_sub.X[0, 0] = 999
+    assert df.iloc[0, 0] != 999  # noqa: PLR2004
+    assert adata.X[0, 0] != 999  # noqa: PLR2004
 
 
 ### Test coerce_to_dataframe ###
