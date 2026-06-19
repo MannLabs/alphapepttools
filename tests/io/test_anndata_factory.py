@@ -305,6 +305,38 @@ def test_get_reader_configuration_with_unknown_reader_type():
     assert config == {}
 
 
+@patch("alphabase.psm_reader.psm_reader.psm_reader_provider.get_reader")
+@patch("alphapepttools.io.anndata_factory.AnnDataFactory._get_reader_configuration")
+def test_from_files_forwards_additional_columns_to_reader(
+    mock_get_reader_configuration,
+    mock_reader,
+    test_psm_df,
+) -> None:
+    """When `additional_columns` is set, `from_files` registers them as identity-mapped
+    columns on the reader before loading."""
+    mock_get_reader_configuration.return_value = {}
+    mock_reader.return_value.load.return_value = test_psm_df.rename(
+        columns={
+            "protein_intensity": PsmDfCols.INTENSITY,
+            "protein_id": PsmDfCols.PROTEINS,
+            "file_id": PsmDfCols.RAW_NAME,
+        }
+    )
+
+    AnnDataFactory.from_files(
+        file_paths=["file1"],
+        reader_type="diann",
+        intensity_column=PsmDfCols.INTENSITY,
+        feature_id_column=PsmDfCols.PROTEINS,
+        sample_id_column=PsmDfCols.RAW_NAME,
+        additional_columns=["my_col_a", "my_col_b"],
+    )
+
+    mock_reader.return_value.add_column_mapping.assert_called_once_with(
+        {"my_col_a": "my_col_a", "my_col_b": "my_col_b"}
+    )
+
+
 @pytest.mark.parametrize(
     ("intensity_column", "feature_id_column", "sample_id_column", "match"),
     [
