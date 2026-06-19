@@ -102,3 +102,57 @@ def test_scanpy_pycombat(
         assert result is None
 
     pd.testing.assert_frame_equal(adata.to_df(layer=layer), expected_adata.to_df())
+
+
+def test_scanpy_pycombat_layer_none(pycombat_test_data_simple):
+    """When layer=None, the corrected matrix is written back to adata.X (not a layer)."""
+    df, md = pycombat_test_data_simple
+    adata = ad.AnnData(df, obs=md)
+    X_before = adata.X.copy()
+
+    result = scanpy_pycombat(adata, batch="batch", layer=None)
+
+    # in-place modification on the local `adata` rebound in the function — returns None
+    assert result is None
+    # caller's adata.X was modified before the rebind (astype on line 184), and copy=False
+    # path still mutates the caller's X via line 212 when no NaN-coerce is needed
+    assert not np.array_equal(adata.X, X_before)
+
+
+def test_scanpy_pycombat_coerces_nan_batches():
+    """NaN values in the batch column should be coerced to an 'NA' batch."""
+    df = pd.DataFrame(
+        {"A": [1.0, 2.0, 4.0, 8.0, 16.0, 32.0], "B": [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]},
+        index=list("ABCDEF"),
+    )
+    md = pd.DataFrame({"batch": ["x", "x", "x", np.nan, np.nan, np.nan]}, index=list("ABCDEF"))
+    adata = ad.AnnData(df, obs=md)
+
+    result = scanpy_pycombat(adata, batch="batch", copy=True)
+
+    assert "NA" in result.obs["batch"].tolist()
+    assert not result.obs["batch"].isna().any()
+
+
+def test_scanpy_pycombat_raises_on_nan_data(pycombat_test_data_simple):
+    """If adata.X contains NaNs, scanpy_pycombat raises ValueError."""
+    df, md = pycombat_test_data_simple
+    df_with_nan = df.copy()
+    df_with_nan.iloc[0, 0] = np.nan
+    adata = ad.AnnData(df_with_nan, obs=md)
+
+    with pytest.raises(ValueError, match="contains NaN"):
+        scanpy_pycombat(adata, batch="batch")
+
+
+def test_scanpy_pycombat_raises_on_singleton_batch():
+    """If a batch contains only one sample, scanpy_pycombat raises ValueError."""
+    df = pd.DataFrame(
+        {"A": [1.0, 2.0, 3.0, 4.0, 5.0], "B": [1.0, 2.0, 3.0, 4.0, 5.0]},
+        index=list("ABCDE"),
+    )
+    md = pd.DataFrame({"batch": ["x", "x", "y", "y", "z"]}, index=list("ABCDE"))  # z is singleton
+    adata = ad.AnnData(df, obs=md)
+
+    with pytest.raises(ValueError, match="only one single sample"):
+        scanpy_pycombat(adata, batch="batch")

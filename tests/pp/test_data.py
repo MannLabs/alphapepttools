@@ -1,3 +1,4 @@
+import logging
 import warnings
 
 import anndata as ad
@@ -7,10 +8,16 @@ import pytest
 
 import alphapepttools as apt
 from alphapepttools.pp.data import (
+    _filter_by_dict,
     _handle_overlapping_columns,
     _to_anndata,
+    _tolist,
+    _tuple_based_filter,
+    _validate_adata_for_completeness_filter,
+    _verify_filter_dict,
     coerce_to_dataframe,
     data_column_to_array,
+    data_columns_to_df,
     data_index_to_array,
     subset_data,
 )
@@ -1287,3 +1294,275 @@ def test_coerce_to_dataframe(
         )
         # Check that obs columns are included
         assert list(result["cell_type"]) == ["type_A", "type_B", "type_C"]
+
+
+### Test _to_anndata ndarray branch ###
+
+
+def test_to_anndata_from_ndarray():
+    # given
+    arr = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+
+    # when
+    adata = _to_anndata(arr)
+
+    # then
+    assert isinstance(adata, ad.AnnData)
+    assert np.array_equal(adata.X, arr)
+
+
+### Test add_metadata validation branches ###
+
+
+def test_add_metadata_invalid_axis(example_data):
+    adata = _to_anndata(example_data)
+    md = pd.DataFrame({"x": [1, 2, 3]}, index=["cell1", "cell2", "cell3"])
+    with pytest.raises(ValueError, match="Axis must be 0 or 1"):
+        apt.pp.add_metadata(adata, md, axis=2)
+
+
+def test_add_metadata_empty_adata(caplog):
+    # given
+    adata = ad.AnnData(np.empty((0, 0)))
+    md = pd.DataFrame({"x": []})
+
+    # when
+    with caplog.at_level(logging.INFO):
+        result = apt.pp.add_metadata(adata, md, axis=0)
+
+    # then
+    assert result is adata
+    assert "adata is empty" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "bad_md",
+    [
+        # not a DataFrame
+        {"col": [1, 2, 3]},
+        # multi-level index
+        pd.DataFrame(
+            {"x": [1, 2, 3]},
+            index=pd.MultiIndex.from_tuples([("a", 1), ("b", 2), ("c", 3)]),
+        ),
+    ],
+)
+def test_add_metadata_bad_metadata_type(example_data, bad_md):
+    adata = _to_anndata(example_data)
+    with pytest.raises(TypeError, match="metadata must be a pd.DataFrame"):
+        apt.pp.add_metadata(adata, bad_md, axis=0)
+
+
+def test_add_metadata_duplicated_metadata_index(example_data):
+    adata = _to_anndata(example_data)
+    md = pd.DataFrame(
+        {"cell_type": ["A", "B", "C"]},
+        index=["cell1", "cell1", "cell3"],  # duplicate
+    )
+    with pytest.raises(ValueError, match="Duplicated metadata indices"):
+        apt.pp.add_metadata(adata, md, axis=0)
+
+
+def test_add_metadata_verbose_log(example_data, caplog):
+    # given — keep_existing_metadata=True + verbose=True exercises the verbose log line
+    adata = _to_anndata(example_data)
+    adata.obs = pd.DataFrame({"existing": ["x", "y", "z"]}, index=["cell1", "cell2", "cell3"])
+    md = pd.DataFrame({"new": ["a", "b", "c"]}, index=["cell1", "cell2", "cell3"])
+
+    # when
+    with caplog.at_level(logging.INFO):
+        apt.pp.add_metadata(adata, md, axis=0, keep_existing_metadata=True, verbose=True)
+
+    # then
+    assert "Join incoming to existing metadata" in caplog.text
+
+
+### Test _filter_by_dict / _tuple_based_filter / _verify_filter_dict ###
+
+
+def test_filter_by_dict_duplicated_indices():
+    df = pd.DataFrame({"x": [1, 2, 3]}, index=["a", "a", "b"])
+    with pytest.raises(ValueError, match="Duplicated indices"):
+        _filter_by_dict(df, {"x": 1}, logic="and")
+
+
+@pytest.mark.parametrize(
+    ("bad_tuple", "match"),
+    [
+        # length != 2
+        ((1, 2, 3), "tuple of length 2"),
+        # contains non-numeric, non-None value
+        ((1, "x"), "numeric values or None"),
+    ],
+)
+def test_tuple_based_filter_invalid_tuple(bad_tuple, match):
+    feature = pd.Series([1, 2, 3], index=["a", "b", "c"])
+    with pytest.raises(ValueError, match=match):
+        _tuple_based_filter(feature, bad_tuple)
+
+
+def test_tuple_based_filter_non_numeric_feature():
+    feature = pd.Series(["a", "b", "c"], index=["x", "y", "z"])
+    with pytest.raises(ValueError, match="numeric features"):
+        _tuple_based_filter(feature, (0, 1))
+
+
+@pytest.mark.parametrize(
+    ("bad_dict", "match"),
+    [
+        # non-string key
+        ({1: "a"}, "Filter keys must be string"),
+        # unknown column (key is a string, but not in data.columns and not "index")
+        ({"missing_col": "a"}, "not found in data columns"),
+        # bad value type (set is not str/number/list/tuple)
+        ({"x": {"not", "allowed"}}, "must be of type str, number, list or tuple"),
+    ],
+)
+def test_verify_filter_dict(bad_dict, match):
+    df = pd.DataFrame({"x": [1, 2, 3]}, index=["a", "b", "c"])
+    with pytest.raises(ValueError, match=match):
+        _verify_filter_dict(bad_dict, df)
+
+
+def test_filter_by_metadata_invalid_axis():
+    adata = _to_anndata(pd.DataFrame({"G1": [1.0, 2.0]}, index=["c1", "c2"]))
+    with pytest.raises(ValueError, match="Invalid 'axis'"):
+        apt.pp.filter_by_metadata(adata, {}, axis=2)
+
+
+### Test data_column_to_array error branches ###
+
+
+def test_data_column_to_array_dataframe_missing_column(example_data):
+    with pytest.raises(ValueError, match="not found in DataFrame"):
+        data_column_to_array(example_data, "nonexistent")
+
+
+def test_data_column_to_array_anndata_from_var_columns(example_data, example_feature_metadata):
+    # given — `gene_name` lives only in adata.var.columns (not in var_names or obs.columns)
+    adata = _to_anndata(example_data)
+    adata = apt.pp.add_metadata(adata, example_feature_metadata, axis=1)
+
+    # when
+    arr = data_column_to_array(adata, "gene_name")
+
+    # then
+    assert np.array_equal(arr, np.array(["gene1", "gene2", "gene3"]))
+
+
+def test_data_column_to_array_anndata_not_found(example_data):
+    adata = _to_anndata(example_data)
+    with pytest.raises(ValueError, match="not found in AnnData"):
+        data_column_to_array(adata, "nonexistent")
+
+
+def test_data_column_to_array_invalid_type():
+    with pytest.raises(TypeError, match="Expected pd.DataFrame or ad.AnnData"):
+        data_column_to_array([1, 2, 3], "x")
+
+
+### Test _tolist ###
+
+
+@pytest.mark.parametrize(
+    ("obj", "expected"),
+    [
+        ("foo", ["foo"]),
+        (["a", "b"], ["a", "b"]),
+    ],
+)
+def test_tolist(obj, expected):
+    assert _tolist(obj) == expected
+
+
+### Test data_columns_to_df edge cases ###
+
+
+def test_data_columns_to_df_anndata_columns_none(example_data):
+    adata = _to_anndata(example_data)
+
+    # when
+    result = data_columns_to_df(adata, columns=None)
+
+    # then
+    assert isinstance(result, pd.DataFrame)
+    assert list(result.columns) == ["G1", "G2", "G3"]
+
+
+def test_data_columns_to_df_invalid_type():
+    with pytest.raises(TypeError, match="Expected pd.DataFrame or ad.AnnData"):
+        data_columns_to_df([1, 2, 3])
+
+
+### Test scale_and_center unknown scaler ###
+
+
+def test_scale_and_center_unknown_scaler(example_data):
+    adata = _to_anndata(example_data)
+    with pytest.raises(NotImplementedError, match="Scaler .* not implemented"):
+        apt.pp.scale_and_center(adata, scaler="unknown")
+
+
+### Test _validate_adata_for_completeness_filter ###
+
+
+def test_validate_completeness_not_anndata():
+    with pytest.raises(TypeError, match="adata must be an AnnData object"):
+        _validate_adata_for_completeness_filter(pd.DataFrame({"x": [1, 2]}), action="drop", var_colname="x")
+
+
+def test_validate_completeness_no_features():
+    adata = ad.AnnData(np.empty((3, 0)))
+    with pytest.raises(ValueError, match="no features"):
+        _validate_adata_for_completeness_filter(adata, action="drop", var_colname="x")
+
+
+def test_validate_completeness_non_numeric_x():
+    adata = ad.AnnData(np.array([["a", "b"], ["c", "d"]], dtype=object))
+    with pytest.raises(ValueError, match="must be numeric"):
+        _validate_adata_for_completeness_filter(adata, action="drop", var_colname="x")
+
+
+def test_validate_completeness_duplicated_obs():
+    df = pd.DataFrame({"G1": [1.0, 2.0]}, index=["dup", "dup"])
+    adata = _to_anndata(df)
+    with pytest.raises(ValueError, match="Duplicated indices"):
+        _validate_adata_for_completeness_filter(adata, action="drop", var_colname="x")
+
+
+def test_validate_completeness_invalid_action():
+    adata = _to_anndata(pd.DataFrame({"G1": [1.0, 2.0]}, index=["c1", "c2"]))
+    with pytest.raises(ValueError, match="must be 'flag' or 'drop'"):
+        _validate_adata_for_completeness_filter(adata, action="bogus", var_colname="x")
+
+
+def test_validate_completeness_existing_var_colname(example_data, caplog):
+    # given — pre-fill var with the colname we'll later flag
+    adata = _to_anndata(example_data)
+    adata.var = pd.DataFrame({"my_flag": [True, True, True]}, index=["G1", "G2", "G3"])
+
+    # when
+    with caplog.at_level(logging.INFO):
+        _validate_adata_for_completeness_filter(adata, action="flag", var_colname="my_flag")
+
+    # then
+    assert "already exists, will overwrite" in caplog.text
+
+
+### Test filter_data_completeness error branches ###
+
+
+@pytest.mark.parametrize("bad_threshold", [-0.1, 1.5])
+def test_filter_data_completeness_invalid_threshold(data_test_completeness_filter, bad_threshold):
+    with pytest.raises(ValueError, match="Threshold must be between 0 and 1"):
+        apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing=bad_threshold)
+
+
+def test_filter_data_completeness_unknown_group(data_test_completeness_filter):
+    with pytest.raises(ValueError, match="not found in"):
+        apt.pp.filter_data_completeness(
+            data_test_completeness_filter,
+            max_missing=0.5,
+            group_column="batch",
+            groups=["nonexistent_batch"],
+        )

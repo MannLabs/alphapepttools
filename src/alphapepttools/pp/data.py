@@ -197,13 +197,15 @@ def add_metadata(  # noqa: C901, PLR0912
         incoming_metadata = incoming_metadata.reindex(adata.var.index)
 
     # 5. assign the new metadata to the adata object's obs or var attribute
+    # Defensive: after the reindex in step 4, indices are guaranteed to match. These raises
+    # exist to make that invariant explicit to readers — unreachable, hence pragma.
     if axis == 0:
         if not adata.obs.index.equals(incoming_metadata.index):
-            raise ValueError("Index mismatch between data and metadata.")
+            raise ValueError("Index mismatch between data and metadata.")  # pragma: no cover
         adata.obs = incoming_metadata
     elif axis == 1:
         if not adata.var.index.equals(incoming_metadata.index):
-            raise ValueError("Index mismatch between data and metadata.")
+            raise ValueError("Index mismatch between data and metadata.")  # pragma: no cover
         adata.var = incoming_metadata
 
     return adata
@@ -256,8 +258,10 @@ def _filter_by_dict(
     filter_masks = []
     for k, v in filter_dict.items():
         feature = data[k] if k != "index" else data.index
+        # Defensive: _verify_filter_dict above rejects None values, so this branch is unreachable
+        # from the public API. Kept as a documented "None means match-all" guard.
         if v is None:
-            current_mask = pd.Series(True, index=data.index)  # noqa: FBT003
+            current_mask = pd.Series(True, index=data.index)  # noqa: FBT003 # pragma: no cover
         # TODO: add function evaluation here if v is a callable, so that users can pass things like np.isnan or lambdas
         elif isinstance(v, str | numbers.Number):
             current_mask = feature == v
