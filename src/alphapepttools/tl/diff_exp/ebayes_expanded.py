@@ -12,6 +12,11 @@ try:
 except ModuleNotFoundError:
     _HAS_INMOOSE = False
 
+from alphapepttools.tl.stats import nan_safe_bh_correction
+from alphapepttools.tl.utils import (
+    negative_log10_pvalue,
+)
+
 
 def build_design_matrix(
     adata: ad.AnnData,
@@ -302,19 +307,63 @@ def run_contrasts(
     C = contrast_matrix.to_numpy()  # (n_contrasts, n_conditions)
     log2fc = C @ B_cond  # (n_contrasts, P)
 
-    # unscaled variance: per-precursor because M_j varies
-    P = B.shape[1]
-    n_contrasts = C.shape[0]
-    unscaled_var = np.full((n_contrasts, P), np.nan)
-
-    # for j in tqdm(range(P), disable=not progress, desc="Fitting features"):
-    for j in tqdm(range(P), desc="Extracting unscaled variances"):
-        M_j = M_cond[j]  # (n_conditions, n_conditions)
-        for c in range(n_contrasts):
-            unscaled_var[c, j] = C[c] @ M_j @ C[c]
+    # unscaled variance: per-precursor quadratic form C[c] @ M_cond[j] @ C[c].
+    # einsum collapses the (feature, contrast) loops into one vectorized call.
+    # NaN propagation matches the explicit loop: 0 * nan = nan, so any contrast
+    # touching a dropped condition column still yields nan.
+    unscaled_var = np.einsum("ca,jab,cb->cj", C, M_cond, C)  # (n_contrasts, P)
 
     stdev_unscaled = np.sqrt(unscaled_var)  # (n_contrasts, P)
     return {"log2fc": log2fc, "unscaled_var": unscaled_var, "stdev_unscaled": stdev_unscaled}
+
+
+def contrasts_from_matrix(
+    contrast_matrix: pd.DataFrame,
+    control_condition: str,
+) -> list[str]:
+    """Generate a list of contrast names from the contrast matrix.
+
+    Each contrast name is formatted as "treatment_vs_control" based on the non-zero entries in the contrast matrix.
+    If control is 1 and treatment is -1, the contrast will be named "treatment_VS_control". If control is -1 and treatment is 1, the contrast will be named "control_VS_treatment".
+
+    Parameters
+    ----------
+    contrast_matrix : pd.DataFrame
+        A DataFrame representing the contrast matrix.
+    control_condition : str
+        The name of the control condition.
+
+    Returns
+    -------
+    list[str]
+        A list of contrast names.
+
+    """
+    if control_condition not in contrast_matrix.columns:
+        raise ValueError(f"Control condition '{control_condition}' not found in contrast matrix columns.")
+
+    if list(contrast_matrix.columns).count(control_condition) > 1:
+        raise ValueError(f"Control condition '{control_condition}' occurs more than once in contrast matrix columns.")
+
+    treatments = [col for col in contrast_matrix.columns if col != control_condition]
+
+    contrast_names = []
+    for treatment in treatments:
+        if list(contrast_matrix.columns).count(treatment) > 1:
+            raise ValueError(f"Treatment condition '{treatment}' occurs more than once in contrast matrix columns.")
+        control_value = contrast_matrix[control_condition].to_numpy()
+        treatment_value = contrast_matrix[treatment].to_numpy()
+
+        if np.all(control_value == 1) and np.all(treatment_value == -1):
+            contrast_names.append(f"{treatment}_VS_{control_condition}")
+        elif np.all(control_value == -1) and np.all(treatment_value == 1):
+            contrast_names.append(f"{control_condition}_VS_{treatment}")
+        else:
+            raise ValueError(
+                f"Contrast between '{treatment}' and '{control_condition}' is not valid. Expected one to be 1 and the other to be -1 across all rows."
+            )
+
+    return contrast_names
 
 
 def ebayes_moderation(
@@ -369,43 +418,8 @@ def ebayes_moderation(
     t = np.full((n_contrasts, P), np.nan)
     p[:, valid] = np.asarray(fit.p_value).T
     t[:, valid] = np.asarray(fit.t).T
-    return p, t
 
-
-# Example for the whole workflow:
-
-# # Step 1: linear fit with NaN handling
-# lm_fit = nan_lfit(
-#     adata=test_adata,
-#     condition_column="condition_col",
-#     control_condition="control",
-#     covariate_column="covariate_col",
-#     control_max_missing=4,
-# )
-
-# # Step 2: Generate contrasts to derive fold changes for each treatment vs control
-# contrast_matrix = make_contrasts(
-#     adata=test_adata,
-#     condition_column="condition_col",
-#     control_condition="control",
-#     control_is=1,
-# )
-
-# # Step 3: Run contrasts to compute log2 fold changes and unscaled variances
-# contrast_results = run_contrasts(
-#     contrast_matrix=contrast_matrix,
-#     B=lm_fit["B"],
-#     M_all=lm_fit["M_all"],
-#     col_info=lm_fit["col_info"],
-# )
-
-# # Step 4: Run empirical Bayes moderation on the unscaled variances
-# p, t = ebayes_moderation(
-#     log2fcs=contrast_results["log2fc"],
-#     stdevs_unscaled=contrast_results["stdev_unscaled"],
-#     sigma2=lm_fit["sigma2"],
-#     dfs=lm_fit["dfs"],
-# )
+    return {"p": p, "t": t}
 
 
 def diff_exp_ebayes(
@@ -463,6 +477,9 @@ def diff_exp_ebayes(
     selected_levels = [*treatment_conditions, control_condition]
     adata = adata[adata.obs[between_column].isin(selected_levels)].copy()
 
+    # Record frequency of each condition in the filtered adata obs
+    n_dict = adata.obs[between_column].value_counts().to_dict()
+
     # Step 1: linear fit with NaN handling
     lm_fit = nan_lfit(
         adata=adata,
@@ -489,7 +506,7 @@ def diff_exp_ebayes(
     )
 
     # Step 4: Run empirical Bayes moderation on the unscaled variances
-    p, t = ebayes_moderation(
+    ebayes_results = ebayes_moderation(
         log2fcs=contrast_results["log2fc"],
         stdevs_unscaled=contrast_results["stdev_unscaled"],
         sigma2=lm_fit["sigma2"],
@@ -500,7 +517,7 @@ def diff_exp_ebayes(
 
     # work with modified diff exp columns (future PR has to fix this in apt)
     # "condition_pair",
-    # "protein",
+    # "protein", --> should be "feature"
     # "log2fc",
     # "p_value",
     # "-log10(p_value)",
@@ -509,3 +526,32 @@ def diff_exp_ebayes(
     # "method",
     # "max_level_1_samples",
     # "max_level_2_samples",
+
+    contrast_names = contrasts_from_matrix(contrast_matrix, control_condition)
+    if len(contrast_names) != contrast_results["log2fc"].shape[0]:
+        raise ValueError("Number of contrast names does not match number of contrasts in results.")
+
+    results = {}
+    for contrast_idx, contrast_name in enumerate(contrast_names):
+        # preprocess p-values and FDR for the current contrast
+        fdr_pvalues = nan_safe_bh_correction(ebayes_results["p"][contrast_idx])
+        neg_log10_fdr = np.array([negative_log10_pvalue(fdr) for fdr in fdr_pvalues])
+        p_values = ebayes_results["p"][contrast_idx]
+        neg_log10_pvalues = np.array([negative_log10_pvalue(p) for p in p_values])
+
+        results[contrast_name] = pd.DataFrame(
+            {
+                "condition_pair": contrast_name,
+                "feature": adata.var_names,
+                "log2fc": contrast_results["log2fc"][contrast_idx],
+                "p_value": p_values,
+                "-log10(p_value)": neg_log10_pvalues,
+                "fdr": fdr_pvalues,
+                "-log10(fdr)": neg_log10_fdr,
+                "method": "nanaware_limma_ebayes_inmoose",
+                "max_level_1_samples": n_dict.get(contrast_name.split("_VS_")[0], np.nan),
+                "max_level_2_samples": n_dict.get(contrast_name.split("_VS_")[1], np.nan),
+            }
+        )
+
+    return results
