@@ -540,16 +540,17 @@ def diff_exp_ebayes(
         results[contrast_name] = pd.DataFrame(
             {
                 "condition_pair": contrast_name,
-                "feature": adata.var_names,
+                "protein": adata.var_names,
                 "log2fc": contrast_results["log2fc"][contrast_idx],
                 "p_value": p_values,
                 "-log10(p_value)": neg_log10_pvalues,
                 "fdr": fdr_pvalues,
                 "-log10(fdr)": neg_log10_fdr,
-                "method": "nanaware_limma_ebayes_inmoose",
+                "method": "limma_ebayes_inmoose_expanded",
                 "max_level_1_samples": max_level_1_samples,
                 "max_level_2_samples": max_level_2_samples,
-            }
+            },
+            index=adata.var_names,
         )
 
     return results
