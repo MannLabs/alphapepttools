@@ -201,6 +201,7 @@ python-version = "3.11"
 include = [ "src" ]
 
 [tool.ty.rules]
+# TODO revisit these exclusions
 # anndata types `.X`/`.layers[...]` as a 12+ member union of every storage
 # backend (ndarray | csr_matrix | AwkArray | ZarrArray | CSRDataset | None | ...).
 # The pipeline treats these as dense numpy arrays (it asserts no-NaN and does
