@@ -14,6 +14,7 @@ except ModuleNotFoundError:
 
 from alphapepttools.tl.stats import nan_safe_bh_correction
 from alphapepttools.tl.utils import (
+    determine_max_replicates,
     negative_log10_pvalue,
 )
 
@@ -240,7 +241,7 @@ def make_contrasts(
     control_condition : str
         The name of the control condition in the between_column.
     control_is : int
-        What the control is in the contrast, if it is 1, then the treatment is -1 and the effective fold change is treatment - control.
+        What the control is in the contrast. If it is 1, the treatment is -1 and the effective fold change is control - treatment. If it is -1, the treatment is 1 and the effective fold change is treatment - control.
 
     Returns
     -------
@@ -323,8 +324,10 @@ def contrasts_from_matrix(
 ) -> list[str]:
     """Generate a list of contrast names from the contrast matrix.
 
-    Each contrast name is formatted as "treatment_vs_control" based on the non-zero entries in the contrast matrix.
-    If control is 1 and treatment is -1, the contrast will be named "treatment_VS_control". If control is -1 and treatment is 1, the contrast will be named "control_VS_treatment".
+    The name encodes the sign of the computed effect, where "A_VS_B" denotes A - B. Since
+    log2fc = C @ B, a control of 1 and treatment of -1 yields control - treatment (named
+    "control_VS_treatment"), while a control of -1 and treatment of 1 yields treatment - control
+    (named "treatment_VS_control").
 
     Parameters
     ----------
@@ -345,22 +348,28 @@ def contrasts_from_matrix(
     if list(contrast_matrix.columns).count(control_condition) > 1:
         raise ValueError(f"Control condition '{control_condition}' occurs more than once in contrast matrix columns.")
 
-    treatments = [col for col in contrast_matrix.columns if col != control_condition]
-
+    # Each row is one contrast: the control column carries control_is, and exactly one treatment
+    # column carries -control_is (all other treatment columns are zero on that row).
     contrast_names = []
-    for treatment in treatments:
-        if list(contrast_matrix.columns).count(treatment) > 1:
-            raise ValueError(f"Treatment condition '{treatment}' occurs more than once in contrast matrix columns.")
-        control_value = contrast_matrix[control_condition].to_numpy()
-        treatment_value = contrast_matrix[treatment].to_numpy()
+    for _, row in contrast_matrix.iterrows():
+        control_value = row[control_condition]
+        treatment_cols = [col for col in contrast_matrix.columns if col != control_condition and row[col] != 0]
+        if len(treatment_cols) != 1:
+            raise ValueError(
+                f"Each contrast row must have exactly one non-zero treatment column, found {treatment_cols}."
+            )
+        treatment = treatment_cols[0]
+        treatment_value = row[treatment]
 
-        if np.all(control_value == 1) and np.all(treatment_value == -1):
-            contrast_names.append(f"{treatment}_VS_{control_condition}")
-        elif np.all(control_value == -1) and np.all(treatment_value == 1):
+        # Name must match the sign of log2fc = C @ B: control=1/treatment=-1 gives
+        # control - treatment, control=-1/treatment=1 gives treatment - control.
+        if control_value == 1 and treatment_value == -1:
             contrast_names.append(f"{control_condition}_VS_{treatment}")
+        elif control_value == -1 and treatment_value == 1:
+            contrast_names.append(f"{treatment}_VS_{control_condition}")
         else:
             raise ValueError(
-                f"Contrast between '{treatment}' and '{control_condition}' is not valid. Expected one to be 1 and the other to be -1 across all rows."
+                f"Contrast between '{treatment}' and '{control_condition}' is not valid. Expected one to be 1 and the other to be -1."
             )
 
     return contrast_names
@@ -445,7 +454,7 @@ def diff_exp_ebayes(
     control_max_missing : int, optional
         Tolerance for missing values in the control condition. Features with more than this number of missing values in the control condition will be skipped, by default 0.
     control_is : int, optional
-        Determines how the control is represented in the contrast matrix. If 1, the treatment is -1 and the effective fold change is treatment - control; if -1, the treatment is 1 and the effective fold change is control - treatment. Default is -1.
+        Determines how the control is represented in the contrast matrix. If 1, the treatment is -1 and the effective fold change is control - treatment; if -1, the treatment is 1 and the effective fold change is treatment - control. Default is -1.
 
     Returns
     -------
@@ -476,9 +485,6 @@ def diff_exp_ebayes(
     # Filter adata to only include samples from the specified conditions
     selected_levels = [*treatment_conditions, control_condition]
     adata = adata[adata.obs[between_column].isin(selected_levels)].copy()
-
-    # Record frequency of each condition in the filtered adata obs
-    n_dict = adata.obs[between_column].value_counts().to_dict()
 
     # Step 1: linear fit with NaN handling
     lm_fit = nan_lfit(
@@ -515,18 +521,6 @@ def diff_exp_ebayes(
 
     # Assemble results into an output dataframe, for multiple contrasts, return a dict of contrasts with their respective results.
 
-    # work with modified diff exp columns (future PR has to fix this in apt)
-    # "condition_pair",
-    # "protein", --> should be "feature"
-    # "log2fc",
-    # "p_value",
-    # "-log10(p_value)",
-    # "fdr",
-    # "-log10(fdr)",
-    # "method",
-    # "max_level_1_samples",
-    # "max_level_2_samples",
-
     contrast_names = contrasts_from_matrix(contrast_matrix, control_condition)
     if len(contrast_names) != contrast_results["log2fc"].shape[0]:
         raise ValueError("Number of contrast names does not match number of contrasts in results.")
@@ -539,6 +533,10 @@ def diff_exp_ebayes(
         p_values = ebayes_results["p"][contrast_idx]
         neg_log10_pvalues = np.array([negative_log10_pvalue(p) for p in p_values])
 
+        # Sample counts per level, mirroring ebayes.py. The name is "level_1_VS_level_2".
+        level_1, level_2 = contrast_name.split("_VS_")
+        max_level_1_samples, max_level_2_samples = determine_max_replicates(adata, between_column, level_1, level_2)
+
         results[contrast_name] = pd.DataFrame(
             {
                 "condition_pair": contrast_name,
@@ -549,8 +547,8 @@ def diff_exp_ebayes(
                 "fdr": fdr_pvalues,
                 "-log10(fdr)": neg_log10_fdr,
                 "method": "nanaware_limma_ebayes_inmoose",
-                "max_level_1_samples": n_dict.get(contrast_name.split("_VS_")[0], np.nan),
-                "max_level_2_samples": n_dict.get(contrast_name.split("_VS_")[1], np.nan),
+                "max_level_1_samples": max_level_1_samples,
+                "max_level_2_samples": max_level_2_samples,
             }
         )
 

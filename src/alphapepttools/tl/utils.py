@@ -97,8 +97,6 @@ def determine_max_replicates(
     """
     max_samples_level_1 = adata.obs[adata.obs[between_column] == level_1].shape[0]
     max_samples_level_2 = adata.obs[adata.obs[between_column] == level_2].shape[0]
-    logger.info(f"Number of samples for {level_1}: {max_samples_level_1}")
-    logger.info(f"Number of samples for {level_2}: {max_samples_level_2}")
     return max_samples_level_1, max_samples_level_2
 
 
