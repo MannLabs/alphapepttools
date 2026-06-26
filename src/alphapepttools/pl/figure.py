@@ -568,7 +568,7 @@ def create_figure(
     width_ratios: list[float] | None = None,
     subplots_kwargs: dict | None = None,
     gridspec_kwargs: dict | None = None,
-) -> tuple[plt.Figure, np.ndarray]:
+) -> tuple[plt.Figure, AxisManager]:
     """Create a figure with a specified number of rows and columns
 
     Returns an AxisManager object to manage axes objects. This is especially useful

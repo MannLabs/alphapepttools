@@ -87,7 +87,7 @@ def detect_special_values(
 
 def nanlog(
     adata: ad.AnnData, base: int = 2, verbosity: int = 1, layer: str | None = None, *, copy: bool = False
-) -> ad.AnnData:
+) -> ad.AnnData | None:
     """Logarithmize a data matrix.
 
     Apply arbitrary base logarithm transformation to AnnData.X, replacing invalid values with np.nan.

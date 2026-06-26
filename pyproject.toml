@@ -191,6 +191,25 @@ omit = [
   "**/test_*.py",
 ]
 
+[tool.ty.environment]
+python-version = "3.11"
+
+[tool.ty.rules]
+# anndata types `.X`/`.layers[...]` as a 12+ member union of every storage
+# backend (ndarray | csr_matrix | AwkArray | ZarrArray | CSRDataset | None | ...).
+# The pipeline treats these as dense numpy arrays (it asserts no-NaN and does
+# `data[idx, :] = ...`), so subscripting and in-place assignment are safe at
+# runtime but cannot be proven to a static checker.
+not-subscriptable = "ignore"
+invalid-assignment = "ignore"
+# Same union flows into helper calls expecting `np.ndarray`; in this stack the
+# rule only ever fires on this union and on external libraries whose stubs
+# declare `str` where the code passes `Path`, so it carries no real signal here.
+invalid-argument-type = "ignore"
+# matplotlib lazily populates submodules (mpl.patches, mpl.legend, ...) that ty
+# cannot see are imported.
+possibly-missing-submodule = "ignore"
+
 [tool.cruft]
 skip = [
   "tests",

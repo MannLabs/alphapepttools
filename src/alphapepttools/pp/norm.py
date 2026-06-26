@@ -121,7 +121,7 @@ def normalize(
     key_added: str | None = None,
     *,
     copy: bool = False,
-) -> ad.AnnData:
+) -> ad.AnnData | None:
     """Normalize measured counts per sample
 
     Parameters
