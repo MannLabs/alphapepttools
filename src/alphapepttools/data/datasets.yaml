@@ -137,14 +137,14 @@
   description: "DVP study on single hepatocytes from livers of healthy donors and patients with desmolapsia."
 
 - name: Weiss2026_shapes
-  url: https://datashare.biochem.mpg.de/s/TqAikHR4w3PfXTj
+  url: https://datashare.biochem.mpg.de/s/eS5XiyKBSWHqRCx
   search_engine: null
   data_type: shapes
   citation: "Weiss, Caroline A. M., et el. Single cell spatial proteomics maps human liver zonation patterns and their vulnerability to fibrosis. bioRxiv 2025.04.13.648568; doi: https://doi.org/10.1101/2025.04.13.648568"
   description: "Example shapes derived from DVP study on single hepatocytes from livers of healthy donors and patients with desmolapsia."
 
 - name: Weiss2026_image
-  url: https://datashare.biochem.mpg.de/s/TqAikHR4w3PfXTj
+  url: https://datashare.biochem.mpg.de/s/tKEDY5mPzxFED2H
   search_engine: null
   data_type: image
   citation: "Weiss, Caroline A. M., et el. Single cell spatial proteomics maps human liver zonation patterns and their vulnerability to fibrosis. bioRxiv 2025.04.13.648568; doi: https://doi.org/10.1101/2025.04.13.648568"
