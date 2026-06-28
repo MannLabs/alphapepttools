@@ -589,7 +589,7 @@ def test_diff_exp_ebayes_expanded_agrees_with_original(
     """The nan-aware expanded eBayes must reproduce the original diff_exp_ebayes on shared features.
 
     The original drops any feature with a missing value, whereas the expanded version keeps all
-    features (NaN rows for those it cannot fit). With control_max_missing=0 the expanded version
+    features (NaN rows for those it cannot fit). With high_max_missing=0 the expanded version
     skips exactly the features the original drops, so the eBayes prior is estimated from the same
     feature set and the moderated statistics must agree to numerical precision. We compare on the
     features the original returns and on the columns both implementations share (the expanded
@@ -605,13 +605,13 @@ def test_diff_exp_ebayes_expanded_agrees_with_original(
     )
     assert comparison_key == expected_comparison_key
 
-    # Expanded implementation: returns a dict keyed by contrast name. control_max_missing=0 makes
+    # Expanded implementation: returns a dict keyed by contrast name. high_max_missing=0 makes
     # its skipped-feature set match the original's dropped set so the eBayes prior is identical.
     expanded_results = diff_exp_ebayes_expanded(
         adata=adata.copy(),
         between_column=between_column,
         comparison=comparison,
-        control_max_missing=0,
+        high_max_missing=0,
     )
     assert set(expanded_results) == {expected_comparison_key}
     expanded = expanded_results[expected_comparison_key]
@@ -728,9 +728,7 @@ def lmfit_adata():
 def test_nan_lmfit_complete_feature(lmfit_adata):
     """For a fully observed feature the fit recovers group means, residual variance and df exactly."""
     design_matrix, col_info = build_design_matrix(lmfit_adata, "group")
-    feature_mask, _ = generate_feature_mask(
-        lmfit_adata, between_column="group", control_condition="A", control_max_missing=0
-    )
+    feature_mask, _ = generate_feature_mask(lmfit_adata, between_column="group", condition="A", max_missing=0)
     fit = nan_lmfit(lmfit_adata, design_matrix, feature_mask=feature_mask)
     j = list(lmfit_adata.var_names).index("complete")
 
@@ -748,9 +746,7 @@ def test_nan_lmfit_complete_feature(lmfit_adata):
 def test_nan_lmfit_drops_empty_condition_column(lmfit_adata):
     """A condition with no observed values is dropped and scattered back as NaN, the rest is fit."""
     design_matrix, _ = build_design_matrix(lmfit_adata, "group")
-    feature_mask, _ = generate_feature_mask(
-        lmfit_adata, between_column="group", control_condition="A", control_max_missing=0
-    )
+    feature_mask, _ = generate_feature_mask(lmfit_adata, between_column="group", condition="A", max_missing=0)
     fit = nan_lmfit(lmfit_adata, design_matrix, feature_mask=feature_mask)
     j = list(lmfit_adata.var_names).index("treat_all_missing")
 
@@ -774,7 +770,7 @@ def test_nan_lmfit_control_missingness_tolerance(lmfit_adata, control_max_missin
     """control_max_missing gates whether a feature with missing control values is fit or skipped."""
     design_matrix, _ = build_design_matrix(lmfit_adata, "group")
     feature_mask, _ = generate_feature_mask(
-        lmfit_adata, between_column="group", control_condition="A", control_max_missing=control_max_missing
+        lmfit_adata, between_column="group", condition="A", max_missing=control_max_missing
     )
     fit = nan_lmfit(lmfit_adata, design_matrix, feature_mask=feature_mask)
     j = list(lmfit_adata.var_names).index("control_missing")
@@ -889,7 +885,7 @@ def test_contrasts_from_matrix_errors(matrix, control_condition):
         contrasts_from_matrix(matrix, control_condition=control_condition)
 
 
-# --- Condition-ordering robustness ---
+# Condition-ordering robustness:
 # The fit and scatter-back must key coefficients by condition name, never by assuming the control
 # comes first or that conditions are contiguous. These tests use a non-control-first, interspersed
 # order (B, A, C with A as the control) to guard against positional mix-ups.
@@ -916,9 +912,7 @@ def interspersed_adata():
 def test_nan_lmfit_maps_coefficients_by_name_under_interspersed_order(interspersed_adata):
     """Coefficients align with conditions by name, not position, for arbitrary input ordering."""
     design_matrix, col_info = build_design_matrix(interspersed_adata, "group")
-    feature_mask, _ = generate_feature_mask(
-        interspersed_adata, between_column="group", control_condition="A", control_max_missing=0
-    )
+    feature_mask, _ = generate_feature_mask(interspersed_adata, between_column="group", condition="A", max_missing=0)
     fit = nan_lmfit(interspersed_adata, design_matrix, feature_mask=feature_mask)
     idx = col_info["condition_col_idxs"]
 
@@ -946,9 +940,7 @@ def test_nan_lmfit_maps_coefficients_by_name_under_interspersed_order(interspers
 def test_run_contrasts_log2fc_correct_under_interspersed_order(interspersed_adata):
     """End-to-end through run_contrasts: each contrast's log2fc is treatment - control, by name."""
     design_matrix, col_info = build_design_matrix(interspersed_adata, "group")
-    feature_mask, _ = generate_feature_mask(
-        interspersed_adata, between_column="group", control_condition="A", control_max_missing=0
-    )
+    feature_mask, _ = generate_feature_mask(interspersed_adata, between_column="group", condition="A", max_missing=0)
     fit = nan_lmfit(interspersed_adata, design_matrix, feature_mask=feature_mask)
     cm = make_contrasts(interspersed_adata, between_column="group", control_condition="A", control_is=-1)
     out = run_contrasts(cm, B=fit["B"], M_all=fit["M_all"], col_info=col_info)
@@ -975,9 +967,7 @@ def test_fit_and_contrasts_invariant_to_sample_permutation(example_adata_ebayes)
 
     def fit_and_contrasts_by_name(adata):
         design_matrix, col_info = build_design_matrix(adata, "group")
-        feature_mask, _ = generate_feature_mask(
-            adata, between_column="group", control_condition="A", control_max_missing=0
-        )
+        feature_mask, _ = generate_feature_mask(adata, between_column="group", condition="A", max_missing=0)
         fit = nan_lmfit(adata, design_matrix, feature_mask=feature_mask)
         cm = make_contrasts(adata, between_column="group", control_condition="A", control_is=-1)
         out = run_contrasts(cm, B=fit["B"], M_all=fit["M_all"], col_info=col_info)
@@ -995,3 +985,53 @@ def test_fit_and_contrasts_invariant_to_sample_permutation(example_adata_ebayes)
     for name, (log2fc, unscaled_var) in base.items():
         np.testing.assert_allclose(shuffled[name][0], log2fc, equal_nan=True)
         np.testing.assert_allclose(shuffled[name][1], unscaled_var, equal_nan=True)
+
+
+# Test filtering out fold changes of conditions with too few treatment replicates. The difference to the control gate is that contrasts with too few replicates are fitted but not passed on to the results
+@pytest.fixture
+def treatment_gate_adata():
+    """Control A fully observed; one feature has a sparsely observed treatment B (only 2 of 5 values)."""
+    x = pd.DataFrame(
+        {
+            "full_1": [10, 12, 14, 16, 18, 1, 2, 3, 4, 5],
+            "full_2": [1, 2, 3, 4, 5, 10, 15, 20, 25, 30],
+            "full_3": [2, 4, 6, 8, 10, 1, 3, 5, 7, 9],
+            "treat_sparse": [10, 12, 14, 16, 18, 1, 2, np.nan, np.nan, np.nan],  # B has only 2 observed
+        },
+        index=[f"cell{i}" for i in range(10)],
+    ).astype(float)
+    obs = pd.DataFrame({"group": ["A"] * 5 + ["B"] * 5}, index=[f"cell{i}" for i in range(10)])
+    adata = ad.AnnData(X=x, obs=obs)
+    nanlog(adata)
+    return adata
+
+
+@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
+@pytest.mark.parametrize(
+    ("low_min_required", "sparse_reported"),
+    [
+        (3, False),  # only 2 observed treatment values, below the required 3 -> fold change suppressed
+        (2, True),  # 2 observed treatment values meet the requirement -> fold change reported
+        (None, True),  # gate disabled -> fold change reported
+    ],
+)
+def test_diff_exp_ebayes_treatment_gate(treatment_gate_adata, low_min_required, sparse_reported):
+    """low_min_required suppresses (NaNs) fold changes whose treatment has too few observed values."""
+    results = diff_exp_ebayes_expanded(
+        adata=treatment_gate_adata,
+        between_column="group",
+        comparison=("B", "A"),
+        low_min_required=low_min_required,
+    )
+    df = results["B_VS_A"].set_index("protein")
+    result_cols = ["log2fc", "p_value", "fdr"]
+
+    # Fully observed features are always reported, regardless of the gate.
+    assert df.loc["full_1", result_cols].notna().all()
+
+    # The sparse-treatment feature is reported only when the requirement admits it.
+    sparse = df.loc["treat_sparse", result_cols]
+    if sparse_reported:
+        assert sparse.notna().all()
+    else:
+        assert sparse.isna().all()

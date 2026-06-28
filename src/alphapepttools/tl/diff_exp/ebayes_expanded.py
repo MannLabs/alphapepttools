@@ -96,10 +96,10 @@ def summarize_design_matrix(
 def generate_feature_mask(
     adata: ad.AnnData,
     between_column: str,
-    control_condition: str,
-    control_max_missing: int = 0,
+    condition: str,
+    max_missing: int = 0,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Generate a mask for features that pass the control condition missingness threshold.
+    """Generate a mask for features that pass a condition's missingness threshold.
 
     Parameters
     ----------
@@ -107,11 +107,11 @@ def generate_feature_mask(
         Annotated data matrix.
     between_column : str
         Column name in adata.obs representing the experimental conditions.
-    control_condition : str
-        The name of the control condition in the between_column.
-    control_max_missing : int
-        Tolerance for missing control values: a feature is skipped if
-        n_control_not_na < n_control - control_max_missing.
+    condition : str
+        The name of the condition in the between_column to evaluate (e.g. a control or treatment).
+    max_missing : int
+        Tolerance for missing values in the condition: a feature is skipped if
+        n_condition_not_na < n_condition - max_missing.
 
     Returns
     -------
@@ -120,14 +120,14 @@ def generate_feature_mask(
         - feature_mask: Boolean array indicating which features pass the missingness threshold.
         - feature_names: The feature names (adata.var_names) for reference.
     """
-    control_mask = adata.obs[between_column] == control_condition
-    control_idxs = np.where(control_mask)[0]
-    n_controls = int(control_mask.sum())
+    condition_mask = adata.obs[between_column] == condition
+    condition_idxs = np.where(condition_mask)[0]
+    n_condition = int(condition_mask.sum())
 
-    # Count observed control values per feature and keep those meeting the threshold
-    control_block = adata.X[control_idxs, :]
-    n_control_not_na = np.sum(~np.isnan(control_block), axis=0)
-    feature_mask = n_control_not_na >= (n_controls - control_max_missing)
+    # Count observed condition values per feature and keep those meeting the threshold
+    condition_block = adata.X[condition_idxs, :]
+    n_condition_not_na = np.sum(~np.isnan(condition_block), axis=0)
+    feature_mask = n_condition_not_na >= (n_condition - max_missing)
 
     # Return the feature mask and the actual feature names from the anndata
     return feature_mask, adata.var_names
@@ -468,15 +468,17 @@ def ebayes_moderation(
     return {"p": p, "t": t}
 
 
-def diff_exp_ebayes(
+def diff_exp_ebayes(  # noqa: C901
     adata: ad.AnnData,
     between_column: str,
     comparison: tuple[str | list[str], str],
     covariate_column: str | None = None,
-    control_max_missing: int = 0,
-    control_is: int = -1,
+    low_min_required: int | None = None,
+    high_max_missing: int | None = None,
 ) -> pd.DataFrame:
     """Run Limma eBayes moderated ttest for differential expression with multiple contrasts and covariate support.
+
+    Special consideration is given to mechanisms of missingness in the comparison (see below for syntax of `comparison` argument): In enrichment (e.g. pulldown), the reference signal is the low signal conditions, where dropouts can occur via a valid 'Missing Not At Random' (MNAR) mechanism where features drop out of LC-MS detection by being too lowly abundant. Therefore, different gating is applied: If a feature has too few observed values in the high-signal condition (i.e. the bait pulldown), it is considered an unreliable measurement and skipped entirely prior to modeling and testing. If a feature has too few observed values to calculate statistically reliable (usually 3 or a above replicates) in the low-signal condition, we suppose a plausible mechanism behind it (MNAR) and the existing measurements are still used for Bayesian modeling, but the resulting fold change is suppressed in the end.
 
     Parameters
     ----------
@@ -485,18 +487,30 @@ def diff_exp_ebayes(
     between_column : str
         Column name in adata.obs containing the contrast levels.
     comparison : tuple[str | list[str], str]
-        Tuple specifying the pair of conditions to compare, e.g. ("treatment1", "control"). Multiple treatment conditions can be specified as a list in the first element: (["treatment1", "treatment2"], "control"). If the first element is set to "_ALL_", all conditions except the control will be compared against the control: ("_ALL_", "control").
+        Tuple specifying the pair of conditions to compare, ordered as (low, high): the first element is
+        the low-signal condition(s), the second is the high-signal reference, e.g. ("treatment1", "control").
+        Multiple low conditions can be specified as a list in the first element: (["treatment1", "treatment2"], "control").
+        If the first element is set to "_ALL_", all conditions except the high reference are compared against it:
+        ("_ALL_", "control"). The high-signal condition is the shared reference where presence is expected and
+        missingness is suspect; the low-signal condition is where
+        dropouts can occur via a valid mechanism.
     covariate_column : str | None, optional
         Column name in adata.obs containing linear covariate levels, by default None.
-    control_max_missing : int, optional
-        Tolerance for missing values in the control condition. Features with more than this number of missing values in the control condition will be skipped, by default 0.
-    control_is : int, optional
-        Determines how the control is represented in the contrast matrix. If 1, the treatment is -1 and the effective fold change is control - treatment; if -1, the treatment is 1 and the effective fold change is treatment - control. Default is -1.
+    low_min_required : int | None, optional
+        Minimum number of observed values required in the low-signal condition of each contrast. Because the low
+        side can legitimately drop out, it is gated on a floor of observations: per contrast, features with fewer
+        than this number of observed values in that contrast's low condition have their fold change suppressed
+        (set to NaN) before FDR correction. If None, the low gate is disabled. By default None.
+    high_max_missing : int | None, optional
+        Tolerance for missing values in the high-signal reference. Because missingness in the high side is
+        untrustworthy, it is gated on a cap of missing values: features with more than this number of missing
+        values in the high reference are skipped entirely. If None, the high gate is disabled. By default None.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame with standardized Limma eBayes differential expression results for each contrast.
+        DataFrame with standardized Limma eBayes differential expression results for each contrast. Fold changes
+        are reported as low - high (i.e. comparison[0] - comparison[1]), and contrasts are named "low_VS_high".
 
     """
     if between_column not in adata.obs.columns:
@@ -519,26 +533,29 @@ def diff_exp_ebayes(
         if treatment not in between_levels:
             raise ValueError(f"Treatment condition '{treatment}' not found in column '{between_column}'.")
 
-    # Filter adata to only include samples from the specified conditions
+    # Step 0: Filter adata to only include samples from the specified conditions
     selected_levels = [*treatment_conditions, control_condition]
     adata = adata[adata.obs[between_column].isin(selected_levels)].copy()
 
-    # Step 1: build the design matrix, gate features on control missingness, and fit with NaN handling
+    # Step 1: build the design matrix, gate features on high-reference missingness, and fit with NaN handling
     design_matrix, col_info = build_design_matrix(adata, between_column, covariate_column)
-    feature_mask, _ = generate_feature_mask(
-        adata,
-        between_column=between_column,
-        control_condition=control_condition,
-        control_max_missing=control_max_missing,
-    )
+    feature_mask = None
+    if high_max_missing is not None:
+        feature_mask, _ = generate_feature_mask(
+            adata,
+            between_column=between_column,
+            condition=control_condition,
+            max_missing=high_max_missing,
+        )
     lm_fit = nan_lmfit(adata, design_matrix, feature_mask=feature_mask)
 
-    # Step 2: Generate contrasts to derive fold changes for each treatment vs control
+    # Step 2: Generate contrasts to derive fold changes for each treatment vs control.
+    # control_is=-1 fixes the direction to low - high (comparison[0] - comparison[1]), named "low_VS_high".
     contrast_matrix = make_contrasts(
         adata=adata,
         between_column=between_column,
         control_condition=control_condition,
-        control_is=control_is,
+        control_is=-1,
     )
 
     # Step 3: Run contrasts to compute log2 fold changes and unscaled variances
@@ -557,29 +574,40 @@ def diff_exp_ebayes(
         dfs=lm_fit["dfs"],
     )
 
-    # Assemble results into an output dataframe, for multiple contrasts, return a dict of contrasts with their respective results.
-
+    # Step 5: Extract contrasts and write output DataFrame with standardized columns for each contrast
     contrast_names = contrasts_from_matrix(contrast_matrix, control_condition)
     if len(contrast_names) != contrast_results["log2fc"].shape[0]:
         raise ValueError("Number of contrast names does not match number of contrasts in results.")
 
     results = {}
     for contrast_idx, contrast_name in enumerate(contrast_names):
+        level_1, level_2 = contrast_name.split("_VS_")
+
+        p_values = ebayes_results["p"][contrast_idx].copy()
+        log2fc = contrast_results["log2fc"][contrast_idx].copy()
+
+        # Low-signal replicate gate: suppress fold changes with too few observed values in the low condition
+        if low_min_required is not None:
+            low_level = level_1 if level_2 == control_condition else level_2
+            low_idxs = np.where(adata.obs[between_column] == low_level)[0]
+            n_low_obs = np.sum(~np.isnan(adata.X[low_idxs, :]), axis=0)
+            low_pass = n_low_obs >= low_min_required
+            p_values[~low_pass] = np.nan
+            log2fc[~low_pass] = np.nan
+
         # preprocess p-values and FDR for the current contrast
-        fdr_pvalues = nan_safe_bh_correction(ebayes_results["p"][contrast_idx])
+        fdr_pvalues = nan_safe_bh_correction(p_values)
         neg_log10_fdr = np.array([negative_log10_pvalue(fdr) for fdr in fdr_pvalues])
-        p_values = ebayes_results["p"][contrast_idx]
         neg_log10_pvalues = np.array([negative_log10_pvalue(p) for p in p_values])
 
         # Sample counts per level, mirroring ebayes.py. The name is "level_1_VS_level_2".
-        level_1, level_2 = contrast_name.split("_VS_")
         max_level_1_samples, max_level_2_samples = determine_max_replicates(adata, between_column, level_1, level_2)
 
         results[contrast_name] = pd.DataFrame(
             {
                 "condition_pair": contrast_name,
                 "protein": adata.var_names,
-                "log2fc": contrast_results["log2fc"][contrast_idx],
+                "log2fc": log2fc,
                 "p_value": p_values,
                 "-log10(p_value)": neg_log10_pvalues,
                 "fdr": fdr_pvalues,
