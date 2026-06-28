@@ -93,14 +93,13 @@ def summarize_design_matrix(
         print(f"{col}: {counts[col]}")
 
 
-def nan_lfit(  # noqa: PLR0915
+def generate_feature_mask(
     adata: ad.AnnData,
     between_column: str,
     control_condition: str,
-    covariate_column: str | None = None,
-    control_max_missing: int = 4,
-) -> dict:
-    """Perform a linear fit on the data in adata while dealing with NaN values.
+    control_max_missing: int = 0,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Generate a mask for features that pass the control condition missingness threshold.
 
     Parameters
     ----------
@@ -110,11 +109,47 @@ def nan_lfit(  # noqa: PLR0915
         Column name in adata.obs representing the experimental conditions.
     control_condition : str
         The name of the control condition in the between_column.
-    covariate_column : str | None, optional
-        Column name in adata.obs representing covariates, by default None.
     control_max_missing : int
-        Tolerance for missing DMSO values: a feature is skipped if
-        n_dmso_not_na < n_dmso - control_max_missing.
+        Tolerance for missing control values: a feature is skipped if
+        n_control_not_na < n_control - control_max_missing.
+
+    Returns
+    -------
+    tuple[np.ndarray, np.ndarray]
+        A tuple containing:
+        - feature_mask: Boolean array indicating which features pass the missingness threshold.
+        - feature_names: The feature names (adata.var_names) for reference.
+    """
+    control_mask = adata.obs[between_column] == control_condition
+    control_idxs = np.where(control_mask)[0]
+    n_controls = int(control_mask.sum())
+
+    # Count observed control values per feature and keep those meeting the threshold
+    control_block = adata.X[control_idxs, :]
+    n_control_not_na = np.sum(~np.isnan(control_block), axis=0)
+    feature_mask = n_control_not_na >= (n_controls - control_max_missing)
+
+    # Return the feature mask and the actual feature names from the anndata
+    return feature_mask, adata.var_names
+
+
+def nan_lmfit(  # noqa: PLR0915
+    adata: ad.AnnData,
+    design_matrix: pd.DataFrame,
+    feature_mask: np.ndarray | None = None,
+) -> dict:
+    """Perform a linear fit on the data in adata while dealing with NaN values.
+
+    Parameters
+    ----------
+    adata : ad.AnnData
+        Annotated data matrix.
+    design_matrix : pd.DataFrame
+        Design matrix with samples as rows (aligned to adata.obs_names) and conditions/covariates
+        as columns, e.g. as produced by build_design_matrix.
+    feature_mask : np.ndarray | None, optional
+        Boolean array of shape (n_features,). Features marked False are not fit and returned as
+        NaN. If None, every feature is fit.
 
     Returns
     -------
@@ -125,20 +160,24 @@ def nan_lfit(  # noqa: PLR0915
         - 'dfs': Degrees of freedom for each feature, shape (n_features,)
         - 'M_all': Unscaled covariance of the coefficients, shape (n_conditions, n_conditions, n_features)
     """
-    # Generate the design matrix and infer data shape
-    dm, col_info = build_design_matrix(adata, between_column, covariate_column)
+    # Validate that the design matrix aligns with the adata samples
+    if design_matrix.shape[0] != adata.n_obs:
+        raise ValueError("Design matrix rows do not match the number of samples in adata.")
+    if not design_matrix.index.equals(adata.obs_names):
+        raise ValueError("Design matrix index does not align with adata.obs_names.")
 
     # Get general shape information
-    K = dm.shape[1]
+    K = design_matrix.shape[1]
     P = adata.n_vars
 
-    # Mask for extracting control samples
-    control_mask = adata.obs[between_column] == control_condition
-    control_idxs = np.where(control_mask)[0]
-    n_controls = int(control_mask.sum())
+    # Default to fitting every feature, and validate any provided mask against the feature count
+    if feature_mask is None:
+        feature_mask = np.full(P, fill_value=True, dtype=bool)
+    elif feature_mask.shape[0] != P:
+        raise ValueError("Feature mask length does not match the number of features in adata.")
 
     # Convert design matrix and response to numpy arrays
-    X = dm.to_numpy()
+    X = design_matrix.to_numpy()
     Y = adata.X
 
     # Initialize output arrays
@@ -152,10 +191,8 @@ def nan_lfit(  # noqa: PLR0915
         # Extract the response vector for the current feature
         y = Y[:, j]
 
-        # Extract control values and check missingness; if too many missing, skip this feature
-        control_values = y[control_idxs]
-        n_control_not_na = np.sum(~np.isnan(control_values))
-        if n_control_not_na < n_controls - control_max_missing:
+        # Skip features that did not pass the feature mask; assign nans
+        if not feature_mask[j]:
             B[:, j] = np.nan
             sigma2[j] = np.nan
             dfs[j] = np.nan
@@ -219,7 +256,7 @@ def nan_lfit(  # noqa: PLR0915
         dfs[j] = df
         M_all[j] = M_full
 
-    return {"B": B, "sigma2": sigma2, "dfs": dfs, "M_all": M_all, "design": dm, "col_info": col_info}
+    return {"B": B, "sigma2": sigma2, "dfs": dfs, "M_all": M_all}
 
 
 def make_contrasts(
@@ -486,14 +523,15 @@ def diff_exp_ebayes(
     selected_levels = [*treatment_conditions, control_condition]
     adata = adata[adata.obs[between_column].isin(selected_levels)].copy()
 
-    # Step 1: linear fit with NaN handling
-    lm_fit = nan_lfit(
-        adata=adata,
+    # Step 1: build the design matrix, gate features on control missingness, and fit with NaN handling
+    design_matrix, col_info = build_design_matrix(adata, between_column, covariate_column)
+    feature_mask, _ = generate_feature_mask(
+        adata,
         between_column=between_column,
         control_condition=control_condition,
-        covariate_column=covariate_column,
         control_max_missing=control_max_missing,
     )
+    lm_fit = nan_lmfit(adata, design_matrix, feature_mask=feature_mask)
 
     # Step 2: Generate contrasts to derive fold changes for each treatment vs control
     contrast_matrix = make_contrasts(
@@ -508,7 +546,7 @@ def diff_exp_ebayes(
         contrast_matrix=contrast_matrix,
         B=lm_fit["B"],
         M_all=lm_fit["M_all"],
-        col_info=lm_fit["col_info"],
+        col_info=col_info,
     )
 
     # Step 4: Run empirical Bayes moderation on the unscaled variances
