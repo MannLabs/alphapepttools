@@ -1,7 +1,7 @@
 # Imputation methods for proteomics data
 
 import logging
-from typing import Literal
+from typing import Literal, cast
 
 import anndata as ad
 import numpy as np
@@ -10,6 +10,8 @@ from bpca import BPCA
 from sklearn.impute import KNNImputer
 
 from ._utils import _is_data_complete, _raise_on_nan_values
+
+from alphapepttools._matrix import get_matrix
 
 logger = logging.getLogger(__name__)
 
@@ -153,14 +155,14 @@ def impute_gaussian(
     """
     adata = adata.copy() if copy else adata
 
-    data = adata.X if layer is None else adata.layers[layer]
+    data = get_matrix(adata, layer)
 
     if group_column is None:
         _raise_on_nan_values(data, mode="all")
         data = _impute_gaussian(data, std_offset=std_offset, std_factor=std_factor, random_state=random_state)
     else:
         _raise_on_nan_values(
-            adata.obs[group_column],
+            cast("pd.Series", adata.obs[group_column]),
             mode="any",
             custom_message=f"`group_column` {group_column} contains nans. Cannot impute groups with missing values, please drop these observations prior to imputation.",
         )
@@ -264,7 +266,7 @@ def impute_median(
     """
     adata = adata.copy() if copy else adata
 
-    data = adata.X if layer is None else adata.layers[layer]
+    data = get_matrix(adata, layer)
 
     if group_column is None:
         _raise_on_nan_values(data, mode="all")
@@ -425,7 +427,7 @@ def impute_knn(
     """
     adata = adata.copy() if copy else adata
 
-    data = adata.X if layer is None else adata.layers[layer]
+    data = get_matrix(adata, layer)
 
     if group_column is None:
         _raise_on_nan_values(data, mode="all")
@@ -550,7 +552,7 @@ def impute_bpca(
     """
     adata = adata.copy() if copy else adata
 
-    data = adata.X if layer is None else adata.layers[layer]
+    data = get_matrix(adata, layer)
 
     if group_column is None:
         _raise_on_nan_values(data, mode="all")

@@ -2,12 +2,14 @@
 
 import numbers
 import warnings
-from collections.abc import Callable, Hashable
+from collections.abc import Callable, Hashable, MutableMapping
 
 import anndata as ad
 import numpy as np
 import pandas as pd
 from scipy.stats import median_abs_deviation
+
+from alphapepttools._matrix import get_matrix
 
 METRICS_KEY = "metrics"
 PMAD_KEY = "pmad"
@@ -146,7 +148,7 @@ def coefficient_of_variation(
 
     """
     adata = adata.copy() if copy else adata
-    data = adata.X if layer is None else adata.layers[layer]
+    data = get_matrix(adata, layer)
 
     if group_column is None:
         adata.var[key_added] = _cv(data, min_valid=min_valid, axis=0)
@@ -167,10 +169,10 @@ def coefficient_of_variation(
 
 
 def _set_nested_dict(
-    dictionary: dict[str, object],
+    dictionary: MutableMapping[str, object],
     keys: list[str],
     value: object,
-) -> dict[str, object]:
+) -> MutableMapping[str, object]:
     """Set value in nested dictionary, creating missing keys as needed
 
     Parameters
@@ -204,7 +206,7 @@ def _set_nested_dict(
 
 
 def _compute_pooled_groupwise_metric(
-    adata: ad.AnnData, func: Callable[[np.ndarray], float], group_column: str, layer: str | None = None, **kwargs
+    adata: ad.AnnData, func: Callable[..., float], group_column: str, layer: str | None = None, **kwargs
 ) -> dict[Hashable, float]:
     """Wrapper function to compute pooled groupwise metrics on data in anndata object
 
@@ -242,7 +244,7 @@ def _compute_pooled_groupwise_metric(
 
     """
     groups = adata.obs.groupby(group_column, observed=False)
-    data = adata.X if layer is None else adata.layers[layer]
+    data = get_matrix(adata, layer)
 
     metrics = {}
     for group_name, indices in groups.indices.items():
@@ -381,7 +383,7 @@ def pooled_coefficient_of_variation(
 
     if inplace:
         adata.uns = _set_nested_dict(adata.uns, value=pcv_groupwise, keys=[METRICS_KEY, PCV_KEY])
-    return pd.DataFrame.from_dict(pcv_groupwise, orient="index", columns=[PCV_KEY])
+    return pd.DataFrame.from_dict(pcv_groupwise, orient="index", columns=pd.Index([PCV_KEY]))
 
 
 def _pmad(x: np.ndarray) -> float:
@@ -502,4 +504,4 @@ def pooled_median_absolute_deviation(
 
     if inplace:
         adata.uns = _set_nested_dict(adata.uns, value=pmad_groupwise, keys=[METRICS_KEY, PMAD_KEY])
-    return pd.DataFrame.from_dict(pmad_groupwise, orient="index", columns=[PMAD_KEY])
+    return pd.DataFrame.from_dict(pmad_groupwise, orient="index", columns=pd.Index([PMAD_KEY]))

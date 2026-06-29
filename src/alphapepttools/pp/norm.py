@@ -8,6 +8,8 @@ from scipy.stats import gmean
 
 from ._utils import _raise_on_missing_value, _raise_on_nan_values
 
+from alphapepttools._matrix import get_matrix
+
 STRATEGIES = ["total_mean", "total_median"]
 
 
@@ -208,7 +210,7 @@ def normalize(
 
     adata = adata.copy() if copy else adata
 
-    data = adata.layers[layer] if layer is not None else adata.X
+    data = get_matrix(adata, layer)
 
     norm_func = _total_mean_normalization if strategy == "total_mean" else _total_median_normalization
 

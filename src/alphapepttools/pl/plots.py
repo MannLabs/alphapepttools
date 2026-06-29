@@ -12,13 +12,14 @@ import logging
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import anndata as ad
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.font_manager import FontProperties
 from matplotlib.legend import Legend
 from matplotlib.patches import Patch
 
@@ -370,7 +371,7 @@ def add_legend_to_axes_from_patches(
     _legend = ax.legend(handles=patches, **kwargs)
 
     # Resize legend title based on config legend title_size
-    _legend.set_title(_legend.get_title().get_text(), prop={"size": config["legend"]["title_size"]})
+    _legend.set_title(_legend.get_title().get_text(), prop=FontProperties(size=config["legend"]["title_size"]))
 
 
 def add_legend_to_axes(
@@ -445,12 +446,12 @@ def add_legend_to_axes(
             patches = make_legend_patches(levels)
             add_legend_to_axes_from_patches(ax, patches, **legend_kwargs)
         elif isinstance(levels, list):
-            levels = np.unique(levels)
+            unique_levels = np.unique(levels)
             if palette is None:
                 palette = BasePalettes.get("qualitative")
-                if len(levels) > len(palette):
+                if len(unique_levels) > len(palette):
                     palette = BasePalettes.get("sequential")
-            color_dict = get_color_mapping(levels, palette)
+            color_dict = get_color_mapping(unique_levels, palette)
             patches = make_legend_patches(color_dict)
             add_legend_to_axes_from_patches(ax, patches, **legend_kwargs)
         else:
@@ -806,7 +807,7 @@ class PlotConfig:
 
     def copy_with(
         self,
-        **changes: dict[str, Any],
+        **changes,
     ) -> "PlotConfig":
         """Create a copy with specified changes"""
         # Make it so that changes can override existing data & _extra fields
@@ -1119,8 +1120,12 @@ def layered_plot(
 
     # Get data from base_config
     data = base_config.data
+    if data is None:
+        raise ValueError("base_config must contain data to plot")
     x_column = base_config.x_column
     y_column = base_config.y_column
+    if not isinstance(x_column, str) or not isinstance(y_column, str):
+        raise TypeError("base_config must provide string x_column and y_column")
 
     # By default, all datapoints are in the default layer
     if layers is None:
@@ -1201,7 +1206,7 @@ def histogram(
     bins: int = 10,
     ax: plt.Axes | None = None,
     color: str = "blue",
-    palette: list[tuple] | None = None,
+    palette: list[str | tuple] | None = None,
     color_dict: dict[str, str | tuple] | None = None,
     legend: str | Legend | None = None,
     hist_kwargs: dict | None = None,
@@ -1337,7 +1342,8 @@ def histogram(
     legend_kwargs = legend_kwargs or {}
 
     if ax is None:
-        _, ax = create_figure(1, 1)
+        _, axm = create_figure(1, 1)
+        ax = axm.next()
 
     values = data_column_to_array(data, value_column)
 
@@ -1688,8 +1694,8 @@ def scatter(
 def barplot(
     ax: plt.Axes,
     data: ad.AnnData | pd.DataFrame,
-    grouping_column: list[str] | None = None,
-    value_column: list[str] | None = None,
+    grouping_column: str | None = None,
+    value_column: str | None = None,
     direct_columns: list[str] | None = None,
     color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
@@ -1852,8 +1858,8 @@ def barplot(
 def boxplot(
     ax: plt.Axes,
     data: ad.AnnData | pd.DataFrame,
-    grouping_column: list[str] | None = None,
-    value_column: list[str] | None = None,
+    grouping_column: str | None = None,
+    value_column: str | None = None,
     direct_columns: list[str] | None = None,
     color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
@@ -1962,7 +1968,7 @@ def boxplot(
     - The subgroup_column allows for further subdivision within each main group
     - Missing values (NaN) are excluded from the distribution calculations
     """
-    data, labels, positions, color_keys = _extract_groupwise_plotting_data(
+    data_lists, labels, positions, color_keys = _extract_groupwise_plotting_data(
         data=data,
         grouping_column=grouping_column,
         value_column=value_column,
@@ -1972,7 +1978,7 @@ def boxplot(
     )
 
     boxes = ax.boxplot(
-        x=data,
+        x=data_lists,
         positions=positions,
         widths=width,  # no typo: widths argument also takes single floats
         patch_artist=True,
@@ -2027,8 +2033,8 @@ def boxplot(
 def violinplot(
     ax: plt.Axes,
     data: ad.AnnData | pd.DataFrame,
-    grouping_column: list[str] | None = None,
-    value_column: list[str] | None = None,
+    grouping_column: str | None = None,
+    value_column: str | None = None,
     direct_columns: list[str] | None = None,
     color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
@@ -2137,7 +2143,7 @@ def violinplot(
     - When using direct_columns, each column's distribution is shown separately
     - Missing values (NaN) are excluded from the distribution calculations
     """
-    data, labels, positions, color_keys = _extract_groupwise_plotting_data(
+    data_lists, labels, positions, color_keys = _extract_groupwise_plotting_data(
         data=data,
         grouping_column=grouping_column,
         value_column=value_column,
@@ -2147,14 +2153,14 @@ def violinplot(
     )
 
     violins = ax.violinplot(
-        dataset=data,
+        dataset=data_lists,
         positions=positions,
         widths=width,
         showmedians=True,
     )
 
     # Styling of violins
-    for color_key, violin in zip(color_keys, violins["bodies"], strict=False):
+    for color_key, violin in zip(color_keys, cast("list", violins["bodies"]), strict=False):
         current_color = color_dict.get(color_key, config["na_color"]) if color_dict else color
         violin.set_facecolor(mcolors.to_rgba(current_color, alpha=alpha))
         violin.set_edgecolor(BaseColors.get("black"))
@@ -2443,11 +2449,15 @@ def plot_pca(
     """
     scatter_kwargs = scatter_kwargs or {}
 
+    if ax is None:
+        _, axm = create_figure(1, 1)
+        ax = axm.next()
+
     adata_pca = extract_pca_anndata(
         data,
         dim_space=dim_space,
         embeddings_name=embeddings_name,
-        expression_columns=color_map_column,
+        expression_columns=[color_map_column] if color_map_column is not None else None,
         method=method,
     )
 
@@ -2501,7 +2511,7 @@ def plot_pca(
 
 
 def scree_plot(
-    adata: ad.AnnData | pd.DataFrame,
+    adata: ad.AnnData,
     ax: plt.Axes,
     n_pcs: int = 20,
     dim_space: str = "obs",
@@ -2592,7 +2602,7 @@ def scree_plot(
 
 
 def plot_pca_loadings(
-    data: ad.AnnData | pd.DataFrame,
+    data: ad.AnnData,
     ax: plt.Axes,
     dim_space: str = "obs",
     embeddings_name: str | None = None,
@@ -2703,7 +2713,7 @@ def plot_pca_loadings(
 
 
 def plot_pca_loadings_2d(
-    data: ad.AnnData | pd.DataFrame,
+    data: ad.AnnData,
     ax: plt.Axes,
     dim_space: str = "obs",
     embeddings_name: str | None = None,

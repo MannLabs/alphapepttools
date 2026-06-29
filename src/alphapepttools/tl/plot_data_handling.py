@@ -453,7 +453,7 @@ def prepare_scree_data_to_plot(
 
 
 def prepare_pca_1d_loadings_data_to_plot(
-    data: ad.AnnData | pd.DataFrame,
+    data: ad.AnnData,
     dim_space: str,
     dim: int,
     nfeatures: int,

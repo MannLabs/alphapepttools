@@ -5,6 +5,7 @@ import warnings
 import anndata as ad
 import numpy as np
 
+from alphapepttools._matrix import get_matrix
 from alphapepttools.pp.transform import detect_special_values
 
 
@@ -75,7 +76,7 @@ def total_intensity(
     if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
 
-    data = adata.X if layer is None else adata.layers[layer]
+    data = get_matrix(adata, layer)
 
     if features is not None and axis == "obs":
         missing = set(features) - set(adata.var_names)
@@ -139,7 +140,7 @@ def number_detected(
     if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
 
-    data = adata.X if layer is None else adata.layers[layer]
+    data = get_matrix(adata, layer)
     special_values_mask = detect_special_values(data, verbosity=0)
 
     result = np.sum(~special_values_mask, axis=1) if axis == "obs" else np.sum(~special_values_mask, axis=0)
@@ -195,7 +196,7 @@ def fraction_complete(
     if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
 
-    data = adata.X if layer is None else adata.layers[layer]
+    data = get_matrix(adata, layer)
     special_values_mask = detect_special_values(data, verbosity=0)
 
     # Fraction of detected features per feature or observation
