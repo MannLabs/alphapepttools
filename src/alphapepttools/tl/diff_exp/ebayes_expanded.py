@@ -97,9 +97,9 @@ def generate_feature_mask(
     adata: ad.AnnData,
     between_column: str,
     condition: str,
-    max_missing: int = 0,
+    min_required: int = 0,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Generate a mask for features that pass a condition's missingness threshold.
+    """Generate a mask for features that meet a condition's minimum-observations threshold.
 
     Parameters
     ----------
@@ -109,25 +109,24 @@ def generate_feature_mask(
         Column name in adata.obs representing the experimental conditions.
     condition : str
         The name of the condition in the between_column to evaluate (e.g. a control or treatment).
-    max_missing : int
-        Tolerance for missing values in the condition: a feature is skipped if
-        n_condition_not_na < n_condition - max_missing.
+    min_required : int
+        Minimum number of observed values required in the condition: a feature is skipped if
+        n_condition_not_na < min_required.
 
     Returns
     -------
     tuple[np.ndarray, np.ndarray]
         A tuple containing:
-        - feature_mask: Boolean array indicating which features pass the missingness threshold.
+        - feature_mask: Boolean array indicating which features meet the minimum-observations threshold.
         - feature_names: The feature names (adata.var_names) for reference.
     """
     condition_mask = adata.obs[between_column] == condition
     condition_idxs = np.where(condition_mask)[0]
-    n_condition = int(condition_mask.sum())
 
     # Count observed condition values per feature and keep those meeting the threshold
     condition_block = adata.X[condition_idxs, :]
     n_condition_not_na = np.sum(~np.isnan(condition_block), axis=0)
-    feature_mask = n_condition_not_na >= (n_condition - max_missing)
+    feature_mask = n_condition_not_na >= min_required
 
     # Return the feature mask and the actual feature names from the anndata
     return feature_mask, adata.var_names
@@ -474,7 +473,7 @@ def diff_exp_ebayes(  # noqa: C901
     comparison: tuple[str | list[str], str],
     covariate_column: str | None = None,
     low_min_required: int | None = None,
-    high_max_missing: int | None = None,
+    high_min_required: int | None = None,
 ) -> pd.DataFrame:
     """Run Limma eBayes moderated ttest for differential expression with multiple contrasts and covariate support.
 
@@ -501,10 +500,11 @@ def diff_exp_ebayes(  # noqa: C901
         side can legitimately drop out, it is gated on a floor of observations: per contrast, features with fewer
         than this number of observed values in that contrast's low condition have their fold change suppressed
         (set to NaN) before FDR correction. If None, the low gate is disabled. By default None.
-    high_max_missing : int | None, optional
-        Tolerance for missing values in the high-signal reference. Because missingness in the high side is
-        untrustworthy, it is gated on a cap of missing values: features with more than this number of missing
-        values in the high reference are skipped entirely. If None, the high gate is disabled. By default None.
+    high_min_required : int | None, optional
+        Minimum number of observed values required in the high-signal reference. Because missingness in the
+        high side is untrustworthy, a feature with fewer than this many observed values in the high reference
+        is skipped entirely (pre-fit, so it is also excluded from the eBayes variance prior). If None, the high
+        gate is disabled. By default None.
 
     Returns
     -------
@@ -540,12 +540,12 @@ def diff_exp_ebayes(  # noqa: C901
     # Step 1: build the design matrix, gate features on high-reference missingness, and fit with NaN handling
     design_matrix, col_info = build_design_matrix(adata, between_column, covariate_column)
     feature_mask = None
-    if high_max_missing is not None:
+    if high_min_required is not None:
         feature_mask, _ = generate_feature_mask(
             adata,
             between_column=between_column,
             condition=control_condition,
-            max_missing=high_max_missing,
+            min_required=high_min_required,
         )
     lm_fit = nan_lmfit(adata, design_matrix, feature_mask=feature_mask)
 
