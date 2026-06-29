@@ -432,8 +432,7 @@ def diff_exp_ebayes(  # noqa: C901
     covariate_column: str | None = None,
     a_min_required: int | None = None,
     b_min_required: int | None = None,
-    *,
-    return_coefficients: bool = False,
+    return_coefficients: bool | None = False,  # noqa: FBT002
 ) -> pd.DataFrame:
     """Run Limma eBayes moderated ttest for differential expression with multiple contrasts and covariate support.
 
