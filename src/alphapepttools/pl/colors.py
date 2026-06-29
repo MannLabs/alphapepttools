@@ -519,7 +519,7 @@ class BaseColors:
         color_name: str | tuple,
         lighten: float | None = None,
         alpha: float | None = None,
-    ) -> tuple:
+    ) -> tuple | str:
         """Retrieve a color by name with optional lightness and alpha adjustments
 
         Retrieves colors from the default color palette, matplotlib named colors,
@@ -900,7 +900,7 @@ class MappedColormaps:
 
         if as_hex:
             return np.apply_along_axis(mpl_colors.to_hex, -1, rgba, keep_alpha=True)
-        return rgba
+        return np.asarray(rgba)
 
     @property
     def scalar_mappable(self) -> mpl.cm.ScalarMappable:

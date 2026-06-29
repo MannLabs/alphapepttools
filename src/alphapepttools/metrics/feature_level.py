@@ -2,7 +2,7 @@
 
 import numbers
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Hashable
 
 import anndata as ad
 import numpy as np
@@ -205,7 +205,7 @@ def _set_nested_dict(
 
 def _compute_pooled_groupwise_metric(
     adata: ad.AnnData, func: Callable[[np.ndarray], float], group_column: str, layer: str | None = None, **kwargs
-) -> dict[str, list[float]]:
+) -> dict[Hashable, float]:
     """Wrapper function to compute pooled groupwise metrics on data in anndata object
 
     Extracts data from anndata object (.X/.layers) and computes a groupwise metric

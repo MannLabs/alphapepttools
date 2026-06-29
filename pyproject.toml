@@ -223,7 +223,6 @@ possibly-missing-submodule = "ignore"
 # so it can run as a pre-commit gate that still enforces every other ty rule.
 unresolved-attribute = "ignore"
 no-matching-overload = "ignore"
-invalid-return-type = "ignore"
 unsupported-operator = "ignore"
 not-iterable = "ignore"
 unresolved-import = "ignore"

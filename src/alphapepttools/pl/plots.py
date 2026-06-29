@@ -429,6 +429,7 @@ def drop_nan_coordinate_points(
     -----
     Uses pandas.isna() to handle both NaN and None values correctly.
     """
+    labels = np.asarray(labels)
     keep_mask = ~(pd.isna(x_values) | pd.isna(y_values))
     return x_values[keep_mask], y_values[keep_mask], labels[keep_mask]
 
@@ -1616,7 +1617,7 @@ def barplot(
     grouping_column: list[str] | None = None,
     value_column: list[str] | None = None,
     direct_columns: list[str] | None = None,
-    color: tuple = BaseColors.get("blue"),
+    color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
 ) -> None:
     """Plot a bar chart from a DataFrame or AnnData object
@@ -1726,7 +1727,7 @@ def boxplot(
     grouping_column: list[str] | None = None,
     value_column: list[str] | None = None,
     direct_columns: list[str] | None = None,
-    color: tuple = BaseColors.get("blue"),
+    color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
 ) -> None:
     """Plot a box plot from a DataFrame or AnnData object
@@ -1863,7 +1864,7 @@ def violinplot(
     grouping_column: list[str] | None = None,
     value_column: list[str] | None = None,
     direct_columns: list[str] | None = None,
-    color: tuple = BaseColors.get("blue"),
+    color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
 ) -> None:
     """Plot a violin plot from a DataFrame or AnnData object
