@@ -93,51 +93,14 @@ def summarize_design_matrix(
         print(f"{col}: {counts[col]}")
 
 
-def generate_feature_mask(
-    adata: ad.AnnData,
-    between_column: str,
-    condition: str,
-    min_required: int = 0,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Generate a mask for features that meet a condition's minimum-observations threshold.
-
-    Parameters
-    ----------
-    adata : ad.AnnData
-        Annotated data matrix.
-    between_column : str
-        Column name in adata.obs representing the experimental conditions.
-    condition : str
-        The name of the condition in the between_column to evaluate (e.g. a control or treatment).
-    min_required : int
-        Minimum number of observed values required in the condition: a feature is skipped if
-        n_condition_not_na < min_required.
-
-    Returns
-    -------
-    tuple[np.ndarray, np.ndarray]
-        A tuple containing:
-        - feature_mask: Boolean array indicating which features meet the minimum-observations threshold.
-        - feature_names: The feature names (adata.var_names) for reference.
-    """
-    condition_mask = adata.obs[between_column] == condition
-    condition_idxs = np.where(condition_mask)[0]
-
-    # Count observed condition values per feature and keep those meeting the threshold
-    condition_block = adata.X[condition_idxs, :]
-    n_condition_not_na = np.sum(~np.isnan(condition_block), axis=0)
-    feature_mask = n_condition_not_na >= min_required
-
-    # Return the feature mask and the actual feature names from the anndata
-    return feature_mask, adata.var_names
-
-
-def nan_lmfit(  # noqa: PLR0915
+def nan_lmfit(
     adata: ad.AnnData,
     design_matrix: pd.DataFrame,
-    feature_mask: np.ndarray | None = None,
 ) -> dict:
     """Perform a linear fit on the data in adata while dealing with NaN values.
+
+    Fits every feature; pre-fit completeness filtering, if wanted, is the caller's responsibility
+    (e.g. via alphapepttools.pp.filter_data_completeness).
 
     Parameters
     ----------
@@ -146,9 +109,6 @@ def nan_lmfit(  # noqa: PLR0915
     design_matrix : pd.DataFrame
         Design matrix with samples as rows (aligned to adata.obs_names) and conditions/covariates
         as columns, e.g. as produced by build_design_matrix.
-    feature_mask : np.ndarray | None, optional
-        Boolean array of shape (n_features,). Features marked False are not fit and returned as
-        NaN. If None, every feature is fit.
 
     Returns
     -------
@@ -169,12 +129,6 @@ def nan_lmfit(  # noqa: PLR0915
     K = design_matrix.shape[1]
     P = adata.n_vars
 
-    # Default to fitting every feature, and validate any provided mask against the feature count
-    if feature_mask is None:
-        feature_mask = np.full(P, fill_value=True, dtype=bool)
-    elif feature_mask.shape[0] != P:
-        raise ValueError("Feature mask length does not match the number of features in adata.")
-
     # Convert design matrix and response to numpy arrays
     X = design_matrix.to_numpy()
     Y = adata.X
@@ -189,14 +143,6 @@ def nan_lmfit(  # noqa: PLR0915
     for j in tqdm(range(P), desc="Fitting features"):
         # Extract the response vector for the current feature
         y = Y[:, j]
-
-        # Skip features that did not pass the feature mask; assign nans
-        if not feature_mask[j]:
-            B[:, j] = np.nan
-            sigma2[j] = np.nan
-            dfs[j] = np.nan
-            M_all[j] = np.nan
-            continue
 
         # Subset to observed values
         obs_mask = ~np.isnan(y)
@@ -467,6 +413,18 @@ def ebayes_moderation(
     return {"p": p, "t": t}
 
 
+def _sufficient_values_mask(
+    adata: ad.AnnData,
+    between_column: str,
+    condition: str,
+    min_required: int,
+) -> np.ndarray:
+    """Per-feature boolean mask: True where `condition` has at least `min_required` observed values."""
+    condition_idxs = np.where(adata.obs[between_column] == condition)[0]
+    n_observed = np.sum(~np.isnan(adata.X[condition_idxs, :]), axis=0)
+    return n_observed >= min_required
+
+
 def diff_exp_ebayes(  # noqa: C901
     adata: ad.AnnData,
     between_column: str,
@@ -477,7 +435,11 @@ def diff_exp_ebayes(  # noqa: C901
 ) -> pd.DataFrame:
     """Run Limma eBayes moderated ttest for differential expression with multiple contrasts and covariate support.
 
-    Special consideration is given to mechanisms of missingness in the comparison (see below for syntax of `comparison` argument): In enrichment (e.g. pulldown), the reference signal is the low signal conditions, where dropouts can occur via a valid 'Missing Not At Random' (MNAR) mechanism where features drop out of LC-MS detection by being too lowly abundant. Therefore, different gating is applied: If a feature has too few observed values in the high-signal condition (i.e. the bait pulldown), it is considered an unreliable measurement and skipped entirely prior to modeling and testing. If a feature has too few observed values to calculate statistically reliable (usually 3 or a above replicates) in the low-signal condition, we suppose a plausible mechanism behind it (MNAR) and the existing measurements are still used for Bayesian modeling, but the resulting fold change is suppressed in the end.
+    Missingness handling inside this function is limited to gating the reported fold changes: per contrast, a
+    feature's fold change and p-value are suppressed (set to NaN, before FDR correction) unless both conditions
+    have at least the required number of observed values (treatment_min_required and control_min_required). All
+    features are still fit and contribute to the eBayes variance prior. Pre-fit completeness filtering, if wanted,
+    is the caller's responsibility and should be done upstream (e.g. alphapepttools.pp.filter_data_completeness).
 
     Parameters
     ----------
@@ -494,14 +456,13 @@ def diff_exp_ebayes(  # noqa: C901
     covariate_column : str | None, optional
         Column name in adata.obs containing linear covariate levels, by default None.
     treatment_min_required : int | None, optional
-        Minimum number of observed values required in the treatment condition of each contrast. Per contrast,
-        features with fewer than this number of observed values in that contrast's treatment condition have their
-        fold change suppressed (set to NaN) before FDR correction. If None, the treatment gate is disabled. By
-        default None.
+        Minimum number of observed values required in the treatment condition (comparison[0]) of each contrast.
+        Per contrast, features with fewer observed values in the treatment have their fold change suppressed (set
+        to NaN) before FDR correction. If None, the treatment gate is disabled. By default None.
     control_min_required : int | None, optional
-        Minimum number of observed values required in the control condition. A feature with fewer than this many
-        observed values in the control is skipped entirely (dropped before fitting). If None, the control gate is
-        disabled. By default None.
+        Minimum number of observed values required in the control condition (comparison[1]). Per contrast, features
+        with fewer observed values in the control have their fold change suppressed (set to NaN) before FDR
+        correction. If None, the control gate is disabled. By default None.
 
     Returns
     -------
@@ -534,20 +495,12 @@ def diff_exp_ebayes(  # noqa: C901
     selected_levels = [*treatment_conditions, control_condition]
     adata = adata[adata.obs[between_column].isin(selected_levels)].copy()
 
-    # Step 1: build the design matrix, gate features on high-reference missingness, and fit with NaN handling
+    # Step 1: build the design matrix and fit every feature with NaN handling
     design_matrix, col_info = build_design_matrix(adata, between_column, covariate_column)
-    feature_mask = None
-    if control_min_required is not None:
-        feature_mask, _ = generate_feature_mask(
-            adata,
-            between_column=between_column,
-            condition=control_condition,
-            min_required=control_min_required,
-        )
-    lm_fit = nan_lmfit(adata, design_matrix, feature_mask=feature_mask)
+    lm_fit = nan_lmfit(adata, design_matrix)
 
     # Step 2: Generate contrasts to derive fold changes for each treatment vs control.
-    # control_is=-1 fixes the direction to low - high (comparison[0] - comparison[1]), named "low_VS_high".
+    # control_is=-1 fixes the direction to treatment - control (comparison[0] - comparison[1]), named "treatment_VS_control".
     contrast_matrix = make_contrasts(
         adata=adata,
         between_column=between_column,
@@ -578,27 +531,30 @@ def diff_exp_ebayes(  # noqa: C901
 
     results = {}
     for contrast_idx, contrast_name in enumerate(contrast_names):
-        level_1, level_2 = contrast_name.split("_VS_")
+        # By convention the contrast is named "treatment_VS_control" (comparison[0] vs comparison[1]).
+        treatment_level, control_level = contrast_name.split("_VS_")
 
         p_values = ebayes_results["p"][contrast_idx].copy()
         log2fc = contrast_results["log2fc"][contrast_idx].copy()
 
-        # Treatment replicate gate: suppress fold changes with too few observed values in the treatment condition
+        # Replicate gate: suppress the fold change unless both conditions have enough observed values
+        keep = np.ones(adata.n_vars, dtype=bool)
         if treatment_min_required is not None:
-            treatment_level = level_1 if level_2 == control_condition else level_2
-            treatment_idxs = np.where(adata.obs[between_column] == treatment_level)[0]
-            n_treatment_obs = np.sum(~np.isnan(adata.X[treatment_idxs, :]), axis=0)
-            treatment_pass = n_treatment_obs >= treatment_min_required
-            p_values[~treatment_pass] = np.nan
-            log2fc[~treatment_pass] = np.nan
+            keep &= _sufficient_values_mask(adata, between_column, treatment_level, treatment_min_required)
+        if control_min_required is not None:
+            keep &= _sufficient_values_mask(adata, between_column, control_level, control_min_required)
+        p_values[~keep] = np.nan
+        log2fc[~keep] = np.nan
 
         # preprocess p-values and FDR for the current contrast
         fdr_pvalues = nan_safe_bh_correction(p_values)
         neg_log10_fdr = np.array([negative_log10_pvalue(fdr) for fdr in fdr_pvalues])
         neg_log10_pvalues = np.array([negative_log10_pvalue(p) for p in p_values])
 
-        # Sample counts per level, mirroring ebayes.py. The name is "level_1_VS_level_2".
-        max_level_1_samples, max_level_2_samples = determine_max_replicates(adata, between_column, level_1, level_2)
+        # Sample counts per level, mirroring ebayes.py. The name is "treatment_VS_control".
+        max_level_1_samples, max_level_2_samples = determine_max_replicates(
+            adata, between_column, treatment_level, control_level
+        )
 
         results[contrast_name] = pd.DataFrame(
             {
