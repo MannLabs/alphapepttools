@@ -1,5 +1,7 @@
 """Principal component regression"""
 
+from typing import cast
+
 import anndata as ad
 import numpy as np
 import pandas as pd
@@ -147,7 +149,7 @@ def principal_component_regression(
     """
     _verify_keys__principal_component_regression(adata, covariate=covariate, pca_key=pca_key, pca_uns_key=pca_key_uns)
 
-    pca_embeddings = adata.obsm[pca_key]
+    pca_embeddings = cast("np.ndarray", adata.obsm[pca_key])
     explained_variance = adata.uns[pca_key_uns][_PCA_VARIANCE_RATIO]
 
     if n_components is not None:

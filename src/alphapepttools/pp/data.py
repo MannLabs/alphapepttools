@@ -11,6 +11,8 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 from sklearn.preprocessing import RobustScaler, StandardScaler
 
+from alphapepttools._matrix import get_matrix
+
 # logging configuration
 logging.basicConfig(level=logging.INFO)
 
@@ -158,7 +160,7 @@ def add_metadata(  # noqa: C901, PLR0912
 
     ### Handle alignment of incoming and existing metadata
     if keep_existing_metadata:
-        existing_metadata = adata.obs if axis == 0 else adata.var
+        existing_metadata = cast("pd.DataFrame", adata.obs if axis == 0 else adata.var)
 
         # if existing metadata should be kept and new metadata contains synonymous fields to existing metadata, drop incoming fields
         incoming_metadata = _handle_overlapping_columns(incoming_metadata, existing_metadata, verbose=verbose)
@@ -279,7 +281,7 @@ def _filter_by_dict(
 
 
 def _tuple_based_filter(
-    feature: pd.Series,
+    feature: pd.Series | pd.Index,
     input_tuple: tuple,
 ) -> pd.Series:
     """Tuple-based filtering of numeric features
@@ -315,7 +317,10 @@ def _tuple_based_filter(
     elif upper is not None:
         current_mask = feature < upper
     else:
-        current_mask = pd.Series(True, index=feature.index)  # noqa: FBT003
+        # feature is a Series for normal columns but a pd.Index for the "index" key; the
+        # latter has no `.index`, so derive the alignment index from the feature itself.
+        alignment_index = feature.index if isinstance(feature, pd.Series) else feature
+        current_mask = pd.Series(True, index=alignment_index)  # noqa: FBT003
 
     return current_mask
 
@@ -423,7 +428,7 @@ def filter_by_metadata(
         print(adata_filtered.shape)  # (5, 5) - cells 0,1,2,4 match the criteria
 
     """
-    metadata_to_filter = adata.obs if axis == 0 else adata.var
+    metadata_to_filter = cast("pd.DataFrame", adata.obs if axis == 0 else adata.var)
     filter_mask = _filter_by_dict(metadata_to_filter, filter_dict, logic)
 
     if action == "drop":
@@ -652,7 +657,7 @@ def data_index_to_array(
 
 
 def _tolist(
-    obj: str | list,
+    obj: str | int | list,
 ) -> list:
     return obj if isinstance(obj, list) else [obj]
 
@@ -864,7 +869,7 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     else:
         raise NotImplementedError(f"Scaler {scaler} not implemented.")
 
-    input_data = adata.X if layer is None else adata.layers[layer]
+    input_data = get_matrix(adata, layer)
     result = scaler.fit_transform(input_data)
     if layer is None:
         adata.X = result

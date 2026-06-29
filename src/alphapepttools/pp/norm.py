@@ -3,6 +3,8 @@ from typing import Literal
 import anndata as ad
 import numpy as np
 
+from alphapepttools._matrix import get_matrix
+
 STRATEGIES = ["total_mean", "total_median"]
 
 
@@ -197,7 +199,7 @@ def normalize(
 
     adata = adata.copy() if copy else adata
 
-    data = adata.layers[layer] if layer is not None else adata.X
+    data = get_matrix(adata, layer)
 
     if strategy == "total_mean":
         normalized_data, norm_factors = _total_mean_normalization(data)

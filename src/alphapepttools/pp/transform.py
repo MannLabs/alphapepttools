@@ -7,6 +7,8 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 
+from alphapepttools._matrix import get_matrix
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -170,7 +172,7 @@ def nanlog(
             return np.log10(x)
         return np.log(x) / np.log(base)
 
-    input_data = adata.X if layer is None else adata.layers[layer]
+    input_data = get_matrix(adata, layer)
 
     # Handle subtleties with filtering and assignment of different datatypes
     special_values_mask = detect_special_values(input_data, verbosity)
