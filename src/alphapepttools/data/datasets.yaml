@@ -127,17 +127,31 @@
   search_engine: directlfq
   data_type: pg
   citation: "Weiss, Caroline A. M., et el. Single cell spatial proteomics maps human liver zonation patterns and their vulnerability to fibrosis. bioRxiv 2025.04.13.648568; doi: https://doi.org/10.1101/2025.04.13.648568"
-  description: DVP study on single hepatocytes from livers of healthy donors and patients with desmolapsia.
+  description: "DVP study on single hepatocytes from livers of healthy donors and patients with desmolapsia."
 
 - name: Weiss2026_metadata
   url: https://datashare.biochem.mpg.de/s/57Zbo6KroKsG3Rx
-  search_engine: none
+  search_engine: null
   data_type: metadata
   citation: "Weiss, Caroline A. M., et el. Single cell spatial proteomics maps human liver zonation patterns and their vulnerability to fibrosis. bioRxiv 2025.04.13.648568; doi: https://doi.org/10.1101/2025.04.13.648568"
-  description: DVP study on single hepatocytes from livers of healthy donors and patients with desmolapsia.
+  description: "DVP study on single hepatocytes from livers of healthy donors and patients with desmolapsia."
+
+- name: Weiss2026_shapes
+  url: https://datashare.biochem.mpg.de/s/eS5XiyKBSWHqRCx
+  search_engine: null
+  data_type: shapes
+  citation: "Weiss, Caroline A. M., et el. Single cell spatial proteomics maps human liver zonation patterns and their vulnerability to fibrosis. bioRxiv 2025.04.13.648568; doi: https://doi.org/10.1101/2025.04.13.648568"
+  description: "Example shapes derived from DVP study on single hepatocytes from livers of healthy donors and patients with desmolapsia."
+
+- name: Weiss2026_image
+  url: https://datashare.biochem.mpg.de/s/tKEDY5mPzxFED2H
+  search_engine: null
+  data_type: image
+  citation: "Weiss, Caroline A. M., et el. Single cell spatial proteomics maps human liver zonation patterns and their vulnerability to fibrosis. bioRxiv 2025.04.13.648568; doi: https://doi.org/10.1101/2025.04.13.648568"
+  description: "Example image derived from DVP study on single hepatocytes from livers of healthy donors and patients with desmolapsia."
 
 - name: Uniprot_to_GeneSymbol_file
   url: https://datashare.biochem.mpg.de/s/GHY7gFskLQBeQyR
-  search_engine: none
+  search_engine: null
   data_type: annotation
   description: File to convert Uniprot IDs (Swiss-Prot) into Gene Symbols (same version used in study).
