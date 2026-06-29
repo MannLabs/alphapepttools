@@ -367,7 +367,7 @@ def _perceptually_uniform_qualitative_colorscale() -> list:
         show_rgba_color_list(colors)
 
     """
-    colors = _get_colors_from_cmap(cmc.batlow, 9)
+    colors = _get_colors_from_cmap(cmc.cmaps["batlow"], 9)
 
     # interlace colors 1-5, 2-6, etc. to maximize color distance
     # Custom hue for maximum contrast between levels
@@ -694,12 +694,12 @@ class BaseColormaps:
 
     # Use perceptually uniform color palettes to avoid visual distortion (Crameri, F. (2018a), Scientific colour maps. Zenodo. http://doi.org/10.5281/zenodo.1243862)
     default_colormaps: ClassVar[dict] = {
-        "sequential": cmc.devon,
-        "diverging": cmc.managua_r,
-        "sequential_r": cmc.devon_r,
-        "diverging_r": cmc.managua,
-        "sequential_clipped": clip_colormap(cmc.devon, lowpoint=0, highpoint=0.8),
-        "sequential_r_clipped": clip_colormap(cmc.devon_r, lowpoint=0.2, highpoint=1),
+        "sequential": cmc.cmaps["devon"],
+        "diverging": cmc.cmaps["managua_r"],
+        "sequential_r": cmc.cmaps["devon_r"],
+        "diverging_r": cmc.cmaps["managua"],
+        "sequential_clipped": clip_colormap(cmc.cmaps["devon"], lowpoint=0, highpoint=0.8),
+        "sequential_r_clipped": clip_colormap(cmc.cmaps["devon_r"], lowpoint=0.2, highpoint=1),
         "magma_clipped": clip_colormap(plt.get_cmap("magma"), lowpoint=0, highpoint=0.8),
     }
 
