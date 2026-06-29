@@ -875,7 +875,11 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
 
 
 # TODO: Abstract class for validation of AnnData objects?
-def _validate_adata_for_completeness_filter(adata: ad.AnnData, action: str, var_colname: str) -> None:
+def _validate_adata_for_completeness_filter(
+    adata: ad.AnnData,
+    action: str,
+    var_colname: str,
+) -> None:
     """Validate AnnData object for data completeness filtering.
 
     Checks that the AnnData object meets requirements for completeness filtering:
@@ -923,6 +927,35 @@ def _validate_adata_for_completeness_filter(adata: ad.AnnData, action: str, var_
         )
 
 
+def _validate_max_missing(
+    max_missing: float,
+) -> bool:
+    """Validate the missingness threshold and report whether it is an absolute count.
+
+    An int is interpreted as an absolute count of missing values; a float as a
+    fraction in [0, 1]. Returns True for the count interpretation, False for the fraction.
+    """
+    if isinstance(max_missing, float):
+        if max_missing < 0 or max_missing > 1:
+            raise ValueError("Float threshold must be between 0 and 1.")
+        return False
+    if isinstance(max_missing, int):
+        if max_missing < 0:
+            raise ValueError("Integer threshold must be non-negative.")
+        return True
+    raise ValueError("Threshold must be a float or an int.")
+
+
+def _count_or_fraction_missing(
+    x: np.ndarray,
+    *,
+    count_mode: bool,
+) -> np.ndarray:
+    """Per-feature missing values, as an absolute count (count_mode) or as a fraction."""
+    nan = np.isnan(x)
+    return nan.sum(axis=0) if count_mode else nan.mean(axis=0)
+
+
 def filter_data_completeness(
     adata: ad.AnnData,
     max_missing: float,
@@ -941,8 +974,8 @@ def filter_data_completeness(
     adata
         AnnData object
     max_missing
-        Maximum fraction of missing values allowed to pass filtering in the interval [0.0, 1.0].
-        Features with a fraction of missing values greater than (`>`) `max_missing` are filtered out.
+        Maximum fraction of missing values allowed to pass. If this is an integer, it is interpreted as the actual number of missing values allowed.
+        If this is a float in the interval [0.0, 1.0], it is interpreted as the fraction of missing values allowed.
     group_column
         Column name in `adata.obs` defining groups for group-wise filtering.
         If `None` (default), computes missingness across all samples.
@@ -990,8 +1023,11 @@ def filter_data_completeness(
             var=pd.DataFrame(index=["prot1", "prot2", "prot3", "prot4"]),
         )
 
-        # Flag features with >30% missing values
+        # Flag features with >30% missing values (float -> fraction)
         adata = apt.pp.filter_data_completeness(adata, max_missing=0.3, action="flag")
+
+        # Drop features with more than 1 missing value (int -> absolute count)
+        adata = apt.pp.filter_data_completeness(adata, max_missing=1, action="drop")
 
         # Drop features with >30% missing in group A only
         adata = apt.pp.filter_data_completeness(
@@ -1015,8 +1051,8 @@ def filter_data_completeness(
         # candidates in clinical studies.
         apt.pp.filter_data_completeness(adata, max_missing=0.5, group_column="condition", keep_strategy="any")
     """
-    if max_missing < 0 or max_missing > 1:
-        raise ValueError("Threshold must be between 0 and 1.")
+    # An int counts missing values; a float in [0, 1] is a fraction of missing values.
+    count_mode = _validate_max_missing(max_missing)
 
     if keep_strategy not in ("all", "any"):
         raise ValueError(f"Supported keep_strategies are `all` and `any`, passed {keep_strategy}")
@@ -1024,7 +1060,7 @@ def filter_data_completeness(
     _validate_adata_for_completeness_filter(adata, action, var_colname)
 
     if group_column is None:
-        keep_mask = np.isnan(adata.X).mean(axis=0) <= max_missing
+        keep_mask = _count_or_fraction_missing(adata.X, count_mode=count_mode) <= max_missing
     else:
         available_groups = adata.obs.groupby(group_column, dropna=True).indices
 
@@ -1036,7 +1072,9 @@ def filter_data_completeness(
 
         for group_nr, group in enumerate(selected_groups):
             group_indices = available_groups[group]
-            keep_mask[group_nr, :] = np.isnan(adata.X[group_indices, :]).mean(axis=0) <= max_missing
+            keep_mask[group_nr, :] = (
+                _count_or_fraction_missing(adata.X[group_indices, :], count_mode=count_mode) <= max_missing
+            )
 
         # Aggregate to decision
         # - any: Any group passes
@@ -1050,7 +1088,8 @@ def filter_data_completeness(
         adata.var[var_colname] = keep_mask
 
     n_dropped = (~keep_mask).sum()
+    threshold_desc = f"{max_missing} missing values" if count_mode else f"{max_missing:.2f} missing fraction"
     logging.info(
-        f"pp.filter_data_completeness(): {action} {n_dropped} / {keep_mask.size} features with >{max_missing:.2f} missing."
+        f"pp.filter_data_completeness(): {action} {n_dropped} / {keep_mask.size} features with >{threshold_desc}."
     )
     return adata
