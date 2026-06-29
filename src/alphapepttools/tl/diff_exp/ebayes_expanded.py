@@ -432,6 +432,8 @@ def diff_exp_ebayes(  # noqa: C901
     covariate_column: str | None = None,
     a_min_required: int | None = None,
     b_min_required: int | None = None,
+    *,
+    return_coefficients: bool = False,
 ) -> pd.DataFrame:
     """Run Limma eBayes moderated ttest for differential expression with multiple contrasts and covariate support.
 
@@ -465,12 +467,17 @@ def diff_exp_ebayes(  # noqa: C901
         Minimum number of observed values required in the B condition (comparison[1]). Per contrast, features with
         fewer observed values in B have their fold change suppressed (set to NaN) before FDR correction. If None,
         the B gate is disabled. By default None.
+    return_coefficients : bool, optional
+        If True, additionally return the full fitted linear coefficients as a (features x design columns) DataFrame,
+        with one column per condition and covariate level. Useful for inspecting effect sizes directly, e.g.
+        diagnosing an outsized covariate (batch/replicate) effect. By default False.
 
     Returns
     -------
-    pd.DataFrame
-        DataFrame with standardized Limma eBayes differential expression results for each contrast. Fold changes
-        are reported as A - B (i.e. comparison[0] - comparison[1]), and contrasts are named "A_VS_B".
+    dict[str, pd.DataFrame] or tuple[dict[str, pd.DataFrame], pd.DataFrame]
+        Per-contrast standardized Limma eBayes results, keyed by contrast name. Fold changes are reported as
+        A - B (i.e. comparison[0] - comparison[1]), and contrasts are named "A_VS_B". If `return_coefficients`
+        is True, returns a tuple of (results, coefficients).
 
     """
     if between_column not in adata.obs.columns:
@@ -571,5 +578,14 @@ def diff_exp_ebayes(  # noqa: C901
             },
             index=adata.var_names,
         )
+
+    if return_coefficients:
+        # rows of B are design-matrix columns (conditions + covariates), in column order
+        coefficients = pd.DataFrame(
+            lm_fit["B"].T,
+            index=adata.var_names,
+            columns=design_matrix.columns,
+        )
+        return results, coefficients
 
     return results
