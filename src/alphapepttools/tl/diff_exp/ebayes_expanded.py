@@ -430,16 +430,18 @@ def diff_exp_ebayes(  # noqa: C901
     between_column: str,
     comparison: tuple[str | list[str], str],
     covariate_column: str | None = None,
-    treatment_min_required: int | None = None,
-    control_min_required: int | None = None,
+    a_min_required: int | None = None,
+    b_min_required: int | None = None,
 ) -> pd.DataFrame:
     """Run Limma eBayes moderated ttest for differential expression with multiple contrasts and covariate support.
 
-    Missingness handling inside this function is limited to gating the reported fold changes: per contrast, a
-    feature's fold change and p-value are suppressed (set to NaN, before FDR correction) unless both conditions
-    have at least the required number of observed values (treatment_min_required and control_min_required). All
-    features are still fit and contribute to the eBayes variance prior. Pre-fit completeness filtering, if wanted,
-    is the caller's responsibility and should be done upstream (e.g. alphapepttools.pp.filter_data_completeness).
+    The two conditions in each comparison are referred to positionally as A (comparison[0]) and B (comparison[1]);
+    the test is symmetric, so no condition is assumed to be a treatment or a control. Missingness handling inside
+    this function is limited to gating the reported fold changes: per contrast, a feature's fold change and
+    p-value are suppressed (set to NaN, before FDR correction) unless both conditions have at least the required
+    number of observed values (a_min_required for A and b_min_required for B). All features are still fit and
+    contribute to the eBayes variance prior. Pre-fit completeness filtering, if wanted, is the caller's
+    responsibility and should be done upstream (e.g. alphapepttools.pp.filter_data_completeness).
 
     Parameters
     ----------
@@ -448,63 +450,63 @@ def diff_exp_ebayes(  # noqa: C901
     between_column : str
         Column name in adata.obs containing the contrast levels.
     comparison : tuple[str | list[str], str]
-        Tuple specifying the pair of conditions to compare, ordered as (treatment, control): the first element
-        is the treatment condition(s), the second is the control reference, e.g. ("treatment1", "control").
-        Multiple treatments can be specified as a list in the first element: (["treatment1", "treatment2"], "control").
-        If the first element is set to "_ALL_", all conditions except the control are compared against it:
-        ("_ALL_", "control").
+        Tuple specifying the pair of conditions to compare, ordered as (A, B): the first element is the A
+        condition(s), the second is the single B reference each A is compared against, e.g. ("A", "B"). Fold
+        changes are reported as A - B. Multiple A conditions can be specified as a list in the first element:
+        (["A1", "A2"], "B"). If the first element is set to "_ALL_", all conditions except B are compared against
+        it: ("_ALL_", "B").
     covariate_column : str | None, optional
         Column name in adata.obs containing linear covariate levels, by default None.
-    treatment_min_required : int | None, optional
-        Minimum number of observed values required in the treatment condition (comparison[0]) of each contrast.
-        Per contrast, features with fewer observed values in the treatment have their fold change suppressed (set
-        to NaN) before FDR correction. If None, the treatment gate is disabled. By default None.
-    control_min_required : int | None, optional
-        Minimum number of observed values required in the control condition (comparison[1]). Per contrast, features
-        with fewer observed values in the control have their fold change suppressed (set to NaN) before FDR
-        correction. If None, the control gate is disabled. By default None.
+    a_min_required : int | None, optional
+        Minimum number of observed values required in the A condition (comparison[0]) of each contrast. Per
+        contrast, features with fewer observed values in A have their fold change suppressed (set to NaN) before
+        FDR correction. If None, the A gate is disabled. By default None.
+    b_min_required : int | None, optional
+        Minimum number of observed values required in the B condition (comparison[1]). Per contrast, features with
+        fewer observed values in B have their fold change suppressed (set to NaN) before FDR correction. If None,
+        the B gate is disabled. By default None.
 
     Returns
     -------
     pd.DataFrame
         DataFrame with standardized Limma eBayes differential expression results for each contrast. Fold changes
-        are reported as low - high (i.e. comparison[0] - comparison[1]), and contrasts are named "low_VS_high".
+        are reported as A - B (i.e. comparison[0] - comparison[1]), and contrasts are named "A_VS_B".
 
     """
     if between_column not in adata.obs.columns:
         raise ValueError(f"Column '{between_column}' not found in adata.obs.")
     between_levels = adata.obs[between_column].unique()
 
-    # Validate control condition
-    control_condition = comparison[1]
-    if control_condition not in between_levels:
-        raise ValueError(f"Control condition '{control_condition}' not found in column '{between_column}'.")
+    # Validate the B condition (the single reference, comparison[1])
+    b_condition = comparison[1]
+    if b_condition not in between_levels:
+        raise ValueError(f"Condition '{b_condition}' not found in column '{between_column}'.")
 
-    # Validate treatment conditions
-    treatment_conditions = comparison[0]
-    if treatment_conditions == "_ALL_":
-        treatment_conditions = [level for level in between_levels if level != control_condition]
-    elif isinstance(treatment_conditions, str):
-        treatment_conditions = [treatment_conditions]
+    # Validate the A conditions (comparison[0])
+    a_conditions = comparison[0]
+    if a_conditions == "_ALL_":
+        a_conditions = [level for level in between_levels if level != b_condition]
+    elif isinstance(a_conditions, str):
+        a_conditions = [a_conditions]
 
-    for treatment in treatment_conditions:
-        if treatment not in between_levels:
-            raise ValueError(f"Treatment condition '{treatment}' not found in column '{between_column}'.")
+    for a_condition in a_conditions:
+        if a_condition not in between_levels:
+            raise ValueError(f"Condition '{a_condition}' not found in column '{between_column}'.")
 
     # Step 0: Filter adata to only include samples from the specified conditions
-    selected_levels = [*treatment_conditions, control_condition]
+    selected_levels = [*a_conditions, b_condition]
     adata = adata[adata.obs[between_column].isin(selected_levels)].copy()
 
     # Step 1: build the design matrix and fit every feature with NaN handling
     design_matrix, col_info = build_design_matrix(adata, between_column, covariate_column)
     lm_fit = nan_lmfit(adata, design_matrix)
 
-    # Step 2: Generate contrasts to derive fold changes for each treatment vs control.
-    # control_is=-1 fixes the direction to treatment - control (comparison[0] - comparison[1]), named "treatment_VS_control".
+    # Step 2: Generate contrasts to derive fold changes for each A vs B.
+    # control_is=-1 fixes the direction to A - B (comparison[0] - comparison[1]), named "A_VS_B".
     contrast_matrix = make_contrasts(
         adata=adata,
         between_column=between_column,
-        control_condition=control_condition,
+        control_condition=b_condition,
         control_is=-1,
     )
 
@@ -525,24 +527,24 @@ def diff_exp_ebayes(  # noqa: C901
     )
 
     # Step 5: Extract contrasts and write output DataFrame with standardized columns for each contrast
-    contrast_names = contrasts_from_matrix(contrast_matrix, control_condition)
+    contrast_names = contrasts_from_matrix(contrast_matrix, b_condition)
     if len(contrast_names) != contrast_results["log2fc"].shape[0]:
         raise ValueError("Number of contrast names does not match number of contrasts in results.")
 
     results = {}
     for contrast_idx, contrast_name in enumerate(contrast_names):
-        # By convention the contrast is named "treatment_VS_control" (comparison[0] vs comparison[1]).
-        treatment_level, control_level = contrast_name.split("_VS_")
+        # By convention the contrast is named "A_VS_B" (comparison[0] vs comparison[1]).
+        a_level, b_level = contrast_name.split("_VS_")
 
         p_values = ebayes_results["p"][contrast_idx].copy()
         log2fc = contrast_results["log2fc"][contrast_idx].copy()
 
         # Replicate gate: suppress the fold change unless both conditions have enough observed values
         keep = np.ones(adata.n_vars, dtype=bool)
-        if treatment_min_required is not None:
-            keep &= _sufficient_values_mask(adata, between_column, treatment_level, treatment_min_required)
-        if control_min_required is not None:
-            keep &= _sufficient_values_mask(adata, between_column, control_level, control_min_required)
+        if a_min_required is not None:
+            keep &= _sufficient_values_mask(adata, between_column, a_level, a_min_required)
+        if b_min_required is not None:
+            keep &= _sufficient_values_mask(adata, between_column, b_level, b_min_required)
         p_values[~keep] = np.nan
         log2fc[~keep] = np.nan
 
@@ -551,10 +553,8 @@ def diff_exp_ebayes(  # noqa: C901
         neg_log10_fdr = np.array([negative_log10_pvalue(fdr) for fdr in fdr_pvalues])
         neg_log10_pvalues = np.array([negative_log10_pvalue(p) for p in p_values])
 
-        # Sample counts per level, mirroring ebayes.py. The name is "treatment_VS_control".
-        max_level_1_samples, max_level_2_samples = determine_max_replicates(
-            adata, between_column, treatment_level, control_level
-        )
+        # Sample counts per level, mirroring ebayes.py. The name is "A_VS_B".
+        max_level_1_samples, max_level_2_samples = determine_max_replicates(adata, between_column, a_level, b_level)
 
         results[contrast_name] = pd.DataFrame(
             {

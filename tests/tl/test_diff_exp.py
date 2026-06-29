@@ -951,21 +951,22 @@ def test_fit_and_contrasts_invariant_to_sample_permutation(example_adata_ebayes)
         np.testing.assert_allclose(shuffled[name][1], unscaled_var, equal_nan=True)
 
 
-# Test filtering out fold changes of conditions with too few treatment replicates. The difference to the control gate is that contrasts with too few replicates are fitted but not passed on to the results
+# The replicate gate suppresses a contrast's fold change when either side has too few observed values. The
+# feature is still fit (and contributes to the eBayes prior); only the reported fold change/p/fdr are NaNed.
 @pytest.fixture
 def gate_adata():
-    """One feature sparse in treatment B (2 of 5), one sparse in control A (2 of 5), the rest full."""
+    """Comparison ("X", "Y"): one feature sparse in X (2 of 5), one sparse in Y (2 of 5), the rest full."""
     x = pd.DataFrame(
         {
             "full_1": [10, 12, 14, 16, 18, 1, 2, 3, 4, 5],
             "full_2": [1, 2, 3, 4, 5, 10, 15, 20, 25, 30],
             "full_3": [2, 4, 6, 8, 10, 1, 3, 5, 7, 9],
-            "treat_sparse": [10, 12, 14, 16, 18, 1, 2, np.nan, np.nan, np.nan],  # B has only 2 observed
-            "control_sparse": [10, 12, np.nan, np.nan, np.nan, 1, 2, 3, 4, 5],  # A has only 2 observed
+            "x_sparse": [np.nan, np.nan, np.nan, 16, 18, 1, 2, 3, 4, 5],  # X has only 2 observed
+            "y_sparse": [10, 12, 14, 16, 18, 1, 2, np.nan, np.nan, np.nan],  # Y has only 2 observed
         },
         index=[f"cell{i}" for i in range(10)],
     ).astype(float)
-    obs = pd.DataFrame({"group": ["A"] * 5 + ["B"] * 5}, index=[f"cell{i}" for i in range(10)])
+    obs = pd.DataFrame({"group": ["X"] * 5 + ["Y"] * 5}, index=[f"cell{i}" for i in range(10)])
     adata = ad.AnnData(X=x, obs=obs)
     nanlog(adata)
     return adata
@@ -973,29 +974,29 @@ def gate_adata():
 
 @pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
 @pytest.mark.parametrize(
-    ("treatment_min_required", "sparse_reported"),
+    ("a_min_required", "sparse_reported"),
     [
-        (3, False),  # only 2 observed treatment values, below the required 3 -> fold change suppressed
-        (2, True),  # 2 observed treatment values meet the requirement -> fold change reported
+        (3, False),  # only 2 observed A (X) values, below the required 3 -> fold change suppressed
+        (2, True),  # 2 observed A (X) values meet the requirement -> fold change reported
         (None, True),  # gate disabled -> fold change reported
     ],
 )
-def test_diff_exp_ebayes_treatment_gate(gate_adata, treatment_min_required, sparse_reported):
-    """treatment_min_required suppresses (NaNs) fold changes whose treatment has too few observed values."""
+def test_diff_exp_ebayes_a_gate(gate_adata, a_min_required, sparse_reported):
+    """a_min_required suppresses (NaNs) fold changes whose A condition has too few observed values."""
     results = diff_exp_ebayes_expanded(
         adata=gate_adata,
         between_column="group",
-        comparison=("B", "A"),
-        treatment_min_required=treatment_min_required,
+        comparison=("X", "Y"),
+        a_min_required=a_min_required,
     )
-    df = results["B_VS_A"].set_index("protein")
+    df = results["X_VS_Y"].set_index("protein")
     result_cols = ["log2fc", "p_value", "fdr"]
 
     # Fully observed features are always reported, regardless of the gate.
     assert df.loc["full_1", result_cols].notna().all()
 
-    # The sparse-treatment feature is reported only when the requirement admits it.
-    sparse = df.loc["treat_sparse", result_cols]
+    # The feature sparse in A (X) is reported only when the requirement admits it.
+    sparse = df.loc["x_sparse", result_cols]
     if sparse_reported:
         assert sparse.notna().all()
     else:
@@ -1004,29 +1005,29 @@ def test_diff_exp_ebayes_treatment_gate(gate_adata, treatment_min_required, spar
 
 @pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
 @pytest.mark.parametrize(
-    ("control_min_required", "sparse_reported"),
+    ("b_min_required", "sparse_reported"),
     [
-        (3, False),  # only 2 observed control values, below the required 3 -> fold change suppressed
-        (2, True),  # 2 observed control values meet the requirement -> fold change reported
+        (3, False),  # only 2 observed B (Y) values, below the required 3 -> fold change suppressed
+        (2, True),  # 2 observed B (Y) values meet the requirement -> fold change reported
         (None, True),  # gate disabled -> fold change reported
     ],
 )
-def test_diff_exp_ebayes_control_gate(gate_adata, control_min_required, sparse_reported):
-    """control_min_required suppresses (NaNs) fold changes whose control has too few observed values."""
+def test_diff_exp_ebayes_b_gate(gate_adata, b_min_required, sparse_reported):
+    """b_min_required suppresses (NaNs) fold changes whose B condition has too few observed values."""
     results = diff_exp_ebayes_expanded(
         adata=gate_adata,
         between_column="group",
-        comparison=("B", "A"),
-        control_min_required=control_min_required,
+        comparison=("X", "Y"),
+        b_min_required=b_min_required,
     )
-    df = results["B_VS_A"].set_index("protein")
+    df = results["X_VS_Y"].set_index("protein")
     result_cols = ["log2fc", "p_value", "fdr"]
 
     # Fully observed features are always reported, regardless of the gate.
     assert df.loc["full_1", result_cols].notna().all()
 
-    # The sparse-control feature is reported only when the requirement admits it.
-    sparse = df.loc["control_sparse", result_cols]
+    # The feature sparse in B (Y) is reported only when the requirement admits it.
+    sparse = df.loc["y_sparse", result_cols]
     if sparse_reported:
         assert sparse.notna().all()
     else:
