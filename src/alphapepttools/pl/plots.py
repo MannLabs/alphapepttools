@@ -146,7 +146,7 @@ def add_lines(
     linetype: str = "vline",
     color: str = "black",
     linestyle: str = "--",
-    linewidth: float = 1,
+    linewidth: float | None = config["linewidths"]["large"],
     line_kwargs: dict | None = None,
 ) -> None:
     """Add vertical or horizontal reference lines to a plot
@@ -167,7 +167,7 @@ def add_lines(
     linestyle
         Line style (e.g., `"--"`, `"-"`, `":"`)
     linewidth
-        Line width, defaults to `config["linewidths"]["medium"]`
+        Line width, defaults to `config["linewidths"]["large"]`
     line_kwargs
         Additional matplotlib line arguments. Note: explicit color, linestyle,
         and linewidth parameters take precedence
