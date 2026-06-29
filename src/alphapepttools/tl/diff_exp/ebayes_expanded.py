@@ -472,8 +472,8 @@ def diff_exp_ebayes(  # noqa: C901
     between_column: str,
     comparison: tuple[str | list[str], str],
     covariate_column: str | None = None,
-    low_min_required: int | None = None,
-    high_min_required: int | None = None,
+    treatment_min_required: int | None = None,
+    control_min_required: int | None = None,
 ) -> pd.DataFrame:
     """Run Limma eBayes moderated ttest for differential expression with multiple contrasts and covariate support.
 
@@ -486,25 +486,22 @@ def diff_exp_ebayes(  # noqa: C901
     between_column : str
         Column name in adata.obs containing the contrast levels.
     comparison : tuple[str | list[str], str]
-        Tuple specifying the pair of conditions to compare, ordered as (low, high): the first element is
-        the low-signal condition(s), the second is the high-signal reference, e.g. ("treatment1", "control").
-        Multiple low conditions can be specified as a list in the first element: (["treatment1", "treatment2"], "control").
-        If the first element is set to "_ALL_", all conditions except the high reference are compared against it:
-        ("_ALL_", "control"). The high-signal condition is the shared reference where presence is expected and
-        missingness is suspect; the low-signal condition is where
-        dropouts can occur via a valid mechanism.
+        Tuple specifying the pair of conditions to compare, ordered as (treatment, control): the first element
+        is the treatment condition(s), the second is the control reference, e.g. ("treatment1", "control").
+        Multiple treatments can be specified as a list in the first element: (["treatment1", "treatment2"], "control").
+        If the first element is set to "_ALL_", all conditions except the control are compared against it:
+        ("_ALL_", "control").
     covariate_column : str | None, optional
         Column name in adata.obs containing linear covariate levels, by default None.
-    low_min_required : int | None, optional
-        Minimum number of observed values required in the low-signal condition of each contrast. Because the low
-        side can legitimately drop out, it is gated on a floor of observations: per contrast, features with fewer
-        than this number of observed values in that contrast's low condition have their fold change suppressed
-        (set to NaN) before FDR correction. If None, the low gate is disabled. By default None.
-    high_min_required : int | None, optional
-        Minimum number of observed values required in the high-signal reference. Because missingness in the
-        high side is untrustworthy, a feature with fewer than this many observed values in the high reference
-        is skipped entirely (pre-fit, so it is also excluded from the eBayes variance prior). If None, the high
-        gate is disabled. By default None.
+    treatment_min_required : int | None, optional
+        Minimum number of observed values required in the treatment condition of each contrast. Per contrast,
+        features with fewer than this number of observed values in that contrast's treatment condition have their
+        fold change suppressed (set to NaN) before FDR correction. If None, the treatment gate is disabled. By
+        default None.
+    control_min_required : int | None, optional
+        Minimum number of observed values required in the control condition. A feature with fewer than this many
+        observed values in the control is skipped entirely (dropped before fitting). If None, the control gate is
+        disabled. By default None.
 
     Returns
     -------
@@ -540,12 +537,12 @@ def diff_exp_ebayes(  # noqa: C901
     # Step 1: build the design matrix, gate features on high-reference missingness, and fit with NaN handling
     design_matrix, col_info = build_design_matrix(adata, between_column, covariate_column)
     feature_mask = None
-    if high_min_required is not None:
+    if control_min_required is not None:
         feature_mask, _ = generate_feature_mask(
             adata,
             between_column=between_column,
             condition=control_condition,
-            min_required=high_min_required,
+            min_required=control_min_required,
         )
     lm_fit = nan_lmfit(adata, design_matrix, feature_mask=feature_mask)
 
@@ -586,14 +583,14 @@ def diff_exp_ebayes(  # noqa: C901
         p_values = ebayes_results["p"][contrast_idx].copy()
         log2fc = contrast_results["log2fc"][contrast_idx].copy()
 
-        # Low-signal replicate gate: suppress fold changes with too few observed values in the low condition
-        if low_min_required is not None:
-            low_level = level_1 if level_2 == control_condition else level_2
-            low_idxs = np.where(adata.obs[between_column] == low_level)[0]
-            n_low_obs = np.sum(~np.isnan(adata.X[low_idxs, :]), axis=0)
-            low_pass = n_low_obs >= low_min_required
-            p_values[~low_pass] = np.nan
-            log2fc[~low_pass] = np.nan
+        # Treatment replicate gate: suppress fold changes with too few observed values in the treatment condition
+        if treatment_min_required is not None:
+            treatment_level = level_1 if level_2 == control_condition else level_2
+            treatment_idxs = np.where(adata.obs[between_column] == treatment_level)[0]
+            n_treatment_obs = np.sum(~np.isnan(adata.X[treatment_idxs, :]), axis=0)
+            treatment_pass = n_treatment_obs >= treatment_min_required
+            p_values[~treatment_pass] = np.nan
+            log2fc[~treatment_pass] = np.nan
 
         # preprocess p-values and FDR for the current contrast
         fdr_pvalues = nan_safe_bh_correction(p_values)

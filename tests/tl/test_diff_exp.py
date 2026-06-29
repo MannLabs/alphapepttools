@@ -589,7 +589,7 @@ def test_diff_exp_ebayes_expanded_agrees_with_original(
     """The nan-aware expanded eBayes must reproduce the original diff_exp_ebayes on shared features.
 
     The original drops any feature with a missing value, whereas the expanded version keeps all
-    features (NaN rows for those it cannot fit). With high_min_required=5 (the full control count, i.e.
+    features (NaN rows for those it cannot fit). With control_min_required=5 (the full control count, i.e.
     no missing allowed) the expanded version skips exactly the features the original drops, so the eBayes
     prior is estimated from the same feature set and the moderated statistics must agree to numerical
     precision. We compare on the
@@ -606,13 +606,13 @@ def test_diff_exp_ebayes_expanded_agrees_with_original(
     )
     assert comparison_key == expected_comparison_key
 
-    # Expanded implementation: returns a dict keyed by contrast name. high_min_required=5 (all 5
+    # Expanded implementation: returns a dict keyed by contrast name. control_min_required=5 (all 5
     # control samples) makes its skipped-feature set match the original's dropped set so the eBayes prior is identical.
     expanded_results = diff_exp_ebayes_expanded(
         adata=adata.copy(),
         between_column=between_column,
         comparison=comparison,
-        high_min_required=5,
+        control_min_required=5,
     )
     assert set(expanded_results) == {expected_comparison_key}
     expanded = expanded_results[expected_comparison_key]
@@ -1009,20 +1009,20 @@ def treatment_gate_adata():
 
 @pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
 @pytest.mark.parametrize(
-    ("low_min_required", "sparse_reported"),
+    ("treatment_min_required", "sparse_reported"),
     [
         (3, False),  # only 2 observed treatment values, below the required 3 -> fold change suppressed
         (2, True),  # 2 observed treatment values meet the requirement -> fold change reported
         (None, True),  # gate disabled -> fold change reported
     ],
 )
-def test_diff_exp_ebayes_treatment_gate(treatment_gate_adata, low_min_required, sparse_reported):
-    """low_min_required suppresses (NaNs) fold changes whose treatment has too few observed values."""
+def test_diff_exp_ebayes_treatment_gate(treatment_gate_adata, treatment_min_required, sparse_reported):
+    """treatment_min_required suppresses (NaNs) fold changes whose treatment has too few observed values."""
     results = diff_exp_ebayes_expanded(
         adata=treatment_gate_adata,
         between_column="group",
         comparison=("B", "A"),
-        low_min_required=low_min_required,
+        treatment_min_required=treatment_min_required,
     )
     df = results["B_VS_A"].set_index("protein")
     result_cols = ["log2fc", "p_value", "fdr"]
