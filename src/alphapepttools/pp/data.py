@@ -1062,7 +1062,7 @@ def filter_data_completeness(
     if group_column is None:
         keep_mask = _count_or_fraction_missing(adata.X, count_mode=count_mode) <= max_missing
     else:
-        available_groups = adata.obs.groupby(group_column, dropna=True).indices
+        available_groups = adata.obs.groupby(group_column, observed=False, dropna=True).indices
 
         selected_groups = groups or list(available_groups.keys())
         if not set(selected_groups).issubset(set(available_groups.keys())):
