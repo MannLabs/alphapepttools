@@ -1714,7 +1714,7 @@ def barplot(
         current_color = color_dict.get(label, config["na_color"]) if color_dict else color
         bar.set_facecolor(mcolors.to_rgba(current_color, alpha=0.5))
         bar.set_edgecolor(BaseColors.get("black"))
-        bar.set(linewidth=config["linewidths"]["large"])
+        bar.set(linewidth=config["linewidths"]["medium"])
 
     ax.set_xticks(positions)
     ax.set_xticklabels(labels)
