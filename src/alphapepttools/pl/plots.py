@@ -100,11 +100,13 @@ def _extract_groupwise_plotting_data(
 
         df = pd.DataFrame({"treatment": ["A", "A", "B", "B", "C"], "intensity": [1, 2, 3, 4, 5]})
 
-        data_lists, labels, positions = _extract_groupwise_plotting_data(
+        data_lists, labels, positions, color_keys = _extract_groupwise_plotting_data(
             df, grouping_column="treatment", value_column="intensity"
         )
         # data_lists: [[1, 2], [3, 4], [5]]
         # labels: ['A', 'B', 'C']
+        # positions: [0.0, 1.0, 2.0]
+        # color_keys: ['A', 'B', 'C']    (same as labels when no subgroup)
 
     Compare multiple columns directly:
 
@@ -112,10 +114,13 @@ def _extract_groupwise_plotting_data(
 
         df = pd.DataFrame({"Protein1": [1, 2, 3], "Protein2": [4, 5, 6], "Protein3": [7, 8, 9]})
 
-        data_lists, labels, positions = _extract_groupwise_plotting_data(
+        data_lists, labels, positions, color_keys = _extract_groupwise_plotting_data(
             df, direct_columns=["Protein1", "Protein2", "Protein3"]
         )
         # Each column becomes a group for comparison
+        # labels: ['Protein1', 'Protein2', 'Protein3']
+        # positions: [0.0, 1.0, 2.0]
+        # color_keys: ['Protein1', 'Protein2', 'Protein3']    (same as labels when no subgroup)
 
     Group with a subgroup column (two conditions per precursor):
 
@@ -129,7 +134,7 @@ def _extract_groupwise_plotting_data(
             }
         )
 
-        data_lists, labels, positions = _extract_groupwise_plotting_data(
+        data_lists, labels, positions, color_keys = _extract_groupwise_plotting_data(
             df,
             grouping_column="precursor",
             value_column="intensity",
@@ -139,11 +144,11 @@ def _extract_groupwise_plotting_data(
         # color_keys: ['ctrl', 'treat', 'ctrl', 'treat']
         # positions: [-0.25, 0.25, 0.75, 1.25]    (with default width=0.5)
     """
-    # Handle long vs. wide data input format
+    # Handle 'wide format' case, where direct_columns is set and column labels directly become x-axis groups
     if direct_columns is not None:
         if grouping_column is not None or value_column is not None:
             logger.info("'direct_columns' provided, ignoring 'grouping_column' and 'value_column' parameters.")
-        df = data_columns_to_df(data, columns=direct_columns)[direct_columns]  # ensure order
+        df = data_columns_to_df(data, columns=direct_columns)[direct_columns]
         df = df.melt(var_name="variable", value_name="value")
         grouping_column, value_column = "variable", "value"
     else:
@@ -161,7 +166,7 @@ def _extract_groupwise_plotting_data(
     if subgroup_column is None:
         groups_to_plot = df[grouping_column].dropna().unique().tolist()
         for i, group in enumerate(groups_to_plot):
-            group_data = df[df[grouping_column] == group][value_column].dropna()
+            group_data = df.loc[df[grouping_column] == group, value_column].dropna()
             if not group_data.empty:
                 data_lists.append(group_data.tolist())
                 labels.append(group)
@@ -171,17 +176,19 @@ def _extract_groupwise_plotting_data(
         main_order = df[grouping_column].dropna().unique().tolist()
         sub_order = df[subgroup_column].dropna().unique().tolist()
         n_sub = len(sub_order)
-        # symmetric offsets around the main-group integer position
-        offsets = [(j - (n_sub - 1) / 2) * width for j in range(n_sub)]
+        offsets = [
+            (j - (n_sub - 1) / 2) * width for j in range(n_sub)
+        ]  # symmetric offsets around the main-group integer position
         for i, group in enumerate(main_order):
             for j, sub in enumerate(sub_order):
-                cell = df[(df[grouping_column] == group) & (df[subgroup_column] == sub)][value_column].dropna()
-                if cell.empty:
-                    continue
-                data_lists.append(cell.tolist())
-                labels.append(group)
-                positions.append(i + offsets[j])
-                color_keys.append(sub)
+                group_data = df.loc[
+                    (df[grouping_column] == group) & (df[subgroup_column] == sub), value_column
+                ].dropna()
+                if not group_data.empty:
+                    data_lists.append(group_data.tolist())
+                    labels.append(group)
+                    positions.append(i + offsets[j])
+                    color_keys.append(sub)
 
     return data_lists, labels, positions, color_keys
 
