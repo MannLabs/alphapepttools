@@ -204,7 +204,7 @@ def add_lines(
     linetype: str = "vline",
     color: str = "black",
     linestyle: str = "--",
-    linewidth: float = 1,
+    linewidth: float | None = config["linewidths"]["large"],
     line_kwargs: dict | None = None,
 ) -> None:
     """Add vertical or horizontal reference lines to a plot
@@ -225,7 +225,7 @@ def add_lines(
     linestyle
         Line style (e.g., `"--"`, `"-"`, `":"`)
     linewidth
-        Line width, defaults to `config["linewidths"]["medium"]`
+        Line width, defaults to `config["linewidths"]["large"]`
     line_kwargs
         Additional matplotlib line arguments. Note: explicit color, linestyle,
         and linewidth parameters take precedence
@@ -1778,7 +1778,7 @@ def barplot(
         current_color = color_dict.get(color_key, config["na_color"]) if color_dict else color
         bar.set_facecolor(mcolors.to_rgba(current_color, alpha=0.5))
         bar.set_edgecolor(BaseColors.get("black"))
-        bar.set(linewidth=config["linewidths"]["large"])
+        bar.set(linewidth=config["linewidths"]["medium"])
 
     # One label per position in case subgroups returned repeated entries
     unique_labels = list(dict.fromkeys(labels))
