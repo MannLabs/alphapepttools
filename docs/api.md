@@ -122,6 +122,7 @@
     io.read_psm_table
     io.read_pg_table
     io.AnnDataFactory
+    io.mulink_from_anndatas
     io.list_available_reader
 ```
 
