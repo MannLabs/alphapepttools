@@ -235,6 +235,8 @@ def _cycle_palette(
 def _get_colors_from_cmap(
     cmap_name: str | mpl.colors.Colormap,
     values: int | np.ndarray,
+    vmin: float | None = None,
+    vmax: float | None = None,
 ) -> list | np.ndarray:
     """Retrieve colors from a colormap for discrete or continuous data
 
@@ -253,6 +255,10 @@ def _get_colors_from_cmap(
         colormap and retrieve the corresponding colors in whatever shape the input
         array was. In the case of 2D input arrays, the output will be a mxnx4 array
         of RGBA tuples.
+    vmin : float, optional
+        Minimum value for normalization when values is an array. If None, uses the minimum of the array.
+    vmax : float, optional
+        Maximum value for normalization when values is an array. If None, uses the maximum of the array.
 
     Returns
     -------
@@ -295,7 +301,11 @@ def _get_colors_from_cmap(
     if not pd.api.types.is_numeric_dtype(values):
         raise TypeError("values must be an integer or a numeric numpy array")
 
-    vmin, vmax = np.nanmin(values), np.nanmax(values)
+    if vmin is None:
+        vmin = np.nanmin(values)
+    if vmax is None:
+        vmax = np.nanmax(values)
+
     values = mpl_colors.Normalize(vmin=vmin, vmax=vmax)(values)
     return cmap(values)
 
@@ -898,6 +908,107 @@ class MappedColormaps:
 
         rgba = _get_colors_from_cmap(self.cmap, data)
 
+        if as_hex:
+            return np.apply_along_axis(mpl_colors.to_hex, -1, rgba, keep_alpha=True)
+        return rgba
+
+    def fit(
+        self,
+        data: np.ndarray | None = None,
+        *,
+        vmin: float | None = None,
+        vmax: float | None = None,
+    ) -> "MappedColormaps":
+        """Determine and store the normalization bounds without producing colors
+
+        Bounds are derived from ``data`` (the full range, or the configured
+        ``percentile`` range), unless explicit ``vmin``/``vmax`` are given, which
+        override on a per-bound basis.
+
+        Parameters
+        ----------
+        data : np.ndarray, optional
+            Data from which to derive the bounds. Required unless both ``vmin`` and
+            ``vmax`` are provided. NaNs are ignored.
+        vmin : float, optional
+            Explicit lower bound, overriding the data-derived minimum.
+        vmax : float, optional
+            Explicit upper bound, overriding the data-derived maximum.
+
+        Returns
+        -------
+        MappedColormaps
+            The fitted instance (``self``).
+
+        Raises
+        ------
+        ValueError
+            If a bound cannot be determined from ``data`` or explicit values.
+
+        Examples
+        --------
+        Pin the colormap to fixed bounds without any data:
+
+        .. code-block:: python
+
+            mapper = MappedColormaps(cmap="cmc.vik")
+            mapper.fit(vmin=0, vmax=1)
+
+        """
+        if data is not None:
+            arr = np.asarray(data)
+            if self.percentile is not None:
+                d_min = np.nanpercentile(arr, self.percentile[0])
+                d_max = np.nanpercentile(arr, self.percentile[1])
+            else:
+                d_min, d_max = np.nanmin(arr), np.nanmax(arr)
+        else:
+            d_min = d_max = None
+
+        self.vmin = vmin if vmin is not None else d_min
+        self.vmax = vmax if vmax is not None else d_max
+
+        if self.vmin is None or self.vmax is None:
+            raise ValueError("fit() requires `data`, or both `vmin` and `vmax`, to set the bounds.")
+        return self
+
+    def transform(
+        self,
+        data: np.ndarray,
+        *,
+        as_hex: bool = False,
+    ) -> np.ndarray:
+        """Map data to colors using the previously fitted normalization bounds
+
+        Uses the ``vmin``/``vmax`` set by :meth:`fit` or :meth:`fit_transform`
+        without re-deriving them from ``data``. Values outside ``[vmin, vmax]`` are
+        clamped to the colormap's end colors.
+
+        Parameters
+        ----------
+        data : np.ndarray
+            Data to be transformed into colors. Can be any shape; colors are
+            returned in the same shape.
+        as_hex : bool, default=False
+            If True, return hex color strings. If False, return RGBA tuples.
+
+        Returns
+        -------
+        np.ndarray
+            Array of colors with the same shape as input data. If as_hex=False,
+            the last dimension will be 4 (RGBA). If as_hex=True, returns array
+            of hex strings.
+
+        Raises
+        ------
+        ValueError
+            If called before :meth:`fit` or :meth:`fit_transform`.
+
+        """
+        if self.vmin is None or self.vmax is None:
+            raise ValueError("Call fit() or fit_transform() before transform().")
+
+        rgba = _get_colors_from_cmap(self.cmap, np.asarray(data), vmin=self.vmin, vmax=self.vmax)
         if as_hex:
             return np.apply_along_axis(mpl_colors.to_hex, -1, rgba, keep_alpha=True)
         return rgba
