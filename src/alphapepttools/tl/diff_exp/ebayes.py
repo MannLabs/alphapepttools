@@ -7,12 +7,13 @@ import pandas as pd
 import patsy
 
 try:
-    from inmoose import limma
+    from inmoose import limma  # ty: ignore[unresolved-import]
 
     _HAS_INMOOSE = True
 except ModuleNotFoundError:
     _HAS_INMOOSE = False
 
+from alphapepttools._matrix import get_matrix, get_obs
 from alphapepttools.pp.data import filter_data_completeness
 from alphapepttools.tl import tl_defaults
 from alphapepttools.tl.utils import (
@@ -54,11 +55,11 @@ def _generate_patsy_design_matrix(
     """
     # Create design dataframe with condition as categorical factor
     design_df = pd.DataFrame(
-        {"sample": adata_subset.obs_names, "condition": adata_subset.obs[between_column].to_list()}
+        {"sample": adata_subset.obs_names, "condition": get_obs(adata_subset)[between_column].to_list()}
     ).set_index("sample")
 
     # Create design matrix without intercept (fit means model: ~ 0 + condition)
-    design_matrix = patsy.dmatrix("~ 0 + condition", data=design_df)
+    design_matrix = patsy.dmatrix("~ 0 + condition", data=design_df)  # ty: ignore[unresolved-attribute]
 
     # Patsy insists on changing the column order to alphabetical, so we need to resort them
     design_colnames = design_matrix.design_info.column_names
@@ -177,9 +178,9 @@ def diff_exp_ebayes(
 
     # Validate inputs (simplified without min_valid_values)
     level_1, level_2 = comparison
-    if level_1 not in adata.obs[between_column].to_list():
+    if level_1 not in get_obs(adata)[between_column].to_list():
         raise ValueError(f"Level {level_1} not found in {between_column}")
-    if level_2 not in adata.obs[between_column].to_list():
+    if level_2 not in get_obs(adata)[between_column].to_list():
         raise ValueError(f"Level {level_2} not found in {between_column}")
 
     logger.info(f"Comparing levels: {level_1} (treatment) vs {level_2} (control)")
@@ -188,7 +189,7 @@ def diff_exp_ebayes(
     max_samples_level_1, max_samples_level_2 = determine_max_replicates(adata, between_column, level_1, level_2)
 
     # Filter adata to only include samples from the comparison
-    adata_subset = adata[adata.obs[between_column].isin([level_1, level_2]), :].copy()
+    adata_subset = adata[get_obs(adata)[between_column].isin([level_1, level_2]), :].copy()
 
     # Remove proteins/peptides with any missing values (as per standard practice)
     # This ensures compatibility with inmoose's lmFit which cannot handle NaN values
@@ -206,7 +207,7 @@ def diff_exp_ebayes(
     logger.info(f"Computing contrast: {contrast_string}")
 
     # Expression matrix: proteins (rows) x samples (columns)
-    expr_matrix = adata_subset.X.T
+    expr_matrix = get_matrix(adata_subset).T
 
     logger.info(f"Design matrix dimensions: {design_matrix.shape[0]} samples x {design_matrix.shape[1]} groups")
     logger.info(f"Expression matrix dimensions: {expr_matrix.shape[0]} proteins x {expr_matrix.shape[1]} samples")

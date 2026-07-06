@@ -6,12 +6,13 @@ import anndata as ad
 import pandas as pd
 
 try:
-    import alphaquant.run_pipeline as aq_pipeline
+    import alphaquant.run_pipeline as aq_pipeline  # ty: ignore[unresolved-import]
 
     _HAS_ALPHAQUANT = True
 except ModuleNotFoundError:
     _HAS_ALPHAQUANT = False
 
+from alphapepttools._matrix import get_obs
 from alphapepttools.tl import tl_defaults
 from alphapepttools.tl.utils import _suppress_plots, determine_max_replicates, negative_log10_pvalue
 
@@ -209,9 +210,10 @@ def diff_exp_alphaquant(
         pd.DataFrame
             DataFrame with 'sample' and 'condition' columns.
         """
-        mask = adata.obs[between_column].isin(comparison)
+        obs = get_obs(adata)
+        mask = obs[between_column].isin(comparison)
         return pd.DataFrame(
-            {"sample": adata.obs.index[mask].astype(str), "condition": adata.obs.loc[mask, between_column]}
+            {"sample": obs.index[mask].astype(str), "condition": obs.loc[mask, between_column]}
         ).reset_index(drop=True)
 
     samplemap = _get_samplemap(adata, between_column, comparison)

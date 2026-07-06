@@ -11,7 +11,7 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 from sklearn.preprocessing import RobustScaler, StandardScaler
 
-from alphapepttools._matrix import get_matrix
+from alphapepttools._matrix import get_matrix, get_obs, get_var
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -575,13 +575,13 @@ def data_column_to_array(
     if isinstance(data, ad.AnnData):
         if column in data.var_names:
             col_idx = data.var_names.get_loc(column)
-            return data.X[:, col_idx].flatten()
+            return get_matrix(data)[:, col_idx].flatten()
 
-        if column in data.obs.columns:
-            return data.obs[column].to_numpy()
+        if column in get_obs(data).columns:
+            return get_obs(data)[column].to_numpy()
 
-        if column in data.var.columns:
-            return data.var[column].to_numpy()
+        if column in get_var(data).columns:
+            return get_var(data)[column].to_numpy()
 
         raise ValueError(
             f"Column {column} not found in AnnData object (checked var_names and obs.columns and var.columns)."
@@ -711,7 +711,7 @@ def coerce_to_dataframe(
     if isinstance(data, pd.DataFrame):
         return data
     # AnnData case: convert X to DataFrame with obs index and var names as columns
-    return pd.concat([data.to_df(), data.obs], axis=1)
+    return pd.concat([data.to_df(), cast("pd.DataFrame", data.obs)], axis=1)
 
 
 def data_columns_to_df(
@@ -797,7 +797,7 @@ def data_columns_to_df(
             if x_cols:
                 parts.append(data.to_df()[x_cols])
             if obs_cols:
-                parts.append(data.obs[obs_cols])
+                parts.append(cast("pd.DataFrame", data.obs)[obs_cols])
 
             dataset = pd.concat(parts, axis=1) if len(parts) > 1 else parts[0]
 
@@ -863,14 +863,14 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler.")
 
     if scaler == "standard":
-        scaler = StandardScaler(with_mean=True, with_std=True)
+        scaler_obj = StandardScaler(with_mean=True, with_std=True)
     elif scaler == "robust":
-        scaler = RobustScaler(with_centering=True, with_scaling=True, quantile_range=(25.0, 75.0))
+        scaler_obj = RobustScaler(with_centering=True, with_scaling=True, quantile_range=(25.0, 75.0))
     else:
         raise NotImplementedError(f"Scaler {scaler} not implemented.")
 
     input_data = get_matrix(adata, layer)
-    result = scaler.fit_transform(input_data)
+    result = scaler_obj.fit_transform(input_data)
     if layer is None:
         adata.X = result
     else:
@@ -1029,9 +1029,9 @@ def filter_data_completeness(
     _validate_adata_for_completeness_filter(adata, action, var_colname)
 
     if group_column is None:
-        keep_mask = np.isnan(adata.X).mean(axis=0) <= max_missing
+        keep_mask = np.isnan(get_matrix(adata)).mean(axis=0) <= max_missing
     else:
-        available_groups = adata.obs.groupby(group_column, dropna=True).indices
+        available_groups = get_obs(adata).groupby(group_column, dropna=True).indices
 
         selected_groups = groups or list(available_groups.keys())
         if not set(selected_groups).issubset(set(available_groups.keys())):
@@ -1039,9 +1039,10 @@ def filter_data_completeness(
 
         keep_mask = np.full(shape=(len(selected_groups), adata.n_vars), fill_value=True, dtype=bool)
 
+        adata_matrix = get_matrix(adata)
         for group_nr, group in enumerate(selected_groups):
             group_indices = available_groups[group]
-            keep_mask[group_nr, :] = np.isnan(adata.X[group_indices, :]).mean(axis=0) <= max_missing
+            keep_mask[group_nr, :] = np.isnan(adata_matrix[group_indices, :]).mean(axis=0) <= max_missing
 
         # Aggregate to decision
         # - any: Any group passes

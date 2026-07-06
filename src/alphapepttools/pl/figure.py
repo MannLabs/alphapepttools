@@ -422,8 +422,7 @@ class AxisManager:
         self,
         axs: plt.Axes | list[plt.Axes],
     ):
-        axs = _indexable_axes(axs)
-        self.axs: np.ndarray = axs
+        self.axs: np.ndarray = _indexable_axes(axs)
         self.current_i = 0
         self.rows, self.cols = self.axs.shape
 

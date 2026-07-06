@@ -6,6 +6,7 @@ import anndata as ad
 import matplotlib.pyplot as plt
 import numpy as np
 
+from alphapepttools._matrix import get_obs
 from alphapepttools.tl.defaults import tl_defaults
 
 logger = logging.getLogger(__name__)
@@ -48,7 +49,7 @@ def negative_log10_pvalue(pvalue: float, ceiling: float = tl_defaults.CEILING_NE
 def _suppress_plots():  # noqa: ANN202 # avoid generator return type annotation
     """Context manager to suppress matplotlib plot display."""
     original_show = plt.show
-    plt.show = lambda *a, **k: None  # NOQA: ARG005
+    plt.show = lambda *a, **k: None  # NOQA: ARG005  # ty: ignore[invalid-assignment]  # intentional monkeypatch to suppress display
     try:
         yield
         plt.close("all")
@@ -95,8 +96,9 @@ def determine_max_replicates(
         # Returns (3, 3)
 
     """
-    max_samples_level_1 = adata.obs[adata.obs[between_column] == level_1].shape[0]
-    max_samples_level_2 = adata.obs[adata.obs[between_column] == level_2].shape[0]
+    obs = get_obs(adata)
+    max_samples_level_1 = obs[obs[between_column] == level_1].shape[0]
+    max_samples_level_2 = obs[obs[between_column] == level_2].shape[0]
     logger.info(f"Number of samples for {level_1}: {max_samples_level_1}")
     logger.info(f"Number of samples for {level_2}: {max_samples_level_2}")
     return max_samples_level_1, max_samples_level_2
@@ -224,7 +226,7 @@ def validate_ttest_inputs(
         raise ValueError("Error in group_ratios_ttest_ind: 'comparison' must be a tuple of exactly two group names.")
 
     g1, g2 = comparison
-    available_groups = set(adata.obs[between_column].dropna().unique())
+    available_groups = set(get_obs(adata)[between_column].dropna().unique())
 
     # check that both groups exist in the data
     if g1 not in available_groups:
@@ -233,7 +235,7 @@ def validate_ttest_inputs(
         raise ValueError(f"Error in group_ratios_ttest_ind: Group '{g2}' not found in column '{between_column}'.")
 
     # check that each group has sufficient samples to even meet min_valid_values
-    group_counts = adata.obs[between_column].value_counts()
+    group_counts = get_obs(adata)[between_column].value_counts()
     if group_counts[g1] < min_valid_values:
         raise ValueError(
             f"Error in group_ratios_ttest_ind: Group '{g1}' has only {group_counts[g1]} samples, need at least {min_valid_values}."

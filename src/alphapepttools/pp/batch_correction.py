@@ -4,6 +4,8 @@ import anndata as ad
 import numpy as np
 import scanpy
 
+from alphapepttools._matrix import get_matrix, get_obs
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -47,10 +49,11 @@ def coerce_nans_to_batch(
 
     """
     adata = adata.copy()
+    obs = get_obs(adata)
 
-    if adata.obs[batch].isna().sum() > 0:
+    if obs[batch].isna().sum() > 0:
         logger.info(f" coerce_nans_to_batch: Replacing NaNs in {batch} with 'NA'...")
-        adata.obs[batch] = adata.obs[batch].fillna("NA")
+        obs[batch] = obs[batch].fillna("NA")
     else:
         logger.info(f" No NaNs found in {batch}.")
 
@@ -101,10 +104,10 @@ def drop_singleton_batches(
     adata = coerce_nans_to_batch(adata, batch)
 
     # If any level of the to-correct data has only one level, drop it
-    batch_level_count = adata.obs.groupby(batch)[batch].transform("count")
+    batch_level_count = get_obs(adata).groupby(batch)[batch].transform("count")
 
     if any(batch_level_count == 1):
-        singleton_batch_samples = adata.obs.loc[batch_level_count == 1, batch]
+        singleton_batch_samples = get_obs(adata).loc[batch_level_count == 1, batch]
         logger.info(
             f" coerce_nans_to_batch: Some levels of batch '{batch}' have only one sample. Dropped samples and their respective value in '{batch}': {list(zip(singleton_batch_samples.index.tolist(), singleton_batch_samples.tolist(), strict=False))}"
         )
@@ -181,15 +184,15 @@ def scanpy_pycombat(
     logger.info(f" scanpy_pycombat: pply pyComBat to correct for {batch}")
 
     # Ensure that X is numeric
-    adata.X = adata.X.astype(float)
+    adata.X = get_matrix(adata).astype(float)
 
     # Harmonize NA values in the batch column into a single "NA" batch
-    if any(adata.obs[batch].isna()):
+    if any(get_obs(adata)[batch].isna()):
         logger.info(f" scanpy_pycombat: Found NaNs in {batch}, coercing them into a 'NA' batch...")
         adata = coerce_nans_to_batch(adata, batch)
 
     # NaN check: if any nans are present in the data, batch correction cannot be performed
-    if any(np.isnan(adata.X).sum(axis=1) > 0):
+    if any(np.isnan(get_matrix(adata)).sum(axis=1) > 0):
         logger.warning(
             " scanpy_pycombat: Error in batch correction: Data matrix contains NaN values. This causes scanpy.pp.combat to fail and return all nans, therefore batch correction can not be performed. Consider running 'impute_gaussian' or another imputation prior to batch correction to remove these samples."
         )
@@ -199,7 +202,7 @@ def scanpy_pycombat(
     # i.e. if a sample only occurs once per plate, everything fails and we get all nans
     # this is a known issue, but it is not clear how to fix it https://github.com/scverse/scanpy/issues/1175
     # for now, we will just catch the error and report it.
-    if any(adata.obs[batch].value_counts() == 1):
+    if any(get_obs(adata)[batch].value_counts() == 1):
         logger.warning(
             f" scanpy_pycombat: Error in batch correction: At least one batch of {batch} contains only one single sample. This causes scanpy.pp.combat to fail and return all nans, therefore batch correction can not be performed. Consider running 'drop_singleton_batches' prior to batch correction to remove these samples."
         )

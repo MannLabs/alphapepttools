@@ -13,6 +13,8 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 
+from alphapepttools._matrix import get_matrix, get_obs
+
 # logging configuration
 logging.basicConfig(level=logging.INFO)
 
@@ -336,7 +338,7 @@ def extract_pca_anndata(
     # Select PCA coordinates and metadata
     if dim_space == "obs":
         pca_coordinates = adata.obsm[pca_coors_key]
-        obs_df = adata.obs
+        obs_df = get_obs(adata)
 
         # Add expression columns if provided
         if expression_columns is not None:
@@ -358,7 +360,7 @@ def extract_pca_anndata(
     adata_pca.var = var_df.copy()
 
     # Name PCA dimensions
-    adata_pca.var_names = [f"pc_{i + 1}" for i in range(adata_pca.X.shape[1])]
+    adata_pca.var_names = [f"pc_{i + 1}" for i in range(get_matrix(adata_pca).shape[1])]
 
     return adata_pca
 

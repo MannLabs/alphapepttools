@@ -3,13 +3,14 @@
 import numbers
 import warnings
 from collections.abc import Callable, Hashable, MutableMapping
+from typing import cast
 
 import anndata as ad
 import numpy as np
 import pandas as pd
 from scipy.stats import median_abs_deviation
 
-from alphapepttools._matrix import get_matrix
+from alphapepttools._matrix import get_matrix, get_obs
 
 METRICS_KEY = "metrics"
 PMAD_KEY = "pmad"
@@ -153,13 +154,13 @@ def coefficient_of_variation(
     if group_column is None:
         adata.var[key_added] = _cv(data, min_valid=min_valid, axis=0)
     else:
-        if pd.isna(adata.obs[group_column]).any():
+        if pd.isna(get_obs(adata)[group_column]).any():
             raise ValueError(
                 f"`group_column` '{group_column}' contains NaNs. "
                 "Drop or relabel the corresponding observations before computing groupwise CVs."
             )
 
-        groups = adata.obs.groupby(group_column, dropna=True).indices
+        groups = get_obs(adata).groupby(group_column, dropna=True).indices
         adata.varm[key_added] = pd.DataFrame(
             {name: _cv(data[idx, :], min_valid=min_valid, axis=0) for name, idx in groups.items()},
             index=adata.var_names,
@@ -194,11 +195,11 @@ def _set_nested_dict(
     """
     current = dictionary
 
-    # Navigate to the parent of the final key
+    # Navigate to the parent of the final key; intermediate values are nested mappings
     for key in keys[:-1]:
         if key not in current:
             current[key] = {}
-        current = current[key]
+        current = cast("MutableMapping[str, object]", current[key])
 
     # Set the final value
     current[keys[-1]] = value
@@ -243,7 +244,7 @@ def _compute_pooled_groupwise_metric(
         print(pcv_groupwise)  # {'control': 0.25, 'treated': 0.31}
 
     """
-    groups = adata.obs.groupby(group_column)
+    groups = get_obs(adata).groupby(group_column)
     data = get_matrix(adata, layer)
 
     metrics = {}

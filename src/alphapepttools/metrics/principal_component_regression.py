@@ -7,6 +7,8 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LinearRegression
 
+from alphapepttools._matrix import get_obs
+
 _PCA_VARIANCE_RATIO = "variance_ratio"
 
 
@@ -156,7 +158,7 @@ def principal_component_regression(
         pca_embeddings = pca_embeddings[:, :n_components]
         explained_variance = explained_variance[:n_components]
 
-    y = adata.obs[covariate]
+    y = get_obs(adata)[covariate]
     if pd.api.types.is_numeric_dtype(y):
         y = y.to_numpy().reshape(-1, 1)
     elif pd.api.types.is_categorical_dtype(y):

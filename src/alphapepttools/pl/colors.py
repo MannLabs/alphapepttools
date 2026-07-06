@@ -127,12 +127,12 @@ def _lighten_color(
     l = min(1, l + factor * (1 - l))
 
     r, g, b = colorsys.hls_to_rgb(h, l, s)
-    color = [r, g, b]
+    channels = [r, g, b]
 
     if alpha is not None:
-        color += [alpha]
+        channels += [alpha]
 
-    return tuple(color)
+    return tuple(channels)
 
 
 def clip_colormap(
@@ -230,6 +230,15 @@ def _cycle_palette(
     if n > len(palette):
         palette = palette * (n // len(palette) + 1)
     return palette[:n]
+
+
+def _rgba_row_to_hex(rgba_row: np.ndarray) -> str:
+    """Convert a single RGBA row to a hex string.
+
+    ``matplotlib.colors.to_hex`` types its first argument as a color tuple/str, but
+    ``np.apply_along_axis`` feeds it ndarray row-slices, which ``to_hex`` accepts at runtime.
+    """
+    return mpl_colors.to_hex(cast("tuple", rgba_row), keep_alpha=True)
 
 
 def _get_colors_from_cmap(
@@ -901,7 +910,7 @@ class MappedColormaps:
         rgba = _get_colors_from_cmap(self.cmap, data)
 
         if as_hex:
-            return np.apply_along_axis(mpl_colors.to_hex, -1, rgba, keep_alpha=True)
+            return np.apply_along_axis(_rgba_row_to_hex, -1, rgba)
         return np.asarray(rgba)
 
     @property

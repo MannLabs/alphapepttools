@@ -23,6 +23,7 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.legend import Legend
 from matplotlib.patches import Patch
 
+from alphapepttools._matrix import get_matrix
 from alphapepttools.pl import defaults
 from alphapepttools.pl.colors import BaseColors, BasePalettes, _get_colors_from_cmap, get_color_mapping
 from alphapepttools.pl.figure import create_figure, label_axes
@@ -729,8 +730,9 @@ class PlotConfig:
 
     def __getattr__(self, name: str) -> object:
         """Access extra fields as attributes"""
-        if name in self._extra:
-            return self._extra[name]
+        extra = self._extra
+        if extra is not None and name in extra:
+            return extra[name]
         raise KeyError(f"'{type(self).__name__}' object has no attribute '{name}'")
 
     def copy_with(
@@ -740,7 +742,7 @@ class PlotConfig:
         """Create a copy with specified changes"""
         # Make it so that changes can override existing data & _extra fields
         current = {"data": self.data}
-        current.update(self._extra)
+        current.update(self._extra or {})
         current.update(changes)
 
         # Since PlotConfig is instantiated with data and _extra, separate them here
@@ -754,7 +756,7 @@ class PlotConfig:
         result = {}
         if self.data is not None:
             result["data"] = self.data
-        result.update(self._extra)
+        result.update(self._extra or {})
         return {k: v for k, v in result.items() if v is not None}
 
 
@@ -1276,8 +1278,8 @@ def histogram(
     values = data_column_to_array(data, value_column)
 
     if color_map_column is None:
-        color = BaseColors.get(color)
-        ax.hist(values, bins=bins, color=color, **hist_kwargs)
+        resolved_color = BaseColors.get(color)
+        ax.hist(values, bins=bins, color=resolved_color, **hist_kwargs)
     else:
         color_levels = _array_to_str(data_column_to_array(data, color_map_column))
         color_dict = _dict_keys_to_str(
@@ -1699,15 +1701,15 @@ def barplot(
     - When using direct_columns, each column's mean is calculated across all rows
     - Missing values (NaN) are excluded from mean and std calculations
     """
-    data, labels, positions = _extract_groupwise_plotting_data(
+    group_values, labels, positions = _extract_groupwise_plotting_data(
         data=data,
         grouping_column=grouping_column,
         value_column=value_column,
         direct_columns=direct_columns,
     )
 
-    means = [pd.Series(d).mean() for d in data]
-    stds = [pd.Series(d).std() for d in data]
+    means = [pd.Series(d).mean() for d in group_values]
+    stds = [pd.Series(d).std() for d in group_values]
 
     bars = ax.bar(
         x=positions,
@@ -2268,9 +2270,10 @@ def plot_pca(
     )
 
     # get the explained variance ratio for the dimensions (for axis labels)
-    var_dim1 = adata_pca.var["variance_ratio"][f"pc_{x_column}"]
+    pca_var = cast("pd.DataFrame", adata_pca.var)
+    var_dim1 = pca_var["variance_ratio"][f"pc_{x_column}"]
     var_dim1 = round(var_dim1 * 100, 2)
-    var_dim2 = adata_pca.var["variance_ratio"][f"pc_{y_column}"]
+    var_dim2 = pca_var["variance_ratio"][f"pc_{y_column}"]
     var_dim2 = round(var_dim2 * 100, 2)
 
     # check pc_x and pc_y are valid
@@ -2301,7 +2304,8 @@ def plot_pca(
             labels = data.var.index if label_column is None else data_column_to_array(data, label_column)
 
         # Create a DataFrame with the PCA coordinates and labels for the new label_plot interface
-        label_df = pd.DataFrame({"x": adata_pca.X[:, x_column - 1], "y": adata_pca.X[:, y_column - 1], "label": labels})
+        pca_matrix = get_matrix(adata_pca)
+        label_df = pd.DataFrame({"x": pca_matrix[:, x_column - 1], "y": pca_matrix[:, y_column - 1], "label": labels})
 
         label_plot(
             ax=ax,
@@ -2909,6 +2913,8 @@ def volcano(  # noqa: C901
         default_color=default_color,
         default_color_key=default_group,
     )
+    # return_glob_layer_indices=True guarantees a list rather than None
+    global_layer_indices = cast("list", global_layer_indices)
 
     # Labeling
     if label_layers is not None:

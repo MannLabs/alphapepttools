@@ -7,6 +7,8 @@ import numpy as np
 import scanpy as sc
 from bpca import BPCA
 
+from alphapepttools._matrix import get_matrix, get_var
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -50,11 +52,11 @@ def _check_inputs_for_dim_reduction(
         raise ValueError(f"dim_space should be either 'obs' or 'var', got {dim_space}")
 
     if meta_data_mask_column_name is not None:
-        if meta_data_mask_column_name not in adata.var.columns:
+        if meta_data_mask_column_name not in get_var(adata).columns:
             raise ValueError(f"Column {meta_data_mask_column_name} not found in data.var")
-        if adata.var[meta_data_mask_column_name].dtype.kind != "b":
+        if get_var(adata)[meta_data_mask_column_name].dtype.kind != "b":
             raise TypeError(
-                f"adata.var['{meta_data_mask_column_name}'] must be of boolean dtype, but it's {adata.var[meta_data_mask_column_name].dtype}."
+                f"adata.var['{meta_data_mask_column_name}'] must be of boolean dtype, but it's {get_var(adata)[meta_data_mask_column_name].dtype}."
             )
 
 
@@ -84,10 +86,10 @@ def _prepare_pca_data(
     is True.
     """
     adata_sub = adata[:, var_mask] if var_mask is not None else adata
-    data_for_pca = adata_sub.layers[layer].copy() if layer is not None else adata_sub.X.copy()
+    data_for_pca = get_matrix(adata_sub, layer).copy()
 
     # Transpose if PCA is done on the feature space
-    return cast("np.ndarray", data_for_pca.T if dim_space == "var" else data_for_pca)
+    return data_for_pca.T if dim_space == "var" else data_for_pca
 
 
 def _store_pca_results(
@@ -145,7 +147,7 @@ def _store_pca_results(
         loadings_mat = pca_res[1].T.copy()
     else:
         n_pcs = pca_res[0].shape[1]
-        mask = np.where(adata.var[meta_data_mask_column_name].values)[0]
+        mask = np.where(get_var(adata)[meta_data_mask_column_name].values)[0]
 
         if dim_space == "var":
             # PC coordinates of the features used in PCA (NA to all features not used in PCA)

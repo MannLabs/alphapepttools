@@ -9,7 +9,7 @@ import pandas as pd
 from bpca import BPCA
 from sklearn.impute import KNNImputer
 
-from alphapepttools._matrix import get_matrix
+from alphapepttools._matrix import get_matrix, get_obs
 
 logger = logging.getLogger(__name__)
 
@@ -57,13 +57,15 @@ def _raise_on_nan_values(
 
     """
     if mode == "any":
-        has_nans = pd.isna(data).any().any() if isinstance(data, (pd.DataFrame, pd.Series)) else np.isnan(data).any()
+        has_nans = (
+            np.asarray(pd.isna(data)).any() if isinstance(data, (pd.DataFrame, pd.Series)) else np.isnan(data).any()
+        )
         if has_nans:
             raise ValueError(f"Data contains nan values. {custom_message or ''}")
     elif mode == "all":
         if isinstance(data, (pd.DataFrame, pd.Series)):
-            all_nan_columns = pd.isna(data).all()
-            if np.atleast_1d(all_nan_columns).any():
+            all_nan_columns = pd.Series(pd.isna(data).all())
+            if all_nan_columns.any():
                 raise ValueError(
                     f"Columns with index {all_nan_columns.index.tolist()} contain all nan values. {custom_message or ''}"
                 )
@@ -227,7 +229,7 @@ def impute_gaussian(
             mode="any",
             custom_message=f"`group_column` {group_column} contains nans. Cannot impute groups with missing values, please drop these observations prior to imputation.",
         )
-        groups = adata.obs.groupby(group_column, dropna=True).indices
+        groups = get_obs(adata).groupby(group_column, dropna=True).indices
 
         for group_indices in groups.values():
             group = data[group_indices]
@@ -333,12 +335,12 @@ def impute_median(
         _raise_on_nan_values(data, mode="all")
         data = _impute_nanmedian(data)
     else:
-        if pd.isna(adata.obs[group_column]).any():
+        if pd.isna(get_obs(adata)[group_column]).any():
             raise ValueError(
                 f"`group_column` {group_column} contains nans. The respective observations will be dropped and not get imputed.",
             )
 
-        groups = adata.obs.groupby(group_column, dropna=True).indices
+        groups = get_obs(adata).groupby(group_column, dropna=True).indices
 
         for group_indices in groups.values():
             group = data[group_indices]
@@ -494,7 +496,7 @@ def impute_knn(
         _raise_on_nan_values(data, mode="all")
         data = _impute_knn(data, n_neighbors=n_neighbors, weights=weights, **kwargs)
     else:
-        groups = adata.obs.groupby(group_column, dropna=True).indices
+        groups = get_obs(adata).groupby(group_column, dropna=True).indices
         _validate_knn_grouping(groups=groups, n_neighbors=n_neighbors)
 
         for group_indices in groups.values():
@@ -619,7 +621,7 @@ def impute_bpca(
         _raise_on_nan_values(data, mode="all")
         data = _impute_bpca(data, n_components=n_components, **kwargs)
     else:
-        groups = adata.obs.groupby(group_column, dropna=True).indices
+        groups = get_obs(adata).groupby(group_column, dropna=True).indices
 
         for group_indices in groups.values():
             group = data[group_indices]
