@@ -1,10 +1,10 @@
 # Reader wrapper to generate MuLink (https://github.com/lucas-diedrich/mulink) instances from reports
 
+import importlib
 from typing import Literal
 
 import anndata as ad
 import mudata as md
-import mulink  # noqa: F401  -- registers the .link accessor on MuData via a side-effect import
 import networkx as nx
 import numpy as np
 import pandas as pd
@@ -243,6 +243,8 @@ def mulink_from_anndatas(
     # IMPORTANT: features in the adjacency matrix need to be aligned with the variable order in the mdata object
     adjancency_matrix = _reindex_adjacency_matrix(adjancency_matrix, new_index=mdata.var_names)
 
+    # Import mulink lazily here to avoid the global side-effect
+    importlib.import_module("mulink")
     mdata.link.add_link(adjancency_matrix)
 
     return mdata
