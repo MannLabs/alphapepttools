@@ -54,7 +54,7 @@ def _extract_groupwise_plotting_data(
     value_column: str | None = None,
     direct_columns: list[str] | None = None,
     subgroup_column: str | None = None,
-    width: float = 0.5,
+    width: float = 0.4,
 ) -> tuple[list[list], list[str], list[float], list[str]]:
     """Extract data for group-wise plotting (violin, bar, box plots)
 
@@ -343,7 +343,10 @@ def add_legend_to_axes_from_patches(
         List of colored patches created by `make_legend_patches`
     **kwargs
         Additional arguments passed to `ax.legend()`.
-        If `fontsize` not provided, uses `config["legend"]["font_size"]`
+        If `fontsize` not provided, uses `config["legend"]["font_size"]`.
+        If `alpha` is provided, it is applied to every patch (so the legend
+        swatches match the transparency of e.g. bars/boxes/violins) and is
+        not forwarded to `ax.legend()`.
 
     Example
     -------
@@ -354,6 +357,12 @@ def add_legend_to_axes_from_patches(
         add_legend_to_axes_from_patches(ax, patches, title="Genotype", loc="upper right")
         # Legend will use config font sizes for text and title
     """
+    # Apply alpha to the patches so swatches match the plotted artists' transparency
+    alpha = kwargs.pop("alpha", None)
+    if alpha is not None:
+        for patch in patches:
+            patch.set_alpha(alpha)
+
     # create new legend
     if "fontsize" not in kwargs:
         kwargs["fontsize"] = config["legend"]["font_size"]
@@ -1685,6 +1694,7 @@ def barplot(
     color_dict: dict | None = None,
     subgroup_column: str | None = None,
     width: float = 0.4,
+    alpha: float = 0.5,
     legend: str | mpl.legend.Legend | None = None,
     legend_kwargs: dict | None = None,
 ) -> None:
@@ -1718,6 +1728,16 @@ def barplot(
     color_dict
         Dictionary mapping group labels to specific colors. Overrides the color
         parameter for specified groups. By default None.
+    subgroup_column
+        Optional column for subgroups within each main group. Each subgroup will be plotted as a separate bar within the main group. By default None.
+    width
+        Width of the bars. By default 0.4.
+    alpha
+        Transparency of the bars (0-1). By default 0.5.
+    legend
+        Legend to add to the plot, by default None. If "auto", a legend is created from the color_dict. By default None.
+    legend_kwargs
+        Additional keyword arguments for the matplotlib legend function. By default None.
 
     Returns
     -------
@@ -1752,11 +1772,27 @@ def barplot(
 
     .. code-block:: python
 
+        import pandas as pd
+        from alphapepttools.pl.figure import create_figure
+        import alphapepttools as apt
+
+        data = pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6], "C": [7, 8, 9]})
+
+        fig, axm = create_figure(1, 1, figsize=(6, 4))
+        ax = axm.next()
+        apt.pl.barplot(
+            ax=ax,
+            data=data,
+            direct_columns=["A", "B", "C"],
+            color_dict={"A": "red", "B": "green", "C": "blue"},
+        )
+
     Notes
     -----
     - Error bars show standard deviation of values within each group
     - Bars have 50% transparency with opaque black outlines
     - When using direct_columns, each column's mean is calculated across all rows
+    - The subgroup_column allows for further subdivision within each main group
     - Missing values (NaN) are excluded from mean and std calculations
     """
     data, labels, positions, color_keys = _extract_groupwise_plotting_data(
@@ -1783,9 +1819,17 @@ def barplot(
     # Styling of bars
     for color_key, bar in zip(color_keys, bars, strict=False):
         current_color = color_dict.get(color_key, config["na_color"]) if color_dict else color
-        bar.set_facecolor(mcolors.to_rgba(current_color, alpha=0.5))
+        bar.set_facecolor(mcolors.to_rgba(current_color, alpha=alpha))
         bar.set_edgecolor(BaseColors.get("black"))
         bar.set(linewidth=config["linewidths"]["medium"])
+
+    # Styling of error bars (vertical lines and caps)
+    if bars.errorbar is not None:
+        _, caplines, barlinecols = bars.errorbar
+        for capline in caplines:
+            capline.set_markeredgewidth(config["linewidths"]["medium"])
+        for barlinecol in barlinecols:
+            barlinecol.set_linewidth(config["linewidths"]["medium"])
 
     # One label per position in case subgroups returned repeated entries
     unique_labels = list(dict.fromkeys(labels))
@@ -1794,6 +1838,7 @@ def barplot(
     ax.set_xticklabels(unique_labels)
 
     legend_kwargs = legend_kwargs or {}
+    legend_kwargs.setdefault("alpha", alpha)
     if legend is not None and color_dict is not None:
         add_legend_to_axes(
             ax=ax,
@@ -1813,6 +1858,7 @@ def boxplot(
     color_dict: dict | None = None,
     subgroup_column: str | None = None,
     width: float = 0.4,
+    alpha: float = 0.5,
     legend: str | mpl.legend.Legend | None = None,
     legend_kwargs: dict | None = None,
 ) -> None:
@@ -1846,6 +1892,16 @@ def boxplot(
     color_dict
         Dictionary mapping group labels to specific colors. Overrides the color
         parameter for specified groups. By default None.
+    subgroup_column
+        Optional column for subgroups within each main group. Each subgroup will be plotted as a separate box within the main group. By default None.
+    width
+        Width of the boxes. By default 0.4.
+    alpha
+        Transparency of the boxes (0-1). By default 0.5.
+    legend
+        Legend to add to the plot, by default None. If "auto", a legend is created from the color_dict. By default None.
+    legend_kwargs
+        Additional keyword arguments for the matplotlib legend function. By default None.
 
     Returns
     -------
@@ -1902,6 +1958,7 @@ def boxplot(
     - Whiskers extend to 1.5 * IQR or the most extreme non-outlier point
     - Boxes have 50% transparency with opaque black outlines
     - When using direct_columns, each column's distribution is shown separately
+    - The subgroup_column allows for further subdivision within each main group
     - Missing values (NaN) are excluded from the distribution calculations
     """
     data, labels, positions, color_keys = _extract_groupwise_plotting_data(
@@ -1916,31 +1973,38 @@ def boxplot(
     boxes = ax.boxplot(
         x=data,
         positions=positions,
-        widths=width,
+        widths=width,  # no typo: widths argument also takes single floats
         patch_artist=True,
     )
 
     # Styling of boxes
     for color_key, box in zip(color_keys, boxes["boxes"], strict=False):
         current_color = color_dict.get(color_key, config["na_color"]) if color_dict else color
-        box.set_facecolor(mcolors.to_rgba(current_color, alpha=0.5))
-        box.set(linewidth=config["linewidths"]["large"])
+        box.set_facecolor(mcolors.to_rgba(current_color, alpha=alpha))
+        box.set(linewidth=config["linewidths"]["medium"])
         box.set_edgecolor(BaseColors.get("black"))
 
     # Styping of medians
     for _, median in zip(labels, boxes["medians"], strict=False):
         median.set(color=BaseColors.get("black"))
-        median.set(linewidth=config["linewidths"]["large"])
+        median.set(linewidth=config["linewidths"]["medium"])
 
     # Styling of whiskers
     for _, whisker in zip(labels * 2, boxes["whiskers"], strict=False):
         whisker.set(color=BaseColors.get("black"))
-        whisker.set(linewidth=config["linewidths"]["large"])
+        whisker.set(linewidth=config["linewidths"]["medium"])
 
     # Styling of caps
     for _, cap in zip(labels * 2, boxes["caps"], strict=False):
         cap.set(color=BaseColors.get("black"))
-        cap.set(linewidth=config["linewidths"]["large"])
+        cap.set(linewidth=config["linewidths"]["medium"])
+
+    # Styling of outlier points (fliers)
+    for _, flier in zip(labels, boxes["fliers"], strict=False):
+        flier.set(
+            markeredgecolor=BaseColors.get("black"),
+            markeredgewidth=config["linewidths"]["medium"],
+        )
 
     # One label per position in case subgroups returned repeated entries
     unique_labels = list(dict.fromkeys(labels))
@@ -1949,6 +2013,7 @@ def boxplot(
     ax.set_xticklabels(unique_labels)
 
     legend_kwargs = legend_kwargs or {}
+    legend_kwargs.setdefault("alpha", alpha)
     if legend is not None and color_dict is not None:
         add_legend_to_axes(
             ax=ax,
@@ -1968,6 +2033,7 @@ def violinplot(
     color_dict: dict | None = None,
     subgroup_column: str | None = None,
     width: float = 0.4,
+    alpha: float = 0.5,
     legend: str | mpl.legend.Legend | None = None,
     legend_kwargs: dict | None = None,
 ) -> None:
@@ -2002,6 +2068,16 @@ def violinplot(
     color_dict
         Dictionary mapping group labels to specific colors. Overrides the color
         parameter for specified groups. By default None.
+    subgroup_column
+        Optional column for subgroups within each main group. Each subgroup will be plotted as a separate violin within the main group. By default None.
+    width
+        Width of the violins. By default 0.4.
+    alpha
+        Transparency of the violins (0-1). By default 0.5.
+    legend
+        Legend to add to the plot, by default None. If "auto", a legend is created from the color_dict. By default None.
+    legend_kwargs
+        Additional keyword arguments for the matplotlib legend function. By default None.
 
     Returns
     -------
@@ -2079,22 +2155,22 @@ def violinplot(
     # Styling of violins
     for color_key, violin in zip(color_keys, violins["bodies"], strict=False):
         current_color = color_dict.get(color_key, config["na_color"]) if color_dict else color
-        violin.set_facecolor(mcolors.to_rgba(current_color, alpha=0.5))
+        violin.set_facecolor(mcolors.to_rgba(current_color, alpha=alpha))
         violin.set_edgecolor(BaseColors.get("black"))
-        violin.set_linewidth(config["linewidths"]["large"])
+        violin.set_linewidth(config["linewidths"]["medium"])
         violin.set_alpha(None)  # Reset any global alpha
 
     # Styling of medians
     violins["cmedians"].set(color=BaseColors.get("black"))
-    violins["cmedians"].set(linewidth=config["linewidths"]["large"])
+    violins["cmedians"].set(linewidth=config["linewidths"]["medium"])
 
     # Styling of min and max whiskers and the central bar
     violins["cmins"].set(color=BaseColors.get("black"))
-    violins["cmins"].set(linewidth=config["linewidths"]["large"])
+    violins["cmins"].set(linewidth=config["linewidths"]["medium"])
     violins["cmaxes"].set(color=BaseColors.get("black"))
-    violins["cmaxes"].set(linewidth=config["linewidths"]["large"])
+    violins["cmaxes"].set(linewidth=config["linewidths"]["medium"])
     violins["cbars"].set(color=BaseColors.get("black"))
-    violins["cbars"].set(linewidth=config["linewidths"]["large"])
+    violins["cbars"].set(linewidth=config["linewidths"]["medium"])
 
     # One label per position in case subgroups returned repeated entries
     unique_labels = list(dict.fromkeys(labels))
@@ -2103,6 +2179,7 @@ def violinplot(
     ax.set_xticklabels(unique_labels)
 
     legend_kwargs = legend_kwargs or {}
+    legend_kwargs.setdefault("alpha", alpha)
     if legend is not None and color_dict is not None:
         add_legend_to_axes(
             ax=ax,
