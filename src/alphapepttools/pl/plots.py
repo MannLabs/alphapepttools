@@ -1814,6 +1814,14 @@ def barplot(
         bar.set_edgecolor(BaseColors.get("black"))
         bar.set(linewidth=config["linewidths"]["medium"])
 
+    # Styling of error bars (vertical lines and caps)
+    if bars.errorbar is not None:
+        _, caplines, barlinecols = bars.errorbar
+        for capline in caplines:
+            capline.set_markeredgewidth(config["linewidths"]["medium"])
+        for barlinecol in barlinecols:
+            barlinecol.set_linewidth(config["linewidths"]["medium"])
+
     # One label per position in case subgroups returned repeated entries
     unique_labels = list(dict.fromkeys(labels))
 
@@ -1963,23 +1971,30 @@ def boxplot(
     for color_key, box in zip(color_keys, boxes["boxes"], strict=False):
         current_color = color_dict.get(color_key, config["na_color"]) if color_dict else color
         box.set_facecolor(mcolors.to_rgba(current_color, alpha=alpha))
-        box.set(linewidth=config["linewidths"]["large"])
+        box.set(linewidth=config["linewidths"]["medium"])
         box.set_edgecolor(BaseColors.get("black"))
 
     # Styping of medians
     for _, median in zip(labels, boxes["medians"], strict=False):
         median.set(color=BaseColors.get("black"))
-        median.set(linewidth=config["linewidths"]["large"])
+        median.set(linewidth=config["linewidths"]["medium"])
 
     # Styling of whiskers
     for _, whisker in zip(labels * 2, boxes["whiskers"], strict=False):
         whisker.set(color=BaseColors.get("black"))
-        whisker.set(linewidth=config["linewidths"]["large"])
+        whisker.set(linewidth=config["linewidths"]["medium"])
 
     # Styling of caps
     for _, cap in zip(labels * 2, boxes["caps"], strict=False):
         cap.set(color=BaseColors.get("black"))
-        cap.set(linewidth=config["linewidths"]["large"])
+        cap.set(linewidth=config["linewidths"]["medium"])
+
+    # Styling of outlier points (fliers)
+    for _, flier in zip(labels, boxes["fliers"], strict=False):
+        flier.set(
+            markeredgecolor=BaseColors.get("black"),
+            markeredgewidth=config["linewidths"]["medium"],
+        )
 
     # One label per position in case subgroups returned repeated entries
     unique_labels = list(dict.fromkeys(labels))
@@ -2131,20 +2146,20 @@ def violinplot(
         current_color = color_dict.get(color_key, config["na_color"]) if color_dict else color
         violin.set_facecolor(mcolors.to_rgba(current_color, alpha=alpha))
         violin.set_edgecolor(BaseColors.get("black"))
-        violin.set_linewidth(config["linewidths"]["large"])
+        violin.set_linewidth(config["linewidths"]["medium"])
         violin.set_alpha(None)  # Reset any global alpha
 
     # Styling of medians
     violins["cmedians"].set(color=BaseColors.get("black"))
-    violins["cmedians"].set(linewidth=config["linewidths"]["large"])
+    violins["cmedians"].set(linewidth=config["linewidths"]["medium"])
 
     # Styling of min and max whiskers and the central bar
     violins["cmins"].set(color=BaseColors.get("black"))
-    violins["cmins"].set(linewidth=config["linewidths"]["large"])
+    violins["cmins"].set(linewidth=config["linewidths"]["medium"])
     violins["cmaxes"].set(color=BaseColors.get("black"))
-    violins["cmaxes"].set(linewidth=config["linewidths"]["large"])
+    violins["cmaxes"].set(linewidth=config["linewidths"]["medium"])
     violins["cbars"].set(color=BaseColors.get("black"))
-    violins["cbars"].set(linewidth=config["linewidths"]["large"])
+    violins["cbars"].set(linewidth=config["linewidths"]["medium"])
 
     # One label per position in case subgroups returned repeated entries
     unique_labels = list(dict.fromkeys(labels))
