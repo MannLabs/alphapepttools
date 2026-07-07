@@ -343,7 +343,10 @@ def add_legend_to_axes_from_patches(
         List of colored patches created by `make_legend_patches`
     **kwargs
         Additional arguments passed to `ax.legend()`.
-        If `fontsize` not provided, uses `config["legend"]["font_size"]`
+        If `fontsize` not provided, uses `config["legend"]["font_size"]`.
+        If `alpha` is provided, it is applied to every patch (so the legend
+        swatches match the transparency of e.g. bars/boxes/violins) and is
+        not forwarded to `ax.legend()`.
 
     Example
     -------
@@ -354,6 +357,12 @@ def add_legend_to_axes_from_patches(
         add_legend_to_axes_from_patches(ax, patches, title="Genotype", loc="upper right")
         # Legend will use config font sizes for text and title
     """
+    # Apply alpha to the patches so swatches match the plotted artists' transparency
+    alpha = kwargs.pop("alpha", None)
+    if alpha is not None:
+        for patch in patches:
+            patch.set_alpha(alpha)
+
     # create new legend
     if "fontsize" not in kwargs:
         kwargs["fontsize"] = config["legend"]["font_size"]
@@ -1829,6 +1838,7 @@ def barplot(
     ax.set_xticklabels(unique_labels)
 
     legend_kwargs = legend_kwargs or {}
+    legend_kwargs.setdefault("alpha", alpha)
     if legend is not None and color_dict is not None:
         add_legend_to_axes(
             ax=ax,
@@ -2003,6 +2013,7 @@ def boxplot(
     ax.set_xticklabels(unique_labels)
 
     legend_kwargs = legend_kwargs or {}
+    legend_kwargs.setdefault("alpha", alpha)
     if legend is not None and color_dict is not None:
         add_legend_to_axes(
             ax=ax,
@@ -2168,6 +2179,7 @@ def violinplot(
     ax.set_xticklabels(unique_labels)
 
     legend_kwargs = legend_kwargs or {}
+    legend_kwargs.setdefault("alpha", alpha)
     if legend is not None and color_dict is not None:
         add_legend_to_axes(
             ax=ax,
