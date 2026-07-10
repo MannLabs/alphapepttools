@@ -54,19 +54,20 @@
 
 # Bader2020 full AlphaDIA report (PSM-level) for study 01
 - name: bader2020_full_alphadia
-  url: https://datashare.biochem.mpg.de/s/c9kbjaQKHnxyqJ4
+  url: https://datashare.biochem.mpg.de/s/F2BEq9j7ptEstNm
   search_engine: alphadia
   citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
   data_type: psm
   description: Full AlphaDIA precursors.tsv for the Bader et al. Alzheimer CSF study
 
 # Bader2020 full Spectronaut report (PSM-level) for study 01
-- name: bader2020_full_spectronaut
-  url: https://datashare.biochem.mpg.de/s/g2A6ErHDR2YgZHz
-  search_engine: spectronaut
-  citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
-  data_type: psm
-  description: Full Spectronaut report.tsv for the Bader et al. Alzheimer CSF study (from https://www.ebi.ac.uk/pride/archive/projects/PXD016278)
+# Pending assessment of minimal required spectronaut report columns
+# - name: bader2020_full_spectronaut
+#   url: https://datashare.biochem.mpg.de/s/g2A6ErHDR2YgZHz
+#   search_engine: spectronaut
+#   citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
+#   data_type: psm
+#   description: Full Spectronaut report.tsv for the Bader et al. Alzheimer CSF study (from https://www.ebi.ac.uk/pride/archive/projects/PXD016278)
 
 # Bader2020 sample metadata
 - name: bader2020_metadata
