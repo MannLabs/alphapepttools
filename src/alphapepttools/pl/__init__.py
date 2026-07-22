@@ -1,26 +1,7 @@
+from importlib import import_module as _import_module
+
 from .colors import BaseColormaps, BaseColors, BasePalettes, MappedColormaps, get_color_mapping, show_rgba_color_list
 from .figure import create_figure, label_axes, save_figure
-from .plots import (
-    PlotConfig,
-    Plots,  # Kept here for backward compatibility, using Plots raises and alerts the user about the deprecation and how to upgrade.
-    add_legend_to_axes,
-    add_legend_to_axes_from_patches,
-    add_lines,
-    barplot,
-    boxplot,
-    histogram,
-    label_plot,
-    layered_plot,
-    make_scatter_config,
-    plot_pca,
-    plot_pca_loadings,
-    plot_pca_loadings_2d,
-    rank_median_plot,
-    scatter,
-    scree_plot,
-    violinplot,
-    volcano,
-)
 
 __all__ = [
     "BaseColormaps",
@@ -52,3 +33,21 @@ __all__ = [
     "violinplot",
     "volcano",
 ]
+
+_PLOT_EXPORTS = frozenset(name for name in __all__ if name not in globals())
+
+
+def __getattr__(name: str) -> object:
+    if name == "plots":
+        return _import_module(".plots", __name__)
+
+    if name not in _PLOT_EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    value = getattr(_import_module(".plots", __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(__all__) | {"plots"})
