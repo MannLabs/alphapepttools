@@ -335,3 +335,18 @@ class TestIRS:
 
         if layer is not None:
             assert np.array_equal(modified_adata.X, original_X)
+
+    @pytest.mark.parametrize(
+        "reference_kwargs",
+        [
+            {"reference_column": "tmt_channel", "reference_value": "does_not_exist"},
+            {"reference_column": "is_reference", "reference_value": "does_not_exist"},
+        ],
+    )
+    def test_irs__reference_value_missing(
+        self, irs_data__reference_values: tuple[ad.AnnData, dict, np.ndarray], *, reference_kwargs
+    ):
+        adata, irs_kwargs, _ = irs_data__reference_values
+
+        with pytest.raises(ValueError, match="`reference_value` .* does not exist"):
+            irs(adata, **reference_kwargs, **irs_kwargs, copy=False, layer=None)
