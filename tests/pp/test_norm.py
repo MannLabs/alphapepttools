@@ -120,6 +120,33 @@ class TestNormalizeFunction:
 
     @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
     @pytest.mark.parametrize("data_type", ["all_equal", "different", "nan"])
+    def test_normalize_function_group_column(self, strategy, data_type, test_data_factory) -> None:
+        """Test that groupwise normalization works"""
+        X, expected_arrays, expected_factors = test_data_factory.get_test_data(data_type)
+
+        # Generate an adata object with 3 groups
+        # Adds a "batch" column in adata.obs
+        BATCH_COLUMN = "batch"
+        N_GROUPS = 3
+        adata = ad.concat(
+            {idx: ad.AnnData(X=X.copy() * (idx + 1)) for idx in range(N_GROUPS)},
+            axis="obs",
+            join="inner",
+            label=BATCH_COLUMN,
+            index_unique="-",  # Make observations unique across replicates
+        )
+
+        # Each group-wise array is the same  - concatenate expected values
+        expected_result = np.concatenate([expected_arrays[strategy] * (idx + 1) for idx in range(N_GROUPS)], axis=0)
+        expected_factors_tiled = np.tile(expected_factors[strategy], N_GROUPS)
+
+        normalize(adata, strategy=strategy, group_column=BATCH_COLUMN, key_added="norm_factors")
+
+        assert np.allclose(adata.X, expected_result, atol=1e-6, equal_nan=True)
+        assert np.allclose(adata.obs["norm_factors"], expected_factors_tiled, atol=1e-6, equal_nan=True)
+
+    @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
+    @pytest.mark.parametrize("data_type", ["all_equal", "different", "nan"])
     def test_normalize_function_key_added(self, strategy, data_type, test_data_factory) -> None:
         X, expected_arrays, _ = test_data_factory.get_test_data(data_type)
         adata = ad.AnnData(X=X.copy())
@@ -308,3 +335,44 @@ class TestIRS:
 
         if layer is not None:
             assert np.array_equal(modified_adata.X, original_X)
+
+    @pytest.mark.parametrize(
+        "reference_kwargs",
+        [
+            {"reference_column": "tmt_channel", "reference_value": "does_not_exist"},
+            {"reference_column": "is_reference", "reference_value": "does_not_exist"},
+        ],
+    )
+    def test_irs__reference_value_missing(
+        self, irs_data__reference_values: tuple[ad.AnnData, dict, np.ndarray], *, reference_kwargs
+    ):
+        """Test that function raises if reference value is not in column"""
+        adata, irs_kwargs, _ = irs_data__reference_values
+
+        with pytest.raises(ValueError, match="`reference_value` .* does not exist"):
+            irs(adata, **reference_kwargs, **irs_kwargs, copy=False, layer=None)
+
+    def test_irs__reference_value_missing_in_group(
+        self, irs_data__reference_values: tuple[ad.AnnData, dict, np.ndarray]
+    ):
+        """Test that function raises if reference value is not available for one group"""
+        adata, irs_kwargs, _ = irs_data__reference_values
+        # reference missing for last group
+        adata.obs["is_reference__one_missing"] = [
+            False,
+            True,
+            False,
+            True,
+            False,
+            False,
+        ]
+
+        with pytest.raises(ValueError, match=r"`reference_value` .* does not exist"):
+            irs(
+                adata,
+                reference_column="is_reference__one_missing",
+                reference_value=True,
+                **irs_kwargs,
+                copy=False,
+                layer=None,
+            )

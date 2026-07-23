@@ -66,7 +66,7 @@ class StudyData:
     name: str
     url: str
     search_engine: str
-    data_type: Literal["pg", "psm", "study_psm", "study_pg", "anndata"]
+    data_type: Literal["pg", "psm", "study_psm", "study_pg", "image", "shapes", "anndata"]
     citation: str | None = None
     description: str | None = None
 
