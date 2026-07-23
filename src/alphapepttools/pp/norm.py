@@ -1,9 +1,12 @@
+import warnings
 from typing import Literal
 
 import anndata as ad
 import numpy as np
+import pandas as pd
+from scipy.stats import gmean
 
-from ._utils import _raise_on_nan_values
+from ._utils import _raise_on_missing_value, _raise_on_nan_values
 
 STRATEGIES = ["total_mean", "total_median"]
 
@@ -234,5 +237,113 @@ def normalize(
 
     if key_added is not None:
         adata.obs[key_added] = norm_factors
+
+    return adata if copy else None
+
+
+def irs(
+    adata: ad.AnnData,
+    group_column: str,
+    reference_column: str | None = None,
+    reference_value: object | None = None,
+    *,
+    layer: str | None = None,
+    copy: bool = False,
+) -> None | ad.AnnData:
+    """Internal Reference Scaling (IRS) normalization.
+
+    Normalize features across multiple runs (e.g. TMT plexes) using a shared
+    internal reference, as commonly performed in isobaric labelling experiments
+    :cite:`Plubell.2017`. For each run defined by `group_column`, a per-feature
+    reference profile is computed from the samples where
+    `reference_column == reference_value`. Every sample in that run is then
+    rescaled so its reference profile matches the geometric mean of reference
+    profiles taken across all runs. NaNs are propagated.
+
+    If `reference_column` is `None`, the per-run arithmetic mean across all
+    samples is used in place of an explicit reference.
+
+    Parameters
+    ----------
+    adata
+        AnnData object
+    group_column
+        Column in `adata.obs` that defines the individual runs.
+    reference_column
+        Column in `adata.obs` indicating which samples are reference channels.
+        If `None`, a virtual reference is constructed from the arithmetic mean
+        of all samples within each run.
+    reference_value
+        Value in `reference_column` that marks the reference sample(s) within
+        each run. Ignored when `reference_column` is `None`.
+    layer
+        Layer in `adata` to normalize. If `None`, uses `adata.X`.
+    copy
+        Whether to return a modified copy (True) of the anndata object. If False (default)
+        modifies the object inplace
+
+    Reference
+    ---------
+    - Plubell, D. L. et al. Extended Multiplexing of Tandem Mass Tags (TMT) Labeling Reveals Age and High Fat Diet Specific Proteome Changes in Mouse Epididymal Adipose Tissue. Mol Cell Proteomics 16, 873-890 (2017).
+    - Phillip Wilmarth. Thorough Testing of Internal Reference Scaling (IRS) [Website]. https://pwilmart.github.io/TMT_analysis_examples/IRS_validation.html. (2019)
+    """
+    if (reference_column is not None) and (reference_value is None):
+        warnings.warn(
+            "`reference_value` is None while `reference_column` is set - is this intended?",
+            stacklevel=2,
+        )
+    if (reference_column is None) and (reference_value is not None):
+        warnings.warn(
+            "`reference_value` is set while `reference_column` is None - it will be ignored.",
+            stacklevel=2,
+        )
+
+    adata = adata.copy() if copy else adata
+
+    data = adata.layers[layer].copy() if layer is not None else adata.X.copy()
+
+    _raise_on_nan_values(
+        adata.obs[group_column],
+        mode="any",
+        custom_message=f"`group_column` {group_column} contains nans. Cannot normalize groups with missing values, please drop these observations prior to normalization.",
+    )
+
+    groups = adata.obs.groupby(group_column, dropna=True)
+
+    sample_ref_values = np.full_like(data, np.nan, dtype=float)
+    group_ref_values = np.full(shape=(len(groups), adata.n_vars), fill_value=np.nan, dtype=float)
+
+    # The internal reference value is either computed from the internal reference samples, as indicated by the reference column,
+    # or it is computed as the mean of all channels in the respective run.
+    for group_idx, (group_name, group_indices) in enumerate(groups.indices.items()):
+        if reference_column is not None:
+            group_metadata: pd.DataFrame = groups.get_group(group_name)
+            _raise_on_missing_value(
+                group_metadata[reference_column],
+                reference_value,
+                value_name="reference_value",
+                custom_message=f"Group {group_name!r} does not contain a reference sample.",
+            )
+
+            # Estimate reference from group-specific reference samples
+            ref_indices = np.where(group_metadata[reference_column] == reference_value)[0]
+            ref_data = data[group_indices, :][ref_indices, :]
+        else:
+            # If no reference value exists, estimate reference from all samples
+            ref_data = data[group_indices, :]
+
+        ref_value = np.nanmean(ref_data, axis=0).squeeze()
+
+        group_ref_values[group_idx] = ref_value
+        sample_ref_values[group_indices] = ref_value
+
+    target_value = gmean(np.stack(group_ref_values), axis=0)
+    norm_factors = target_value / sample_ref_values
+    data = data * norm_factors
+
+    if layer is None:
+        adata.X = data
+    else:
+        adata.layers[layer] = data
 
     return adata if copy else None

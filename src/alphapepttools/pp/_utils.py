@@ -65,3 +65,31 @@ def _raise_on_nan_values(
                 )
     else:
         raise ValueError("Mode must be either 'any' or 'all'.")
+
+
+def _raise_on_missing_value(
+    data: pd.Series,
+    value: object,
+    value_name: str = "value",
+    custom_message: str | None = None,
+) -> None:
+    """Check that a value is present in the data.
+
+    Parameters
+    ----------
+    data
+        Series to search for `value`.
+    value
+        Value that is expected to be present in `data`.
+    value_name
+        Name of the argument holding `value`, used in the error message.
+    custom_message
+        Additional message appended to the raised error.
+
+    Raises
+    ------
+    ValueError
+        If `value` is not present in `data`.
+    """
+    if not (data == value).any():
+        raise ValueError(f"`{value_name}` {value!r} does not exist in the provided column. {custom_message or ''}")
