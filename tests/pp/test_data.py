@@ -6,7 +6,14 @@ import pandas as pd
 import pytest
 
 import alphapepttools as apt
-from alphapepttools.pp.data import _handle_overlapping_columns, _to_anndata, coerce_to_dataframe, data_column_to_array
+from alphapepttools.pp.data import (
+    _count_or_fraction_missing,
+    _handle_overlapping_columns,
+    _to_anndata,
+    _validate_max_missing,
+    coerce_to_dataframe,
+    data_column_to_array,
+)
 
 
 # example data
@@ -1050,6 +1057,62 @@ def data_test_completeness_filter():
             "drop",
             "any",
         ),
+        # 6. Integer max_missing: absolute count of missing values allowed.
+        # Per-feature missing counts (out of 5): A=0, B=1, C=2, D=3, E=4
+        # 6.1. max_missing=0 (int): keep only fully-complete features
+        (
+            ["A"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            0,
+            None,
+            None,
+            "drop",
+            "all",
+        ),
+        # 6.2. max_missing=1 (int): allow at most 1 missing value
+        #      (contrast with 1.4: max_missing=1.0 float keeps everything)
+        (
+            ["A", "B"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            1,
+            None,
+            None,
+            "drop",
+            "all",
+        ),
+        # 6.3. max_missing=3 (int): allow at most 3 missing values
+        (
+            ["A", "B", "C", "D"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            3,
+            None,
+            None,
+            "drop",
+            "all",
+        ),
+        # 6.4. Group-wise int count, keep_strategy="all": pass if <=1 missing in *every* batch.
+        #      Batch 1 (3 samples) missing: A=0,B=1,C=2,D=3,E=3 ; Batch 2 (2 samples): A=0,B=0,C=0,D=0,E=1
+        #      → only A,B satisfy <=1 in both batches
+        (
+            ["A", "B"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            1,
+            "batch",
+            None,
+            "drop",
+            "all",
+        ),
+        # 6.5. Group-wise int count, keep_strategy="any": pass if <=1 missing in *at least one* batch.
+        #      Batch 2 has <=1 missing for all features → keep everything
+        (
+            ["A", "B", "C", "D", "E"],
+            ["cell1", "cell2", "cell3", "cell4", "cell5"],
+            1,
+            "batch",
+            None,
+            "drop",
+            "any",
+        ),
     ],
 )
 def test_filter_data_completeness(
@@ -1093,6 +1156,64 @@ def test_filter_data_completeness_invalid_keep_strategy(data_test_completeness_f
             group_column="batch",
             keep_strategy="invalid",
         )
+
+
+def test_filter_data_completeness_float_out_of_range(data_test_completeness_filter):
+    with pytest.raises(ValueError, match="between 0 and 1"):
+        apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing=1.5)
+
+
+def test_filter_data_completeness_negative_count(data_test_completeness_filter):
+    with pytest.raises(ValueError, match="non-negative"):
+        apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing=-1)
+
+
+def test_filter_data_completeness_invalid_type(data_test_completeness_filter):
+    with pytest.raises(ValueError, match="float or an int"):
+        apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing="0.5")
+
+
+# test _validate_max_missing
+@pytest.mark.parametrize(
+    ("max_missing", "expected_count_mode"),
+    [
+        (0.0, False),
+        (0.5, False),
+        (1.0, False),
+        (0, True),
+        (1, True),
+        (5, True),
+    ],
+)
+def test_validate_max_missing_returns_count_mode(max_missing, expected_count_mode):
+    # a float (fraction) -> False; an int (absolute count) -> True
+    assert _validate_max_missing(max_missing) is expected_count_mode
+
+
+@pytest.mark.parametrize(
+    ("max_missing", "match"),
+    [
+        (1.5, "between 0 and 1"),
+        (-0.1, "between 0 and 1"),
+        (-1, "non-negative"),
+        ("0.5", "float or an int"),
+    ],
+)
+def test_validate_max_missing_invalid(max_missing, match):
+    with pytest.raises(ValueError, match=match):
+        _validate_max_missing(max_missing)
+
+
+# test _count_or_fraction_missing
+def test_count_or_fraction_missing():
+    # per-feature missing values: A=0, B=1, C=2 (out of 3 rows)
+    x = np.array([[1.0, np.nan, np.nan], [2.0, 5.0, np.nan], [3.0, 6.0, 9.0]])
+
+    # count_mode=True -> absolute counts
+    np.testing.assert_array_equal(_count_or_fraction_missing(x, count_mode=True), [0, 1, 2])
+
+    # count_mode=False -> fractions
+    np.testing.assert_allclose(_count_or_fraction_missing(x, count_mode=False), [0.0, 1 / 3, 2 / 3])
 
 
 # test data_column_to_array
