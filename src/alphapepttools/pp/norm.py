@@ -6,9 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import gmean
 
-from ._utils import _raise_on_nan_values
-
-from ._utils import _raise_on_nan_values
+from ._utils import _raise_on_missing_value, _raise_on_nan_values
 
 STRATEGIES = ["total_mean", "total_median"]
 
@@ -298,6 +296,14 @@ def irs(
         warnings.warn(
             "`reference_value` is set while `reference_column` is None - it will be ignored.",
             stacklevel=2,
+        )
+
+    if (reference_column is not None) and (reference_value is not None):
+        _raise_on_missing_value(
+            adata.obs[reference_column],
+            reference_value,
+            value_name="reference_value",
+            custom_message=f"Column {reference_column!r} does not contain the requested reference value.",
         )
 
     adata = adata.copy() if copy else adata
