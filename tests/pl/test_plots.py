@@ -257,7 +257,7 @@ def test_data_columns_to_df_failures(which_data, example_data, example_sample_me
             None,
             [[2.0], [3.0]],  # NaN is dropped, grouped by batch [1,1,2]
             [1, 2],
-            [1, 2],
+            [0, 1],
         ),
         (
             "batch",
@@ -265,7 +265,7 @@ def test_data_columns_to_df_failures(which_data, example_data, example_sample_me
             None,
             [[4.0, 5.0], [6.0]],  # First two cells in batch 1, last in batch 2
             [1, 2],
-            [1, 2],
+            [0, 1],
         ),
         # Case with direct column usage and dropping NaNs
         (
@@ -274,7 +274,7 @@ def test_data_columns_to_df_failures(which_data, example_data, example_sample_me
             ["A", "B", "age"],
             [[2.0, 3.0], [4.0, 5.0, 6.0], [10.0, 20.0, 30.0]],
             ["A", "B", "age"],
-            [1, 2, 3],
+            [0, 1, 2],
         ),
     ],
 )
@@ -290,10 +290,39 @@ def test__extract_groupwise_plotting_data(
 ):
     adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
 
-    data_lists, labels, positions = _extract_groupwise_plotting_data(
+    data_lists, labels, positions, color_keys = _extract_groupwise_plotting_data(
         data=adata, grouping_column=grouping_column, value_column=value_column, direct_columns=direct_columns
     )
 
     assert data_lists == expected_data
     assert labels == expected_labels
     assert positions == expected_positions
+    # In flat mode color_keys mirrors labels so a label-keyed color_dict still works.
+    assert color_keys == expected_labels
+
+
+def test__extract_groupwise_plotting_data_subgrouped():
+    """Subgroup mode dodges positions, emits one cell per (group, subgroup),
+    keeps labels per-cell as the main group, and emits subgroup values as color_keys.
+    """
+    df = pd.DataFrame(
+        {
+            "precursor": ["P1", "P1", "P1", "P1", "P2", "P2", "P2", "P2"],
+            "condition": ["ctrl", "ctrl", "treat", "treat", "ctrl", "ctrl", "treat", "treat"],
+            "intensity": [1.0, 2.0, 10.0, 20.0, 3.0, 4.0, 30.0, 40.0],
+        }
+    )
+
+    data_lists, labels, positions, color_keys = _extract_groupwise_plotting_data(
+        data=df,
+        grouping_column="precursor",
+        value_column="intensity",
+        subgroup_column="condition",
+        width=0.4,
+    )
+
+    assert data_lists == [[1.0, 2.0], [10.0, 20.0], [3.0, 4.0], [30.0, 40.0]]
+    assert labels == ["P1", "P1", "P2", "P2"]
+    assert color_keys == ["ctrl", "treat", "ctrl", "treat"]
+    # With width=0.4 and 2 subgroups: offsets = [-0.2, +0.2] around each main-group integer.
+    assert positions == pytest.approx([-0.2, 0.2, 0.8, 1.2])

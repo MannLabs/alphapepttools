@@ -120,6 +120,33 @@ class TestNormalizeFunction:
 
     @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
     @pytest.mark.parametrize("data_type", ["all_equal", "different", "nan"])
+    def test_normalize_function_group_column(self, strategy, data_type, test_data_factory) -> None:
+        """Test that groupwise normalization works"""
+        X, expected_arrays, expected_factors = test_data_factory.get_test_data(data_type)
+
+        # Generate an adata object with 3 groups
+        # Adds a "batch" column in adata.obs
+        BATCH_COLUMN = "batch"
+        N_GROUPS = 3
+        adata = ad.concat(
+            {idx: ad.AnnData(X=X.copy() * (idx + 1)) for idx in range(N_GROUPS)},
+            axis="obs",
+            join="inner",
+            label=BATCH_COLUMN,
+            index_unique="-",  # Make observations unique across replicates
+        )
+
+        # Each group-wise array is the same  - concatenate expected values
+        expected_result = np.concatenate([expected_arrays[strategy] * (idx + 1) for idx in range(N_GROUPS)], axis=0)
+        expected_factors_tiled = np.tile(expected_factors[strategy], N_GROUPS)
+
+        normalize(adata, strategy=strategy, group_column=BATCH_COLUMN, key_added="norm_factors")
+
+        assert np.allclose(adata.X, expected_result, atol=1e-6, equal_nan=True)
+        assert np.allclose(adata.obs["norm_factors"], expected_factors_tiled, atol=1e-6, equal_nan=True)
+
+    @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
+    @pytest.mark.parametrize("data_type", ["all_equal", "different", "nan"])
     def test_normalize_function_key_added(self, strategy, data_type, test_data_factory) -> None:
         X, expected_arrays, _ = test_data_factory.get_test_data(data_type)
         adata = ad.AnnData(X=X.copy())
