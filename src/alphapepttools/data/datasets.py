@@ -33,6 +33,8 @@ class StudyData:
             - 'psm': Peptide spectrum match (PSM) table
             - 'study_psm': Full study data (metadata + PSM table)
             - 'study_pg': Full study data (metadata + PG table)
+            - 'shapes': Shapes file (geojson)
+            - 'image': Image file
             - 'anndata': AnnData object
     citation
         Citation reference for the study, optional
