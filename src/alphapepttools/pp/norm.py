@@ -144,7 +144,7 @@ def normalize(
         Column name in `adata.obs` defining groups for group-wise normalization.
         If `None` (default), computes statistics across all samples.
         If specified, computes statistics separately for each group.
-        This is useful when working with data from different batches with vastly different intensity distributions.
+        This is useful when working with data from different batches with different intensity distributions.
     key_added
         If not None, adds normalization factors to column in `adata.obs`
     copy
