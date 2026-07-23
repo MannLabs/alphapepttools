@@ -298,14 +298,6 @@ def irs(
             stacklevel=2,
         )
 
-    if (reference_column is not None) and (reference_value is not None):
-        _raise_on_missing_value(
-            adata.obs[reference_column],
-            reference_value,
-            value_name="reference_value",
-            custom_message=f"Column {reference_column!r} does not contain the requested reference value.",
-        )
-
     adata = adata.copy() if copy else adata
 
     data = adata.layers[layer].copy() if layer is not None else adata.X.copy()
@@ -326,6 +318,12 @@ def irs(
     for group_idx, (group_name, group_indices) in enumerate(groups.indices.items()):
         if reference_column is not None:
             group_metadata: pd.DataFrame = groups.get_group(group_name)
+            _raise_on_missing_value(
+                group_metadata[reference_column],
+                reference_value,
+                value_name="reference_value",
+                custom_message=f"Group {group_name!r} does not contain a reference sample.",
+            )
             ref_indices = np.where(group_metadata[reference_column] == reference_value)[0]
             ref_data = data[group_indices, :][ref_indices, :]
         else:
