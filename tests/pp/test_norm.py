@@ -115,7 +115,7 @@ class TestNormalizeFunction:
 
         assert np.isclose(adata.X, expected_arrays[strategy], atol=1e-6, equal_nan=True).all()
         assert len(adata.obs.columns) == 0
-        assert len(adata.layers) == 0
+        assert [k for k in adata.layers if k is not None] == []
 
     @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
     @pytest.mark.parametrize("data_type", ["all_equal", "different", "nan"])

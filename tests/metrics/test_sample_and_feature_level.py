@@ -80,6 +80,31 @@ class TestTotalIntensity:
         with pytest.raises(ValueError, match="not found in adata.layers"):
             total_intensity(qc_adata, layer="nonexistent")
 
+    def test_total_intensity_features_subset(self, qc_adata):
+        """Selecting a subset of features should sum only those columns."""
+        # qc_adata var_names are the default ['0', '1', '2']
+        # Row sums over columns 0 and 1: [1+2, 0+2, 1+0] = [3, 2, 1]
+        expected = np.array([3.0, 2.0, 1.0])
+
+        total_intensity(qc_adata, features=["0", "1"])
+
+        assert np.allclose(qc_adata.obs["total_intensity"].values, expected)
+
+    def test_total_intensity_features_all_missing_raises(self, qc_adata):
+        """If none of the requested features exist, raise ValueError."""
+        with pytest.raises(ValueError, match="None of the specified features were found"):
+            total_intensity(qc_adata, features=["nope_a", "nope_b"])
+
+    def test_total_intensity_features_some_missing_warns(self, qc_adata):
+        """If some requested features are missing, warn but still proceed with the rest."""
+        # Only '0' exists; 'nope' does not. Result is column 0 only: [1, 0, 1]
+        expected = np.array([1.0, 0.0, 1.0])
+
+        with pytest.warns(UserWarning, match="not found in adata.var_names"):
+            total_intensity(qc_adata, features=["0", "nope"])
+
+        assert np.allclose(qc_adata.obs["total_intensity"].values, expected)
+
     def test_total_intensity_axis_var_expected_values(self, qc_adata):
         """Test total_intensity with axis='var' computes correct values."""
         expected = np.array([2.0, 4.0, 3.0])
