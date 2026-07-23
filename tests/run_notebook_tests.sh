@@ -9,7 +9,7 @@ export IS_PYTEST_RUN=True
 # supplementary_02_scalability-demo_PCAn is a supplementary notebook and not part of tutorials/studies yet
 
 # TODO: enable also study_03_biomarker_skin.ipynb
-EXCLUDE_PATTERN="study_03_biomarker_skin|study_04_scDVP|supplementary_02_scalability-demo_PCAn|tutorial_05_tmt-data"
+EXCLUDE_PATTERN="study_03_biomarker_skin|study_04_scDVP|supplementary_02_scalability-demo_PCAn"
 
 ALL_NBS=$(find ../docs/notebooks -name "*.ipynb" | grep -vE "$EXCLUDE_PATTERN")
 
