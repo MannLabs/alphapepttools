@@ -324,9 +324,12 @@ def irs(
                 value_name="reference_value",
                 custom_message=f"Group {group_name!r} does not contain a reference sample.",
             )
+
+            # Estimate reference from group-specific reference samples
             ref_indices = np.where(group_metadata[reference_column] == reference_value)[0]
             ref_data = data[group_indices, :][ref_indices, :]
         else:
+            # If no reference value exists, estimate reference from all samples
             ref_data = data[group_indices, :]
 
         ref_value = np.nanmean(ref_data, axis=0).squeeze()
