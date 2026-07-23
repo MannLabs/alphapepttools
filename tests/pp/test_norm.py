@@ -367,7 +367,7 @@ class TestIRS:
             False,
         ]
 
-        with pytest.raises(ValueError, match="`reference_value` .* does not exist"):
+        with pytest.raises(ValueError, match=r"`reference_value` .* does not exist"):
             irs(
                 adata,
                 reference_column="is_reference__one_missing",
