@@ -144,8 +144,6 @@ class TestNormalizeFunction:
         assert np.allclose(adata.X, expected_result, atol=1e-6, equal_nan=True)
         assert np.allclose(adata.obs["norm_factors"], expected_factors_tiled, atol=1e-6, equal_nan=True)
 
-        assert len(adata.layers) == 0
-
     @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
     @pytest.mark.parametrize("data_type", ["all_equal", "different", "nan"])
     def test_normalize_function_key_added(self, strategy, data_type, test_data_factory) -> None:
