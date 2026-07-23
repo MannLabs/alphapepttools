@@ -346,7 +346,33 @@ class TestIRS:
     def test_irs__reference_value_missing(
         self, irs_data__reference_values: tuple[ad.AnnData, dict, np.ndarray], *, reference_kwargs
     ):
+        """Test that function raises if reference value is not in column"""
         adata, irs_kwargs, _ = irs_data__reference_values
 
         with pytest.raises(ValueError, match="`reference_value` .* does not exist"):
             irs(adata, **reference_kwargs, **irs_kwargs, copy=False, layer=None)
+
+    def test_irs__reference_value_missing_in_group(
+        self, irs_data__reference_values: tuple[ad.AnnData, dict, np.ndarray]
+    ):
+        """Test that function raises if reference value is not available for one group"""
+        adata, irs_kwargs, _ = irs_data__reference_values
+        # reference missing for last group
+        adata.obs["is_reference__one_missing"] = [
+            False,
+            True,
+            False,
+            True,
+            False,
+            False,
+        ]
+
+        with pytest.raises(ValueError, match="`reference_value` .* does not exist"):
+            irs(
+                adata,
+                reference_column="is_reference__one_missing",
+                reference_value=True,
+                **irs_kwargs,
+                copy=False,
+                layer=None,
+            )
