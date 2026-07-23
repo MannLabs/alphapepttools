@@ -13,7 +13,7 @@ jobs:
       contents: read
       pull-requests: write
     steps:
-      - uses: MannLabs/alphashared/actions/code-review@v1.1.9
+      - uses: MannLabs/alphashared/actions/code-review@v1
         continue-on-error: true
         with:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

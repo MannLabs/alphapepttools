@@ -14,3 +14,9 @@ updates:
     commit-message:
       include: scope
       prefix: "[dep]"
+    ignore:
+      # Only update alphashared on major releases (v1, v2, ...), not minor/patch
+      - dependency-name: "MannLabs/alphashared*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"
