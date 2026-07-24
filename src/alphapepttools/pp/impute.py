@@ -130,30 +130,43 @@ def _impute_gaussian(
 
 def impute_gaussian(
     adata: ad.AnnData,
+    *,
+    by: str,
     group_column: str | None = None,
     layer: str | None = None,
     std_offset: float = 1.8,
     std_factor: float = 0.3,
     random_state: int = 42,
-    *,
     copy: bool = False,
 ) -> ad.AnnData:
-    """Impute missing values in each column by random sampling from a gaussian distribution.
+    """Impute missing values by random sampling from a gaussian distribution.
 
-    The distribution is centered at std_offset * feature standard deviation below the
-    feature mean and has a standard deviation of std_factor * feature standard deviation.
-    Can perform global imputation using all samples or group-wise imputation
-    using subsets of samples defined by a categorical variable.
+    This imputation method is suited for missing-not-at-random (MNAR) values, e.g. when
+    values dip below the limit of detection of the instrument. It operates on
+    either samples or features, depending on the `by` parameter. Conceptually,
+    feature-wise imputation focuses on the feature's own detection limit while sample-wise
+    on the specific sample's (i.e. mass spec run's) detection limit.
+
+    NOTE: This kind of imputation risks generating artificially inflated fold-changes
+    in differential expression analyses. We caution against running differential
+    expression on imputed data unless there is a strong rationale for doing so, e.g. in the
+    case of pulldowns where one side could be expected to be missing completely.
+
+    The distribution from which imputed values are sampled is centered at
+    std_offset * standard deviation below the mean and has a standard
+    deviation of std_factor * standard deviation.
 
     Parameters
     ----------
     adata
         AnnData object containing the data to be imputed.
+    by
+        Whether to impute by "sample" or "feature". If "sample", the imputation is performed for each sample (row) independently. If "feature", the imputation is performed for each feature (column) independently.
     group_column
-        Column name in `adata.obs` defining groups for group-wise imputation.
-        If `None` (default), computes statistics across all samples.
-        If specified, computes statistics separately for each group and imputes
-        missing values using the group-specific gaussian distribution.
+        Column name in `adata.obs` or `adata.var`, must be in the orthogonal axis to the `by` parameter (i.e. imputation
+        on sample level only allows grouping by features and vice versa). Imputation for the respective group is performed
+        from a gaussian distribution fitted to the non-missing values of the group.
+        If `None` (default), all samples/features are treated as a single group, depending on the `by` parameter.
         If `group_column` contains NaNs, the respective observations are ignored.
     layer
         Name of the layer to impute. If None (default), the data matrix X is used.
@@ -213,6 +226,9 @@ def impute_gaussian(
     """
     adata = adata.copy() if copy else adata
 
+    if by == "sample":
+        adata = adata.transpose()
+
     data = adata.X if layer is None else adata.layers[layer]
 
     if group_column is None:
@@ -237,6 +253,9 @@ def impute_gaussian(
         adata.X = data
     else:
         adata.layers[layer] = data
+
+    if by == "sample":
+        adata = adata.transpose()
 
     return adata if copy else None
 
