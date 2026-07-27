@@ -453,7 +453,7 @@ def prepare_scree_data_to_plot(
 
 
 def prepare_pca_1d_loadings_data_to_plot(
-    data: ad.AnnData,
+    adata: ad.AnnData,
     dim_space: str,
     dim: int,
     nfeatures: int,
@@ -464,7 +464,7 @@ def prepare_pca_1d_loadings_data_to_plot(
 
     Parameters
     ----------
-    data
+    adata
         AnnData to plot.
     dim_space
         The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection.
@@ -537,19 +537,19 @@ def prepare_pca_1d_loadings_data_to_plot(
     loadings_attr = "varm" if dim_space == "obs" else "obsm"
 
     _validate_pca_loadings_plot_inputs(
-        adata=data, loadings_name=loadings_key, dim=dim, dim2=None, nfeatures=nfeatures, dim_space=dim_space
+        adata=adata, loadings_name=loadings_key, dim=dim, dim2=None, nfeatures=nfeatures, dim_space=dim_space
     )
 
     # create the dataframe for plotting
     dim_z = dim - 1  # to account from 0 indexing
-    loadings_matrix = getattr(data, loadings_attr)[loadings_key]
+    loadings_matrix = getattr(adata, loadings_attr)[loadings_key]
     loadings_df = pd.DataFrame({"dim_loadings": loadings_matrix[:, dim_z]})
 
     # Use appropriate index for features based on dim_space
     if dim_space == "obs":
-        loadings_df["feature"] = data.var.index.astype("string")
+        loadings_df["feature"] = adata.var.index.astype("string")
     else:  # dim_space == "var"
-        loadings_df["feature"] = data.obs.index.astype("string")
+        loadings_df["feature"] = adata.obs.index.astype("string")
 
     loadings_df["abs_loadings"] = loadings_df["dim_loadings"].abs()
     # Sort the DataFrame by absolute loadings and select the top features
@@ -561,7 +561,7 @@ def prepare_pca_1d_loadings_data_to_plot(
 
 
 def prepare_pca_2d_loadings_data_to_plot(
-    data: ad.AnnData,
+    adata: ad.AnnData,
     pc_x: int,
     pc_y: int,
     nfeatures: int,
@@ -577,13 +577,8 @@ def prepare_pca_2d_loadings_data_to_plot(
 
     Parameters
     ----------
-    data
+    adata
         The AnnData object containing PCA results.
-    embiddings_name
-        The custom embeddings name used in PCA. If None, uses default naming convention.
-    method
-        The method used for dimensionality reduction. Options are "pca" or "bpca" with "pca" as the default.
-        This is used to construct the default keys if `embeddings_name` is None.
     pc_x
         The first principal component index (1-based) to extract loadings for.
     pc_y
@@ -592,6 +587,11 @@ def prepare_pca_2d_loadings_data_to_plot(
         Number of top features per PC to highlight based on absolute loadings.
     dim_space
         The dimension space used in PCA. Can be either "obs" or "var".
+    embeddings_name
+        The custom embeddings name used in PCA. If None, uses default naming convention.
+    method
+        The method used for dimensionality reduction. Options are "pca" or "bpca" with "pca" as the default.
+        This is used to construct the default keys if `embeddings_name` is None.
 
     Returns
     -------
@@ -651,7 +651,7 @@ def prepare_pca_2d_loadings_data_to_plot(
     loadings_key = f"PCs_{method}_{dim_space}" if embeddings_name is None else embeddings_name
 
     _validate_pca_loadings_plot_inputs(
-        adata=data, loadings_name=loadings_key, dim=pc_x, dim2=pc_y, nfeatures=nfeatures, dim_space=dim_space
+        adata=adata, loadings_name=loadings_key, dim=pc_x, dim2=pc_y, nfeatures=nfeatures, dim_space=dim_space
     )
 
     dim1_z = pc_x - 1  # convert to 0-based index
@@ -659,7 +659,7 @@ def prepare_pca_2d_loadings_data_to_plot(
 
     # Determine which attribute to use based on dim_space
     loadings_attr = "varm" if dim_space == "obs" else "obsm"
-    orig_loadings = getattr(data, loadings_attr)[loadings_key]
+    orig_loadings = getattr(adata, loadings_attr)[loadings_key]
 
     loadings = pd.DataFrame(
         {
@@ -670,9 +670,9 @@ def prepare_pca_2d_loadings_data_to_plot(
 
     # Add feature names based on dim_space
     if dim_space == "obs":
-        loadings["feature"] = data.var_names
+        loadings["feature"] = adata.var_names
     else:  # dim_space == "var"
-        loadings["feature"] = data.obs_names
+        loadings["feature"] = adata.obs_names
 
     # get only features that were used in the PCA (e.g., those that are part of the core proteome)
     # these would be features with all-NaN loadings in all PC dimensions

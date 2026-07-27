@@ -2127,7 +2127,7 @@ def rank_median_plot(
 
 
 def plot_pca(
-    data: ad.AnnData,
+    adata: ad.AnnData,
     x_column: int = 1,
     y_column: int = 2,
     color: str = "blue",
@@ -2154,7 +2154,7 @@ def plot_pca(
 
     Parameters
     ----------
-    data
+    adata
         AnnData object containing PCA results (must have run PCA first).
     x_column
         Principal component number for x-axis (1-indexed, so 1 = PC1, 2 = PC2, etc.).
@@ -2163,7 +2163,7 @@ def plot_pca(
     color
         Single color for all points. Overridden by color_map_column or color_column.
     color_map_column
-        Column in data.obs (for dim_space="obs") or data.var (for dim_space="var") to use
+        Column in adata.obs (for dim_space="obs") or adata.var (for dim_space="var") to use
         for color encoding. Values are mapped to colors using palette or color_dict.
         Overrides the color parameter.
     color_column
@@ -2183,7 +2183,7 @@ def plot_pca(
         Whether to add text labels to points in the scatter plot.
     label_column
         Column to use for point labels. If None and label=True, uses the index
-        (data.obs.index for dim_space="obs", data.var.index for dim_space="var").
+        (adata.obs.index for dim_space="obs", adata.var.index for dim_space="var").
     ax
         Matplotlib axes to plot on. If None, a new figure is created.
     palette
@@ -2203,7 +2203,7 @@ def plot_pca(
 
         fig, ax = plt.subplots()
         Plots.plot_pca(
-            data=adata,
+            adata=adata,
             ax=ax,
             x_column=1,
             y_column=2,
@@ -2217,7 +2217,7 @@ def plot_pca(
 
         fig, ax = plt.subplots()
         Plots.plot_pca(
-            data=adata,
+            adata=adata,
             ax=ax,
             x_column=2,  # PC2
             y_column=3,  # PC3
@@ -2234,7 +2234,7 @@ def plot_pca(
         # Show how proteins/genes relate to each other in PC space
         fig, ax = plt.subplots()
         Plots.plot_pca(
-            data=adata,
+            adata=adata,
             ax=ax,
             x_column=1,
             y_column=2,
@@ -2260,7 +2260,7 @@ def plot_pca(
         ax = axm.next()
 
     adata_pca = extract_pca_anndata(
-        data,
+        adata,
         dim_space=dim_space,
         embeddings_name=embeddings_name,
         expression_columns=[color_map_column] if color_map_column is not None else None,
@@ -2296,9 +2296,9 @@ def plot_pca(
     if label:
         # For labeling, we need to consider the appropriate observation space
         if dim_space == "obs":
-            labels = data.obs.index if label_column is None else data_column_to_array(data, label_column)
+            labels = adata.obs.index if label_column is None else data_column_to_array(adata, label_column)
         else:  # dim_space == "var"
-            labels = data.var.index if label_column is None else data_column_to_array(data, label_column)
+            labels = adata.var.index if label_column is None else data_column_to_array(adata, label_column)
 
         # Create a DataFrame with the PCA coordinates and labels for the new label_plot interface
         label_df = pd.DataFrame({"x": adata_pca.X[:, x_column - 1], "y": adata_pca.X[:, y_column - 1], "label": labels})
@@ -2408,7 +2408,7 @@ def scree_plot(
 
 
 def plot_pca_loadings(
-    data: ad.AnnData,
+    adata: ad.AnnData,
     ax: plt.Axes,
     dim_space: str = "obs",
     embeddings_name: str | None = None,
@@ -2426,7 +2426,7 @@ def plot_pca_loadings(
 
     Parameters
     ----------
-    data
+    adata
         AnnData object containing PCA results (must have run PCA first).
     ax
         Matplotlib axes object to plot on.
@@ -2455,7 +2455,7 @@ def plot_pca_loadings(
 
         fig, ax = plt.subplots()
         Plots.plot_pca_loadings(
-            data=adata,
+            adata=adata,
             ax=ax,
             dim=1,
             nfeatures=20,
@@ -2466,7 +2466,7 @@ def plot_pca_loadings(
     .. code-block:: python
 
         fig, ax = plt.subplots()
-        Plots.plot_pca_loadings(data=adata, ax=ax, dim=3, nfeatures=30, scatter_kwargs={"s": 50, "alpha": 0.8})
+        Plots.plot_pca_loadings(adata=adata, ax=ax, dim=3, nfeatures=30, scatter_kwargs={"s": 50, "alpha": 0.8})
 
     Feature space loadings (var projection):
 
@@ -2475,7 +2475,7 @@ def plot_pca_loadings(
         # Show which samples most influence feature PC1
         fig, ax = plt.subplots()
         Plots.plot_pca_loadings(
-            data=adata,
+            adata=adata,
             ax=ax,
             dim=1,
             dim_space="var",
@@ -2495,7 +2495,7 @@ def plot_pca_loadings(
     scatter_kwargs = scatter_kwargs or {}
 
     top_loadings = prepare_pca_1d_loadings_data_to_plot(
-        data=data,
+        adata=adata,
         dim_space=dim_space,
         embeddings_name=embeddings_name,
         method=method,
@@ -2519,7 +2519,7 @@ def plot_pca_loadings(
 
 
 def plot_pca_loadings_2d(
-    data: ad.AnnData,
+    adata: ad.AnnData,
     ax: plt.Axes,
     dim_space: str = "obs",
     embeddings_name: str | None = None,
@@ -2541,7 +2541,7 @@ def plot_pca_loadings_2d(
 
     Parameters
     ----------
-    data
+    adata
         AnnData to plot.
     ax
         Matplotlib axes object to plot on.
@@ -2579,7 +2579,7 @@ def plot_pca_loadings_2d(
 
         fig, ax = plt.supplots()
         Plots.plot_pca_loadings_2d(
-            data=adata,
+            adata=adata,
             ax=ax,
             pc_x=1,
             pc_y=2,
@@ -2604,7 +2604,7 @@ def plot_pca_loadings_2d(
     # Generate the correct loadings key name
 
     loadings_df = prepare_pca_2d_loadings_data_to_plot(
-        data=data,
+        adata=adata,
         embeddings_name=embeddings_name,
         method=method,
         pc_x=pc_x,
