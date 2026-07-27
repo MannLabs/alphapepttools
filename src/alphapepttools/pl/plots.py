@@ -2408,7 +2408,7 @@ def scree_plot(
 
 
 def plot_pca_loadings(
-    data: ad.AnnData,
+    adata: ad.AnnData,
     ax: plt.Axes,
     dim_space: str = "obs",
     embeddings_name: str | None = None,
@@ -2426,7 +2426,7 @@ def plot_pca_loadings(
 
     Parameters
     ----------
-    data
+    adata
         AnnData object containing PCA results (must have run PCA first).
     ax
         Matplotlib axes object to plot on.
@@ -2455,7 +2455,7 @@ def plot_pca_loadings(
 
         fig, ax = plt.subplots()
         Plots.plot_pca_loadings(
-            data=adata,
+            adata=adata,
             ax=ax,
             dim=1,
             nfeatures=20,
@@ -2466,7 +2466,7 @@ def plot_pca_loadings(
     .. code-block:: python
 
         fig, ax = plt.subplots()
-        Plots.plot_pca_loadings(data=adata, ax=ax, dim=3, nfeatures=30, scatter_kwargs={"s": 50, "alpha": 0.8})
+        Plots.plot_pca_loadings(adata=adata, ax=ax, dim=3, nfeatures=30, scatter_kwargs={"s": 50, "alpha": 0.8})
 
     Feature space loadings (var projection):
 
@@ -2475,7 +2475,7 @@ def plot_pca_loadings(
         # Show which samples most influence feature PC1
         fig, ax = plt.subplots()
         Plots.plot_pca_loadings(
-            data=adata,
+            adata=adata,
             ax=ax,
             dim=1,
             dim_space="var",
@@ -2495,7 +2495,7 @@ def plot_pca_loadings(
     scatter_kwargs = scatter_kwargs or {}
 
     top_loadings = prepare_pca_1d_loadings_data_to_plot(
-        data=data,
+        adata=adata,
         dim_space=dim_space,
         embeddings_name=embeddings_name,
         method=method,

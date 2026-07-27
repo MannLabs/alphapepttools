@@ -453,7 +453,7 @@ def prepare_scree_data_to_plot(
 
 
 def prepare_pca_1d_loadings_data_to_plot(
-    data: ad.AnnData,
+    adata: ad.AnnData,
     dim_space: str,
     dim: int,
     nfeatures: int,
@@ -464,7 +464,7 @@ def prepare_pca_1d_loadings_data_to_plot(
 
     Parameters
     ----------
-    data
+    adata
         AnnData to plot.
     dim_space
         The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection.
@@ -537,19 +537,19 @@ def prepare_pca_1d_loadings_data_to_plot(
     loadings_attr = "varm" if dim_space == "obs" else "obsm"
 
     _validate_pca_loadings_plot_inputs(
-        adata=data, loadings_name=loadings_key, dim=dim, dim2=None, nfeatures=nfeatures, dim_space=dim_space
+        adata=adata, loadings_name=loadings_key, dim=dim, dim2=None, nfeatures=nfeatures, dim_space=dim_space
     )
 
     # create the dataframe for plotting
     dim_z = dim - 1  # to account from 0 indexing
-    loadings_matrix = getattr(data, loadings_attr)[loadings_key]
+    loadings_matrix = getattr(adata, loadings_attr)[loadings_key]
     loadings_df = pd.DataFrame({"dim_loadings": loadings_matrix[:, dim_z]})
 
     # Use appropriate index for features based on dim_space
     if dim_space == "obs":
-        loadings_df["feature"] = data.var.index.astype("string")
+        loadings_df["feature"] = adata.var.index.astype("string")
     else:  # dim_space == "var"
-        loadings_df["feature"] = data.obs.index.astype("string")
+        loadings_df["feature"] = adata.obs.index.astype("string")
 
     loadings_df["abs_loadings"] = loadings_df["dim_loadings"].abs()
     # Sort the DataFrame by absolute loadings and select the top features
