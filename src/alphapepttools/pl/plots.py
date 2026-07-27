@@ -2604,7 +2604,7 @@ def plot_pca_loadings_2d(
     # Generate the correct loadings key name
 
     loadings_df = prepare_pca_2d_loadings_data_to_plot(
-        data=data,
+        adata=data,
         embeddings_name=embeddings_name,
         method=method,
         pc_x=pc_x,
