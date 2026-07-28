@@ -31,6 +31,7 @@ notebooks/tutorials/tutorial_02_basic_plotting_workflow
 notebooks/tutorials/tutorial_03_basic_PCA_workflow
 notebooks/tutorials/tutorial_04_volcanoplot
 notebooks/tutorials/tutorial_05_tmt-data
+notebooks/supplementary/supplementary_02_scalability-demo_PCAn.ipynb
 notebooks/supplementary/supplementary_01_filtering_demo
 
 ```
