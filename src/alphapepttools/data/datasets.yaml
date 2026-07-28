@@ -3,40 +3,40 @@
   search_engine: alphadia
   citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
   data_type: study_pg
-  description: Study on Cerebral Spinal Fluid of Alzheimer patients by Bader et al.
+  description: "Study on Cerebral Spinal Fluid of Alzheimer patients by Bader et al."
 
 - name: bader2020_pg_diann
   url: https://datashare.biochem.mpg.de/s/3oZsya2L5bGnmtQ
   search_engine: DiaNN
   citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
   data_type: study_pg
-  description: Study on Cerebral Spinal Fluid of Alzheimer patients by Bader et al.
+  description: "Study on Cerebral Spinal Fluid of Alzheimer patients by Bader et al."
 
 - name: spectronaut_pg
   url: https://datashare.biochem.mpg.de/s/Ai9TiBTeaPHK5by
   search_engine: spectronaut
   data_type: pg
-  description: An example spectronaut report
+  description: "An example spectronaut report"
 
 - name: bader2020_psm_alphadia
   url: https://datashare.biochem.mpg.de/s/awYyxod4ksz86kk
   search_engine: alphadia
   citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
   data_type: study_psm
-  description: Study on Cerebral Spinal Fluid of Alzheimer patients by Bader et al.
+  description: "Study on Cerebral Spinal Fluid of Alzheimer patients by Bader et al."
 
 - name: bader2020_psm_diann
   url: https://datashare.biochem.mpg.de/s/c4Z5Yg6srKQyDym
   search_engine: DiaNN
   citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
   data_type: study_psm
-  description: Study on Cerebral Spinal Fluid of Alzheimer patients by Bader et al.
+  description: "Study on Cerebral Spinal Fluid of Alzheimer patients by Bader et al."
 
 - name: spectronaut_psm
   url: https://datashare.biochem.mpg.de/s/GtfJL49Rf9w78EE
   search_engine: spectronaut
   data_type: study_psm
-  description: An example spectronaut report
+  description: "An example spectronaut report"
 
 # Bader2020 full DIANN report (PSM-level) for workflow tutorials
 - name: bader2020_full_diann
@@ -44,7 +44,7 @@
   search_engine: DiaNN
   citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
   data_type: psm
-  description: Full DiaNN report.parquet for the Bader et al. Alzheimer CSF study
+  description: "Full DiaNN report.parquet for the Bader et al. Alzheimer CSF study"
 
 # Bader2020 sample metadata
 - name: bader2020_metadata
@@ -52,20 +52,20 @@
   search_engine: none
   data_type: metadata
   citation: "Bader JM, Geyer PE, Müller JB, Strauss MT, Koch M, Leypoldt F, Koertvelyessy P, Bittner D, Schipke CG, Incesoy EI, Peters O, Deigendesch N, Simons M, Jensen MK, Zetterberg H, Mann M. Proteome profiling in cerebrospinal fluid reveals novel biomarkers of Alzheimer's disease. Mol Syst Biol. 2020 Jun;16(6):e9356. doi: 10.15252/msb.20199356. PMID: 32485097; PMCID: PMC7266499."
-  description: Sample metadata for the Bader et al. Alzheimer CSF study
+  description: "Sample metadata for the Bader et al. Alzheimer CSF study"
 
 # HeLa QC dataset for PCA workflow tutorial
 - name: hela_pg_diann
   url: https://datashare.biochem.mpg.de/s/XDi34GJpGHBgm5x
   search_engine: DiaNN
   data_type: pg
-  description: HeLa QC protein group matrix from DiaNN (report.pg_matrix.tsv)
+  description: "HeLa QC protein group matrix from DiaNN (report.pg_matrix.tsv)"
 
 - name: hela_metadata
   url: https://datashare.biochem.mpg.de/s/aHpXSLX9RxbYPzp
   search_engine: none
   data_type: metadata
-  description: HeLa QC sample metadata (simple_metadata.csv)
+  description: "HeLa QC sample metadata (simple_metadata.csv)"
 
 # PELSA study datasets for differential expression tutorial
 - name: pelsa_report_diann
@@ -73,46 +73,46 @@
   search_engine: DiaNN
   citation: "Li, Kejia, et al. A peptide-centric local stability assay enables proteome-scale identification of the protein targets and binding regions of diverse ligands. Nature Methods 22.2 (2025): 278-282."
   data_type: psm
-  description: PELSA Staurosporine study DiaNN report for differential expression analysis
+  description: "PELSA Staurosporine study DiaNN report for differential expression analysis"
 
 - name: pelsa_metadata
   url: https://datashare.biochem.mpg.de/s/NGof744gWw66Mc8
   search_engine: none
   data_type: metadata
   citation: "Li, Kejia, et al. A peptide-centric local stability assay enables proteome-scale identification of the protein targets and binding regions of diverse ligands. Nature Methods 22.2 (2025): 278-282."
-  description: Sample metadata for the PELSA Staurosporine study
+  description: "Sample metadata for the PELSA Staurosporine study"
 
 - name: kinase_table
   url: https://datashare.biochem.mpg.de/s/DnNe8EFSQyqy5pb
   search_engine: none
   data_type: annotation
   citation: "Manning, Gerard, et al. The protein kinase complement of the human genome. Science 298.5600 (2002): 1912-1934."
-  description: Human kinase annotation table from kinhub.org
+  description: "Human kinase annotation table from kinhub.org"
 
 # Small example reports for PSM reader tutorial
 - name: alphadia_1.8.1_psm_report
   url: https://datashare.biochem.mpg.de/s/ZBAGvQb4j2Lh0fo
   search_engine: alphadia
   data_type: psm
-  description: Small example reports for testing PSM readers (AlphaDIA 1.8.1)
+  description: "Small example reports for testing PSM readers (AlphaDIA 1.8.1)"
 
 - name: alphadia_2.0.0_psm_report
   url: https://datashare.biochem.mpg.de/s/FoTMb5Gmk9qgZtr
   search_engine: alphadia
   data_type: psm
-  description: Small example reports for testing PSM readers (AlphaDIA 2.0.0, parquet)
+  description: "Small example reports for testing PSM readers (AlphaDIA 2.0.0, parquet)"
 
 - name: diann_1.8.1_psm_report
   url: https://datashare.biochem.mpg.de/s/DQeP6FYDFYcXadd
   search_engine: diann
   data_type: psm
-  description: Small example reports for testing PSM readers (DiaNN 1.8.1)
+  description: "Small example reports for testing PSM readers (DiaNN 1.8.1)"
 
 - name: diann_1.9.0_psm_report
   url: https://datashare.biochem.mpg.de/s/N65ZsaaX74eesx7
   search_engine: diann
   data_type: psm
-  description: Small example reports for testing PSM readers (DiaNN 1.9.0, parquet)
+  description: "Small example reports for testing PSM readers (DiaNN 1.9.0, parquet)"
 
 - name: albrecht_pcan
   url: https://datashare.biochem.mpg.de/s/Bn6R9FQRj3Jn2ZB
@@ -127,20 +127,41 @@
   search_engine: directlfq
   data_type: pg
   citation: "Weiss, Caroline A. M., et el. Single cell spatial proteomics maps human liver zonation patterns and their vulnerability to fibrosis. bioRxiv 2025.04.13.648568; doi: https://doi.org/10.1101/2025.04.13.648568"
-  description: DVP study on single hepatocytes from livers of healthy donors and patients with desmolapsia.
+  description: "DVP study on single hepatocytes from livers of healthy donors and patients with desmolapsia."
 
 - name: Weiss2026_metadata
   url: https://datashare.biochem.mpg.de/s/57Zbo6KroKsG3Rx
-  search_engine: none
+  search_engine: null
   data_type: metadata
   citation: "Weiss, Caroline A. M., et el. Single cell spatial proteomics maps human liver zonation patterns and their vulnerability to fibrosis. bioRxiv 2025.04.13.648568; doi: https://doi.org/10.1101/2025.04.13.648568"
-  description: DVP study on single hepatocytes from livers of healthy donors and patients with desmolapsia.
+  description: "DVP study on single hepatocytes from livers of healthy donors and patients with desmolapsia."
+
+- name: Weiss2026_shapes
+  url: https://datashare.biochem.mpg.de/s/eeebAfieZCG6TDA
+  search_engine: null
+  data_type: shapes
+  citation: "Weiss, Caroline A. M., et el. Single cell spatial proteomics maps human liver zonation patterns and their vulnerability to fibrosis. bioRxiv 2025.04.13.648568; doi: https://doi.org/10.1101/2025.04.13.648568"
+  description: "Example shapes derived from DVP study on single hepatocytes from livers of healthy donors and patients with desmolapsia."
+
+- name: Weiss2026_image
+  url: https://datashare.biochem.mpg.de/s/tKEDY5mPzxFED2H
+  search_engine: null
+  data_type: image
+  citation: "Weiss, Caroline A. M., et el. Single cell spatial proteomics maps human liver zonation patterns and their vulnerability to fibrosis. bioRxiv 2025.04.13.648568; doi: https://doi.org/10.1101/2025.04.13.648568"
+  description: "Example image derived from DVP study on single hepatocytes from livers of healthy donors and patients with desmolapsia."
 
 - name: Uniprot_to_GeneSymbol_file
   url: https://datashare.biochem.mpg.de/s/GHY7gFskLQBeQyR
-  search_engine: none
+  search_engine: null
   data_type: annotation
-  description: File to convert Uniprot IDs (Swiss-Prot) into Gene Symbols (same version used in study).
+  description: "File to convert Uniprot IDs (Swiss-Prot) into Gene Symbols (same version used in study)."
+
+- name: khan2018
+  url: https://datashare.biochem.mpg.de/s/943T3jg7g9HBaiN
+  search_engine: none
+  data_type: anndata
+  citation: "Khan, S.Y., Ali, M., Kabir, F., Renuse, S., Na, C.H., Talbot, C.C., Hackett, S.F. and Riazuddin, S.A., 2018. Proteome Profiling of Developing Murine Lens Through Mass Spectrometry. Investigative Ophthalmology & Visual Science, 59(1), pp.100-107."
+  description: "TMT dataset of murine lenses at different developmental stages."
 
 - name: lehtioe2021_pg
   url: "https://datashare.biochem.mpg.de/s/4EPk8ZZK3CAm2Zg"
