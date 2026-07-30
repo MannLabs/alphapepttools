@@ -157,7 +157,7 @@ def coefficient_of_variation(
                 "Drop or relabel the corresponding observations before computing groupwise CVs."
             )
 
-        groups = adata.obs.groupby(group_column, dropna=True).indices
+        groups = adata.obs.groupby(group_column, dropna=True, observed=False).indices
         adata.varm[key_added] = pd.DataFrame(
             {name: _cv(data[idx, :], min_valid=min_valid, axis=0) for name, idx in groups.items()},
             index=adata.var_names,
@@ -241,7 +241,7 @@ def _compute_pooled_groupwise_metric(
         print(pcv_groupwise)  # {'control': 0.25, 'treated': 0.31}
 
     """
-    groups = adata.obs.groupby(group_column)
+    groups = adata.obs.groupby(group_column, observed=False)
     data = adata.X if layer is None else adata.layers[layer]
 
     metrics = {}

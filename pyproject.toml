@@ -29,6 +29,8 @@ dependencies = [
   "bpca>=0.1",
   "cmcrameri",          # TODO: remove this to optional dependencies?
   "matplotlib>=3.10.5", # 3.10.5 contains a critical fix (https://github.com/matplotlib/matplotlib/pull/30217) to make matplotlib compatible with python 3.14
+  "mudata",
+  "mulink",
   "openpyxl",
   "pyarrow",
   "scanpy",
@@ -70,6 +72,8 @@ optional-dependencies.stable = [
   "bpca==0.1",
   "cmcrameri==1.9",
   "matplotlib==3.10.8",
+  "mudata==0.3.8",
+  "mulink==0.0.1",
   "openpyxl==3.1.5",
   "pyarrow==23.0.1",
   "scanpy==1.11.5",     # scanpy version 1.12 dropped support for python<3.12
