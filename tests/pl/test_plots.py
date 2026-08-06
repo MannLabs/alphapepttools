@@ -64,7 +64,7 @@ def extract_label_plot_data(ax):
     texts = ax.texts
 
     line_dfs = []
-    for line, text in zip(lines, texts, strict=False):
+    for line, text in zip(lines, texts, strict=True):
         x_left, x_right = line.get_xdata()
         y_left, y_right = line.get_ydata()
         label = text.get_text()
@@ -98,9 +98,18 @@ def extract_label_plot_data(ax):
         (
             pd.DataFrame(
                 {
-                    "x": [2, 1, 2, 1, 2, 1],
-                    "y": [2, 2.1, 3, 3.1, 1, 1.1],
-                    "label": ["middle_right", "middle_left", "top_right", "top_left", "bottom_right", "bottom_left"],
+                    "x": [2, 1, 2, 1, 2, 1, np.nan, 1],
+                    "y": [2, 2.1, 3, 3.1, 1, 1.1, 2.5, np.nan],
+                    "label": [
+                        "middle_right",
+                        "middle_left",
+                        "top_right",
+                        "top_left",
+                        "bottom_right",
+                        "bottom_left",
+                        "dropped_nan_x",
+                        "dropped_nan_y",
+                    ],
                 }
             ),
             "x",
@@ -121,9 +130,18 @@ def extract_label_plot_data(ax):
         (
             pd.DataFrame(
                 {
-                    "x": [2, 1, 2, 1, 2, 1],
-                    "y": [2, 2.1, 3, 3.1, 1, 1.1],
-                    "label": ["middle_right", "middle_left", "top_right", "top_left", "bottom_right", "bottom_left"],
+                    "x": [2, 1, 2, 1, 2, 1, np.nan, 1],
+                    "y": [2, 2.1, 3, 3.1, 1, 1.1, 2.5, np.nan],
+                    "label": [
+                        "middle_right",
+                        "middle_left",
+                        "top_right",
+                        "top_left",
+                        "bottom_right",
+                        "bottom_left",
+                        "dropped_nan_x",
+                        "dropped_nan_y",
+                    ],
                 }
             ),
             "x",
