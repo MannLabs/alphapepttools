@@ -16,6 +16,7 @@
     pp.nanlog
     pp.detect_special_values
     pp.normalize
+    pp.irs
     pp.impute_gaussian
     pp.impute_median
     pp.impute_knn
@@ -122,6 +123,7 @@
     io.read_psm_table
     io.read_pg_table
     io.AnnDataFactory
+    io.mulink_from_anndatas
     io.list_available_reader
 ```
 

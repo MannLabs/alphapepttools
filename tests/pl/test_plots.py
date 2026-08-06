@@ -302,18 +302,18 @@ def test__extract_groupwise_plotting_data(
 ):
     adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
 
-    data_lists, labels, positions = _extract_groupwise_plotting_data(
+    data_lists, labels, positions, color_keys = _extract_groupwise_plotting_data(
         data=adata, grouping_column=grouping_column, value_column=value_column, direct_columns=direct_columns
     )
 
     assert data_lists == expected_data
     assert labels == expected_labels
     assert positions == expected_positions
+    # In flat mode color_keys mirrors labels so a label-keyed color_dict still works.
+    assert color_keys == expected_labels
 
 
 ### Test drop_nan_coordinate_points — alignment contract ###
-
-
 def test_drop_nan_coordinate_points_keeps_arrays_aligned():
     """NaN in x or y at index i should drop labels[i] in lockstep — same length, same order."""
     x = np.array([1.0, np.nan, 3.0, 4.0])
@@ -527,3 +527,30 @@ def test_extract_plot_layer_specs_four_elements():
 def test_extract_plot_layer_specs_validation(layer_specs, expected_exception, match):
     with pytest.raises(expected_exception, match=match):
         _extract_plot_layer_specs(layer_specs)
+
+
+def test__extract_groupwise_plotting_data_subgrouped():
+    """Subgroup mode dodges positions, emits one cell per (group, subgroup),
+    keeps labels per-cell as the main group, and emits subgroup values as color_keys.
+    """
+    df = pd.DataFrame(
+        {
+            "precursor": ["P1", "P1", "P1", "P1", "P2", "P2", "P2", "P2"],
+            "condition": ["ctrl", "ctrl", "treat", "treat", "ctrl", "ctrl", "treat", "treat"],
+            "intensity": [1.0, 2.0, 10.0, 20.0, 3.0, 4.0, 30.0, 40.0],
+        }
+    )
+
+    data_lists, labels, positions, color_keys = _extract_groupwise_plotting_data(
+        data=df,
+        grouping_column="precursor",
+        value_column="intensity",
+        subgroup_column="condition",
+        width=0.4,
+    )
+
+    assert data_lists == [[1.0, 2.0], [10.0, 20.0], [3.0, 4.0], [30.0, 40.0]]
+    assert labels == ["P1", "P1", "P2", "P2"]
+    assert color_keys == ["ctrl", "treat", "ctrl", "treat"]
+    # With width=0.4 and 2 subgroups: offsets = [-0.2, +0.2] around each main-group integer.
+    assert positions == pytest.approx([-0.2, 0.2, 0.8, 1.2])
