@@ -1696,7 +1696,7 @@ def barplot(
     subgroup_column: str | None = None,
     width: float = 0.4,
     alpha: float = 0.5,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     legend_kwargs: dict | None = None,
 ) -> None:
     """Plot a bar chart from a DataFrame or AnnData object
@@ -1860,7 +1860,7 @@ def boxplot(
     subgroup_column: str | None = None,
     width: float = 0.4,
     alpha: float = 0.5,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     legend_kwargs: dict | None = None,
 ) -> None:
     """Plot a box plot from a DataFrame or AnnData object
@@ -2035,7 +2035,7 @@ def violinplot(
     subgroup_column: str | None = None,
     width: float = 0.4,
     alpha: float = 0.5,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     legend_kwargs: dict | None = None,
 ) -> None:
     """Plot a violin plot from a DataFrame or AnnData object
