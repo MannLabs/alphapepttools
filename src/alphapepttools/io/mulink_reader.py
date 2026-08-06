@@ -1,4 +1,5 @@
 # Reader wrapper to generate MuLink (https://github.com/lucas-diedrich/mulink) instances from reports
+# Port from https://github.com/lucas-diedrich/mulink/blob/main/docs/notebooks/protein-data.ipynb?short_path=4fbb043, with adjustments to build a MuLink instance from a set of AnnData objects rather than a PSM-table
 
 import importlib
 from typing import Literal
@@ -13,7 +14,9 @@ from tqdm import tqdm
 
 from alphapepttools.io.reader_columns import ALPHAPEPTTOOLS_FEATURE_ID_NAME, FEATURE_LEVEL_CONFIG
 
-# Port from https://github.com/lucas-diedrich/mulink/blob/main/docs/notebooks/protein-data.ipynb?short_path=4fbb043, with adjustments to build a MuLink instance from a set of AnnData objects rather than a PSM-table
+# Mudata changed the settings override context manager from a module to a method in version 0.4
+# see: https://mudata.readthedocs.io/latest/changelog.html
+mudata_options_context = getattr(md, "set_options", None) or md.settings.override
 
 
 def _sparse_matrix_mapping(
@@ -234,10 +237,8 @@ def mulink_from_anndatas(
         transitive_closure=transitive_closure,
     )
 
-    # pull_on_update=False adopts mudata 0.4 behavior: mdata.var stays clean (just
-    # modality/feature membership), without merging per-modality var columns across
-    # incompatible feature levels.
-    with md.set_options(pull_on_update=False):
+    # Do not merge per-modality var columns across incompatible feature levels.
+    with mudata_options_context(pull_on_update=False):
         mdata = md.MuData(data=anndatas)
 
     # IMPORTANT: features in the adjacency matrix need to be aligned with the variable order in the mdata object
