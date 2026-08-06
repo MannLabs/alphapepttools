@@ -16,11 +16,13 @@
     pp.nanlog
     pp.detect_special_values
     pp.normalize
+    pp.irs
     pp.impute_gaussian
     pp.impute_median
     pp.impute_knn
     pp.impute_bpca
     pp.scanpy_pycombat
+    pp.drop_singleton_batches
 
 ```
 
@@ -40,14 +42,13 @@
     tl.nan_safe_ttest_ind
     tl.diff_exp_ttest
     tl.diff_exp_alphaquant
+    tl.diff_exp_ebayes
     tl.pca
     tl.bpca
-    tl.diff_exp_ebayes
     tl.extract_pca_anndata
     tl.prepare_pca_1d_loadings_data_to_plot
     tl.prepare_pca_2d_loadings_data_to_plot
     tl.prepare_scree_data_to_plot
-    tl.prepare_pca_1d_loadings_data_to_plot
 ```
 
 ## Metrics
@@ -85,12 +86,28 @@
     pl.BaseColormaps
     pl.BaseColors
     pl.BasePalettes
+    pl.MappedColormaps
+    pl.show_rgba_color_list
+    pl.PlotConfig
+    pl.make_scatter_config
     pl.add_legend_to_axes
     pl.add_legend_to_axes_from_patches
     pl.create_figure
     pl.label_axes
     pl.save_figure
     pl.get_color_mapping
+    pl.layered_plot
+    pl.histogram
+    pl.scatter
+    pl.barplot
+    pl.boxplot
+    pl.violinplot
+    pl.rank_median_plot
+    pl.plot_pca
+    pl.scree_plot
+    pl.plot_pca_loadings
+    pl.plot_pca_loadings_2d
+    pl.volcano
 ```
 
 ## IO
@@ -107,6 +124,7 @@
     io.read_psm_table
     io.read_pg_table
     io.AnnDataFactory
+    io.mulink_from_anndatas
     io.list_available_reader
 ```
 

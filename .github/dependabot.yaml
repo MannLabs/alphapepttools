@@ -1,0 +1,22 @@
+# Set update schedule for GitHub Actions
+
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      # Check for updates to GitHub Actions every week
+      interval: "weekly"
+    # Do not pull most recent updates to ensure that security issues get detected
+    # This only applies for version updates, i.e. security-relevant releases are immediately applied
+    cooldown:
+      default-days: 7
+    commit-message:
+      include: scope
+      prefix: "[dep]"
+    ignore:
+      # Only update alphashared on major releases (v1, v2, ...), not minor/patch
+      - dependency-name: "MannLabs/alphashared*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"

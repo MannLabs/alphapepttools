@@ -3,6 +3,7 @@
 import logging
 import numbers
 import warnings
+from typing import Literal
 
 import anndata as ad
 import numpy as np
@@ -511,11 +512,12 @@ def data_column_to_array(
     ----------
     data
         Data to extract the column from.
-    column
-        Column name to extract. If data is of type ad.AnnData, var_names is considered
-        first for the column names. If the column is not found in var_names, the columns
-        of data.obs are considered. If the column is not found in either, a ValueError
-        is raised.
+    column : str
+        Column to extract. If data is of type ad.AnnData, the hierarchy to match fields is
+        - var_names first
+        - obs columns
+        - var columns
+        If the column is not found in either, a ValueError is raised.
 
     Returns
     -------
@@ -562,21 +564,18 @@ def data_column_to_array(
     if isinstance(data, pd.DataFrame):
         if column not in data.columns:
             raise ValueError(f"Column {column} not found in DataFrame.")
+
         return data[column].to_numpy()
 
     if isinstance(data, ad.AnnData):
-        # prioritize var_names, i.e. numeric data from X
         if column in data.var_names:
             col_idx = data.var_names.get_loc(column)
-            logging.info(f"Column '{column}' found in: data.var_names. Using that")
             return data.X[:, col_idx].flatten()
 
         if column in data.obs.columns:
-            logging.info(f"Column '{column}' found in: data.obs.columns. Using that")
             return data.obs[column].to_numpy()
 
         if column in data.var.columns:
-            logging.info(f"Column '{column}' found in: data.var.columns. Using that")
             return data.var[column].to_numpy()
 
         raise ValueError(
@@ -584,6 +583,130 @@ def data_column_to_array(
         )
 
     raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
+
+
+def data_index_to_array(
+    data: pd.DataFrame | ad.AnnData,
+    dim_space: str = "obs",
+) -> np.ndarray:
+    """Get indices from a DataFrame or an AnnData object
+
+    Parameters
+    ----------
+    data : pd.DataFrame | ad.AnnData
+        Data to extract indices from.
+    dim_space : str, optional
+        Dimension space to extract indices from. Either "obs" for observation/row indices
+        or "var" for variable/column indices. By default "obs".
+
+    Returns
+    -------
+    np.ndarray
+        The indices as a numpy array
+
+    Raises
+    ------
+    ValueError
+        If dim_space is not "obs" or "var"
+    TypeError
+        If data is not a DataFrame or AnnData object
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import anndata as ad
+    >>> import numpy as np
+    >>>
+    >>> # DataFrame example
+    >>> df = pd.DataFrame({"A": [1, 2, 3]}, index=["row1", "row2", "row3"])
+    >>> data_index_to_array(df, "obs")
+    array(['row1', 'row2', 'row3'], dtype=object)
+    >>> data_index_to_array(df, "var")
+    array(['A'], dtype=object)
+    >>>
+    >>> # AnnData example
+    >>> adata = ad.AnnData(np.random.rand(3, 2))
+    >>> adata.obs_names = ["cell1", "cell2", "cell3"]
+    >>> adata.var_names = ["gene1", "gene2"]
+    >>> data_index_to_array(adata, "obs")
+    array(['cell1', 'cell2', 'cell3'], dtype=object)
+    >>> data_index_to_array(adata, "var")
+    array(['gene1', 'gene2'], dtype=object)
+    """
+    if dim_space not in ["obs", "var"]:
+        raise ValueError(f"dim_space must be 'obs' or 'var', got '{dim_space}'")
+
+    if isinstance(data, pd.DataFrame):
+        if dim_space == "obs":
+            return data.index.to_numpy()
+        # dim_space == "var"
+        return data.columns.to_numpy()
+
+    if isinstance(data, ad.AnnData):
+        if dim_space == "obs":
+            return data.obs_names.to_numpy()
+        # dim_space == "var"
+        return data.var_names.to_numpy()
+
+    raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
+
+
+def _tolist(
+    obj: str | list,
+) -> list:
+    return obj if isinstance(obj, list) else [obj]
+
+
+def subset_data(
+    data: pd.DataFrame | ad.AnnData,
+    idxs: pd.Index | list[int],
+) -> pd.DataFrame | ad.AnnData:
+    """Subset data based on indices
+
+    filtering data based on provided indices, handle both pd.DataFrame and AnnData objects.
+    The returned object is a copy of the input data with only the specified indices.
+
+    Parameters
+    ----------
+    data : pd.DataFrame | ad.AnnData
+        Data to subset.
+    idxs : pd.Index | list[int]
+        Indices to subset the data.
+
+    Returns
+    -------
+    pd.DataFrame | ad.AnnData
+        Subsetted data.
+
+    """
+    if isinstance(data, pd.DataFrame):
+        return data.iloc[idxs].copy()
+    # AnnData
+    return data[idxs].copy()
+
+
+def coerce_to_dataframe(
+    data: pd.DataFrame | ad.AnnData,
+) -> pd.DataFrame:
+    """Coerce data to a DataFrame
+
+    If data is already a DataFrame, it is returned as is. If data is an AnnData object, the default .to_df() method is used to convert the X matrix to a DataFrame with obs index and var names as columns.
+
+    Parameters
+    ----------
+    data : pd.DataFrame | ad.AnnData
+        Data to coerce.
+
+    Returns
+    -------
+    pd.DataFrame
+        Coerced DataFrame.
+
+    """
+    if isinstance(data, pd.DataFrame):
+        return data
+    # AnnData case: convert X to DataFrame with obs index and var names as columns
+    return pd.concat([data.to_df(), data.obs], axis=1)
 
 
 def data_columns_to_df(
@@ -805,39 +928,40 @@ def filter_data_completeness(
     max_missing: float,
     group_column: str | None = None,
     groups: list[str] | None = None,
-    action: str = "flag",
+    keep_strategy: Literal["any", "all"] = "all",
+    action: Literal["flag", "drop"] = "flag",
     var_colname: str = "passed_threshold_missing_values",
 ) -> ad.AnnData:
     """Filter features based on missing values.
 
-    Filters AnnData features (columns) based on the fraction of missing values.
-    If group_column and groups are provided, only missingness of certain metadata
-    levels is considered. This is especially useful for imbalanced classes, where
-    filtering by global missingness may leave too many missing values in the smaller
-    class.
-
-    (In case rows should be filtered, it is recommended to transpose the adata
-    object prior to calling this function and reverting the transpose afterwards.)
+    Operates globally, or per-group when group_column is set.
 
     Parameters
     ----------
+    adata
+        AnnData object
     max_missing
-        Maximum fraction of missing values allowed. Compared with the fraction of missing values
-        in a "greater than" fashion, i.e. if max_missing is 0.6 and the fraction of missing values
-        is 0.6, the sample or feature is kept. Greater than comparison is used here since the
-        missing fraction may be 0.0, which equals filtering for 100 % data completeness.
+        Maximum fraction of missing values allowed to pass filtering in the interval [0.0, 1.0].
+        Features with a fraction of missing values greater than (`>`) `max_missing` are filtered out.
     group_column
-        Column in obs to determine groups for filtering.
+        Column name in `adata.obs` defining groups for group-wise filtering.
+        If `None` (default), computes missingness across all samples.
+        If specified, computes statistics separately for each group.
+        This is useful to retain features that are exclusive to a specific sample group.
     groups
         List of levels of the group_column to consider in filtering. E.g. if the column has the levels
-        ['A', 'B', 'C'], and groups = ['A', 'B'], only missingness of features in these
-        groups is considered. If None, all groups are considered.
+        `['A', 'B', 'C']`, and `groups = ['A', 'B']`, only missingness of features in these
+        groups is considered. If `None`, all groups are considered.
+    keep_strategy
+        Only relevant for groupwise filtering.
+        - `all` : keep a feature only if it passes in every group.
+        - `any` : keep a feature if it passes the threshold in at least one group.
     action
-        Action to perform. can be 'flag' (default) or 'drop'. If 'flag', a boolean column in `adata.var`
-        is added to indicate whether the feature passed the missingness threshold. If 'drop',
+        Action to perform. Can be `flag` (default) or `drop`. If `flag`, a boolean column in `adata.var`
+        is added to indicate whether the feature passed the missingness threshold. If `drop`,
         features that do not pass the threshold are dropped from the AnnData object.
     var_colname
-        Name of the `adata.var` boolean column to add if action is 'flag'. Default is 'passed_threshold_missing_values'.
+        Name of the `adata.var` boolean column to add if action is `flag`.
 
     Returns
     -------
@@ -854,7 +978,7 @@ def filter_data_completeness(
         import anndata as ad
         import pandas as pd
         import numpy as np
-        from alphapepttools.pp.data import filter_data_completeness
+        import alphapepttools as apt
 
         # Create data with missing values
         X = np.array(
@@ -867,54 +991,66 @@ def filter_data_completeness(
         )
 
         # Flag features with >30% missing values
-        adata = filter_data_completeness(adata, max_missing=0.3, action="flag")
+        adata = apt.pp.filter_data_completeness(adata, max_missing=0.3, action="flag")
 
         # Drop features with >30% missing in group A only
-        adata = filter_data_completeness(adata, max_missing=0.3, group_column="group", groups=["A"], action="drop")
+        adata = apt.pp.filter_data_completeness(
+            adata, max_missing=0.3, group_column="group", groups=["A"], action="drop"
+        )
 
-    Filter by group-specific completeness:
+    Groupwise filtering — `keep_strategy` controls how per-group results are combined:
 
     .. code-block:: python
 
-        # Consider missingness only in specific groups
-        adata = filter_data_completeness(adata, max_missing=0.5, group_column="group", groups=["A", "B"], action="flag")
+        # No grouping: keep features with ≤50% missingness across the whole study
+        apt.pp.filter_data_completeness(adata, max_missing=0.5)
 
+        # Logical AND (default): keep features with ≤50% missingness in *every* condition.
+        # A feature with 5/5 missing in condition A and 0/995 missing in condition B is removed
+        # despite being 99.5% complete overall.
+        apt.pp.filter_data_completeness(adata, max_missing=0.5, group_column="condition", keep_strategy="all")
+
+        # Logical OR: keep features with ≤50% missingness in *at least one* condition.
+        # Retains condition-specific features, which are often the most interesting
+        # candidates in clinical studies.
+        apt.pp.filter_data_completeness(adata, max_missing=0.5, group_column="condition", keep_strategy="any")
     """
     if max_missing < 0 or max_missing > 1:
         raise ValueError("Threshold must be between 0 and 1.")
 
+    if keep_strategy not in ("all", "any"):
+        raise ValueError(f"Supported keep_strategies are `all` and `any`, passed {keep_strategy}")
+
     _validate_adata_for_completeness_filter(adata, action, var_colname)
 
-    # Resolve group indices
-    if group_column:
-        if group_column not in adata.obs.columns:
-            raise ValueError(f"Group column '{group_column}' not found in obs, available: {adata.obs.columns}.")
+    if group_column is None:
+        keep_mask = np.isnan(adata.X).mean(axis=0) <= max_missing
+    else:
+        available_groups = adata.obs.groupby(group_column, dropna=True).indices
 
-        available_groups = set(adata.obs[group_column].unique())
-        selected_groups = set(groups) if groups else available_groups
-
-        if not selected_groups.issubset(available_groups):
+        selected_groups = groups or list(available_groups.keys())
+        if not set(selected_groups).issubset(set(available_groups.keys())):
             raise ValueError(f"Some groups in {groups} not found in '{group_column}'.")
 
-        group_indices = {group: adata.obs.index[adata.obs[group_column] == group] for group in selected_groups}
-    else:
-        group_indices = {"all": adata.obs.index}
+        keep_mask = np.full(shape=(len(selected_groups), adata.n_vars), fill_value=True, dtype=bool)
 
-    # Calculate missingness for each group
-    drop_mask = np.array([False] * adata.shape[1])
-    for indices in group_indices.values():
-        missing_fraction = np.isnan(adata[indices, :].X).mean(axis=0)
-        drop_mask |= missing_fraction > max_missing
-        n_dropped = drop_mask.sum()
+        for group_nr, group in enumerate(selected_groups):
+            group_indices = available_groups[group]
+            keep_mask[group_nr, :] = np.isnan(adata.X[group_indices, :]).mean(axis=0) <= max_missing
+
+        # Aggregate to decision
+        # - any: Any group passes
+        # - all: All groups pass
+        keep_mask = keep_mask.any(axis=0) if keep_strategy == "any" else keep_mask.all(axis=0)
 
     # depending on action, either flag or drop features
     if action == "drop":
-        if drop_mask.any():
-            adata = adata[:, ~drop_mask].copy()
+        adata = adata[:, keep_mask].copy()
     else:
-        adata.var[var_colname] = ~drop_mask
+        adata.var[var_colname] = keep_mask
 
+    n_dropped = (~keep_mask).sum()
     logging.info(
-        f"pp.filter_data_completeness(): {action} {n_dropped} / {drop_mask.size} features with >{max_missing:.2f} missing in any group."
+        f"pp.filter_data_completeness(): {action} {n_dropped} / {keep_mask.size} features with >{max_missing:.2f} missing."
     )
     return adata
