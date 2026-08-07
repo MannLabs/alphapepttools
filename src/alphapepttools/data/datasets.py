@@ -90,7 +90,7 @@ class StudyData:
 
         """
         output_dir = Path.cwd() if output_dir is None else output_dir
-        return DataShareDownloader(url=self.url, output_dir=output_dir).download()
+        return Path(DataShareDownloader(url=self.url, output_dir=output_dir).download())
 
     @property
     def df(self) -> pd.DataFrame:
