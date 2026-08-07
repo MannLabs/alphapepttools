@@ -15,11 +15,11 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 import anndata as ad
-import matplotlib as mpl
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.legend import Legend
 from matplotlib.patches import Patch
 
 from alphapepttools.pl import defaults
@@ -287,7 +287,7 @@ def add_lines(
 
 def make_legend_patches(
     color_dict: dict[str, str | tuple],
-) -> list[mpl.patches.Patch]:
+) -> list[Patch]:
     """Create colored patches for matplotlib legends
 
     Converts a label-to-color mapping into matplotlib patches suitable for legends.
@@ -327,7 +327,7 @@ def make_legend_patches(
 
 def add_legend_to_axes_from_patches(
     ax: plt.Axes,
-    patches: list[mpl.patches.Patch],
+    patches: list[Patch],
     **kwargs,
 ) -> None:
     """Add a legend with patches to an axes, using config defaults for font sizes
@@ -376,7 +376,7 @@ def add_legend_to_axes_from_patches(
 def add_legend_to_axes(
     ax: plt.Axes,
     levels: list[str] | dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = "auto",
+    legend: str | Legend | None = "auto",
     palette: list[str | tuple] | None = None,
     **legend_kwargs,
 ) -> None:
@@ -437,7 +437,7 @@ def add_legend_to_axes(
         existing_legend = ax.legend(["A", "B"], loc="upper left")
         add_legend_to_axes(other_ax, legend=existing_legend)
     """
-    if isinstance(legend, mpl.legend.Legend):
+    if isinstance(legend, Legend):
         ax.add_artist(legend)
         return
     if legend == "auto":
@@ -503,6 +503,7 @@ def drop_nan_coordinate_points(
     -----
     Uses pandas.isna() to handle both NaN and None values correctly.
     """
+    labels = np.asarray(labels)
     keep_mask = ~(pd.isna(x_values) | pd.isna(y_values))
     return x_values[keep_mask], y_values[keep_mask], labels[keep_mask]
 
@@ -1202,7 +1203,7 @@ def histogram(
     color: str = "blue",
     palette: list[tuple] | None = None,
     color_dict: dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     hist_kwargs: dict | None = None,
     legend_kwargs: dict | None = None,
     xlim: tuple[float, float] | None = None,
@@ -1399,7 +1400,7 @@ def scatter(
     ax: plt.Axes | None = None,
     palette: list[str | tuple] | None = None,
     color_dict: dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     scatter_kwargs: dict | None = None,
     legend_kwargs: dict | None = None,
     figure_kwargs: dict | None = None,
@@ -1690,12 +1691,12 @@ def barplot(
     grouping_column: list[str] | None = None,
     value_column: list[str] | None = None,
     direct_columns: list[str] | None = None,
-    color: tuple = BaseColors.get("blue"),
+    color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
     subgroup_column: str | None = None,
     width: float = 0.4,
     alpha: float = 0.5,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     legend_kwargs: dict | None = None,
 ) -> None:
     """Plot a bar chart from a DataFrame or AnnData object
@@ -1854,12 +1855,12 @@ def boxplot(
     grouping_column: list[str] | None = None,
     value_column: list[str] | None = None,
     direct_columns: list[str] | None = None,
-    color: tuple = BaseColors.get("blue"),
+    color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
     subgroup_column: str | None = None,
     width: float = 0.4,
     alpha: float = 0.5,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     legend_kwargs: dict | None = None,
 ) -> None:
     """Plot a box plot from a DataFrame or AnnData object
@@ -2029,12 +2030,12 @@ def violinplot(
     grouping_column: list[str] | None = None,
     value_column: list[str] | None = None,
     direct_columns: list[str] | None = None,
-    color: tuple = BaseColors.get("blue"),
+    color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
     subgroup_column: str | None = None,
     width: float = 0.4,
     alpha: float = 0.5,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     legend_kwargs: dict | None = None,
 ) -> None:
     """Plot a violin plot from a DataFrame or AnnData object
@@ -2198,7 +2199,7 @@ def rank_median_plot(
     color_column: str | None = None,
     palette: list[str | tuple] | None = None,
     color_dict: dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     scatter_kwargs: dict | None = None,
 ) -> None:
     """Rank plot showing median intensities across samples.
@@ -2328,7 +2329,7 @@ def plot_pca(
     ax: plt.Axes | None = None,
     palette: list[str | tuple] | None = None,
     color_dict: dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     scatter_kwargs: dict | None = None,
 ) -> None:
     """PCA scatter plot showing principal component projections.
@@ -2870,7 +2871,7 @@ def volcano(  # noqa: C901
     scatter_kwargs: dict | None = None,
     line_kwargs: dict | None = None,
     label_kwargs: dict | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     legend_kwargs: dict | None = None,
     # Default layer parameters
     default_color: str | tuple = BaseColors.get("grey"),
