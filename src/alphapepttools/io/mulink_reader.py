@@ -16,6 +16,7 @@ from alphapepttools.io.reader_columns import ALPHAPEPTTOOLS_FEATURE_ID_NAME, FEA
 
 # Mudata changed the settings override context manager from a module to a method in version 0.4
 # see: https://mudata.readthedocs.io/latest/changelog.html
+# TODO: Remove when mudata is bounded to >=0.4
 mudata_options_context = getattr(md, "set_options", None) or md.settings.override
 
 
