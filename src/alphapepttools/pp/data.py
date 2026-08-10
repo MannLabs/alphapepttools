@@ -11,7 +11,7 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 from sklearn.preprocessing import RobustScaler, StandardScaler
 
-from alphapepttools._matrix import get_matrix
+from alphapepttools._utils import get_matrix
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)

@@ -1,14 +1,14 @@
 import warnings
-from typing import Literal
+from typing import Literal, cast
 
 import anndata as ad
 import numpy as np
 import pandas as pd
 from scipy.stats import gmean
 
-from ._utils import _raise_on_missing_value, _raise_on_nan_values
+from alphapepttools._utils import get_matrix
 
-from alphapepttools._matrix import get_matrix
+from ._utils import _raise_on_missing_value, _raise_on_nan_values
 
 STRATEGIES = ["total_mean", "total_median"]
 
@@ -218,7 +218,7 @@ def normalize(
         normalized_data, norm_factors = norm_func(data)
     else:
         _raise_on_nan_values(
-            adata.obs[group_column],
+            cast("pd.Series", adata.obs[group_column]),
             mode="any",
             custom_message=f"`group_column` {group_column} contains nans. Cannot normalize groups with missing values, please drop these observations prior to normalization.",
         )
@@ -305,7 +305,7 @@ def irs(
     data = adata.layers[layer].copy() if layer is not None else adata.X.copy()
 
     _raise_on_nan_values(
-        adata.obs[group_column],
+        cast("pd.Series", adata.obs[group_column]),
         mode="any",
         custom_message=f"`group_column` {group_column} contains nans. Cannot normalize groups with missing values, please drop these observations prior to normalization.",
     )

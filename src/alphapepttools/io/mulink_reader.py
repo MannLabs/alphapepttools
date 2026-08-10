@@ -1,7 +1,6 @@
 # Reader wrapper to generate MuLink (https://github.com/lucas-diedrich/mulink) instances from reports
 
 import importlib
-from typing import Literal
 
 import anndata as ad
 import mudata as md
@@ -37,11 +36,13 @@ def _sparse_matrix_mapping(
     Directed graph in which source vertices are pointing towards target vertices.
     The semantics of the edges depend on the application
     """
-    columns = mapping_df.columns if columns is None else columns
+    column_names = mapping_df.columns.tolist() if columns is None else columns
 
     full_dag = nx.DiGraph()
-    for idx in tqdm(range(len(columns) - 1)):
-        dag = nx.from_pandas_edgelist(mapping_df, source=columns[idx], target=columns[idx + 1], create_using=nx.DiGraph)
+    for idx in tqdm(range(len(column_names) - 1)):
+        dag = nx.from_pandas_edgelist(
+            mapping_df, source=column_names[idx], target=column_names[idx + 1], create_using=nx.DiGraph
+        )
         full_dag = nx.compose(full_dag, dag)
 
     if transitive_closure:
@@ -89,7 +90,7 @@ def _reindex_adjacency_matrix(df: pd.DataFrame, new_index: pd.Index) -> csr_matr
 
 
 def mulink_from_anndatas(
-    anndatas: dict[Literal["genes", "proteins", "peptides", "precursors"], ad.AnnData],
+    anndatas: dict[str, ad.AnnData],
     *,
     transitive_closure: bool = True,
 ) -> md.MuData:

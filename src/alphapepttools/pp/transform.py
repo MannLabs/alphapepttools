@@ -7,7 +7,7 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 
-from alphapepttools._matrix import get_matrix
+from alphapepttools._utils import get_matrix
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

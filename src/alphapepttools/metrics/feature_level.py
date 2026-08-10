@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import median_abs_deviation
 
-from alphapepttools._matrix import get_matrix
+from alphapepttools._utils import get_matrix
 
 METRICS_KEY = "metrics"
 PMAD_KEY = "pmad"

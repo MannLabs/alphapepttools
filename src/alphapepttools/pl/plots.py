@@ -153,9 +153,9 @@ def _extract_groupwise_plotting_data(
         df = df.melt(var_name="variable", value_name="value")
         grouping_column, value_column = "variable", "value"
     else:
-        columns = [grouping_column, value_column]
-        if subgroup_column is not None:
-            columns.append(subgroup_column)
+        if grouping_column is None or value_column is None:
+            raise ValueError("Either 'direct_columns' or both 'grouping_column' and 'value_column' must be provided.")
+        columns = [column for column in (grouping_column, value_column, subgroup_column) if column is not None]
         df = data_columns_to_df(data, columns=columns)
 
     # Handle single vs subgrouped plotting

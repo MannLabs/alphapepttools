@@ -9,9 +9,9 @@ import pandas as pd
 from bpca import BPCA
 from sklearn.impute import KNNImputer
 
-from ._utils import _is_data_complete, _raise_on_nan_values
+from alphapepttools._utils import get_matrix
 
-from alphapepttools._matrix import get_matrix
+from ._utils import _is_data_complete, _raise_on_nan_values
 
 logger = logging.getLogger(__name__)
 

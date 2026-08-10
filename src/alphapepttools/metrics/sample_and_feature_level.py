@@ -5,7 +5,7 @@ import warnings
 import anndata as ad
 import numpy as np
 
-from alphapepttools._matrix import get_matrix
+from alphapepttools._utils import get_matrix
 from alphapepttools.pp.transform import detect_special_values
 
 
