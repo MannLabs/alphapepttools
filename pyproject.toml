@@ -29,6 +29,8 @@ dependencies = [
   "bpca>=0.1",
   "cmcrameri",          # TODO: remove this to optional dependencies?
   "matplotlib>=3.10.5", # 3.10.5 contains a critical fix (https://github.com/matplotlib/matplotlib/pull/30217) to make matplotlib compatible with python 3.14
+  "mudata",
+  "mulink",
   "openpyxl",
   "pyarrow",
   "scanpy",
@@ -70,6 +72,8 @@ optional-dependencies.stable = [
   "bpca==0.1",
   "cmcrameri==1.9",
   "matplotlib==3.10.8",
+  "mudata==0.3.8",
+  "mulink==0.0.1",
   "openpyxl==3.1.5",
   "pyarrow==23.0.1",
   "scanpy==1.11.5",     # scanpy version 1.12 dropped support for python<3.12
@@ -190,6 +194,42 @@ source = [ "alphapepttools" ]
 omit = [
   "**/test_*.py",
 ]
+
+[tool.ty.environment]
+python-version = "3.11"
+
+# Type-check only the shipped package; tests are exempt from annotation checks
+# (mirroring ruff's `tests/* -> ANN` ignore) and stray top-level scripts are not
+# part of the distribution.
+[tool.ty.src]
+include = [ "src" ]
+
+[tool.ty.rules]
+# TODO revisit these exclusions
+# anndata types `.X`/`.layers[...]` as a 12+ member union of every storage
+# backend (ndarray | csr_matrix | AwkArray | ZarrArray | CSRDataset | None | ...).
+# The pipeline treats these as dense numpy arrays (it asserts no-NaN and does
+# `data[idx, :] = ...`), so subscripting and in-place assignment are safe at
+# runtime but cannot be proven to a static checker.
+not-subscriptable = "ignore"
+invalid-assignment = "ignore"
+# Same union flows into helper calls expecting `np.ndarray`; in this stack the
+# rule only ever fires on this union and on external libraries whose stubs
+# declare `str` where the code passes `Path`, so it carries no real signal here.
+invalid-argument-type = "ignore"
+# matplotlib lazily populates submodules (mpl.patches, mpl.legend, ...) that ty
+# cannot see are imported.
+possibly-missing-submodule = "ignore"
+# The remaining rules below fire only on this stack's untyped/dynamic libraries
+# (cmcrameri's generated colormaps, patsy, scanpy/numpy/pandas overloads, the
+# `.X` union) and on the optional `alphaquant` dependency. Genuine issues these
+# surfaced were already fixed in code; disabling them keeps `ty check src` clean
+# so it can run as a pre-commit gate that still enforces every other ty rule.
+unresolved-attribute = "ignore"
+no-matching-overload = "ignore"
+unsupported-operator = "ignore"
+not-iterable = "ignore"
+unresolved-import = "ignore"
 
 [tool.cruft]
 skip = [
