@@ -1015,7 +1015,7 @@ def data_test_completeness_filter():
             "all",
         ),
         # 5. Group-wise filtering with keep_strategy="any" (logical OR) — diverges from "all"
-        # 5.1. max_missing=0.5: batch 2 passes everything (<=0.5), so "any" keeps all features
+        # 5.1. max_missing_fraction=0.5: batch 2 passes everything (<=0.5), so "any" keeps all features
         # (vs. "all" which gives ["A", "B"] — see 2.1)
         (
             ["A", "B", "C", "D", "E"],
@@ -1026,7 +1026,7 @@ def data_test_completeness_filter():
             "drop",
             "any",
         ),
-        # 5.2. max_missing=0.0 with "any": A passes in batch 1; A,B,C,D pass in batch 2
+        # 5.2. max_missing_fraction=0.0 with "any": A passes in batch 1; A,B,C,D pass in batch 2
         # → keep A,B,C,D (vs. "all" which gives ["A"] — see 2.3)
         (
             ["A", "B", "C", "D"],
