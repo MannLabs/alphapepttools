@@ -247,7 +247,7 @@ def test_study_data_download_should__use_cwd(minimal_study) -> None:
     """Test that StudyData.download uses current working directory when output_dir is None."""
     # given
     mock_downloader = Mock()
-    mock_downloader.download.return_value = Mock()
+    mock_downloader.download.return_value = "downloaded/data/file"
 
     # when
     with (

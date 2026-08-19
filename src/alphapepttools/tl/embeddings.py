@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Iterable
-from typing import Literal
+from typing import Literal, cast
 
 import anndata as ad
 import numpy as np
@@ -87,7 +87,7 @@ def _prepare_pca_data(
     data_for_pca = adata_sub.layers[layer].copy() if layer is not None else adata_sub.X.copy()
 
     # Transpose if PCA is done on the feature space
-    return data_for_pca.T if dim_space == "var" else data_for_pca
+    return cast("np.ndarray", data_for_pca.T if dim_space == "var" else data_for_pca)
 
 
 def _store_pca_results(
