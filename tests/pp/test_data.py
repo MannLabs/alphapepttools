@@ -9,8 +9,8 @@ import alphapepttools as apt
 from alphapepttools.pp.data import (
     _count_or_fraction_missing,
     _handle_overlapping_columns,
+    _resolve_max_missing,
     _to_anndata,
-    _validate_max_missing,
     coerce_to_dataframe,
     data_column_to_array,
 )
@@ -838,14 +838,14 @@ def data_test_completeness_filter():
 
 # test data completeness filtering
 @pytest.mark.parametrize(
-    ("expected_columns", "expected_rows", "max_missing", "group_column", "groups", "action", "keep_strategy"),
+    ("expected_columns", "expected_rows", "max_missing_kwargs", "group_column", "groups", "action", "keep_strategy"),
     [
         # 1. Check filtering of columns (features)
         # 1.1. Filter columns with 0.5 threshold
         (
             ["A", "B", "C"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.5,
+            {"max_missing_fraction": 0.5},
             None,
             None,
             "drop",
@@ -855,7 +855,7 @@ def data_test_completeness_filter():
         (
             ["A", "B", "C", "D"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.6,
+            {"max_missing_fraction": 0.6},
             None,
             None,
             "drop",
@@ -865,7 +865,7 @@ def data_test_completeness_filter():
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.5,
+            {"max_missing_fraction": 0.5},
             None,
             None,
             "flag",
@@ -875,7 +875,7 @@ def data_test_completeness_filter():
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            1.0,
+            {"max_missing_fraction": 1.0},
             None,
             None,
             "drop",
@@ -885,7 +885,7 @@ def data_test_completeness_filter():
         (
             ["A"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.0,
+            {"max_missing_fraction": 0.0},
             None,
             None,
             "drop",
@@ -896,7 +896,7 @@ def data_test_completeness_filter():
         (
             ["A", "B"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.5,
+            {"max_missing_fraction": 0.5},
             "batch",
             None,
             "drop",
@@ -906,7 +906,7 @@ def data_test_completeness_filter():
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            1.0,
+            {"max_missing_fraction": 1.0},
             "batch",
             None,
             "drop",
@@ -916,7 +916,7 @@ def data_test_completeness_filter():
         (
             ["A"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.0,
+            {"max_missing_fraction": 0.0},
             "batch",
             None,
             "drop",
@@ -927,7 +927,7 @@ def data_test_completeness_filter():
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.5,
+            {"max_missing_fraction": 0.5},
             "batch",
             ["2"],
             "drop",
@@ -937,7 +937,7 @@ def data_test_completeness_filter():
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            1.0,
+            {"max_missing_fraction": 1.0},
             "batch",
             ["2"],
             "drop",
@@ -947,7 +947,7 @@ def data_test_completeness_filter():
         (
             ["A", "B", "C", "D"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.0,
+            {"max_missing_fraction": 0.0},
             "batch",
             ["2"],
             "drop",
@@ -957,7 +957,7 @@ def data_test_completeness_filter():
         (
             ["A", "B"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.5,
+            {"max_missing_fraction": 0.5},
             "batch",
             ["1"],
             "drop",
@@ -967,7 +967,7 @@ def data_test_completeness_filter():
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            1.0,
+            {"max_missing_fraction": 1.0},
             "batch",
             ["1"],
             "drop",
@@ -977,7 +977,7 @@ def data_test_completeness_filter():
         (
             ["A"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.0,
+            {"max_missing_fraction": 0.0},
             "batch",
             ["1"],
             "drop",
@@ -988,7 +988,7 @@ def data_test_completeness_filter():
         (
             ["A", "B"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.5,
+            {"max_missing_fraction": 0.5},
             "batch",
             ["1", "2"],
             "drop",
@@ -998,7 +998,7 @@ def data_test_completeness_filter():
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            1.0,
+            {"max_missing_fraction": 1.0},
             "batch",
             ["1", "2"],
             "drop",
@@ -1008,7 +1008,7 @@ def data_test_completeness_filter():
         (
             ["A"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.0,
+            {"max_missing_fraction": 0.0},
             "batch",
             ["1", "2"],
             "drop",
@@ -1020,7 +1020,7 @@ def data_test_completeness_filter():
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.5,
+            {"max_missing_fraction": 0.5},
             "batch",
             None,
             "drop",
@@ -1031,7 +1031,7 @@ def data_test_completeness_filter():
         (
             ["A", "B", "C", "D"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.0,
+            {"max_missing_fraction": 0.0},
             "batch",
             None,
             "drop",
@@ -1041,7 +1041,7 @@ def data_test_completeness_filter():
         (
             ["A", "B"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.5,
+            {"max_missing_fraction": 0.5},
             "batch",
             ["1"],
             "drop",
@@ -1051,63 +1051,63 @@ def data_test_completeness_filter():
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0.5,
+            {"max_missing_fraction": 0.5},
             "batch",
             ["1", "2"],
             "drop",
             "any",
         ),
-        # 6. Integer max_missing: absolute count of missing values allowed.
+        # 6. max_missing_count: absolute count of missing values allowed.
         # Per-feature missing counts (out of 5): A=0, B=1, C=2, D=3, E=4
-        # 6.1. max_missing=0 (int): keep only fully-complete features
+        # 6.1. max_missing_count=0: keep only fully-complete features
         (
             ["A"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            0,
+            {"max_missing_count": 0},
             None,
             None,
             "drop",
             "all",
         ),
-        # 6.2. max_missing=1 (int): allow at most 1 missing value
-        #      (contrast with 1.4: max_missing=1.0 float keeps everything)
+        # 6.2. max_missing_count=1: allow at most 1 missing value
+        #      (contrast with 1.4: max_missing_fraction=1.0 keeps everything)
         (
             ["A", "B"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            1,
+            {"max_missing_count": 1},
             None,
             None,
             "drop",
             "all",
         ),
-        # 6.3. max_missing=3 (int): allow at most 3 missing values
+        # 6.3. max_missing_count=3: allow at most 3 missing values
         (
             ["A", "B", "C", "D"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            3,
+            {"max_missing_count": 3},
             None,
             None,
             "drop",
             "all",
         ),
-        # 6.4. Group-wise int count, keep_strategy="all": pass if <=1 missing in *every* batch.
+        # 6.4. Group-wise count, keep_strategy="all": pass if <=1 missing in *every* batch.
         #      Batch 1 (3 samples) missing: A=0,B=1,C=2,D=3,E=3 ; Batch 2 (2 samples): A=0,B=0,C=0,D=0,E=1
         #      → only A,B satisfy <=1 in both batches
         (
             ["A", "B"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            1,
+            {"max_missing_count": 1},
             "batch",
             None,
             "drop",
             "all",
         ),
-        # 6.5. Group-wise int count, keep_strategy="any": pass if <=1 missing in *at least one* batch.
+        # 6.5. Group-wise count, keep_strategy="any": pass if <=1 missing in *at least one* batch.
         #      Batch 2 has <=1 missing for all features → keep everything
         (
             ["A", "B", "C", "D", "E"],
             ["cell1", "cell2", "cell3", "cell4", "cell5"],
-            1,
+            {"max_missing_count": 1},
             "batch",
             None,
             "drop",
@@ -1119,7 +1119,7 @@ def test_filter_data_completeness(
     data_test_completeness_filter,
     expected_columns,
     expected_rows,
-    max_missing,
+    max_missing_kwargs,
     group_column,
     groups,
     action,
@@ -1131,7 +1131,7 @@ def test_filter_data_completeness(
     # when
     adata_filtered = apt.pp.filter_data_completeness(
         adata=adata,
-        max_missing=max_missing,
+        **max_missing_kwargs,
         group_column=group_column,
         groups=groups,
         action=action,
@@ -1152,56 +1152,108 @@ def test_filter_data_completeness_invalid_keep_strategy(data_test_completeness_f
     with pytest.raises(ValueError, match="Supported keep_strategies"):
         apt.pp.filter_data_completeness(
             adata=data_test_completeness_filter,
-            max_missing=0.5,
+            max_missing_fraction=0.5,
             group_column="batch",
             keep_strategy="invalid",
         )
 
 
-def test_filter_data_completeness_float_out_of_range(data_test_completeness_filter):
+def test_filter_data_completeness_fraction_out_of_range(data_test_completeness_filter):
     with pytest.raises(ValueError, match="between 0 and 1"):
-        apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing=1.5)
+        apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing_fraction=1.5)
 
 
 def test_filter_data_completeness_negative_count(data_test_completeness_filter):
     with pytest.raises(ValueError, match="non-negative"):
-        apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing=-1)
+        apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing_count=-1)
 
 
-def test_filter_data_completeness_invalid_type(data_test_completeness_filter):
-    with pytest.raises(ValueError, match="float or an int"):
-        apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing="0.5")
+def test_filter_data_completeness_both_thresholds(data_test_completeness_filter):
+    # the two thresholds are contradictory, so passing both is an error rather than a silent preference
+    with pytest.raises(ValueError, match="Exactly one of"):
+        apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing_fraction=0.5, max_missing_count=1)
 
 
-# test _validate_max_missing
+def test_filter_data_completeness_no_threshold(data_test_completeness_filter):
+    with pytest.raises(ValueError, match="Exactly one of"):
+        apt.pp.filter_data_completeness(data_test_completeness_filter)
+
+
+# the mode follows the argument that was passed, never the runtime type of its value
 @pytest.mark.parametrize(
-    ("max_missing", "expected_count_mode"),
+    ("expected_columns", "max_missing_kwargs"),
     [
-        (0.0, False),
-        (0.5, False),
-        (1.0, False),
-        (0, True),
-        (1, True),
-        (5, True),
+        # an int fraction is still a fraction: 1 means 100% missing allowed -> keep everything
+        (["A", "B", "C", "D", "E"], {"max_missing_fraction": 1}),
+        # a numpy integer count behaves exactly like the equivalent python int (see case 6.2)
+        (["A", "B"], {"max_missing_count": np.int64(1)}),
+        # a numpy float fraction behaves exactly like the equivalent python float (see case 1.1)
+        (["A", "B", "C"], {"max_missing_fraction": np.float32(0.5)}),
     ],
 )
-def test_validate_max_missing_returns_count_mode(max_missing, expected_count_mode):
-    # a float (fraction) -> False; an int (absolute count) -> True
-    assert _validate_max_missing(max_missing) is expected_count_mode
+def test_filter_data_completeness_threshold_type_does_not_select_mode(
+    data_test_completeness_filter, expected_columns, max_missing_kwargs
+):
+    adata_filtered = apt.pp.filter_data_completeness(data_test_completeness_filter, **max_missing_kwargs, action="drop")
+    assert adata_filtered.var.index.to_list() == expected_columns
+
+
+def test_filter_data_completeness_unused_categories_ignored(data_test_completeness_filter):
+    # unused levels of a categorical group column must not contribute empty groups:
+    # an empty group has no missing values to count, and its mean is NaN
+    adata = data_test_completeness_filter.copy()
+    adata.obs["batch"] = pd.Categorical(adata.obs["batch"], categories=["1", "2", "3"])
+
+    for max_missing_kwargs in ({"max_missing_fraction": 0.5}, {"max_missing_count": 1}):
+        for keep_strategy in ("all", "any"):
+            with_unused = apt.pp.filter_data_completeness(
+                adata, **max_missing_kwargs, group_column="batch", keep_strategy=keep_strategy, action="drop"
+            )
+            without_unused = apt.pp.filter_data_completeness(
+                data_test_completeness_filter,
+                **max_missing_kwargs,
+                group_column="batch",
+                keep_strategy=keep_strategy,
+                action="drop",
+            )
+            assert with_unused.var.index.to_list() == without_unused.var.index.to_list()
+
+
+# test _resolve_max_missing
+@pytest.mark.parametrize(
+    ("max_missing_fraction", "max_missing_count", "expected"),
+    [
+        (0.0, None, (0.0, False)),
+        (0.5, None, (0.5, False)),
+        (1.0, None, (1.0, False)),
+        (None, 0, (0, True)),
+        (None, 1, (1, True)),
+        (None, 5, (5, True)),
+        # an int fraction stays a fraction, a numpy scalar is normalised to a python number
+        (1, None, (1.0, False)),
+        (None, np.int64(2), (2, True)),
+    ],
+)
+def test_resolve_max_missing(max_missing_fraction, max_missing_count, expected):
+    threshold, is_count_mode = _resolve_max_missing(max_missing_fraction, max_missing_count)
+
+    assert (threshold, is_count_mode) == expected
+    assert isinstance(threshold, int if is_count_mode else float)
 
 
 @pytest.mark.parametrize(
-    ("max_missing", "match"),
+    ("max_missing_fraction", "max_missing_count", "match"),
     [
-        (1.5, "between 0 and 1"),
-        (-0.1, "between 0 and 1"),
-        (-1, "non-negative"),
-        ("0.5", "float or an int"),
+        (1.5, None, "between 0 and 1"),
+        (-0.1, None, "between 0 and 1"),
+        (None, -1, "non-negative"),
+        (0.5, 1, "Exactly one of"),
+        (None, None, "Exactly one of"),
     ],
 )
-def test_validate_max_missing_invalid(max_missing, match):
+def test_resolve_max_missing_invalid(max_missing_fraction, max_missing_count, match):
     with pytest.raises(ValueError, match=match):
-        _validate_max_missing(max_missing)
+        _resolve_max_missing(max_missing_fraction, max_missing_count)
 
 
 # test _count_or_fraction_missing
@@ -1209,11 +1261,11 @@ def test_count_or_fraction_missing():
     # per-feature missing values: A=0, B=1, C=2 (out of 3 rows)
     x = np.array([[1.0, np.nan, np.nan], [2.0, 5.0, np.nan], [3.0, 6.0, 9.0]])
 
-    # count_mode=True -> absolute counts
-    np.testing.assert_array_equal(_count_or_fraction_missing(x, count_mode=True), [0, 1, 2])
+    # is_count_mode=True -> absolute counts
+    np.testing.assert_array_equal(_count_or_fraction_missing(x, is_count_mode=True), [0, 1, 2])
 
-    # count_mode=False -> fractions
-    np.testing.assert_allclose(_count_or_fraction_missing(x, count_mode=False), [0.0, 1 / 3, 2 / 3])
+    # is_count_mode=False -> fractions
+    np.testing.assert_allclose(_count_or_fraction_missing(x, is_count_mode=False), [0.0, 1 / 3, 2 / 3])
 
 
 # test data_column_to_array
