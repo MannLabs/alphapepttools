@@ -972,6 +972,24 @@ def _resolve_max_missing(
     return threshold, is_count_mode
 
 
+def _reject_unexpected_kwargs(kwargs: dict) -> None:
+    """Raise a helpful error for the removed `max_missing` argument, or any other stray kwarg.
+
+    `max_missing` was split into `max_missing_fraction` and `max_missing_count`. Without this
+    check a stale `max_missing=...` call would fail with the unrelated "exactly one threshold"
+    error, which does not hint at what to change.
+    """
+    if "max_missing" in kwargs:
+        raise TypeError(
+            "`max_missing` has been replaced by `max_missing_fraction` and `max_missing_count`. "
+            "Use `max_missing_fraction=<float in [0.0, 1.0]>` to keep the previous behaviour, or "
+            "`max_missing_count=<int>` to filter by an absolute number of missing values instead."
+        )
+
+    if kwargs:
+        raise TypeError(f"Unexpected keyword argument(s): {', '.join(sorted(kwargs))}.")
+
+
 def _count_or_fraction_missing(
     x: np.ndarray,
     *,
@@ -991,6 +1009,7 @@ def filter_data_completeness(
     keep_strategy: Literal["any", "all"] = "all",
     action: Literal["flag", "drop"] = "flag",
     var_colname: str = "passed_threshold_missing_values",
+    **kwargs,
 ) -> ad.AnnData:
     """Filter features based on missing values.
 
@@ -1112,6 +1131,10 @@ def filter_data_completeness(
         # candidates in clinical studies.
         apt.pp.filter_data_completeness(adata, max_missing_fraction=0.5, group_column="condition", keep_strategy="any")
     """
+    # Checked first so that a stale `max_missing=...` call gets the migration hint rather than
+    # the unrelated "exactly one threshold" error below.
+    _reject_unexpected_kwargs(kwargs)
+
     # Funnel both thresholds into a single variable for downstream processing. The argument
     # that was passed - not the type of its value - decides how the threshold is interpreted.
     max_missing, is_count_mode = _resolve_max_missing(max_missing_fraction, max_missing_count)

@@ -1179,6 +1179,18 @@ def test_filter_data_completeness_no_threshold(data_test_completeness_filter):
         apt.pp.filter_data_completeness(data_test_completeness_filter)
 
 
+def test_filter_data_completeness_removed_max_missing(data_test_completeness_filter):
+    # the removed argument gets a migration hint rather than the "exactly one threshold" error
+    with pytest.raises(TypeError, match="`max_missing` has been replaced"):
+        apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing=0.5, action="drop")
+
+
+def test_filter_data_completeness_unknown_kwarg(data_test_completeness_filter):
+    # **kwargs must not silently swallow typos
+    with pytest.raises(TypeError, match="Unexpected keyword argument"):
+        apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing_fraction=0.5, actoin="drop")
+
+
 # the mode follows the argument that was passed, never the runtime type of its value
 @pytest.mark.parametrize(
     ("expected_columns", "max_missing_kwargs"),
