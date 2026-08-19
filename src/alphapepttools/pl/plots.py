@@ -15,11 +15,11 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 import anndata as ad
-import matplotlib as mpl
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.legend import Legend
 from matplotlib.patches import Patch
 
 from alphapepttools.pl import defaults
@@ -53,12 +53,18 @@ def _extract_groupwise_plotting_data(
     grouping_column: str | None = None,
     value_column: str | None = None,
     direct_columns: list[str] | None = None,
-) -> tuple[list[list], list[str], list[int]]:
+    subgroup_column: str | None = None,
+    width: float = 0.4,
+) -> tuple[list[list], list[str], list[float], list[str]]:
     """Extract data for group-wise plotting (violin, bar, box plots)
 
     Transforms long-format data into the list-of-lists format required by
     matplotlib's violin, bar, and box plot functions. Each sublist contains
     the values for one group.
+
+    When ``subgroup_column`` is provided, cells are emitted per ``(group, subgroup)``
+    pair and positions are dodged so that subgroups within a main group sit close
+    together while main groups stay spaced one unit apart.
 
     Parameters
     ----------
@@ -70,11 +76,21 @@ def _extract_groupwise_plotting_data(
         Column whose values should be plotted
     direct_columns
         Alternative to grouping/value columns: treat each column as a separate group
+    subgroup_column
+        Optional column whose values subdivide each main group. When provided,
+        each ``(group, subgroup)`` pair becomes its own cell with a dodged position.
+    width
+        Visual width of each cell. In subgrouped mode it is also the step between
+        adjacent subgroup positions, so neighbouring subgroup bars sit flush.
+        Reduce this value when many subgroups would otherwise overflow into the
+        next main group's slot.
 
     Returns
     -------
-    tuple[list[list], list[str], list[int]]
-        (data_lists, labels, positions) for plotting
+    tuple[list[list], list[str], list[float], list[str]]
+        (data_lists, labels, positions, color_keys) for plotting. ``color_keys``
+        contains group labels when ``subgroup_column`` is None, and subgroup
+        labels when ``subgroup_column`` is provided.
 
     Examples
     --------
@@ -84,11 +100,13 @@ def _extract_groupwise_plotting_data(
 
         df = pd.DataFrame({"treatment": ["A", "A", "B", "B", "C"], "intensity": [1, 2, 3, 4, 5]})
 
-        data_lists, labels, positions = _extract_groupwise_plotting_data(
+        data_lists, labels, positions, color_keys = _extract_groupwise_plotting_data(
             df, grouping_column="treatment", value_column="intensity"
         )
         # data_lists: [[1, 2], [3, 4], [5]]
         # labels: ['A', 'B', 'C']
+        # positions: [0.0, 1.0, 2.0]
+        # color_keys: ['A', 'B', 'C']    (same as labels when no subgroup)
 
     Compare multiple columns directly:
 
@@ -96,36 +114,83 @@ def _extract_groupwise_plotting_data(
 
         df = pd.DataFrame({"Protein1": [1, 2, 3], "Protein2": [4, 5, 6], "Protein3": [7, 8, 9]})
 
-        data_lists, labels, positions = _extract_groupwise_plotting_data(
+        data_lists, labels, positions, color_keys = _extract_groupwise_plotting_data(
             df, direct_columns=["Protein1", "Protein2", "Protein3"]
         )
         # Each column becomes a group for comparison
+        # labels: ['Protein1', 'Protein2', 'Protein3']
+        # positions: [0.0, 1.0, 2.0]
+        # color_keys: ['Protein1', 'Protein2', 'Protein3']    (same as labels when no subgroup)
+
+    Group with a subgroup column (two conditions per precursor):
+
+    .. code-block:: python
+
+        df = pd.DataFrame(
+            {
+                "precursor": ["P1", "P1", "P2", "P2"],
+                "condition": ["ctrl", "treat", "ctrl", "treat"],
+                "intensity": [1.0, 2.0, 3.0, 4.0],
+            }
+        )
+
+        data_lists, labels, positions, color_keys = _extract_groupwise_plotting_data(
+            df,
+            grouping_column="precursor",
+            value_column="intensity",
+            subgroup_column="condition",
+        )
+        # labels: ['P1', 'P1', 'P2', 'P2']         (one per cell; dedup in plot for ticks)
+        # color_keys: ['ctrl', 'treat', 'ctrl', 'treat']
+        # positions: [-0.25, 0.25, 0.75, 1.25]    (with default width=0.5)
     """
+    # Handle 'wide format' case, where direct_columns is set and column labels directly become x-axis groups
     if direct_columns is not None:
         if grouping_column is not None or value_column is not None:
             logger.info("'direct_columns' provided, ignoring 'grouping_column' and 'value_column' parameters.")
-        df = data_columns_to_df(data, columns=direct_columns)[direct_columns]  # ensure order
+        df = data_columns_to_df(data, columns=direct_columns)[direct_columns]
         df = df.melt(var_name="variable", value_name="value")
         grouping_column, value_column = "variable", "value"
     else:
-        df = data_columns_to_df(data, columns=[grouping_column, value_column])
+        columns = [grouping_column, value_column]
+        if subgroup_column is not None:
+            columns.append(subgroup_column)
+        df = data_columns_to_df(data, columns=columns)
 
-    # Determine groups
-    groups_to_plot = df[grouping_column].dropna().unique().tolist()
+    # Handle single vs subgrouped plotting
+    data_lists: list[list] = []
+    labels: list[str] = []
+    positions: list[float] = []
+    color_keys: list[str] = []
 
-    # Extract data for each group
-    data_lists = []
-    labels = []
-    positions = []
+    if subgroup_column is None:
+        groups_to_plot = df[grouping_column].dropna().unique().tolist()
+        for i, group in enumerate(groups_to_plot):
+            group_data = df.loc[df[grouping_column] == group, value_column].dropna()
+            if not group_data.empty:
+                data_lists.append(group_data.tolist())
+                labels.append(group)
+                positions.append(float(i))
+                color_keys.append(group)
+    else:
+        main_order = df[grouping_column].dropna().unique().tolist()
+        sub_order = df[subgroup_column].dropna().unique().tolist()
+        n_sub = len(sub_order)
+        offsets = [
+            (j - (n_sub - 1) / 2) * width for j in range(n_sub)
+        ]  # symmetric offsets around the main-group integer position
+        for i, group in enumerate(main_order):
+            for j, sub in enumerate(sub_order):
+                group_data = df.loc[
+                    (df[grouping_column] == group) & (df[subgroup_column] == sub), value_column
+                ].dropna()
+                if not group_data.empty:
+                    data_lists.append(group_data.tolist())
+                    labels.append(group)
+                    positions.append(i + offsets[j])
+                    color_keys.append(sub)
 
-    for i, group in enumerate(groups_to_plot):
-        group_data = df[df[grouping_column] == group][value_column].dropna()
-        if not group_data.empty:
-            data_lists.append(group_data.tolist())
-            labels.append(group)
-            positions.append(i)
-
-    return data_lists, labels, positions
+    return data_lists, labels, positions, color_keys
 
 
 def _set_optional_axis_limits(
@@ -146,7 +211,7 @@ def add_lines(
     linetype: str = "vline",
     color: str = "black",
     linestyle: str = "--",
-    linewidth: float = 1,
+    linewidth: float | None = config["linewidths"]["large"],
     line_kwargs: dict | None = None,
 ) -> None:
     """Add vertical or horizontal reference lines to a plot
@@ -167,7 +232,7 @@ def add_lines(
     linestyle
         Line style (e.g., `"--"`, `"-"`, `":"`)
     linewidth
-        Line width, defaults to `config["linewidths"]["medium"]`
+        Line width, defaults to `config["linewidths"]["large"]`
     line_kwargs
         Additional matplotlib line arguments. Note: explicit color, linestyle,
         and linewidth parameters take precedence
@@ -222,7 +287,7 @@ def add_lines(
 
 def make_legend_patches(
     color_dict: dict[str, str | tuple],
-) -> list[mpl.patches.Patch]:
+) -> list[Patch]:
     """Create colored patches for matplotlib legends
 
     Converts a label-to-color mapping into matplotlib patches suitable for legends.
@@ -262,7 +327,7 @@ def make_legend_patches(
 
 def add_legend_to_axes_from_patches(
     ax: plt.Axes,
-    patches: list[mpl.patches.Patch],
+    patches: list[Patch],
     **kwargs,
 ) -> None:
     """Add a legend with patches to an axes, using config defaults for font sizes
@@ -278,7 +343,10 @@ def add_legend_to_axes_from_patches(
         List of colored patches created by `make_legend_patches`
     **kwargs
         Additional arguments passed to `ax.legend()`.
-        If `fontsize` not provided, uses `config["legend"]["font_size"]`
+        If `fontsize` not provided, uses `config["legend"]["font_size"]`.
+        If `alpha` is provided, it is applied to every patch (so the legend
+        swatches match the transparency of e.g. bars/boxes/violins) and is
+        not forwarded to `ax.legend()`.
 
     Example
     -------
@@ -289,6 +357,12 @@ def add_legend_to_axes_from_patches(
         add_legend_to_axes_from_patches(ax, patches, title="Genotype", loc="upper right")
         # Legend will use config font sizes for text and title
     """
+    # Apply alpha to the patches so swatches match the plotted artists' transparency
+    alpha = kwargs.pop("alpha", None)
+    if alpha is not None:
+        for patch in patches:
+            patch.set_alpha(alpha)
+
     # create new legend
     if "fontsize" not in kwargs:
         kwargs["fontsize"] = config["legend"]["font_size"]
@@ -302,7 +376,7 @@ def add_legend_to_axes_from_patches(
 def add_legend_to_axes(
     ax: plt.Axes,
     levels: list[str] | dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = "auto",
+    legend: str | Legend | None = "auto",
     palette: list[str | tuple] | None = None,
     **legend_kwargs,
 ) -> None:
@@ -363,7 +437,7 @@ def add_legend_to_axes(
         existing_legend = ax.legend(["A", "B"], loc="upper left")
         add_legend_to_axes(other_ax, legend=existing_legend)
     """
-    if isinstance(legend, mpl.legend.Legend):
+    if isinstance(legend, Legend):
         ax.add_artist(legend)
         return
     if legend == "auto":
@@ -429,6 +503,7 @@ def drop_nan_coordinate_points(
     -----
     Uses pandas.isna() to handle both NaN and None values correctly.
     """
+    labels = np.asarray(labels)
     keep_mask = ~(pd.isna(x_values) | pd.isna(y_values))
     return x_values[keep_mask], y_values[keep_mask], labels[keep_mask]
 
@@ -1128,7 +1203,7 @@ def histogram(
     color: str = "blue",
     palette: list[tuple] | None = None,
     color_dict: dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     hist_kwargs: dict | None = None,
     legend_kwargs: dict | None = None,
     xlim: tuple[float, float] | None = None,
@@ -1325,7 +1400,7 @@ def scatter(
     ax: plt.Axes | None = None,
     palette: list[str | tuple] | None = None,
     color_dict: dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     scatter_kwargs: dict | None = None,
     legend_kwargs: dict | None = None,
     figure_kwargs: dict | None = None,
@@ -1616,8 +1691,13 @@ def barplot(
     grouping_column: list[str] | None = None,
     value_column: list[str] | None = None,
     direct_columns: list[str] | None = None,
-    color: tuple = BaseColors.get("blue"),
+    color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
+    subgroup_column: str | None = None,
+    width: float = 0.4,
+    alpha: float = 0.5,
+    legend: str | Legend | None = None,
+    legend_kwargs: dict | None = None,
 ) -> None:
     """Plot a bar chart from a DataFrame or AnnData object
 
@@ -1649,6 +1729,16 @@ def barplot(
     color_dict
         Dictionary mapping group labels to specific colors. Overrides the color
         parameter for specified groups. By default None.
+    subgroup_column
+        Optional column for subgroups within each main group. Each subgroup will be plotted as a separate bar within the main group. By default None.
+    width
+        Width of the bars. By default 0.4.
+    alpha
+        Transparency of the bars (0-1). By default 0.5.
+    legend
+        Legend to add to the plot, by default None. If "auto", a legend is created from the color_dict. By default None.
+    legend_kwargs
+        Additional keyword arguments for the matplotlib legend function. By default None.
 
     Returns
     -------
@@ -1683,18 +1773,36 @@ def barplot(
 
     .. code-block:: python
 
+        import pandas as pd
+        from alphapepttools.pl.figure import create_figure
+        import alphapepttools as apt
+
+        data = pd.DataFrame({"A": [1, 2, 3], "B": [4, 5, 6], "C": [7, 8, 9]})
+
+        fig, axm = create_figure(1, 1, figsize=(6, 4))
+        ax = axm.next()
+        apt.pl.barplot(
+            ax=ax,
+            data=data,
+            direct_columns=["A", "B", "C"],
+            color_dict={"A": "red", "B": "green", "C": "blue"},
+        )
+
     Notes
     -----
     - Error bars show standard deviation of values within each group
     - Bars have 50% transparency with opaque black outlines
     - When using direct_columns, each column's mean is calculated across all rows
+    - The subgroup_column allows for further subdivision within each main group
     - Missing values (NaN) are excluded from mean and std calculations
     """
-    data, labels, positions = _extract_groupwise_plotting_data(
+    data, labels, positions, color_keys = _extract_groupwise_plotting_data(
         data=data,
         grouping_column=grouping_column,
         value_column=value_column,
         direct_columns=direct_columns,
+        subgroup_column=subgroup_column,
+        width=width,
     )
 
     means = [pd.Series(d).mean() for d in data]
@@ -1706,18 +1814,39 @@ def barplot(
         yerr=stds,
         capsize=5,
         align="center",
-        width=0.5,
+        width=width,
     )
 
     # Styling of bars
-    for label, bar in zip(labels, bars, strict=False):
-        current_color = color_dict.get(label, config["na_color"]) if color_dict else color
-        bar.set_facecolor(mcolors.to_rgba(current_color, alpha=0.5))
+    for color_key, bar in zip(color_keys, bars, strict=False):
+        current_color = color_dict.get(color_key, config["na_color"]) if color_dict else color
+        bar.set_facecolor(mcolors.to_rgba(current_color, alpha=alpha))
         bar.set_edgecolor(BaseColors.get("black"))
-        bar.set(linewidth=config["linewidths"]["large"])
+        bar.set(linewidth=config["linewidths"]["medium"])
 
-    ax.set_xticks(positions)
-    ax.set_xticklabels(labels)
+    # Styling of error bars (vertical lines and caps)
+    if bars.errorbar is not None:
+        _, caplines, barlinecols = bars.errorbar
+        for capline in caplines:
+            capline.set_markeredgewidth(config["linewidths"]["medium"])
+        for barlinecol in barlinecols:
+            barlinecol.set_linewidth(config["linewidths"]["medium"])
+
+    # One label per position in case subgroups returned repeated entries
+    unique_labels = list(dict.fromkeys(labels))
+
+    ax.set_xticks(range(len(unique_labels)))
+    ax.set_xticklabels(unique_labels)
+
+    legend_kwargs = legend_kwargs or {}
+    legend_kwargs.setdefault("alpha", alpha)
+    if legend is not None and color_dict is not None:
+        add_legend_to_axes(
+            ax=ax,
+            levels=color_dict,
+            legend=legend,
+            **legend_kwargs,
+        )
 
 
 def boxplot(
@@ -1726,8 +1855,13 @@ def boxplot(
     grouping_column: list[str] | None = None,
     value_column: list[str] | None = None,
     direct_columns: list[str] | None = None,
-    color: tuple = BaseColors.get("blue"),
+    color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
+    subgroup_column: str | None = None,
+    width: float = 0.4,
+    alpha: float = 0.5,
+    legend: str | Legend | None = None,
+    legend_kwargs: dict | None = None,
 ) -> None:
     """Plot a box plot from a DataFrame or AnnData object
 
@@ -1759,6 +1893,16 @@ def boxplot(
     color_dict
         Dictionary mapping group labels to specific colors. Overrides the color
         parameter for specified groups. By default None.
+    subgroup_column
+        Optional column for subgroups within each main group. Each subgroup will be plotted as a separate box within the main group. By default None.
+    width
+        Width of the boxes. By default 0.4.
+    alpha
+        Transparency of the boxes (0-1). By default 0.5.
+    legend
+        Legend to add to the plot, by default None. If "auto", a legend is created from the color_dict. By default None.
+    legend_kwargs
+        Additional keyword arguments for the matplotlib legend function. By default None.
 
     Returns
     -------
@@ -1815,46 +1959,69 @@ def boxplot(
     - Whiskers extend to 1.5 * IQR or the most extreme non-outlier point
     - Boxes have 50% transparency with opaque black outlines
     - When using direct_columns, each column's distribution is shown separately
+    - The subgroup_column allows for further subdivision within each main group
     - Missing values (NaN) are excluded from the distribution calculations
     """
-    data, labels, positions = _extract_groupwise_plotting_data(
+    data, labels, positions, color_keys = _extract_groupwise_plotting_data(
         data=data,
         grouping_column=grouping_column,
         value_column=value_column,
         direct_columns=direct_columns,
+        subgroup_column=subgroup_column,
+        width=width,
     )
 
     boxes = ax.boxplot(
         x=data,
         positions=positions,
-        widths=0.5,
+        widths=width,  # no typo: widths argument also takes single floats
         patch_artist=True,
     )
 
     # Styling of boxes
-    for label, box in zip(labels, boxes["boxes"], strict=False):
-        current_color = color_dict.get(label, config["na_color"]) if color_dict else color
-        box.set_facecolor(mcolors.to_rgba(current_color, alpha=0.5))
-        box.set(linewidth=config["linewidths"]["large"])
+    for color_key, box in zip(color_keys, boxes["boxes"], strict=False):
+        current_color = color_dict.get(color_key, config["na_color"]) if color_dict else color
+        box.set_facecolor(mcolors.to_rgba(current_color, alpha=alpha))
+        box.set(linewidth=config["linewidths"]["medium"])
         box.set_edgecolor(BaseColors.get("black"))
 
     # Styping of medians
     for _, median in zip(labels, boxes["medians"], strict=False):
         median.set(color=BaseColors.get("black"))
-        median.set(linewidth=config["linewidths"]["large"])
+        median.set(linewidth=config["linewidths"]["medium"])
 
     # Styling of whiskers
     for _, whisker in zip(labels * 2, boxes["whiskers"], strict=False):
         whisker.set(color=BaseColors.get("black"))
-        whisker.set(linewidth=config["linewidths"]["large"])
+        whisker.set(linewidth=config["linewidths"]["medium"])
 
     # Styling of caps
     for _, cap in zip(labels * 2, boxes["caps"], strict=False):
         cap.set(color=BaseColors.get("black"))
-        cap.set(linewidth=config["linewidths"]["large"])
+        cap.set(linewidth=config["linewidths"]["medium"])
 
-    ax.set_xticks(positions)
-    ax.set_xticklabels(labels)
+    # Styling of outlier points (fliers)
+    for _, flier in zip(labels, boxes["fliers"], strict=False):
+        flier.set(
+            markeredgecolor=BaseColors.get("black"),
+            markeredgewidth=config["linewidths"]["medium"],
+        )
+
+    # One label per position in case subgroups returned repeated entries
+    unique_labels = list(dict.fromkeys(labels))
+
+    ax.set_xticks(range(len(unique_labels)))
+    ax.set_xticklabels(unique_labels)
+
+    legend_kwargs = legend_kwargs or {}
+    legend_kwargs.setdefault("alpha", alpha)
+    if legend is not None and color_dict is not None:
+        add_legend_to_axes(
+            ax=ax,
+            levels=color_dict,
+            legend=legend,
+            **legend_kwargs,
+        )
 
 
 def violinplot(
@@ -1863,8 +2030,13 @@ def violinplot(
     grouping_column: list[str] | None = None,
     value_column: list[str] | None = None,
     direct_columns: list[str] | None = None,
-    color: tuple = BaseColors.get("blue"),
+    color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
+    subgroup_column: str | None = None,
+    width: float = 0.4,
+    alpha: float = 0.5,
+    legend: str | Legend | None = None,
+    legend_kwargs: dict | None = None,
 ) -> None:
     """Plot a violin plot from a DataFrame or AnnData object
 
@@ -1897,6 +2069,16 @@ def violinplot(
     color_dict
         Dictionary mapping group labels to specific colors. Overrides the color
         parameter for specified groups. By default None.
+    subgroup_column
+        Optional column for subgroups within each main group. Each subgroup will be plotted as a separate violin within the main group. By default None.
+    width
+        Width of the violins. By default 0.4.
+    alpha
+        Transparency of the violins (0-1). By default 0.5.
+    legend
+        Legend to add to the plot, by default None. If "auto", a legend is created from the color_dict. By default None.
+    legend_kwargs
+        Additional keyword arguments for the matplotlib legend function. By default None.
 
     Returns
     -------
@@ -1955,42 +2137,57 @@ def violinplot(
     - When using direct_columns, each column's distribution is shown separately
     - Missing values (NaN) are excluded from the distribution calculations
     """
-    data, labels, positions = _extract_groupwise_plotting_data(
+    data, labels, positions, color_keys = _extract_groupwise_plotting_data(
         data=data,
         grouping_column=grouping_column,
         value_column=value_column,
         direct_columns=direct_columns,
+        subgroup_column=subgroup_column,
+        width=width,
     )
 
     violins = ax.violinplot(
         dataset=data,
         positions=positions,
-        widths=0.5,
+        widths=width,
         showmedians=True,
     )
 
     # Styling of violins
-    for label, violin in zip(labels, violins["bodies"], strict=False):
-        current_color = color_dict.get(label, config["na_color"]) if color_dict else color
-        violin.set_facecolor(mcolors.to_rgba(current_color, alpha=0.5))
+    for color_key, violin in zip(color_keys, violins["bodies"], strict=False):
+        current_color = color_dict.get(color_key, config["na_color"]) if color_dict else color
+        violin.set_facecolor(mcolors.to_rgba(current_color, alpha=alpha))
         violin.set_edgecolor(BaseColors.get("black"))
-        violin.set_linewidth(config["linewidths"]["large"])
+        violin.set_linewidth(config["linewidths"]["medium"])
         violin.set_alpha(None)  # Reset any global alpha
 
     # Styling of medians
     violins["cmedians"].set(color=BaseColors.get("black"))
-    violins["cmedians"].set(linewidth=config["linewidths"]["large"])
+    violins["cmedians"].set(linewidth=config["linewidths"]["medium"])
 
     # Styling of min and max whiskers and the central bar
     violins["cmins"].set(color=BaseColors.get("black"))
-    violins["cmins"].set(linewidth=config["linewidths"]["large"])
+    violins["cmins"].set(linewidth=config["linewidths"]["medium"])
     violins["cmaxes"].set(color=BaseColors.get("black"))
-    violins["cmaxes"].set(linewidth=config["linewidths"]["large"])
+    violins["cmaxes"].set(linewidth=config["linewidths"]["medium"])
     violins["cbars"].set(color=BaseColors.get("black"))
-    violins["cbars"].set(linewidth=config["linewidths"]["large"])
+    violins["cbars"].set(linewidth=config["linewidths"]["medium"])
 
-    ax.set_xticks(positions)
-    ax.set_xticklabels(labels)
+    # One label per position in case subgroups returned repeated entries
+    unique_labels = list(dict.fromkeys(labels))
+
+    ax.set_xticks(range(len(unique_labels)))
+    ax.set_xticklabels(unique_labels)
+
+    legend_kwargs = legend_kwargs or {}
+    legend_kwargs.setdefault("alpha", alpha)
+    if legend is not None and color_dict is not None:
+        add_legend_to_axes(
+            ax=ax,
+            levels=color_dict,
+            legend=legend,
+            **legend_kwargs,
+        )
 
 
 def rank_median_plot(
@@ -2002,7 +2199,7 @@ def rank_median_plot(
     color_column: str | None = None,
     palette: list[str | tuple] | None = None,
     color_dict: dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     scatter_kwargs: dict | None = None,
 ) -> None:
     """Rank plot showing median intensities across samples.
@@ -2132,7 +2329,7 @@ def plot_pca(
     ax: plt.Axes | None = None,
     palette: list[str | tuple] | None = None,
     color_dict: dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     scatter_kwargs: dict | None = None,
 ) -> None:
     """PCA scatter plot showing principal component projections.
@@ -2674,7 +2871,7 @@ def volcano(  # noqa: C901
     scatter_kwargs: dict | None = None,
     line_kwargs: dict | None = None,
     label_kwargs: dict | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     legend_kwargs: dict | None = None,
     # Default layer parameters
     default_color: str | tuple = BaseColors.get("grey"),

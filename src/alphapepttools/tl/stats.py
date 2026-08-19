@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 
 
 def nan_safe_bh_correction(
-    pvals: np.array,
-) -> np.array:
+    pvals: np.ndarray,
+) -> np.ndarray:
     """Apply Benjamini-Hochberg correction with NaN-safe handling.
 
     Scipy.stats.false_discovery_control is not nan-safe, we need to delete nans, apply correction, then re-insert nans.

@@ -568,7 +568,7 @@ def create_figure(
     width_ratios: list[float] | None = None,
     subplots_kwargs: dict | None = None,
     gridspec_kwargs: dict | None = None,
-) -> tuple[plt.Figure, np.ndarray]:
+) -> tuple[plt.Figure, AxisManager]:
     """Create a figure with a specified number of rows and columns
 
     Returns an AxisManager object to manage axes objects. This is especially useful
@@ -639,6 +639,14 @@ def create_figure(
             "svg.fonttype": "none",
             "pdf.fonttype": 42,
             "ps.fonttype": 42,
+            "axes.linewidth": config["linewidths"]["medium"],
+            "grid.linewidth": config["linewidths"]["small"],
+            "xtick.major.width": config["linewidths"]["small"],
+            "ytick.major.width": config["linewidths"]["small"],
+            "xtick.minor.width": config["linewidths"]["small"],
+            "ytick.minor.width": config["linewidths"]["small"],
+            "lines.linewidth": config["linewidths"]["medium"],
+            "patch.linewidth": config["linewidths"]["medium"],
         }
     )
 
