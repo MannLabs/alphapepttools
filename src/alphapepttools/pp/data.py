@@ -994,7 +994,18 @@ def filter_data_completeness(
 ) -> ad.AnnData:
     """Filter features based on missing values.
 
-    Operates globally, or per-group when group_column is set.
+    The missingness threshold is given either as a fraction (`max_missing_fraction`) or as an
+    absolute number of missing values (`max_missing_count`). Exactly one of the two must be
+    provided.
+
+    Operates globally, or per-group when `group_column` is set.
+
+    Under group-wise filtering the threshold is evaluated within each group, not across
+    the whole dataset. For `max_missing_count` this means the same absolute count
+    corresponds to different completeness levels in groups of different size - e.g.
+    `max_missing_count=1` allows 1 of 3 missing in a three-sample group and 1 of 20 in a
+    twenty-sample group. Use `max_missing_fraction` if you want a size-independent
+    criterion.
 
     Parameters
     ----------
@@ -1017,8 +1028,10 @@ def filter_data_completeness(
         List of levels of the group_column to consider in filtering. E.g. if the column has the levels
         `['A', 'B', 'C']`, and `groups = ['A', 'B']`, only missingness of features in these
         groups is considered. If `None`, all groups are considered.
+        Silently ignored if `group_column` is `None`.
     keep_strategy
-        Only relevant for groupwise filtering.
+        Only relevant for groupwise filtering: it decides how the per-group results are combined.
+        Silently ignored if `group_column` is `None`, since there is only one result to combine.
         - `all` : keep a feature only if it passes in every group.
         - `any` : keep a feature if it passes the threshold in at least one group.
     action
@@ -1033,6 +1046,18 @@ def filter_data_completeness(
     AnnData
         AnnData object with either a new `adata.var` column added (if `flag`)
         or filtered features (if `drop`).
+        Note that `flag` adds the column to the object that was passed in and returns that same
+        object, whereas `drop` leaves the input untouched and returns a filtered copy.
+
+    Raises
+    ------
+    TypeError
+        If `adata` is not an AnnData object.
+    ValueError
+        If not exactly one of `max_missing_fraction` / `max_missing_count` is provided, if a
+        threshold is out of range, if `keep_strategy` or `action` is invalid, if `adata` has no
+        features, non-numeric values in `X` or duplicated indices in `obs`, or if a requested
+        group is not present in `group_column`.
 
     Examples
     --------
@@ -1055,15 +1080,19 @@ def filter_data_completeness(
             var=pd.DataFrame(index=["prot1", "prot2", "prot3", "prot4"]),
         )
 
-        # Flag features with >30% missing values
+        # Missing values per feature: prot1=0, prot2=2, prot3=1, prot4=0 (out of 4 samples)
+
+        # Mark which features have <=30% missing values in `adata.var`, without dropping any:
+        # prot2 (50% missing) is marked False, the rest True
         adata = apt.pp.filter_data_completeness(adata, max_missing_fraction=0.3, action="flag")
 
-        # Drop features with more than 1 missing value
+        # Drop features with more than 1 missing value: removes prot2
         adata = apt.pp.filter_data_completeness(adata, max_missing_count=1, action="drop")
 
-        # Drop features with >30% missing in group A only
+        # Consider missingness in group B only: removes prot3, which is missing in 1 of the 2
+        # group-B samples (50%) even though it is only 25% missing overall
         adata = apt.pp.filter_data_completeness(
-            adata, max_missing_fraction=0.3, group_column="group", groups=["A"], action="drop"
+            adata, max_missing_fraction=0.3, group_column="group", groups=["B"], action="drop"
         )
 
     Groupwise filtering — `keep_strategy` controls how per-group results are combined:
