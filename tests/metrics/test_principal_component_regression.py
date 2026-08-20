@@ -22,8 +22,11 @@ def adata_dummy():
     obs["categorical"] = pd.Series(np.random.choice(["A", "B", "C"], size=n_cells), dtype="category")
     obs["string"] = ["label"] * n_cells  # unsupported type
 
-    obsm = {"X_pca": np.random.randn(n_cells, n_pcs)}
-    uns = {"pca": {"variance_ratio": np.linspace(0.1, 0.01, n_pcs)}}
+    obsm = {"X_pca_obs": np.random.randn(n_cells, n_pcs), "custom_pca": np.random.randn(n_cells, n_pcs)}
+    uns = {
+        "variance_pca_obs": {"variance_ratio": np.linspace(0.1, 0.01, n_pcs)},
+        "custom_pca": {"variance_ratio": np.linspace(0.1, 0.01, n_pcs)},
+    }
 
     return ad.AnnData(
         X=X,
@@ -51,21 +54,29 @@ def test_principal_component_regression_subset_components(adata_dummy):
     assert score_subset <= score_all
 
 
+def test_principal_component_regression_custom_key(adata_dummy):
+    score_all = principal_component_regression(
+        adata_dummy, covariate="continuous", pca_key="custom_pca", pca_key_uns="custom_pca"
+    )
+    score_subset = principal_component_regression(
+        adata_dummy, covariate="continuous", n_components=5, pca_key="custom_pca", pca_key_uns="custom_pca"
+    )
+    assert score_subset <= score_all
+
+
 def test_principal_component_regression_missing_covariate(adata_dummy):
     with pytest.raises(KeyError, match="not found in `adata.obs`"):
         principal_component_regression(adata_dummy, covariate="missing")
 
 
-def test_principal_component_regression_missing_pca_key(adata_dummy):
-    adata_dummy.obsm.pop("X_pca")
+def test_principal_component_regression_missing_pca_key_obsm(adata_dummy):
     with pytest.raises(KeyError, match="was not found in `adata.obsm`"):
-        principal_component_regression(adata_dummy, covariate="continuous")
+        principal_component_regression(adata_dummy, covariate="continuous", pca_key="missing_key")
 
 
 def test_principal_component_regression_missing_pca_uns_key(adata_dummy):
-    adata_dummy.uns.pop("pca")
     with pytest.raises(KeyError, match="was not found in `adata.uns`"):
-        principal_component_regression(adata_dummy, covariate="continuous")
+        principal_component_regression(adata_dummy, covariate="continuous", pca_key_uns="missing_key")
 
 
 def test_principal_component_regression_unsupported_dtype(adata_dummy):
