@@ -33,6 +33,9 @@ class StudyData:
             - 'psm': Peptide spectrum match (PSM) table
             - 'study_psm': Full study data (metadata + PSM table)
             - 'study_pg': Full study data (metadata + PG table)
+            - 'shapes': Shapes file (geojson)
+            - 'image': Image file
+            - 'anndata': AnnData object
     citation
         Citation reference for the study, optional
     description
@@ -65,7 +68,7 @@ class StudyData:
     name: str
     url: str
     search_engine: str
-    data_type: Literal["pg", "psm", "study_psm", "study_pg", "image", "shapes"]
+    data_type: Literal["pg", "psm", "study_psm", "study_pg", "image", "shapes", "anndata"]
     citation: str | None = None
     description: str | None = None
 
@@ -87,7 +90,7 @@ class StudyData:
 
         """
         output_dir = Path.cwd() if output_dir is None else output_dir
-        return DataShareDownloader(url=self.url, output_dir=output_dir).download()
+        return Path(DataShareDownloader(url=self.url, output_dir=output_dir).download())
 
     @property
     def df(self) -> pd.DataFrame:
