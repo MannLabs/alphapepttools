@@ -349,9 +349,9 @@ def _contrasts_from_matrix(
         # Name must match the sign of log2fc = C @ B: control=1/treatment=-1 gives
         # control - treatment, control=-1/treatment=1 gives treatment - control.
         if control_value == 1 and treatment_value == -1:
-            contrast_names.append(f"{control_condition}_VS_{treatment}")
+            contrast_names.append(f"{control_condition}{tl_defaults.CONDITION_SPLIT_STRING}{treatment}")
         elif control_value == -1 and treatment_value == 1:
-            contrast_names.append(f"{treatment}_VS_{control_condition}")
+            contrast_names.append(f"{treatment}{tl_defaults.CONDITION_SPLIT_STRING}{control_condition}")
         else:
             raise ValueError(
                 f"Contrast between '{treatment}' and '{control_condition}' is not valid. Expected one to be 1 and the other to be -1."
@@ -688,7 +688,7 @@ def diff_exp_ebayes(
     results = {}
     for contrast_idx, contrast_name in enumerate(contrast_names):
         # By convention the contrast is named "A_VS_B" (comparison[0] vs comparison[1]).
-        a_level, b_level = contrast_name.split("_VS_")
+        a_level, b_level = contrast_name.split(tl_defaults.CONDITION_SPLIT_STRING)
 
         p_values = ebayes_results["p"][contrast_idx].copy()
         log2fc = contrast_results["log2fc"][contrast_idx].copy()
