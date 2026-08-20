@@ -274,8 +274,12 @@ def _filter_by_dict(
         merged_filter_mask = np.all(filter_masks, axis=0)
     elif logic == "or":
         merged_filter_mask = np.any(filter_masks, axis=0)
+    else:
+        raise ValueError(f"Supported logics are `and` and `or`, passed {logic}")
 
-    return merged_filter_mask
+    # np.all/np.any reduce to a plain array, so restore the index to stay consistent with the
+    # early return above and to keep the mask aligned when callers index with it
+    return pd.Series(merged_filter_mask, index=data.index)
 
 
 def _tuple_based_filter(
