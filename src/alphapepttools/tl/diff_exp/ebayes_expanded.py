@@ -174,7 +174,7 @@ def _nan_lmfit(
         m = y_obs.shape[0]
         df = m - rank
 
-        # DF check: if df <= 0, skip this feature
+        # Skip features with insufficient degrees of freedom
         if df <= 0:
             B[:, j] = np.nan
             sigma2[j] = np.nan
@@ -198,7 +198,7 @@ def _nan_lmfit(
         M_full = np.full((K, K), np.nan)
         M_full[np.ix_(live_col_idxs, live_col_idxs)] = M_live
 
-        # Store results in output arrays
+        # Store results in output arrays with correct shapes
         B[:, j] = B_full
         sigma2[j] = s2
         dfs[j] = df
@@ -370,7 +370,7 @@ def ebayes_moderation(
 
     Features that were never fit (NaN sigma2/dfs, or df<=0) are excluded from the
     prior estimation and returned as NaN. Within-feature NaNs (inestimable single
-    contrasts from dead compound columns) are left to propagate through eBayes.
+    contrasts from dead coefficients columns) are left to propagate through eBayes.
 
     Parameters
     ----------
@@ -395,26 +395,27 @@ def ebayes_moderation(
     n_contrasts, P = log2fcs.shape
 
     # Remove features that have no fit at all, i.e. NaN columns in log2fcs, stdevs_unscaled, or nan in sigma2, or dfs
-    valid = np.isfinite(sigma2) & np.isfinite(dfs) & (dfs > 0)
+    valid_mask = np.isfinite(sigma2) & np.isfinite(dfs) & (dfs > 0)
 
     # inmoose's eBayes asserts `.index` on coefficients/stdev_unscaled (so wrap in DataFrame),
     # but does `df[:, None]` on df_residual internally — keep sigma/df_residual as ndarrays.
     # TODO: swap valid_idx for adata.var_names later so results round-trip back to precursor IDs.
-    valid_idx = np.where(valid)[0]
+    valid_idx = np.where(valid_mask)[0]
+    # TODO: get rid of limma.MArrayLM once a port is in place; this is only a container to call eBayes with the expected input
     fit = limma.MArrayLM(
-        coefficients=pd.DataFrame(log2fcs[:, valid].T, index=valid_idx),
-        stdev_unscaled=pd.DataFrame(stdevs_unscaled[:, valid].T, index=valid_idx),
-        sigma=np.sqrt(sigma2[valid]),  # SD, not variance
-        df_residual=dfs[valid],
+        coefficients=pd.DataFrame(log2fcs[:, valid_mask].T, index=valid_idx),
+        stdev_unscaled=pd.DataFrame(stdevs_unscaled[:, valid_mask].T, index=valid_idx),
+        sigma=np.sqrt(sigma2[valid_mask]),  # SD, not variance
+        df_residual=dfs[valid_mask],
         cov_coef=None,
     )
     fit = limma.eBayes(fit)
 
-    # scatter back to full (88, P), excluded features stay NaN
+    # scatter back to full (n_contrasts, P), excluded features stay NaN
     p = np.full((n_contrasts, P), np.nan)
     t = np.full((n_contrasts, P), np.nan)
-    p[:, valid] = np.asarray(fit.p_value).T
-    t[:, valid] = np.asarray(fit.t).T
+    p[:, valid_mask] = np.asarray(fit.p_value).T
+    t[:, valid_mask] = np.asarray(fit.t).T
 
     return {"p": p, "t": t}
 
@@ -514,12 +515,12 @@ def _replicate_gate_mask(
         Boolean mask of shape (n_features,). All True if both gates are disabled.
 
     """
-    keep = np.ones(adata.n_vars, dtype=bool)
+    keep_mask = np.ones(adata.n_vars, dtype=bool)
     if a_min_required is not None:
-        keep &= _sufficient_values_mask(adata, between_column, a_level, a_min_required)
+        keep_mask &= _sufficient_values_mask(adata, between_column, a_level, a_min_required)
     if b_min_required is not None:
-        keep &= _sufficient_values_mask(adata, between_column, b_level, b_min_required)
-    return keep
+        keep_mask &= _sufficient_values_mask(adata, between_column, b_level, b_min_required)
+    return keep_mask
 
 
 def _standardize_contrast_frame(
@@ -586,7 +587,7 @@ def diff_exp_ebayes(
     a_min_required: int | None = None,
     b_min_required: int | None = None,
     return_coefficients: bool = False,  # noqa: FBT001, FBT002
-) -> dict[str, pd.DataFrame] | tuple[dict[str, pd.DataFrame], pd.DataFrame]:
+) -> tuple[dict[str, pd.DataFrame], pd.DataFrame | None]:
     """Run Limma eBayes moderated ttest for differential expression with multiple contrasts and covariate support.
 
     The two conditions in each comparison are referred to positionally as A (comparison[0]) and B (comparison[1]);
@@ -626,11 +627,11 @@ def diff_exp_ebayes(
 
     Returns
     -------
-    dict[str, pd.DataFrame] or tuple[dict[str, pd.DataFrame], pd.DataFrame]
-        Per-contrast standardized Limma eBayes results, keyed by contrast name, each carrying the shared
-        `tl_defaults.DIFF_EXP_COLS` columns. Fold changes are reported as A - B (i.e. comparison[0] -
-        comparison[1]), and contrasts are named "A_VS_B". If `return_coefficients` is True, returns a tuple
-        of (results, coefficients).
+    tuple[dict[str, pd.DataFrame], pd.DataFrame | None]
+        Always a (results, coefficients) tuple. `results` holds the per-contrast standardized Limma eBayes
+        results, keyed by contrast name, each carrying the shared `tl_defaults.DIFF_EXP_COLS` columns. Fold
+        changes are reported as A - B (i.e. comparison[0] - comparison[1]), and contrasts are named "A_VS_B".
+        `coefficients` is the fitted-coefficient DataFrame if `return_coefficients` is True, else None.
 
     Raises
     ------
@@ -719,4 +720,4 @@ def diff_exp_ebayes(
         )
         return results, coefficients
 
-    return results
+    return results, None

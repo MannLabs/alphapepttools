@@ -612,7 +612,7 @@ def test_diff_exp_ebayes_expanded_agrees_with_original(
     # Expanded implementation fits every feature, so filter incomplete features upfront (as a user would)
     # to match the original's feature set and therefore its eBayes prior.
     adata_complete = filter_data_completeness(adata.copy(), max_missing_count=0, action="drop")
-    expanded_results = diff_exp_ebayes_expanded(
+    expanded_results, _ = diff_exp_ebayes_expanded(
         adata=adata_complete,
         between_column=between_column,
         comparison=comparison,
@@ -987,7 +987,7 @@ def gate_adata():
 )
 def test_diff_exp_ebayes_a_gate(gate_adata, a_min_required, sparse_reported):
     """a_min_required suppresses (NaNs) fold changes whose A condition has too few observed values."""
-    results = diff_exp_ebayes_expanded(
+    results, _ = diff_exp_ebayes_expanded(
         adata=gate_adata,
         between_column="group",
         comparison=("X", "Y"),
@@ -1018,7 +1018,7 @@ def test_diff_exp_ebayes_a_gate(gate_adata, a_min_required, sparse_reported):
 )
 def test_diff_exp_ebayes_b_gate(gate_adata, b_min_required, sparse_reported):
     """b_min_required suppresses (NaNs) fold changes whose B condition has too few observed values."""
-    results = diff_exp_ebayes_expanded(
+    results, _ = diff_exp_ebayes_expanded(
         adata=gate_adata,
         between_column="group",
         comparison=("X", "Y"),
@@ -1066,13 +1066,17 @@ def covariate_adata():
 
 
 @pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
-def test_diff_exp_ebayes_default_returns_results_only(covariate_adata):
-    """Without return_coefficients the return is the bare results dict (keeps the original return shape)."""
+def test_diff_exp_ebayes_default_returns_no_coefficients(covariate_adata):
+    """The return is always a (results, coefficients) tuple; coefficients is None unless requested."""
     out = diff_exp_ebayes_expanded(
         adata=covariate_adata, between_column="group", comparison=("A", "B"), covariate_column="batch"
     )
-    assert isinstance(out, dict)
-    assert set(out) == {"A_VS_B"}
+    assert isinstance(out, tuple)
+
+    results, coefficients = out
+    assert isinstance(results, dict)
+    assert set(results) == {"A_VS_B"}
+    assert coefficients is None
 
 
 @pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
