@@ -12,11 +12,14 @@ try:
 except ModuleNotFoundError:
     _HAS_INMOOSE = False
 
+from alphapepttools.tl.defaults import tl_defaults
 from alphapepttools.tl.stats import nan_safe_bh_correction
 from alphapepttools.tl.utils import (
     determine_max_replicates,
     negative_log10_pvalue,
 )
+
+_METHOD_NAME = "limma_ebayes_inmoose_expanded"
 
 
 def _build_design_matrix(
@@ -416,6 +419,58 @@ def ebayes_moderation(
     return {"p": p, "t": t}
 
 
+def _resolve_comparison(
+    adata: ad.AnnData,
+    between_column: str,
+    comparison: tuple[str | list[str], str],
+) -> tuple[list[str], str]:
+    """Validate `between_column` and resolve `comparison` into explicit A conditions and the B reference.
+
+    Parameters
+    ----------
+    adata : ad.AnnData
+        AnnData object whose .obs carries the condition labels.
+    between_column : str
+        Column name in adata.obs containing the contrast levels.
+    comparison : tuple[str | list[str], str]
+        Comparison as (A, B), where A is a single condition, a list of conditions, or the "_ALL_"
+        sentinel (every level except B), and B is the single reference condition.
+
+    Returns
+    -------
+    tuple[list[str], str]
+        The A conditions as an explicit list (sentinel expanded, single strings wrapped), and the
+        B reference condition.
+
+    Raises
+    ------
+    ValueError
+        If `between_column` is absent from adata.obs, or if any resolved condition is not a level of it.
+
+    """
+    if between_column not in adata.obs.columns:
+        raise ValueError(f"Column '{between_column}' not found in adata.obs.")
+    between_levels = adata.obs[between_column].unique()
+
+    # Validate the B condition (the single reference, comparison[1])
+    b_condition = comparison[1]
+    if b_condition not in between_levels:
+        raise ValueError(f"Condition '{b_condition}' not found in column '{between_column}'.")
+
+    # Resolve the A conditions (comparison[0]) to an explicit list
+    a_conditions = comparison[0]
+    if a_conditions == "_ALL_":
+        a_conditions = [level for level in between_levels if level != b_condition]
+    elif isinstance(a_conditions, str):
+        a_conditions = [a_conditions]
+
+    for a_condition in a_conditions:
+        if a_condition not in between_levels:
+            raise ValueError(f"Condition '{a_condition}' not found in column '{between_column}'.")
+
+    return list(a_conditions), b_condition
+
+
 def _sufficient_values_mask(
     adata: ad.AnnData,
     between_column: str,
@@ -428,7 +483,102 @@ def _sufficient_values_mask(
     return n_observed >= min_required
 
 
-def diff_exp_ebayes(  # noqa: C901
+def _replicate_gate_mask(
+    adata: ad.AnnData,
+    between_column: str,
+    a_level: str,
+    b_level: str,
+    a_min_required: int | None,
+    b_min_required: int | None,
+) -> np.ndarray:
+    """Per-feature boolean mask: True where both conditions of a contrast have enough observed values.
+
+    Parameters
+    ----------
+    adata : ad.AnnData
+        AnnData object subset to the samples that were fit.
+    between_column : str
+        Column name in adata.obs containing the contrast levels.
+    a_level : str
+        The A condition of the contrast.
+    b_level : str
+        The B condition of the contrast.
+    a_min_required : int | None
+        Minimum number of observed values required in A. If None, the A gate is disabled.
+    b_min_required : int | None
+        Minimum number of observed values required in B. If None, the B gate is disabled.
+
+    Returns
+    -------
+    np.ndarray
+        Boolean mask of shape (n_features,). All True if both gates are disabled.
+
+    """
+    keep = np.ones(adata.n_vars, dtype=bool)
+    if a_min_required is not None:
+        keep &= _sufficient_values_mask(adata, between_column, a_level, a_min_required)
+    if b_min_required is not None:
+        keep &= _sufficient_values_mask(adata, between_column, b_level, b_min_required)
+    return keep
+
+
+def _standardize_contrast_frame(
+    contrast_name: str,
+    var_names: pd.Index,
+    log2fc: np.ndarray,
+    p_values: np.ndarray,
+    max_level_1_samples: int,
+    max_level_2_samples: int,
+) -> pd.DataFrame:
+    """Assemble one contrast's results into the shared differential expression output format.
+
+    FDR correction is applied here, so any gating of `p_values` (e.g. the replicate gate) must
+    already have been applied by the caller.
+
+    Parameters
+    ----------
+    contrast_name : str
+        Name of the contrast, "A_VS_B" by convention. Written to the condition_pair column.
+    var_names : pd.Index
+        Feature names, used as both the frame index and the protein column.
+    log2fc : np.ndarray
+        Log2 fold changes for this contrast, shape (n_features,).
+    p_values : np.ndarray
+        p-values for this contrast, shape (n_features,).
+    max_level_1_samples : int
+        Number of samples in the A condition.
+    max_level_2_samples : int
+        Number of samples in the B condition.
+
+    Returns
+    -------
+    pd.DataFrame
+        Results frame carrying exactly the shared `tl_defaults.DIFF_EXP_COLS` columns, in that order.
+
+    """
+    fdr_pvalues = nan_safe_bh_correction(p_values)
+
+    df = pd.DataFrame(
+        {
+            "condition_pair": contrast_name,
+            "protein": var_names,
+            "log2fc": log2fc,
+            "p_value": p_values,
+            "-log10(p_value)": [negative_log10_pvalue(p) for p in p_values],
+            "fdr": fdr_pvalues,
+            "-log10(fdr)": [negative_log10_pvalue(fdr) for fdr in fdr_pvalues],
+            "method": _METHOD_NAME,
+            "max_level_1_samples": max_level_1_samples,
+            "max_level_2_samples": max_level_2_samples,
+        },
+        index=var_names,
+    )
+
+    # Reindex on the shared column contract so this method stays aligned with the other diff_exp methods
+    return df[tl_defaults.DIFF_EXP_COLS]
+
+
+def diff_exp_ebayes(
     adata: ad.AnnData,
     between_column: str,
     comparison: tuple[str | list[str], str],
@@ -477,30 +627,25 @@ def diff_exp_ebayes(  # noqa: C901
     Returns
     -------
     dict[str, pd.DataFrame] or tuple[dict[str, pd.DataFrame], pd.DataFrame]
-        Per-contrast standardized Limma eBayes results, keyed by contrast name. Fold changes are reported as
-        A - B (i.e. comparison[0] - comparison[1]), and contrasts are named "A_VS_B". If `return_coefficients`
-        is True, returns a tuple of (results, coefficients).
+        Per-contrast standardized Limma eBayes results, keyed by contrast name, each carrying the shared
+        `tl_defaults.DIFF_EXP_COLS` columns. Fold changes are reported as A - B (i.e. comparison[0] -
+        comparison[1]), and contrasts are named "A_VS_B". If `return_coefficients` is True, returns a tuple
+        of (results, coefficients).
+
+    Raises
+    ------
+    ImportError
+        If inmoose is not installed.
+    ValueError
+        If `between_column` is not in adata.obs, or any condition in `comparison` is not a level of it.
 
     """
-    if between_column not in adata.obs.columns:
-        raise ValueError(f"Column '{between_column}' not found in adata.obs.")
-    between_levels = adata.obs[between_column].unique()
+    if not _HAS_INMOOSE:
+        raise ImportError(
+            "inmoose is required for diff_exp_ebayes(). Install it through pip or install alphapepttools with the 'full'/'full-stable' extra."
+        )
 
-    # Validate the B condition (the single reference, comparison[1])
-    b_condition = comparison[1]
-    if b_condition not in between_levels:
-        raise ValueError(f"Condition '{b_condition}' not found in column '{between_column}'.")
-
-    # Validate the A conditions (comparison[0])
-    a_conditions = comparison[0]
-    if a_conditions == "_ALL_":
-        a_conditions = [level for level in between_levels if level != b_condition]
-    elif isinstance(a_conditions, str):
-        a_conditions = [a_conditions]
-
-    for a_condition in a_conditions:
-        if a_condition not in between_levels:
-            raise ValueError(f"Condition '{a_condition}' not found in column '{between_column}'.")
+    a_conditions, b_condition = _resolve_comparison(adata, between_column, comparison)
 
     # Step 0: Filter adata to only include samples from the specified conditions
     selected_levels = [*a_conditions, b_condition]
@@ -549,36 +694,20 @@ def diff_exp_ebayes(  # noqa: C901
         log2fc = contrast_results["log2fc"][contrast_idx].copy()
 
         # Replicate gate: suppress the fold change unless both conditions have enough observed values
-        keep = np.ones(adata.n_vars, dtype=bool)
-        if a_min_required is not None:
-            keep &= _sufficient_values_mask(adata, between_column, a_level, a_min_required)
-        if b_min_required is not None:
-            keep &= _sufficient_values_mask(adata, between_column, b_level, b_min_required)
+        keep = _replicate_gate_mask(adata, between_column, a_level, b_level, a_min_required, b_min_required)
         p_values[~keep] = np.nan
         log2fc[~keep] = np.nan
-
-        # preprocess p-values and FDR for the current contrast
-        fdr_pvalues = nan_safe_bh_correction(p_values)
-        neg_log10_fdr = np.array([negative_log10_pvalue(fdr) for fdr in fdr_pvalues])
-        neg_log10_pvalues = np.array([negative_log10_pvalue(p) for p in p_values])
 
         # Sample counts per level, mirroring ebayes.py. The name is "A_VS_B".
         max_level_1_samples, max_level_2_samples = determine_max_replicates(adata, between_column, a_level, b_level)
 
-        results[contrast_name] = pd.DataFrame(
-            {
-                "condition_pair": contrast_name,
-                "protein": adata.var_names,
-                "log2fc": log2fc,
-                "p_value": p_values,
-                "-log10(p_value)": neg_log10_pvalues,
-                "fdr": fdr_pvalues,
-                "-log10(fdr)": neg_log10_fdr,
-                "method": "limma_ebayes_inmoose_expanded",
-                "max_level_1_samples": max_level_1_samples,
-                "max_level_2_samples": max_level_2_samples,
-            },
-            index=adata.var_names,
+        results[contrast_name] = _standardize_contrast_frame(
+            contrast_name=contrast_name,
+            var_names=adata.var_names,
+            log2fc=log2fc,
+            p_values=p_values,
+            max_level_1_samples=max_level_1_samples,
+            max_level_2_samples=max_level_2_samples,
         )
 
     if return_coefficients:

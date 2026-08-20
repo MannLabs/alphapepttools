@@ -14,11 +14,15 @@ from alphapepttools.tl.defaults import tl_defaults
 from alphapepttools.tl.diff_exp.alphaquant_wrapper import _HAS_ALPHAQUANT, _standardize_alphaquant_results
 from alphapepttools.tl.diff_exp.ebayes import _HAS_INMOOSE
 from alphapepttools.tl.diff_exp.ebayes_expanded import (
+    _METHOD_NAME,
     _build_design_matrix,
     _contrasts_from_matrix,
     _make_contrasts,
     _nan_lmfit,
+    _replicate_gate_mask,
+    _resolve_comparison,
     _run_contrasts,
+    _standardize_contrast_frame,
 )
 from alphapepttools.tl.diff_exp.ebayes_expanded import diff_exp_ebayes as diff_exp_ebayes_expanded
 from alphapepttools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
@@ -1106,3 +1110,186 @@ def test_diff_exp_ebayes_return_coefficients(covariate_adata, covariate_column, 
         columns=design_matrix.columns,
     )
     pd.testing.assert_frame_equal(coefficients, expected)
+
+
+# Comparison resolution turns the user-facing comparison tuple into explicit A conditions and the single B
+# reference, expanding the "_ALL_" sentinel and validating every level up front.
+@pytest.mark.parametrize(
+    ("comparison", "expected_a", "expected_b"),
+    [
+        (("B", "A"), ["B"], "A"),  # single A condition is wrapped into a list
+        ((["B", "C"], "A"), ["B", "C"], "A"),  # explicit list of A conditions passes through
+        ((["C"], "A"), ["C"], "A"),  # single-element list needs no expansion
+        (("_ALL_", "A"), ["B", "C"], "A"),  # sentinel expands to every level except B, in appearance order
+    ],
+)
+def test__resolve_comparison(comparison, expected_a, expected_b):
+    """Valid comparisons resolve to an explicit list of A conditions plus the B reference."""
+    a_conditions, b_condition = _resolve_comparison(_abc_adata(), "group", comparison)
+
+    assert isinstance(a_conditions, list)
+    assert a_conditions == expected_a
+    assert b_condition == expected_b
+
+
+def test__resolve_comparison_all_sentinel_excludes_b():
+    """ "_ALL_" never compares the B reference against itself, whichever level B is."""
+    a_conditions, b_condition = _resolve_comparison(_abc_adata(), "group", ("_ALL_", "B"))
+
+    assert b_condition not in a_conditions
+    assert set(a_conditions) == {"A", "C"}
+
+
+@pytest.mark.parametrize(
+    ("between_column", "comparison"),
+    [
+        ("missing", ("B", "A")),  # between column absent from adata.obs
+        ("group", ("B", "missing")),  # B reference is not a level of the between column
+        ("group", ("missing", "A")),  # single A condition is not a level
+        ("group", (["B", "missing"], "A")),  # one A condition of a list is not a level
+        ("group", ("_ALL_", "missing")),  # sentinel cannot expand against an unknown B
+    ],
+)
+def test__resolve_comparison_validation(between_column, comparison):
+    """An unknown between column or condition raises ValueError before any fitting happens."""
+    with pytest.raises(ValueError):
+        _resolve_comparison(_abc_adata(), between_column, comparison)
+
+
+# The replicate gate mask is the per-contrast AND of the two per-condition sufficiency masks; a None
+# requirement disables that side of the gate.
+@pytest.fixture
+def gate_mask_adata():
+    """Conditions X and Y (three samples each) with one feature sparse in X and one sparse in Y."""
+    x = np.array(
+        [
+            # full, x_sparse, y_sparse
+            [1.0, np.nan, 1.0],
+            [2.0, np.nan, 2.0],
+            [3.0, 3.0, 3.0],
+            [4.0, 4.0, np.nan],
+            [5.0, 5.0, np.nan],
+            [6.0, 6.0, 6.0],
+        ]
+    )
+    obs = pd.DataFrame({"group": ["X"] * 3 + ["Y"] * 3}, index=[f"s{i}" for i in range(6)])
+    var = pd.DataFrame(index=["full", "x_sparse", "y_sparse"])
+    return ad.AnnData(X=x, obs=obs, var=var)
+
+
+@pytest.mark.parametrize(
+    ("a_min_required", "b_min_required", "expected"),
+    [
+        (None, None, [True, True, True]),  # both gates disabled -> everything kept
+        (2, None, [True, False, True]),  # A gate only: x_sparse has 1 observed in X
+        (None, 2, [True, True, False]),  # B gate only: y_sparse has 1 observed in Y
+        (2, 2, [True, False, False]),  # both gates -> both sparse features dropped
+        (1, 1, [True, True, True]),  # requirements met everywhere
+        (4, None, [False, False, False]),  # more required than X has samples -> nothing kept
+    ],
+)
+def test__replicate_gate_mask(gate_mask_adata, a_min_required, b_min_required, expected):
+    """The mask keeps a feature only where both conditions meet their (enabled) requirement."""
+    keep = _replicate_gate_mask(
+        gate_mask_adata,
+        between_column="group",
+        a_level="X",
+        b_level="Y",
+        a_min_required=a_min_required,
+        b_min_required=b_min_required,
+    )
+
+    assert keep.dtype == bool
+    assert keep.shape == (gate_mask_adata.n_vars,)
+    np.testing.assert_array_equal(keep, np.array(expected))
+
+
+# Output standardization is the single place the shared diff_exp column contract is applied to the
+# expanded eBayes results, and the only place FDR correction happens.
+_MAX_A_SAMPLES = 4
+_MAX_B_SAMPLES = 5
+
+
+def _contrast_frame_inputs():
+    """A three-feature contrast: one significant, one not, one gated out (NaN)."""
+    var_names = pd.Index(["p1", "p2", "p3"])
+    log2fc = np.array([2.0, -0.5, np.nan])
+    p_values = np.array([0.001, 0.5, np.nan])
+    return var_names, log2fc, p_values
+
+
+def test__standardize_contrast_frame_columns_follow_shared_contract():
+    """The frame carries exactly the shared DIFF_EXP_COLS, in that order, indexed by feature."""
+    var_names, log2fc, p_values = _contrast_frame_inputs()
+
+    df = _standardize_contrast_frame(
+        contrast_name="A_VS_B",
+        var_names=var_names,
+        log2fc=log2fc,
+        p_values=p_values,
+        max_level_1_samples=_MAX_A_SAMPLES,
+        max_level_2_samples=_MAX_B_SAMPLES,
+    )
+
+    assert list(df.columns) == tl_defaults.DIFF_EXP_COLS
+    assert df.index.equals(var_names)
+    assert list(df["protein"]) == list(var_names)
+    assert (df["condition_pair"] == "A_VS_B").all()
+    assert (df["method"] == _METHOD_NAME).all()
+    assert (df["max_level_1_samples"] == _MAX_A_SAMPLES).all()
+    assert (df["max_level_2_samples"] == _MAX_B_SAMPLES).all()
+
+
+def test__standardize_contrast_frame_derived_columns():
+    """log2fc/p_value pass through untouched; fdr and both -log10 columns are derived from them."""
+    var_names, log2fc, p_values = _contrast_frame_inputs()
+
+    df = _standardize_contrast_frame(
+        contrast_name="A_VS_B",
+        var_names=var_names,
+        log2fc=log2fc,
+        p_values=p_values,
+        max_level_1_samples=_MAX_A_SAMPLES,
+        max_level_2_samples=_MAX_B_SAMPLES,
+    )
+
+    np.testing.assert_allclose(df["log2fc"].to_numpy(), log2fc, equal_nan=True)
+    np.testing.assert_allclose(df["p_value"].to_numpy(), p_values, equal_nan=True)
+
+    # FDR is the nan-safe BH correction of the (already gated) p-values
+    np.testing.assert_allclose(df["fdr"].to_numpy(), tl.nan_safe_bh_correction(p_values), equal_nan=True)
+
+    # Both -log10 columns mirror their source column
+    np.testing.assert_allclose(df["-log10(p_value)"].to_numpy(), -np.log10(p_values), equal_nan=True)
+    np.testing.assert_allclose(df["-log10(fdr)"].to_numpy(), -np.log10(df["fdr"].to_numpy()), equal_nan=True)
+
+
+def test__standardize_contrast_frame_keeps_gated_features_nan():
+    """A feature gated out upstream (NaN p-value) stays NaN across every derived column."""
+    var_names, log2fc, p_values = _contrast_frame_inputs()
+
+    df = _standardize_contrast_frame(
+        contrast_name="A_VS_B",
+        var_names=var_names,
+        log2fc=log2fc,
+        p_values=p_values,
+        max_level_1_samples=_MAX_A_SAMPLES,
+        max_level_2_samples=_MAX_B_SAMPLES,
+    )
+
+    derived_cols = ["log2fc", "p_value", "-log10(p_value)", "fdr", "-log10(fdr)"]
+    assert df.loc["p3", derived_cols].isna().all()
+
+    # The NaN feature must not consume a rank in the BH correction of the others
+    np.testing.assert_allclose(df.loc[["p1", "p2"], "fdr"].to_numpy(), np.array([0.002, 0.5]))
+
+
+# inmoose is an optional dependency; without it the failure must be an explicit ImportError rather than a
+# NameError from inside the moderation step.
+def test_diff_exp_ebayes_requires_inmoose():
+    """diff_exp_ebayes raises ImportError up front when inmoose is unavailable."""
+    with (
+        patch("alphapepttools.tl.diff_exp.ebayes_expanded._HAS_INMOOSE", new=False),
+        pytest.raises(ImportError, match="inmoose is required"),
+    ):
+        diff_exp_ebayes_expanded(adata=_abc_adata(), between_column="group", comparison=("B", "A"))
