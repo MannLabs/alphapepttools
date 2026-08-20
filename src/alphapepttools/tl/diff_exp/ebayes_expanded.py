@@ -81,7 +81,7 @@ def _build_design_matrix(
     return dm, {"condition_col_idxs": condition_col_idxs, "covariate_col_idxs": covariate_col_idxs}
 
 
-def _summarize_design_matrix(
+def print_design_matrix_summary(
     dm: pd.DataFrame,
 ) -> None:
     """Summarize the design matrix by reporting the counts of samples for each condition and covariate level."""
