@@ -194,7 +194,7 @@ def diff_exp_ebayes(
     # This ensures compatibility with inmoose's lmFit which cannot handle NaN values
     adata_subset = filter_data_completeness(
         adata_subset,
-        max_missing=0,
+        max_missing_count=0,
         action="drop",
     )
 
