@@ -14,6 +14,7 @@ notebooks/studies/study_01_biomarker_csf
 notebooks/studies/study_02_peptidomics_pelsa
 notebooks/studies/study_03_biomarker_skin
 notebooks/studies/study_04_scDVP
+notebooks/studies/study_05_multimodal
 ```
 
 ## Functional steps
@@ -28,6 +29,9 @@ notebooks/tutorials/tutorial_00_data_sources
 notebooks/tutorials/tutorial_01_basic_workflow
 notebooks/tutorials/tutorial_02_basic_plotting_workflow
 notebooks/tutorials/tutorial_03_basic_PCA_workflow
+notebooks/tutorials/tutorial_04_volcanoplot
+notebooks/tutorials/tutorial_05_tmt-data
+notebooks/supplementary/supplementary_02_scalability-demo_PCAn.ipynb
 notebooks/supplementary/supplementary_01_filtering_demo
 
 ```

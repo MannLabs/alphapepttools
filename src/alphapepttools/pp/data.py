@@ -3,7 +3,7 @@
 import logging
 import numbers
 import warnings
-from typing import Literal
+from typing import Literal, cast
 
 import anndata as ad
 import numpy as np
@@ -799,7 +799,7 @@ def data_columns_to_df(
     else:
         raise TypeError(f"Expected pd.DataFrame or ad.AnnData, got {type(data)}")
 
-    return dataset
+    return cast("pd.DataFrame", dataset)
 
 
 def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
