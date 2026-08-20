@@ -275,7 +275,7 @@ def _filter_by_dict(
     elif logic == "or":
         merged_filter_mask = np.any(filter_masks, axis=0)
 
-    return merged_filter_mask
+    return pd.Series(merged_filter_mask, index=data.index)
 
 
 def _tuple_based_filter(
