@@ -19,7 +19,7 @@ def nan_safe_ttest_ind(
     b: pd.Series,
     min_valid_values: int | None = None,
     **kwargs,
-) -> tuple[float, float] | tuple[np.nan, np.nan]:
+) -> tuple[float, float]:
     """NaN-safe wrapper around scipy.stats.ttest_ind.
 
     Performs independent t-test between two samples, but returns (nan, nan) if either

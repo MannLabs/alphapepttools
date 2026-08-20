@@ -16,6 +16,7 @@
     pp.nanlog
     pp.detect_special_values
     pp.normalize
+    pp.irs
     pp.impute_gaussian
     pp.impute_median
     pp.impute_knn

@@ -167,7 +167,7 @@ def _validate_pca_loadings_plot_inputs(
 
 def _extract_expression_df(
     adata: ad.AnnData,
-    names: list[str] | str | None,
+    names: list[str] | str,
 ) -> pd.DataFrame:
     """Extract expression data from an AnnData object as a numeric DataFrame.
 
