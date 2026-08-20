@@ -14,11 +14,11 @@ from alphapepttools.tl.defaults import tl_defaults
 from alphapepttools.tl.diff_exp.alphaquant_wrapper import _HAS_ALPHAQUANT, _standardize_alphaquant_results
 from alphapepttools.tl.diff_exp.ebayes import _HAS_INMOOSE
 from alphapepttools.tl.diff_exp.ebayes_expanded import (
-    build_design_matrix,
-    contrasts_from_matrix,
-    make_contrasts,
-    nan_lmfit,
-    run_contrasts,
+    _build_design_matrix,
+    _contrasts_from_matrix,
+    _make_contrasts,
+    _nan_lmfit,
+    _run_contrasts,
 )
 from alphapepttools.tl.diff_exp.ebayes_expanded import diff_exp_ebayes as diff_exp_ebayes_expanded
 from alphapepttools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
@@ -607,7 +607,7 @@ def test_diff_exp_ebayes_expanded_agrees_with_original(
 
     # Expanded implementation fits every feature, so filter incomplete features upfront (as a user would)
     # to match the original's feature set and therefore its eBayes prior.
-    adata_complete = filter_data_completeness(adata.copy(), max_missing=0, action="drop")
+    adata_complete = filter_data_completeness(adata.copy(), max_missing_count=0, action="drop")
     expanded_results = diff_exp_ebayes_expanded(
         adata=adata_complete,
         between_column=between_column,
@@ -650,12 +650,12 @@ def _abc_adata():
 
 
 # Test building a design matrix with and without covariates, and validate error handling for invalid inputs.
-def test_build_design_matrix_basic():
+def test__build_design_matrix_basic():
     """Without a covariate, the design matrix is a one-hot encoding of the conditions."""
     obs = pd.DataFrame({"group": ["A", "A", "B", "B"]}, index=[f"s{i}" for i in range(4)])
     adata = ad.AnnData(X=np.zeros((4, 1), dtype=float), obs=obs)
 
-    dm, col_info = build_design_matrix(adata, "group")
+    dm, col_info = _build_design_matrix(adata, "group")
 
     # Columns follow the order conditions first appear in.
     assert list(dm.columns) == ["A", "B"]
@@ -667,7 +667,7 @@ def test_build_design_matrix_basic():
     assert col_info == {"condition_col_idxs": {"A": 0, "B": 1}, "covariate_col_idxs": {}}
 
 
-def test_build_design_matrix_with_covariate():
+def test__build_design_matrix_with_covariate():
     """A covariate is added in k-1 fashion: the last level is dropped to avoid multicollinearity."""
     obs = pd.DataFrame(
         {"group": ["A", "A", "B", "B"], "batch": ["x", "x", "y", "y"]},
@@ -675,7 +675,7 @@ def test_build_design_matrix_with_covariate():
     )
     adata = ad.AnnData(X=np.zeros((4, 1), dtype=float), obs=obs)
 
-    dm, col_info = build_design_matrix(adata, "group", covariate_column="batch")
+    dm, col_info = _build_design_matrix(adata, "group", covariate_column="batch")
 
     # Two condition columns plus one covariate column ("y" dropped).
     assert list(dm.columns) == ["A", "B", "x"]
@@ -683,7 +683,7 @@ def test_build_design_matrix_with_covariate():
     assert col_info == {"condition_col_idxs": {"A": 0, "B": 1}, "covariate_col_idxs": {"x": 2}}
 
 
-# Test raise behavior for invalid condition/covariate specifications in build_design_matrix
+# Test raise behavior for invalid condition/covariate specifications in _build_design_matrix
 @pytest.mark.parametrize(
     ("condition", "covariate", "between_column", "covariate_column"),
     [
@@ -693,7 +693,7 @@ def test_build_design_matrix_with_covariate():
         (["A", "B"], [np.nan, "x"], "group", "batch"),  # NaN in covariate column
     ],
 )
-def test_build_design_matrix_validation(condition, covariate, between_column, covariate_column):
+def test__build_design_matrix_validation(condition, covariate, between_column, covariate_column):
     """Invalid condition/covariate specifications raise ValueError."""
     data = {"group": condition}
     if covariate is not None:
@@ -702,7 +702,7 @@ def test_build_design_matrix_validation(condition, covariate, between_column, co
     adata = ad.AnnData(X=np.zeros((len(condition), 1), dtype=float), obs=obs)
 
     with pytest.raises(ValueError):
-        build_design_matrix(adata, between_column, covariate_column=covariate_column)
+        _build_design_matrix(adata, between_column, covariate_column=covariate_column)
 
 
 # Nan-aware linear fit (counterpart to inmoose.limma.lmFit)
@@ -725,10 +725,10 @@ def lmfit_adata():
 
 
 # First check the case with complete features
-def test_nan_lmfit_complete_feature(lmfit_adata):
+def test__nan_lmfit_complete_feature(lmfit_adata):
     """For a fully observed feature the fit recovers group means, residual variance and df exactly."""
-    design_matrix, col_info = build_design_matrix(lmfit_adata, "group")
-    fit = nan_lmfit(lmfit_adata, design_matrix)
+    design_matrix, col_info = _build_design_matrix(lmfit_adata, "group")
+    fit = _nan_lmfit(lmfit_adata, design_matrix)
     j = list(lmfit_adata.var_names).index("complete")
 
     # Coefficients are the group means (A=4, B=2); condition order is [A, B].
@@ -742,10 +742,10 @@ def test_nan_lmfit_complete_feature(lmfit_adata):
 
 
 # Next check the case with empty condition columns (all missing in one group)
-def test_nan_lmfit_drops_empty_condition_column(lmfit_adata):
+def test__nan_lmfit_drops_empty_condition_column(lmfit_adata):
     """A condition with no observed values is dropped and scattered back as NaN, the rest is fit."""
-    design_matrix, _ = build_design_matrix(lmfit_adata, "group")
-    fit = nan_lmfit(lmfit_adata, design_matrix)
+    design_matrix, _ = _build_design_matrix(lmfit_adata, "group")
+    fit = _nan_lmfit(lmfit_adata, design_matrix)
     j = list(lmfit_adata.var_names).index("treat_all_missing")
 
     # Only the control mean is estimable; the dead treatment coefficient is NaN.
@@ -765,10 +765,10 @@ def test_nan_lmfit_drops_empty_condition_column(lmfit_adata):
         (-1, np.array([[-1, 1, 0], [-1, 0, 1]])),  # control = -1, each treatment = +1
     ],
 )
-def test_make_contrasts(control_is, expected):
+def test__make_contrasts(control_is, expected):
     """The contrast matrix has the control on every row and -control_is in each treatment's own row."""
     adata = _abc_adata()
-    cm = make_contrasts(adata, between_column="group", control_condition="A", control_is=control_is)
+    cm = _make_contrasts(adata, between_column="group", control_condition="A", control_is=control_is)
 
     # Columns are the conditions; rows are the K-1 treatment-vs-control contrasts.
     assert list(cm.columns) == ["A", "B", "C"]
@@ -777,7 +777,7 @@ def test_make_contrasts(control_is, expected):
 
 
 # Test computing the contrast log2FC, unscaled variance and standard deviation from the contrast matrix into separate arrays
-def test_run_contrasts():
+def test__run_contrasts():
     """log2fc and unscaled variance are computed per contrast, dropping covariate rows/cols."""
     # Conditions A, B, C at indices 0-2, plus a covariate at index 3 that must be ignored.
     col_info = {"condition_col_idxs": {"A": 0, "B": 1, "C": 2}, "covariate_col_idxs": {"cov": 3}}
@@ -786,9 +786,9 @@ def test_run_contrasts():
     # Unscaled covariance: identity on the conditions, large values on the covariate row/col.
     m = np.full((1, 4, 4), 1000.0)
     m[0, :3, :3] = np.eye(3)
-    contrast_matrix = make_contrasts(_abc_adata(), between_column="group", control_condition="A", control_is=1)
+    contrast_matrix = _make_contrasts(_abc_adata(), between_column="group", control_condition="A", control_is=1)
 
-    out = run_contrasts(contrast_matrix, B=b, M_all=m, col_info=col_info)
+    out = _run_contrasts(contrast_matrix, B=b, M_all=m, col_info=col_info)
 
     # Contrast 0 = A - B = 1 - 3 = -2; contrast 1 = A - C = 1 - 4 = -3 (covariate coef ignored).
     np.testing.assert_allclose(out["log2fc"], np.array([[-2.0], [-3.0]]))
@@ -797,10 +797,10 @@ def test_run_contrasts():
     np.testing.assert_allclose(out["stdev_unscaled"], np.sqrt(np.array([[2.0], [2.0]])))
 
 
-def test_run_contrasts_matches_explicit_quadratic_form():
+def test__run_contrasts_matches_explicit_quadratic_form():
     """The einsum-based unscaled variance matches an explicit per-feature, per-contrast loop."""
     col_info = {"condition_col_idxs": {"A": 0, "B": 1, "C": 2}, "covariate_col_idxs": {}}
-    contrast_matrix = make_contrasts(_abc_adata(), between_column="group", control_condition="A", control_is=-1)
+    contrast_matrix = _make_contrasts(_abc_adata(), between_column="group", control_condition="A", control_is=-1)
     c = contrast_matrix.to_numpy()
 
     # A few features with distinct, non-trivial (but symmetric) covariance matrices.
@@ -808,7 +808,7 @@ def test_run_contrasts_matches_explicit_quadratic_form():
     m = np.stack([rng_free, rng_free * 2.0, np.eye(3)])
     b = np.array([[1.0, 0.0, 2.0], [3.0, 1.0, 2.0], [4.0, 2.0, 2.0]])
 
-    out = run_contrasts(contrast_matrix, B=b, M_all=m, col_info=col_info)
+    out = _run_contrasts(contrast_matrix, B=b, M_all=m, col_info=col_info)
 
     expected = np.empty((c.shape[0], m.shape[0]))
     for j in range(m.shape[0]):
@@ -825,12 +825,12 @@ def test_run_contrasts_matches_explicit_quadratic_form():
         (-1, ["B_VS_A", "C_VS_A"]),  # log2fc = treatment - control -> "treatment_VS_control"
     ],
 )
-def test_contrasts_from_matrix_naming(control_is, expected_names):
+def test__contrasts_from_matrix_naming(control_is, expected_names):
     """Contrast names follow the sign of log2fc and the row order of the matrix."""
     adata = _abc_adata()
-    cm = make_contrasts(adata, between_column="group", control_condition="A", control_is=control_is)
+    cm = _make_contrasts(adata, between_column="group", control_condition="A", control_is=control_is)
 
-    assert contrasts_from_matrix(cm, control_condition="A") == expected_names
+    assert _contrasts_from_matrix(cm, control_condition="A") == expected_names
 
 
 @pytest.mark.parametrize(
@@ -846,10 +846,10 @@ def test_contrasts_from_matrix_naming(control_is, expected_names):
         (pd.DataFrame([[1, 1, 0]], columns=["A", "B", "C"]), "A"),
     ],
 )
-def test_contrasts_from_matrix_errors(matrix, control_condition):
+def test__contrasts_from_matrix_errors(matrix, control_condition):
     """Malformed contrast matrices are rejected."""
     with pytest.raises(ValueError):
-        contrasts_from_matrix(matrix, control_condition=control_condition)
+        _contrasts_from_matrix(matrix, control_condition=control_condition)
 
 
 # Condition-ordering robustness:
@@ -876,10 +876,10 @@ def interspersed_adata():
     return ad.AnnData(X=x, obs=obs)
 
 
-def test_nan_lmfit_maps_coefficients_by_name_under_interspersed_order(interspersed_adata):
+def test__nan_lmfit_maps_coefficients_by_name_under_interspersed_order(interspersed_adata):
     """Coefficients align with conditions by name, not position, for arbitrary input ordering."""
-    design_matrix, col_info = build_design_matrix(interspersed_adata, "group")
-    fit = nan_lmfit(interspersed_adata, design_matrix)
+    design_matrix, col_info = _build_design_matrix(interspersed_adata, "group")
+    fit = _nan_lmfit(interspersed_adata, design_matrix)
     idx = col_info["condition_col_idxs"]
 
     # Appearance order is [B, A, C]: the control "A" is deliberately NOT the first column.
@@ -903,13 +903,13 @@ def test_nan_lmfit_maps_coefficients_by_name_under_interspersed_order(interspers
     assert np.isfinite(m_miss[np.ix_([idx["B"], idx["A"]], [idx["B"], idx["A"]])]).all()
 
 
-def test_run_contrasts_log2fc_correct_under_interspersed_order(interspersed_adata):
-    """End-to-end through run_contrasts: each contrast's log2fc is treatment - control, by name."""
-    design_matrix, col_info = build_design_matrix(interspersed_adata, "group")
-    fit = nan_lmfit(interspersed_adata, design_matrix)
-    cm = make_contrasts(interspersed_adata, between_column="group", control_condition="A", control_is=-1)
-    out = run_contrasts(cm, B=fit["B"], M_all=fit["M_all"], col_info=col_info)
-    names = contrasts_from_matrix(cm, control_condition="A")
+def test__run_contrasts_log2fc_correct_under_interspersed_order(interspersed_adata):
+    """End-to-end through _run_contrasts: each contrast's log2fc is treatment - control, by name."""
+    design_matrix, col_info = _build_design_matrix(interspersed_adata, "group")
+    fit = _nan_lmfit(interspersed_adata, design_matrix)
+    cm = _make_contrasts(interspersed_adata, between_column="group", control_condition="A", control_is=-1)
+    out = _run_contrasts(cm, B=fit["B"], M_all=fit["M_all"], col_info=col_info)
+    names = _contrasts_from_matrix(cm, control_condition="A")
 
     j_all = list(interspersed_adata.var_names).index("all_present")
     log2fc_by_name = {name: out["log2fc"][i, j_all] for i, name in enumerate(names)}
@@ -931,11 +931,11 @@ def test_fit_and_contrasts_invariant_to_sample_permutation(example_adata_ebayes)
     """
 
     def fit_and_contrasts_by_name(adata):
-        design_matrix, col_info = build_design_matrix(adata, "group")
-        fit = nan_lmfit(adata, design_matrix)
-        cm = make_contrasts(adata, between_column="group", control_condition="A", control_is=-1)
-        out = run_contrasts(cm, B=fit["B"], M_all=fit["M_all"], col_info=col_info)
-        names = contrasts_from_matrix(cm, control_condition="A")
+        design_matrix, col_info = _build_design_matrix(adata, "group")
+        fit = _nan_lmfit(adata, design_matrix)
+        cm = _make_contrasts(adata, between_column="group", control_condition="A", control_is=-1)
+        out = _run_contrasts(cm, B=fit["B"], M_all=fit["M_all"], col_info=col_info)
+        names = _contrasts_from_matrix(cm, control_condition="A")
         return {name: (out["log2fc"][i], out["unscaled_var"][i]) for i, name in enumerate(names)}
 
     adata = example_adata_ebayes.copy()
@@ -1093,7 +1093,7 @@ def test_diff_exp_ebayes_return_coefficients(covariate_adata, covariate_column, 
     assert set(results) == {"A_VS_B"}
 
     # one row per feature, one column per design coefficient (conditions + any covariate levels)
-    design_matrix, _ = build_design_matrix(covariate_adata, "group", covariate_column)
+    design_matrix, _ = _build_design_matrix(covariate_adata, "group", covariate_column)
     assert coefficients.index.equals(covariate_adata.var_names)
     assert list(coefficients.columns) == list(design_matrix.columns)
     assert {"A", "B"}.issubset(coefficients.columns)
@@ -1101,7 +1101,7 @@ def test_diff_exp_ebayes_return_coefficients(covariate_adata, covariate_column, 
 
     # values are exactly the fitted coefficients, transposed to (features x design columns)
     expected = pd.DataFrame(
-        nan_lmfit(covariate_adata, design_matrix)["B"].T,
+        _nan_lmfit(covariate_adata, design_matrix)["B"].T,
         index=covariate_adata.var_names,
         columns=design_matrix.columns,
     )

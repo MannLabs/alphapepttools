@@ -19,7 +19,7 @@ from alphapepttools.tl.utils import (
 )
 
 
-def build_design_matrix(
+def _build_design_matrix(
     adata: ad.AnnData,
     condition_column: str,
     covariate_column: str | None = None,
@@ -81,7 +81,7 @@ def build_design_matrix(
     return dm, {"condition_col_idxs": condition_col_idxs, "covariate_col_idxs": covariate_col_idxs}
 
 
-def summarize_design_matrix(
+def _summarize_design_matrix(
     dm: pd.DataFrame,
 ) -> None:
     """Summarize the design matrix by reporting the counts of samples for each condition and covariate level."""
@@ -93,7 +93,7 @@ def summarize_design_matrix(
         print(f"{col}: {counts[col]}")
 
 
-def nan_lmfit(
+def _nan_lmfit(
     adata: ad.AnnData,
     design_matrix: pd.DataFrame,
 ) -> dict:
@@ -204,7 +204,7 @@ def nan_lmfit(
     return {"B": B, "sigma2": sigma2, "dfs": dfs, "M_all": M_all}
 
 
-def make_contrasts(
+def _make_contrasts(
     adata: ad.AnnData,
     between_column: str,
     control_condition: str,
@@ -251,7 +251,7 @@ def make_contrasts(
     return pd.DataFrame(contrast_matrix, columns=condition_names)
 
 
-def run_contrasts(
+def _run_contrasts(
     contrast_matrix: pd.DataFrame,
     B: np.ndarray,  # noqa: N803
     M_all: np.ndarray,  # noqa: N803
@@ -300,7 +300,7 @@ def run_contrasts(
     return {"log2fc": log2fc, "unscaled_var": unscaled_var, "stdev_unscaled": stdev_unscaled}
 
 
-def contrasts_from_matrix(
+def _contrasts_from_matrix(
     contrast_matrix: pd.DataFrame,
     control_condition: str,
 ) -> list[str]:
@@ -362,7 +362,7 @@ def ebayes_moderation(
     stdevs_unscaled: np.ndarray,
     sigma2: np.ndarray,
     dfs: np.ndarray,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> dict[str, np.ndarray]:
     """Moderate residual variances via empirical Bayes (inmoose limma port).
 
     Features that were never fit (NaN sigma2/dfs, or df<=0) are excluded from the
@@ -382,8 +382,11 @@ def ebayes_moderation(
 
     Returns
     -------
-    tuple[np.ndarray, np.ndarray]
-        p-values and moderated t-statistics for each contrast and feature, both of shape (n_contrasts, n_features). Features that were never fit are returned as NaN.
+    dict[str, np.ndarray]
+        A dictionary containing:
+        - 'p': p-values for each contrast and feature, shape (n_contrasts, n_features).
+        - 't': moderated t-statistics for each contrast and feature, same shape.
+        Features that were never fit are returned as NaN.
 
     """
     n_contrasts, P = log2fcs.shape
@@ -432,8 +435,8 @@ def diff_exp_ebayes(  # noqa: C901
     covariate_column: str | None = None,
     a_min_required: int | None = None,
     b_min_required: int | None = None,
-    return_coefficients: bool | None = False,  # noqa: FBT002
-) -> pd.DataFrame:
+    return_coefficients: bool = False,  # noqa: FBT001, FBT002
+) -> dict[str, pd.DataFrame] | tuple[dict[str, pd.DataFrame], pd.DataFrame]:
     """Run Limma eBayes moderated ttest for differential expression with multiple contrasts and covariate support.
 
     The two conditions in each comparison are referred to positionally as A (comparison[0]) and B (comparison[1]);
@@ -504,12 +507,12 @@ def diff_exp_ebayes(  # noqa: C901
     adata = adata[adata.obs[between_column].isin(selected_levels)].copy()
 
     # Step 1: build the design matrix and fit every feature with NaN handling
-    design_matrix, col_info = build_design_matrix(adata, between_column, covariate_column)
-    lm_fit = nan_lmfit(adata, design_matrix)
+    design_matrix, col_info = _build_design_matrix(adata, between_column, covariate_column)
+    lm_fit = _nan_lmfit(adata, design_matrix)
 
     # Step 2: Generate contrasts to derive fold changes for each A vs B.
     # control_is=-1 fixes the direction to A - B (comparison[0] - comparison[1]), named "A_VS_B".
-    contrast_matrix = make_contrasts(
+    contrast_matrix = _make_contrasts(
         adata=adata,
         between_column=between_column,
         control_condition=b_condition,
@@ -517,7 +520,7 @@ def diff_exp_ebayes(  # noqa: C901
     )
 
     # Step 3: Run contrasts to compute log2 fold changes and unscaled variances
-    contrast_results = run_contrasts(
+    contrast_results = _run_contrasts(
         contrast_matrix=contrast_matrix,
         B=lm_fit["B"],
         M_all=lm_fit["M_all"],
@@ -533,7 +536,7 @@ def diff_exp_ebayes(  # noqa: C901
     )
 
     # Step 5: Extract contrasts and write output DataFrame with standardized columns for each contrast
-    contrast_names = contrasts_from_matrix(contrast_matrix, b_condition)
+    contrast_names = _contrasts_from_matrix(contrast_matrix, b_condition)
     if len(contrast_names) != contrast_results["log2fc"].shape[0]:
         raise ValueError("Number of contrast names does not match number of contrasts in results.")
 
