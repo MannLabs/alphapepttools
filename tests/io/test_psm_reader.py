@@ -57,3 +57,34 @@ class TestReadPsmTable:
             additional_columns=["custom_intensity", "custom_feature", "custom_sample"],
             extra_param="extra_value",
         )
+
+    @patch("alphapepttools.io.psm_reader.AnnDataFactory")
+    def test_read_psm_table_flattens_var_and_obs_columns(self, mock_factory_class):
+        """var_columns as a list and obs_columns as a string should both be folded into
+        additional_columns and forwarded unchanged to create_anndata."""
+        # Setup mock
+        mock_factory_instance = Mock()
+        mock_factory_class.from_files.return_value = mock_factory_instance
+
+        read_psm_table(
+            file_paths="/path/to/file.txt",
+            search_engine="alphadia",
+            var_columns=["my_var_a", "my_var_b"],  # list → extend branch
+            obs_columns="my_obs",  # string → append branch
+        )
+
+        # `from_files` receives the flattened additional_columns
+        mock_factory_class.from_files.assert_called_once_with(
+            file_paths="/path/to/file.txt",
+            reader_type="alphadia",
+            level="proteins",
+            intensity_column=None,
+            feature_id_column=None,
+            sample_id_column=None,
+            additional_columns=["my_var_a", "my_var_b", "my_obs"],
+        )
+        # The original var_columns / obs_columns are forwarded to create_anndata
+        mock_factory_instance.create_anndata.assert_called_once_with(
+            var_columns=["my_var_a", "my_var_b"],
+            obs_columns="my_obs",
+        )

@@ -4,7 +4,11 @@ import pandas as pd
 import pytest
 
 from alphapepttools.tl.tools import get_id2gene_map, map_genes_to_protein_groups
-from alphapepttools.tl.utils import drop_features_with_too_few_valid_values, find_iterable_kwargs
+from alphapepttools.tl.utils import (
+    drop_features_with_too_few_valid_values,
+    find_iterable_kwargs,
+    validate_ttest_inputs,
+)
 
 DUMMY_FASTA = """>tr|ID0|ID0_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN0 PE=1 SV=1
 PEPTIDEKPEPTIDEK
@@ -87,6 +91,28 @@ def test_map_genes_to_protein_groups(example_protein_groups, id2gene, expected_g
     )
 
     assert mapped_genes == expected_genes
+
+
+def test_get_id2gene_map_invalid_source_type(example_fasta):
+    """`source_type` outside {'file', 'string'} should raise ValueError."""
+    with pytest.raises(ValueError, match="source_type must be either"):
+        get_id2gene_map(example_fasta, source_type="invalid")
+
+
+def test_get_id2gene_map_invalid_input_type():
+    """Non-str/Path input should raise TypeError."""
+    with pytest.raises(TypeError, match="fasta_input must be a Path or string"):
+        get_id2gene_map(12345, source_type="string")
+
+
+def test_map_genes_to_protein_groups_all_unmapped():
+    """If no protein in a group has a gene name, the group should map to 'NA'."""
+    result = map_genes_to_protein_groups(
+        id2gene_map={"ID0": "GN0"},  # only ID0 mapped
+        protein_groups=["ID_unmapped_1;ID_unmapped_2"],
+        delimiter=";",
+    )
+    assert result == ["NA"]
 
 
 # Test ttest filtering function
@@ -209,3 +235,48 @@ def test_find_iterable_kwargs_edge_cases(input_kwargs, expected_result):
     """Test find_iterable_kwargs with edge cases."""
     result = find_iterable_kwargs(input_kwargs)
     assert result == expected_result
+
+
+def test_find_iterable_kwargs_invalid_type():
+    """Non-dict input raises TypeError."""
+    with pytest.raises(TypeError, match="dictionary of keyword arguments"):
+        find_iterable_kwargs([1, 2, 3])
+
+
+### Test validate_ttest_inputs ###
+
+
+@pytest.fixture
+def simple_ttest_adata():
+    """AnnData with 5 samples of group A and 3 of group B (imbalanced for sample-count tests)."""
+    return ad.AnnData(
+        X=np.random.rand(8, 3),
+        obs=pd.DataFrame(
+            {"condition": ["A"] * 5 + ["B"] * 3},
+            index=[f"s{i}" for i in range(8)],
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("between_column", "comparison", "min_valid_values", "match"),
+    [
+        # missing between_column
+        ("nonexistent", ("A", "B"), 2, "not found in adata.obs"),
+        # comparison is a list, not a tuple
+        ("condition", ["A", "B"], 2, "tuple of exactly two"),
+        # comparison has wrong length
+        ("condition", ("A", "B", "C"), 2, "tuple of exactly two"),
+        # g1 not in available groups
+        ("condition", ("Z", "B"), 2, "Group 'Z' not found"),
+        # g2 not in available groups
+        ("condition", ("A", "Z"), 2, "Group 'Z' not found"),
+        # g1 has too few samples (A=5 < 6)
+        ("condition", ("A", "B"), 6, "Group 'A' has only"),
+        # g2 has too few samples (g1 passes first: A=5≥4, then B=3 < 4)
+        ("condition", ("A", "B"), 4, "Group 'B' has only"),
+    ],
+)
+def test_validate_ttest_inputs_raises(simple_ttest_adata, between_column, comparison, min_valid_values, match):
+    with pytest.raises(ValueError, match=match):
+        validate_ttest_inputs(simple_ttest_adata, between_column, comparison, min_valid_values=min_valid_values)
