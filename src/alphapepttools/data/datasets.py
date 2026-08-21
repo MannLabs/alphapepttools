@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, cast
 
 import pandas as pd
 import yaml
@@ -33,6 +33,9 @@ class StudyData:
             - 'psm': Peptide spectrum match (PSM) table
             - 'study_psm': Full study data (metadata + PSM table)
             - 'study_pg': Full study data (metadata + PG table)
+            - 'shapes': Shapes file (geojson)
+            - 'image': Image file
+            - 'anndata': AnnData object
     citation
         Citation reference for the study, optional
     description
@@ -65,7 +68,7 @@ class StudyData:
     name: str
     url: str
     search_engine: str
-    data_type: Literal["pg", "psm", "study_psm", "study_pg", "image", "shapes"]
+    data_type: Literal["pg", "psm", "study_psm", "study_pg", "image", "shapes", "anndata"]
     citation: str | None = None
     description: str | None = None
 
@@ -87,7 +90,8 @@ class StudyData:
 
         """
         output_dir = Path.cwd() if output_dir is None else output_dir
-        return DataShareDownloader(url=self.url, output_dir=output_dir).download()
+        # alphabase's `DataShareDownloader` annotates `output_dir` as `str` but accepts a `Path` at runtime.
+        return Path(DataShareDownloader(url=self.url, output_dir=cast("str", output_dir)).download())
 
     @property
     def df(self) -> pd.DataFrame:
@@ -228,7 +232,7 @@ class StudyCollection:
         )
 
     @classmethod
-    def from_yaml(cls, file_path: str) -> "StudyCollection":
+    def from_yaml(cls, file_path: str | Path) -> "StudyCollection":
         """Create a StudyCollection from a YAML configuration file
 
         Loads study definitions from a YAML file and creates a populated
@@ -258,7 +262,7 @@ class StudyCollection:
             print(collection.df)
 
         """
-        with Path.open(file_path, "r") as file:
+        with Path(file_path).open("r") as file:
             studies = yaml.safe_load(file.read())
 
         studies = [StudyData(**study) for study in studies]

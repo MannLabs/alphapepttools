@@ -192,7 +192,7 @@ class AnnDataFactory:
         return self._add_metadata_from_columns(adata, obs_columns, self._sample_id_column, axis=0)
 
     @classmethod
-    def _get_reader_configuration(cls, reader_type: str) -> dict[str, dict[str, Any]]:
+    def _get_reader_configuration(cls, reader_type: str) -> dict[str, Any]:
         """Get reader-specific configuration for mapping PSMs to anndata."""
         reader_configs = {
             "diann": {
