@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Iterable
-from typing import Literal
+from typing import Literal, cast
 
 import anndata as ad
 import numpy as np
@@ -87,7 +87,7 @@ def _prepare_pca_data(
     data_for_pca = adata_sub.layers[layer].copy() if layer is not None else adata_sub.X.copy()
 
     # Transpose if PCA is done on the feature space
-    return data_for_pca.T if dim_space == "var" else data_for_pca
+    return cast("np.ndarray", data_for_pca.T if dim_space == "var" else data_for_pca)
 
 
 def _store_pca_results(
@@ -190,7 +190,7 @@ def _store_pca_results(
 def pca(
     adata: ad.AnnData,
     layer: str | None = None,
-    dim_space: str = "obs",
+    dim_space: Literal["obs", "var"] = "obs",
     embeddings_name: str | None = None,
     n_comps: int | None = None,
     meta_data_mask_column_name: str | None = None,
@@ -326,7 +326,11 @@ def pca(
     )
 
     # Run on array instead of anndata to allow for PCA on variables instead of observations)
-    var_mask = adata.var[meta_data_mask_column_name] if meta_data_mask_column_name is not None else None
+    var_mask = (
+        cast("Iterable[bool]", adata.var[meta_data_mask_column_name])
+        if meta_data_mask_column_name is not None
+        else None
+    )
     data_for_pca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask, dim_space=dim_space)
     pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, copy=False, **pca_kwargs)
 
@@ -377,7 +381,7 @@ def _run_bpca(
 def bpca(
     adata: ad.AnnData,
     layer: str | None = None,
-    dim_space: str = "obs",
+    dim_space: Literal["obs", "var"] = "obs",
     embeddings_name: str | None = None,
     n_comps: int = 50,
     meta_data_mask_column_name: str | None = None,
@@ -488,7 +492,11 @@ def bpca(
         adata=adata, layer=layer, dim_space=dim_space, meta_data_mask_column_name=meta_data_mask_column_name
     )
 
-    var_mask = adata.var[meta_data_mask_column_name] if meta_data_mask_column_name is not None else None
+    var_mask = (
+        cast("Iterable[bool]", adata.var[meta_data_mask_column_name])
+        if meta_data_mask_column_name is not None
+        else None
+    )
     data_for_bpca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask, dim_space=dim_space)
 
     pca_res = _run_bpca(data_for_bpca=data_for_bpca, n_components=n_comps, **bpca_kwargs)

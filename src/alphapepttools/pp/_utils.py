@@ -53,13 +53,13 @@ def _raise_on_nan_values(
     elif mode == "all":
         if isinstance(data, (pd.DataFrame, pd.Series)):
             all_nan_columns = pd.isna(data).all()
-            if any(all_nan_columns):
+            if np.any(all_nan_columns):
                 raise ValueError(
                     f"Columns with index {all_nan_columns.index.tolist()} contain all nan values. {custom_message or ''}"
                 )
         else:
             all_nan_features = np.isnan(data).all(axis=0)
-            if any(all_nan_features):
+            if np.any(all_nan_features):
                 raise ValueError(
                     f"Features with index {(np.where(all_nan_features)[0]).tolist()} contain all nan values. {custom_message or ''}"
                 )
