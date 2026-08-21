@@ -42,15 +42,18 @@ pip install -e ".[dev,test,doc]"
 
 ## Handling anndata objects
 
-The central data structure of `alphapepttools` is the `anndata.AnnData` object. All functions should be compatible with `anndata.AnnData`.
+The central data structure of `alphapepttools` is the `anndata.AnnData` object. All functions should be compatible with `anndata.AnnData`. We default to `inplace` modifications, i.e. functions should default to returning `None` and acting on passed `anndata.AnnData` objects directly. This behaviour is adapted from [`scanpy v1`](https://scanpy.readthedocs.io/en/stable/) and aims to maximize the compatibility of the interfaces.
 
-Functions that act on the omics data in the anndata object (typically in the `.pp` and `.tl` modules) should generally follow the following call signature
+### Acting on omics measurements
+
+Functions that act on the measurement data (`.X`, `.layers[...]`) in the anndata object (typically in the `.pp` and `.tl` modules) or change the object's shape (e.g. filtering operations) _MUST_ follow the following call signature
 
 ```python
-alphapepttools.pp.func(adata: ad.AnnData, ..., layer: str | None = None, copy: bool = False) -> None | ad.AnnData:
+alphapepttools.pp.func(adata: ad.AnnData, ..., *, layer: str | None = None, copy: bool = False) -> None | ad.AnnData:
 ...
 
-alphapepttools.tl.func(adata: ad.AnnData, ..., layer: str | None = None, copy: bool = False) -> None | ad.AnnData:
+alphapepttools.tl.func(adata: ad.AnnData, ..., *, layer: str | None = None, copy: bool = False) -> None | ad.AnnData:
+  ...
 
 ```
 
@@ -58,9 +61,7 @@ alphapepttools.tl.func(adata: ad.AnnData, ..., layer: str | None = None, copy: b
 
 **Modification inplace** Per default, the `anndata.AnnData` object is modified inplace (`copy=False`), this means that the current object is updated and the function returns `None`. If `copy=True`, an updated copy of the object is returned and the original object remains unchanged.
 
-This behaviour is adapted from [`scanpy`](https://scanpy.readthedocs.io/en/stable/) and aims to maximize the compatibility of the interfaces.
-
-### Examples
+#### Examples
 
 Default behaviour:
 
@@ -98,7 +99,30 @@ assert not np.array_equal(adata.X, adata_new.X)
 
 # The original anndata remains unchanged
 assert np.array_equal(adata.X, adata_original.X)
+```
 
+### Generating summary statistics from anndata object
+
+Functions that generate new summary statistics and do not act on the measurement layers `.X`/`.layers` (e.g. differential expression analysis results, summary metrics, etc.; typically in `.tl`, and `.metrics` module) _SHOULD_ store the data inplace in the anndata object. They _MAY_ also allow users to return the results as a `pandas.DataFrame` by exposing an `inplace` argument. They should follow this general call signature:
+
+```python
+alphapepttools.tl.func(adata: ad.AnnData, ..., *, layer: str | None = None, inplace: bool = True) -> None | pd.DataFrame:
+  ...
+
+alphapepttools.metrics.func(adata: ad.AnnData, ..., *, layer: str | None = None, inplace: bool = True) -> None | pd.DataFrame:
+  ...
+```
+
+In summary, the keyword `inplace` also determines if an anndata object is modified, but it determines if a result is added to a non-measurement layer slot in anndata (`.obs`, `.var`, `.obsm`, `.varm`, `.uns`) or if it is returned as dataframe.
+
+#### Examples
+
+```
+result = apt.tl.func(adata, ..., inplace=False)
+assert isinstance(result, pd.DataFrame)
+
+result = apt.tl.func(adata, ..., inplace=True)
+assert result is None
 ```
 
 ## Code-style
