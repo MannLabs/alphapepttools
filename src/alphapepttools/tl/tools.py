@@ -5,7 +5,9 @@ from collections.abc import Iterable
 from io import StringIO
 from pathlib import Path
 
+import anndata as ad
 import numpy as np
+import pandas as pd
 import regex as re
 from Bio import SeqIO
 
@@ -158,3 +160,42 @@ def map_genes_to_protein_groups(
         out_gene_names.append(";".join(gene_names))
 
     return out_gene_names
+
+
+def find_protease_cut_sites(
+    adata: ad.AnnData,
+    sequence_column: str = "sequence",
+    cleavage_pattern: str = r"(?<!P)[KR](?!P)",
+) -> pd.Series:
+    """Find internal protease cut sites in peptide sequences to detect miscleavages
+
+    The cleavage pattern can be defined as a regex pattern, and looks for tryptic
+    cleavage sites by default (K or R not followed by P). The function counts only
+    internal cleavage sites by excluding the C-terminal residue from the search.
+
+    Parameters
+    ----------
+    adata
+        AnnData object containing peptide-level data. Must have `sequence_column` in `adata.var`.
+    sequence_column
+        Column name in `adata.var` containing peptide sequences. Defaults to "sequence".
+    cleavage_pattern
+        Regular expression pattern defining the protease cleavage sites. Defaults to r"(?<!P)[KR](?!P)" for trypsin.
+
+    Returns
+    -------
+    pd.Series
+        Series containing the count of internal cleavage sites for each peptide sequence.
+        A value of 0 indicates no miscleavages (fully tryptic), values ≥1 indicate the number of missed cleavages.
+
+    """
+    if sequence_column not in adata.var.columns:
+        raise ValueError(f"{sequence_column} column not found in adata.var.columns, is this a precursor table?")
+
+    # replace empty sequences with a placeholder to avoid regex errors
+    valid_sequences = adata.var[sequence_column].apply(lambda x: x + "_" if len(x) == 0 else x)
+
+    # remove C-terminal residue to focus on internal cleavage sites
+    valid_sequences_no_c_term = valid_sequences.apply(lambda x: x[:-1])
+
+    return valid_sequences_no_c_term.apply(lambda x: len(re.findall(cleavage_pattern, x)))

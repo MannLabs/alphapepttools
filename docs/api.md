@@ -37,6 +37,7 @@
 
     tl.get_id2gene_map
     tl.map_genes_to_protein_groups
+    tl.find_protease_cut_sites
     tl.nan_safe_bh_correction
     tl.nan_safe_ttest_ind
     tl.diff_exp_ttest

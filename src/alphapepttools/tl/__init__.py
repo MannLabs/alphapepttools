@@ -10,4 +10,4 @@ from .plot_data_handling import (
     prepare_scree_data_to_plot,
 )
 from .stats import nan_safe_bh_correction
-from .tools import get_id2gene_map, map_genes_to_protein_groups
+from .tools import find_protease_cut_sites, get_id2gene_map, map_genes_to_protein_groups

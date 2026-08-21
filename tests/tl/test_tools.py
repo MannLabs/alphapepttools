@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from alphapepttools.tl.tools import get_id2gene_map, map_genes_to_protein_groups
+from alphapepttools.tl.tools import find_protease_cut_sites, get_id2gene_map, map_genes_to_protein_groups
 from alphapepttools.tl.utils import drop_features_with_too_few_valid_values, find_iterable_kwargs
 
 DUMMY_FASTA = """>tr|ID0|ID0_HUMAN Protein1 OS=Homo sapiens OX=9606 GN=GN0 PE=1 SV=1
@@ -134,6 +134,37 @@ def test_drop_features_with_too_few_valid_values(example_adata):
 
     expected_columns = ["A", "C"]
     assert list(filtered_adata.var_names) == expected_columns
+
+
+# Test find_protease_cut_sites function
+@pytest.mark.parametrize(
+    ("sequences", "expected_counts"),
+    [
+        # Fully tryptic peptides (0 miscleavages)
+        (["AAAAAA", "AAAAAAK", "AAAAAAAR"], [0, 0, 0]),
+        # One miscleavage
+        (["AAAAAKAAAAAR", "AAAAARAAAAAAK"], [1, 1]),
+        # Two miscleavages
+        (["AAAAAKAAAAAKAAAAAAR", "AAAAARAAAAARAAAAAAK"], [2, 2]),
+        # Proline rule: KP and RP should NOT be counted as cleavage sites
+        (["AAAAKPAAAAAR", "AAAARPAAAAAAK"], [0, 0]),
+        # Mixed cases
+        (["AAAAAA", "AAAAAAK", "AAAAAKAAAAAR", "AAAAAKAAAAAKAAAAAAR"], [0, 0, 1, 2]),
+        # Edge case: empty sequence
+        ([""], [0]),
+        # Edge case: single residue
+        (["K"], [0]),
+    ],
+)
+def test_find_protease_cut_sites(sequences, expected_counts):
+    adata = ad.AnnData(
+        np.zeros((1, len(sequences))),
+        var=pd.DataFrame({"sequence": sequences}),
+    )
+
+    counts = find_protease_cut_sites(adata, sequence_column="sequence")
+
+    assert list(counts) == expected_counts
 
 
 # Test the find_iterable_kwargs function
