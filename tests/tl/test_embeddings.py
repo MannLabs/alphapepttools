@@ -350,3 +350,56 @@ def test_bpca__components_ordered_by_variance(toy_adata_with_missing_values, dim
     variance_ratio = adata.uns[f"variance_bpca_{dim_space}"]["variance_ratio"]
     # Check that absolute variance ratios are in descending order
     assert np.all(np.diff(variance_ratio) <= 0)
+
+
+### Test _check_inputs_for_dim_reduction validation branches ###
+
+
+def test_pca__non_anndata_raises():
+    """Non-AnnData input should raise TypeError."""
+    with pytest.raises(TypeError, match="Data should be AnnData object"):
+        apt.tl.pca(np.random.randn(10, 5))
+
+
+def test_pca__missing_layer_raises(toy_adata):
+    """Unknown layer name should raise ValueError."""
+    with pytest.raises(ValueError, match="not found in AnnData"):
+        apt.tl.pca(toy_adata, layer="nonexistent_layer")
+
+
+def test_pca__invalid_dim_space_raises(toy_adata):
+    """`dim_space` outside {'obs', 'var'} should raise ValueError."""
+    with pytest.raises(ValueError, match="dim_space should be either"):
+        apt.tl.pca(toy_adata, dim_space="invalid")
+
+
+def test_pca__missing_mask_column_raises(toy_adata):
+    """Unknown `meta_data_mask_column_name` should raise ValueError."""
+    with pytest.raises(ValueError, match="not found in data.var"):
+        apt.tl.pca(toy_adata, meta_data_mask_column_name="nonexistent_column")
+
+
+def test_pca__non_boolean_mask_column_raises(toy_adata):
+    """A mask column that is not boolean should raise TypeError."""
+    toy_adata.var["int_mask"] = list(range(toy_adata.n_vars))  # int, not bool
+    with pytest.raises(TypeError, match="must be of boolean dtype"):
+        apt.tl.pca(toy_adata, meta_data_mask_column_name="int_mask")
+
+
+### Test _store_pca_results overwrite warnings ###
+
+
+def test_pca__warns_on_existing_keys(toy_adata, caplog):
+    """A second pca() call should warn that variance, coords, and loadings keys will be overwritten."""
+    # First call populates the default keys
+    apt.tl.pca(toy_adata)
+
+    import logging
+
+    # Second call should produce three warnings (variance, coords, loadings)
+    with caplog.at_level(logging.WARNING):
+        apt.tl.pca(toy_adata)
+
+    assert "Overwriting existing PCA variance" in caplog.text
+    assert "Overwriting existing PCA coordinates" in caplog.text
+    assert "Overwriting existing PCA loadings" in caplog.text
