@@ -68,7 +68,7 @@ def get_id2gene_map(
             fasta_data = list(SeqIO.parse(handle, "fasta"))
     else:
         logger.info("Parsing FASTA from string content")
-        with StringIO(fasta_input) as handle:
+        with StringIO(str(fasta_input)) as handle:
             fasta_data = list(SeqIO.parse(handle, "fasta"))
 
     for record in fasta_data:
