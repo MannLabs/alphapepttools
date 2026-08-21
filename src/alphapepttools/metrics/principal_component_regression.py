@@ -1,5 +1,7 @@
 """Principal component regression"""
 
+from typing import cast
+
 import anndata as ad
 import numpy as np
 import pandas as pd
@@ -20,12 +22,12 @@ def _verify_keys__principal_component_regression(
     """
     if pca_key not in adata.obsm:
         raise KeyError(
-            f"Key `pca_key={pca_key}` was not found in `adata.obsm`. Run `alphapepttools.pp.pca` first or specify correct key."
+            f"Key `pca_key={pca_key}` was not found in `adata.obsm`. Run `alphapepttools.tl.pca` first or specify correct key."
         )
 
     if pca_uns_key not in adata.uns:
         raise KeyError(
-            f"Key `pca_key_uns={pca_uns_key}` was not found in `adata.uns`. Run `alphapepttools.pp.pca` first or specify correct key."
+            f"Key `pca_key_uns={pca_uns_key}` was not found in `adata.uns`. Run `alphapepttools.tl.pca` first or specify correct key."
         )
 
     if covariate not in adata.obs:
@@ -72,8 +74,8 @@ def principal_component_regression(
     adata: ad.AnnData,
     covariate: str,
     n_components: int | None = None,
-    pca_key: str = "X_pca",
-    pca_key_uns: str = "pca",
+    pca_key: str = "X_pca_obs",
+    pca_key_uns: str = "variance_pca_obs",
 ) -> float:
     r"""Compute principal component regression (PCR) score.
 
@@ -124,11 +126,11 @@ def principal_component_regression(
 
         import alphapepttools as at
 
-        at.pp.pca(adata)
+        at.tl.pca(adata)
         at.metrics.principal_component_regression(adata, covariate="batch")
 
         # With custom PCA keys
-        at.pp.pca(adata, layer="layer_batch_corrected", key_added="pca_batch_corrected")
+        at.tl.pca(adata, layer="layer_batch_corrected", key_added="pca_batch_corrected")
         at.metrics.principal_component_regression(
             adata, covariate="batch", pca_key="pca_batch_corrected", pca_uns_key="pca_batch_corrected"
         )
@@ -147,7 +149,7 @@ def principal_component_regression(
     """
     _verify_keys__principal_component_regression(adata, covariate=covariate, pca_key=pca_key, pca_uns_key=pca_key_uns)
 
-    pca_embeddings = adata.obsm[pca_key]
+    pca_embeddings = cast("np.ndarray", adata.obsm[pca_key])
     explained_variance = adata.uns[pca_key_uns][_PCA_VARIANCE_RATIO]
 
     if n_components is not None:

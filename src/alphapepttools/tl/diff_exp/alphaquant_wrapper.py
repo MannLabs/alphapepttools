@@ -189,7 +189,7 @@ def diff_exp_alphaquant(
     def _get_samplemap(
         adata: ad.AnnData,
         between_column: str,
-        comparison: list,
+        comparison: list | tuple,
     ) -> pd.DataFrame:
         """Extract AlphaQuant-compatible samplemap from AnnData.
 
