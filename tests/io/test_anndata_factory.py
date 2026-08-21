@@ -303,3 +303,69 @@ def test_get_reader_configuration_with_unknown_reader_type():
     # when
     config = AnnDataFactory._get_reader_configuration("invalid_reader_type")
     assert config == {}
+
+
+@patch("alphabase.psm_reader.psm_reader.psm_reader_provider.get_reader")
+@patch("alphapepttools.io.anndata_factory.AnnDataFactory._get_reader_configuration")
+def test_from_files_forwards_additional_columns_to_reader(
+    mock_get_reader_configuration,
+    mock_reader,
+    test_psm_df,
+) -> None:
+    """When `additional_columns` is set, `from_files` registers them as identity-mapped
+    columns on the reader before loading."""
+    mock_get_reader_configuration.return_value = {}
+    mock_reader.return_value.load.return_value = test_psm_df.rename(
+        columns={
+            "protein_intensity": PsmDfCols.INTENSITY,
+            "protein_id": PsmDfCols.PROTEINS,
+            "file_id": PsmDfCols.RAW_NAME,
+        }
+    )
+
+    AnnDataFactory.from_files(
+        file_paths=["file1"],
+        reader_type="diann",
+        intensity_column=PsmDfCols.INTENSITY,
+        feature_id_column=PsmDfCols.PROTEINS,
+        sample_id_column=PsmDfCols.RAW_NAME,
+        additional_columns=["my_col_a", "my_col_b"],
+    )
+
+    mock_reader.return_value.add_column_mapping.assert_called_once_with(
+        {"my_col_a": "my_col_a", "my_col_b": "my_col_b"}
+    )
+
+
+@pytest.mark.parametrize(
+    ("intensity_column", "feature_id_column", "sample_id_column", "match"),
+    [
+        (None, "feat", "sample", "intensity_column is required"),
+        ("intensity", None, "sample", "feature_id_column is required"),
+        ("intensity", "feat", None, "sample_id_column is required"),
+    ],
+)
+@patch("alphabase.psm_reader.psm_reader.psm_reader_provider.get_reader")
+@patch("alphapepttools.io.anndata_factory.AnnDataFactory._get_reader_configuration")
+def test_from_files_raises_on_missing_required_column(
+    mock_get_reader_configuration,
+    mock_reader,
+    intensity_column,
+    feature_id_column,
+    sample_id_column,
+    match,
+) -> None:
+    """If a required column has no default for the given (reader_type, level) combo
+    and the user does not supply one, `from_files` raises a ValueError."""
+    mock_get_reader_configuration.return_value = {}
+    mock_reader.return_value.load.return_value = pd.DataFrame()
+
+    with pytest.raises(ValueError, match=match):
+        AnnDataFactory.from_files(
+            file_paths=["file1"],
+            reader_type="diann",
+            level="unknown_level",  # no defaults for this level
+            intensity_column=intensity_column,
+            feature_id_column=feature_id_column,
+            sample_id_column=sample_id_column,
+        )
