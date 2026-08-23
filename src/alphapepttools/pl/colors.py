@@ -10,7 +10,7 @@
 
 import colorsys
 import logging
-from typing import ClassVar
+from typing import ClassVar, cast
 
 import cmcrameri.cm as cmc
 import matplotlib as mpl
@@ -367,7 +367,7 @@ def _perceptually_uniform_qualitative_colorscale() -> list:
         show_rgba_color_list(colors)
 
     """
-    colors = _get_colors_from_cmap(cmc.batlow, 9)
+    colors = _get_colors_from_cmap(cmc.cmaps["batlow"], 9)
 
     # interlace colors 1-5, 2-6, etc. to maximize color distance
     # Custom hue for maximum contrast between levels
@@ -519,7 +519,7 @@ class BaseColors:
         color_name: str | tuple,
         lighten: float | None = None,
         alpha: float | None = None,
-    ) -> tuple:
+    ) -> tuple | str:
         """Retrieve a color by name with optional lightness and alpha adjustments
 
         Retrieves colors from the default color palette, matplotlib named colors,
@@ -678,7 +678,8 @@ class BasePalettes:
             except ValueError as exc:
                 raise ValueError(f"Unknown palette name: {palette_name}") from exc
 
-        return _cycle_palette(palette, n)
+        # both branches above assign a list (`_get_colors_from_cmap` with an int returns a list)
+        return _cycle_palette(cast("list", palette), n)
 
 
 # TODO: Fix so a defined number of colors can be retrieved with .get, as well as the whole colormap
@@ -694,12 +695,12 @@ class BaseColormaps:
 
     # Use perceptually uniform color palettes to avoid visual distortion (Crameri, F. (2018a), Scientific colour maps. Zenodo. http://doi.org/10.5281/zenodo.1243862)
     default_colormaps: ClassVar[dict] = {
-        "sequential": cmc.devon,
-        "diverging": cmc.managua_r,
-        "sequential_r": cmc.devon_r,
-        "diverging_r": cmc.managua,
-        "sequential_clipped": clip_colormap(cmc.devon, lowpoint=0, highpoint=0.8),
-        "sequential_r_clipped": clip_colormap(cmc.devon_r, lowpoint=0.2, highpoint=1),
+        "sequential": cmc.cmaps["devon"],
+        "diverging": cmc.cmaps["managua_r"],
+        "sequential_r": cmc.cmaps["devon_r"],
+        "diverging_r": cmc.cmaps["managua"],
+        "sequential_clipped": clip_colormap(cmc.cmaps["devon"], lowpoint=0, highpoint=0.8),
+        "sequential_r_clipped": clip_colormap(cmc.cmaps["devon_r"], lowpoint=0.2, highpoint=1),
         "magma_clipped": clip_colormap(plt.get_cmap("magma"), lowpoint=0, highpoint=0.8),
     }
 
@@ -820,7 +821,8 @@ class MappedColormaps:
         Example
 
         """
-        self.cmap = BaseColormaps.get(cmap)
+        # `get` without `n` always returns a continuous Colormap, never the discrete-color list
+        self.cmap = cast("Colormap", BaseColormaps.get(cmap))
         self.percentile = percentile
         self.vmin = None
         self.vmax = None
@@ -900,7 +902,7 @@ class MappedColormaps:
 
         if as_hex:
             return np.apply_along_axis(mpl_colors.to_hex, -1, rgba, keep_alpha=True)
-        return rgba
+        return np.asarray(rgba)
 
     @property
     def scalar_mappable(self) -> mpl.cm.ScalarMappable:

@@ -75,6 +75,19 @@ def test_nan_safe_ttest_ind(ab, expected, min_valid_values):
         assert result == expected, f"Expected {expected}, got {result}"
 
 
+def test_nan_safe_ttest_ind_converts_non_series():
+    """List inputs should be converted to pd.Series and processed normally."""
+    result = tl.nan_safe_ttest_ind([1, 2, 3], [4, 5, 6])
+    expected = ttest_ind([1, 2, 3], [4, 5, 6])
+    assert np.allclose(result, expected)
+
+
+def test_nan_safe_ttest_ind_raises_on_unconvertible_input():
+    """Input that pd.Series cannot accept (e.g. a 2D array) should raise TypeError."""
+    with pytest.raises(TypeError, match="Cannot convert inputs"):
+        tl.nan_safe_ttest_ind(np.array([[1, 2], [3, 4]]), pd.Series([4, 5, 6]))
+
+
 # Test group-wise ttest with ratios
 @pytest.mark.parametrize(
     ("between_column", "comparison", "min_valid_values", "expected_output"),
@@ -557,3 +570,59 @@ def test__standardize_alphaquant_results(
     assert result["-log10(fdr)"].iloc[0] == neg_log10_fdr, (
         f"Expected -log10(fdr) {neg_log10_fdr}, got {result['-log10(fdr)'].iloc[0]}"
     )
+
+
+### Test validation raises in diff_exp_alphaquant / diff_exp_ebayes / _standardize_alphaquant_results ###
+
+
+@pytest.fixture
+def adata_for_diff_exp():
+    """Tiny AnnData for triggering validation raises (no real computation needed)."""
+    return ad.AnnData(
+        X=np.array([[1.0, 2.0], [3.0, 4.0]]),
+        obs=pd.DataFrame({"condition": ["A", "B"]}, index=["s1", "s2"]),
+    )
+
+
+def test__standardize_alphaquant_results_unknown_level():
+    """Passing an unknown level should raise ValueError."""
+    with pytest.raises(ValueError, match="Unknown level"):
+        _standardize_alphaquant_results("A_VS_B", "unknown_level", pd.DataFrame())
+
+
+@pytest.mark.skipif(not _HAS_ALPHAQUANT, reason="alphaquant not installed")
+@pytest.mark.parametrize(
+    ("kwargs_override", "match"),
+    [
+        ({"plots": "bogus"}, "Parameter 'plots'"),
+        ({"between_column": "nonexistent"}, "not found in adata.obs"),
+        ({"comparison": ["A", "B"]}, "tuple of exactly two"),
+    ],
+)
+def test_diff_exp_alphaquant_validation_raises(adata_for_diff_exp, kwargs_override, match):
+    """Input validation in diff_exp_alphaquant should raise before any computation."""
+    base_kwargs = {
+        "adata": adata_for_diff_exp,
+        "report": pd.DataFrame(),
+        "between_column": "condition",
+        "comparison": ("A", "B"),
+    }
+    base_kwargs.update(kwargs_override)
+    with pytest.raises(ValueError, match=match):
+        tl.diff_exp_alphaquant(**base_kwargs)
+
+
+@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
+@pytest.mark.parametrize(
+    ("comparison", "match"),
+    [
+        # level_1 missing
+        (("MISSING", "B"), "Level MISSING not found"),
+        # level_2 missing
+        (("A", "MISSING"), "Level MISSING not found"),
+    ],
+)
+def test_diff_exp_ebayes_missing_level_raises(adata_for_diff_exp, comparison, match):
+    """A comparison referencing a level not in `between_column` should raise."""
+    with pytest.raises(ValueError, match=match):
+        tl.diff_exp_ebayes(adata_for_diff_exp, between_column="condition", comparison=comparison)
