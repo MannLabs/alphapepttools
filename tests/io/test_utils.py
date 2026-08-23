@@ -16,3 +16,9 @@ def test_available_reader(kind: Literal["psm_reader", "pg_reader"]) -> None:
     elif kind == "pg_reader":
         assert len(list_of_available_reader) == len(pg_reader_provider.reader_dict)
     assert "alphadia" in list_of_available_reader
+
+
+def test_list_available_reader_invalid_kind() -> None:
+    """Unknown `kind` should raise KeyError."""
+    with pytest.raises(KeyError, match="Pass either"):
+        list_available_reader("invalid_kind")

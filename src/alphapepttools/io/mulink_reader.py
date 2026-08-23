@@ -1,7 +1,7 @@
 # Reader wrapper to generate MuLink (https://github.com/lucas-diedrich/mulink) instances from reports
+# Port from https://github.com/lucas-diedrich/mulink/blob/main/docs/notebooks/protein-data.ipynb?short_path=4fbb043, with adjustments to build a MuLink instance from a set of AnnData objects rather than a PSM-table
 
 import importlib
-from typing import Literal
 
 import anndata as ad
 import mudata as md
@@ -13,7 +13,10 @@ from tqdm import tqdm
 
 from alphapepttools.io.reader_columns import ALPHAPEPTTOOLS_FEATURE_ID_NAME, FEATURE_LEVEL_CONFIG
 
-# Port from https://github.com/lucas-diedrich/mulink/blob/main/docs/notebooks/protein-data.ipynb?short_path=4fbb043, with adjustments to build a MuLink instance from a set of AnnData objects rather than a PSM-table
+# Mudata changed the settings override context manager from a module to a method in version 0.4
+# see: https://mudata.readthedocs.io/latest/changelog.html
+# TODO: Remove when mudata is bounded to >=0.4
+mudata_options_context = getattr(md, "set_options", None) or md.settings.override
 
 
 def _sparse_matrix_mapping(
@@ -37,11 +40,13 @@ def _sparse_matrix_mapping(
     Directed graph in which source vertices are pointing towards target vertices.
     The semantics of the edges depend on the application
     """
-    columns = mapping_df.columns if columns is None else columns
+    column_names = mapping_df.columns.tolist() if columns is None else columns
 
     full_dag = nx.DiGraph()
-    for idx in tqdm(range(len(columns) - 1)):
-        dag = nx.from_pandas_edgelist(mapping_df, source=columns[idx], target=columns[idx + 1], create_using=nx.DiGraph)
+    for idx in tqdm(range(len(column_names) - 1)):
+        dag = nx.from_pandas_edgelist(
+            mapping_df, source=column_names[idx], target=column_names[idx + 1], create_using=nx.DiGraph
+        )
         full_dag = nx.compose(full_dag, dag)
 
     if transitive_closure:
@@ -89,7 +94,7 @@ def _reindex_adjacency_matrix(df: pd.DataFrame, new_index: pd.Index) -> csr_matr
 
 
 def mulink_from_anndatas(
-    anndatas: dict[Literal["genes", "proteins", "peptides", "precursors"], ad.AnnData],
+    anndatas: dict[str, ad.AnnData],
     *,
     transitive_closure: bool = True,
 ) -> md.MuData:
@@ -234,10 +239,8 @@ def mulink_from_anndatas(
         transitive_closure=transitive_closure,
     )
 
-    # pull_on_update=False adopts mudata 0.4 behavior: mdata.var stays clean (just
-    # modality/feature membership), without merging per-modality var columns across
-    # incompatible feature levels.
-    with md.set_options(pull_on_update=False):
+    # Do not merge per-modality var columns across incompatible feature levels.
+    with mudata_options_context(pull_on_update=False):
         mdata = md.MuData(data=anndatas)
 
     # IMPORTANT: features in the adjacency matrix need to be aligned with the variable order in the mdata object
