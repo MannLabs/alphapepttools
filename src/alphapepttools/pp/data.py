@@ -11,6 +11,8 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 from sklearn.preprocessing import RobustScaler, StandardScaler
 
+from alphapepttools._utils import get_matrix
+
 # logging configuration
 logging.basicConfig(level=logging.INFO)
 
@@ -158,7 +160,7 @@ def add_metadata(  # noqa: C901, PLR0912
 
     ### Handle alignment of incoming and existing metadata
     if keep_existing_metadata:
-        existing_metadata = adata.obs if axis == 0 else adata.var
+        existing_metadata = cast("pd.DataFrame", adata.obs if axis == 0 else adata.var)
 
         # if existing metadata should be kept and new metadata contains synonymous fields to existing metadata, drop incoming fields
         incoming_metadata = _handle_overlapping_columns(incoming_metadata, existing_metadata, verbose=verbose)
@@ -277,13 +279,11 @@ def _filter_by_dict(
     else:
         raise ValueError(f"Supported logics are `and` and `or`, passed {logic}")
 
-    # np.all/np.any reduce to a plain array, so restore the index to stay consistent with the
-    # early return above and to keep the mask aligned when callers index with it
     return pd.Series(merged_filter_mask, index=data.index)
 
 
 def _tuple_based_filter(
-    feature: pd.Series,
+    feature: pd.Series | pd.Index,
     input_tuple: tuple,
 ) -> pd.Series:
     """Tuple-based filtering of numeric features
@@ -319,7 +319,10 @@ def _tuple_based_filter(
     elif upper is not None:
         current_mask = feature < upper
     else:
-        current_mask = pd.Series(True, index=feature.index)  # noqa: FBT003
+        # feature is a Series for normal columns but a pd.Index for the "index" key; the
+        # latter has no `.index`, so derive the alignment index from the feature itself.
+        alignment_index = feature.index if isinstance(feature, pd.Series) else feature
+        current_mask = pd.Series(True, index=alignment_index)  # noqa: FBT003
 
     return current_mask
 
@@ -427,7 +430,7 @@ def filter_by_metadata(
         print(adata_filtered.shape)  # (5, 5) - cells 0,1,2,4 match the criteria
 
     """
-    metadata_to_filter = adata.obs if axis == 0 else adata.var
+    metadata_to_filter = cast("pd.DataFrame", adata.obs if axis == 0 else adata.var)
     filter_mask = _filter_by_dict(metadata_to_filter, filter_dict, logic)
 
     if action == "drop":
@@ -656,7 +659,7 @@ def data_index_to_array(
 
 
 def _tolist(
-    obj: str | list,
+    obj: str | int | list,
 ) -> list:
     return obj if isinstance(obj, list) else [obj]
 
@@ -868,7 +871,7 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
     else:
         raise NotImplementedError(f"Scaler {scaler} not implemented.")
 
-    input_data = adata.X if layer is None else adata.layers[layer]
+    input_data = get_matrix(adata, layer)
     result = scaler.fit_transform(input_data)
     if layer is None:
         adata.X = result
@@ -959,21 +962,23 @@ def _resolve_max_missing(
     ValueError
         If not exactly one threshold is provided, or if a threshold is out of range.
     """
-    if (max_missing_fraction is None) == (max_missing_count is None):
-        raise ValueError("Exactly one of `max_missing_fraction` or `max_missing_count` must be provided.")
+    exactly_one_error = "Exactly one of `max_missing_fraction` or `max_missing_count` must be provided."
 
-    is_count_mode = max_missing_count is not None
+    # Branch on each argument separately (rather than on a precomputed `is_count_mode` flag) so
+    # that the non-None-ness of the threshold in use is visible to the type checker.
+    if max_missing_fraction is not None and max_missing_count is not None:
+        raise ValueError(exactly_one_error)
 
-    if is_count_mode:
+    if max_missing_count is not None:
         if max_missing_count < 0:
             raise ValueError("`max_missing_count` must be non-negative.")
-        threshold = int(max_missing_count)
-    else:
-        if max_missing_fraction < 0 or max_missing_fraction > 1:
-            raise ValueError("`max_missing_fraction` must be between 0 and 1.")
-        threshold = float(max_missing_fraction)
+        return int(max_missing_count), True
 
-    return threshold, is_count_mode
+    if max_missing_fraction is None:
+        raise ValueError(exactly_one_error)
+    if max_missing_fraction < 0 or max_missing_fraction > 1:
+        raise ValueError("`max_missing_fraction` must be between 0 and 1.")
+    return float(max_missing_fraction), False
 
 
 def _reject_unexpected_kwargs(kwargs: dict) -> None:
@@ -1149,8 +1154,10 @@ def filter_data_completeness(
 
     _validate_adata_for_completeness_filter(adata, action, var_colname)
 
+    x = get_matrix(adata)
+
     if group_column is None:
-        keep_mask = _count_or_fraction_missing(adata.X, is_count_mode=is_count_mode) <= max_missing
+        keep_mask = _count_or_fraction_missing(x, is_count_mode=is_count_mode) <= max_missing
     else:
         available_groups = adata.obs.groupby(group_column, observed=True, dropna=True).indices
 
@@ -1163,7 +1170,7 @@ def filter_data_completeness(
         for group_nr, group in enumerate(selected_groups):
             group_indices = available_groups[group]
             keep_mask[group_nr, :] = (
-                _count_or_fraction_missing(adata.X[group_indices, :], is_count_mode=is_count_mode) <= max_missing
+                _count_or_fraction_missing(x[group_indices, :], is_count_mode=is_count_mode) <= max_missing
             )
 
         # Aggregate to decision

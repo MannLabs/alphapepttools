@@ -10,7 +10,7 @@
 
 import colorsys
 import logging
-from typing import ClassVar
+from typing import ClassVar, cast
 
 import cmcrameri.cm as cmc
 import matplotlib as mpl
@@ -678,7 +678,8 @@ class BasePalettes:
             except ValueError as exc:
                 raise ValueError(f"Unknown palette name: {palette_name}") from exc
 
-        return _cycle_palette(palette, n)
+        # both branches above assign a list (`_get_colors_from_cmap` with an int returns a list)
+        return _cycle_palette(cast("list", palette), n)
 
 
 # TODO: Fix so a defined number of colors can be retrieved with .get, as well as the whole colormap
@@ -820,7 +821,8 @@ class MappedColormaps:
         Example
 
         """
-        self.cmap = BaseColormaps.get(cmap)
+        # `get` without `n` always returns a continuous Colormap, never the discrete-color list
+        self.cmap = cast("Colormap", BaseColormaps.get(cmap))
         self.percentile = percentile
         self.vmin = None
         self.vmax = None

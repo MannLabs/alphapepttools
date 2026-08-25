@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 import anndata as ad
 import numpy as np
@@ -229,7 +230,7 @@ def diff_exp_ttest(
     )
 
     # adjust pvalues using Benjamini-Hochberg method, accounting for nans
-    p_adj = nan_safe_bh_correction(p_values)
+    p_adj = nan_safe_bh_correction(cast("np.ndarray", p_values))
 
     # store results in dataframe
     result_df = (
