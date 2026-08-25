@@ -1079,8 +1079,9 @@ def filter_data_completeness(
     ValueError
         If not exactly one of `max_missing_fraction` / `max_missing_count` is provided, if a
         threshold is out of range, if `keep_strategy` or `action` is invalid, if `adata` has no
-        features, non-numeric values in `X` or duplicated indices in `obs`, or if a requested
-        group is not present in `group_column`.
+        features, non-numeric values in `X` or duplicated indices in `obs`.
+    KeyError
+        If a requested group is not present in `group_column`.
 
     Examples
     --------
