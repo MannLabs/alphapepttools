@@ -9,7 +9,7 @@ try:
     import alphaquant.run_pipeline as aq_pipeline
 
     _HAS_ALPHAQUANT = True
-except ModuleNotFoundError:
+except ModuleNotFoundError:  # pragma: no cover - optional dep, env-dependent
     _HAS_ALPHAQUANT = False
 
 from alphapepttools.tl import tl_defaults
@@ -169,7 +169,7 @@ def diff_exp_alphaquant(
         proteoform_results = alphaquant_results["proteoform"]
 
     """
-    if not _HAS_ALPHAQUANT:
+    if not _HAS_ALPHAQUANT:  # pragma: no cover - optional dep, env-dependent
         raise ImportError(
             "alphaquant is required for diff_exp_alphaquant(). Install it through pip or install alphapepttools with the 'full'/'full-stable' extra."
         )
@@ -189,7 +189,7 @@ def diff_exp_alphaquant(
     def _get_samplemap(
         adata: ad.AnnData,
         between_column: str,
-        comparison: list,
+        comparison: list | tuple,
     ) -> pd.DataFrame:
         """Extract AlphaQuant-compatible samplemap from AnnData.
 
@@ -242,7 +242,7 @@ def diff_exp_alphaquant(
                     min_valid_values=min_valid_values,
                     valid_values_filter_mode=valid_values_filter_mode,
                 )
-        else:
+        else:  # pragma: no cover - plots="show" branch, only differs by skipping _suppress_plots wrapper
             aq_pipeline.run_pipeline(
                 input_file=str(report_dir),
                 samplemap_file=str(samplemap_dir),

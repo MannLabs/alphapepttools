@@ -10,7 +10,7 @@ try:
     from inmoose import limma
 
     _HAS_INMOOSE = True
-except ModuleNotFoundError:
+except ModuleNotFoundError:  # pragma: no cover - optional dep, env-dependent
     _HAS_INMOOSE = False
 
 from alphapepttools.pp.data import filter_data_completeness
@@ -168,7 +168,7 @@ def diff_exp_ebayes(
         significant = ebayes_results[ebayes_results["fdr"] < 0.05]
 
     """
-    if not _HAS_INMOOSE:
+    if not _HAS_INMOOSE:  # pragma: no cover - optional dep, env-dependent
         raise ImportError(
             "inmoose is required for diff_exp_ebayes(). Install it through pip or install alphapepttools with the 'full'/'full-stable' extra."
         )
@@ -194,7 +194,7 @@ def diff_exp_ebayes(
     # This ensures compatibility with inmoose's lmFit which cannot handle NaN values
     adata_subset = filter_data_completeness(
         adata_subset,
-        max_missing=0,
+        max_missing_count=0,
         action="drop",
     )
 

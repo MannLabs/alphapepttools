@@ -12,14 +12,15 @@ import logging
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 import anndata as ad
-import matplotlib as mpl
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from matplotlib.font_manager import FontProperties
+from matplotlib.legend import Legend
 from matplotlib.patches import Patch
 
 from alphapepttools.pl import defaults
@@ -152,9 +153,9 @@ def _extract_groupwise_plotting_data(
         df = df.melt(var_name="variable", value_name="value")
         grouping_column, value_column = "variable", "value"
     else:
-        columns = [grouping_column, value_column]
-        if subgroup_column is not None:
-            columns.append(subgroup_column)
+        if grouping_column is None or value_column is None:
+            raise ValueError("Either 'direct_columns' or both 'grouping_column' and 'value_column' must be provided.")
+        columns = [column for column in (grouping_column, value_column, subgroup_column) if column is not None]
         df = data_columns_to_df(data, columns=columns)
 
     # Handle single vs subgrouped plotting
@@ -287,7 +288,7 @@ def add_lines(
 
 def make_legend_patches(
     color_dict: dict[str, str | tuple],
-) -> list[mpl.patches.Patch]:
+) -> list[Patch]:
     """Create colored patches for matplotlib legends
 
     Converts a label-to-color mapping into matplotlib patches suitable for legends.
@@ -327,7 +328,7 @@ def make_legend_patches(
 
 def add_legend_to_axes_from_patches(
     ax: plt.Axes,
-    patches: list[mpl.patches.Patch],
+    patches: list[Patch],
     **kwargs,
 ) -> None:
     """Add a legend with patches to an axes, using config defaults for font sizes
@@ -370,13 +371,13 @@ def add_legend_to_axes_from_patches(
     _legend = ax.legend(handles=patches, **kwargs)
 
     # Resize legend title based on config legend title_size
-    _legend.set_title(_legend.get_title().get_text(), prop={"size": config["legend"]["title_size"]})
+    _legend.set_title(_legend.get_title().get_text(), prop=FontProperties(size=config["legend"]["title_size"]))
 
 
 def add_legend_to_axes(
     ax: plt.Axes,
     levels: list[str] | dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = "auto",
+    legend: str | Legend | None = "auto",
     palette: list[str | tuple] | None = None,
     **legend_kwargs,
 ) -> None:
@@ -437,7 +438,7 @@ def add_legend_to_axes(
         existing_legend = ax.legend(["A", "B"], loc="upper left")
         add_legend_to_axes(other_ax, legend=existing_legend)
     """
-    if isinstance(legend, mpl.legend.Legend):
+    if isinstance(legend, Legend):
         ax.add_artist(legend)
         return
     if legend == "auto":
@@ -445,12 +446,12 @@ def add_legend_to_axes(
             patches = make_legend_patches(levels)
             add_legend_to_axes_from_patches(ax, patches, **legend_kwargs)
         elif isinstance(levels, list):
-            levels = np.unique(levels)
+            unique_levels = np.unique(levels)
             if palette is None:
                 palette = BasePalettes.get("qualitative")
-                if len(levels) > len(palette):
+                if len(unique_levels) > len(palette):
                     palette = BasePalettes.get("sequential")
-            color_dict = get_color_mapping(levels, palette)
+            color_dict = get_color_mapping(unique_levels, palette)
             patches = make_legend_patches(color_dict)
             add_legend_to_axes_from_patches(ax, patches, **legend_kwargs)
         else:
@@ -503,6 +504,7 @@ def drop_nan_coordinate_points(
     -----
     Uses pandas.isna() to handle both NaN and None values correctly.
     """
+    labels = np.asarray(labels)
     keep_mask = ~(pd.isna(x_values) | pd.isna(y_values))
     return x_values[keep_mask], y_values[keep_mask], labels[keep_mask]
 
@@ -805,7 +807,7 @@ class PlotConfig:
 
     def copy_with(
         self,
-        **changes: dict[str, Any],
+        **changes,
     ) -> "PlotConfig":
         """Create a copy with specified changes"""
         # Make it so that changes can override existing data & _extra fields
@@ -1118,8 +1120,12 @@ def layered_plot(
 
     # Get data from base_config
     data = base_config.data
+    if data is None:
+        raise ValueError("base_config must contain data to plot")
     x_column = base_config.x_column
     y_column = base_config.y_column
+    if not isinstance(x_column, str) or not isinstance(y_column, str):
+        raise TypeError("base_config must provide string x_column and y_column")
 
     # By default, all datapoints are in the default layer
     if layers is None:
@@ -1200,9 +1206,9 @@ def histogram(
     bins: int = 10,
     ax: plt.Axes | None = None,
     color: str = "blue",
-    palette: list[tuple] | None = None,
+    palette: list[str | tuple] | None = None,
     color_dict: dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     hist_kwargs: dict | None = None,
     legend_kwargs: dict | None = None,
     xlim: tuple[float, float] | None = None,
@@ -1336,7 +1342,8 @@ def histogram(
     legend_kwargs = legend_kwargs or {}
 
     if ax is None:
-        _, ax = create_figure(1, 1)
+        _, axm = create_figure(1, 1)
+        ax = axm.next()
 
     values = data_column_to_array(data, value_column)
 
@@ -1399,7 +1406,7 @@ def scatter(
     ax: plt.Axes | None = None,
     palette: list[str | tuple] | None = None,
     color_dict: dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     scatter_kwargs: dict | None = None,
     legend_kwargs: dict | None = None,
     figure_kwargs: dict | None = None,
@@ -1687,15 +1694,15 @@ def scatter(
 def barplot(
     ax: plt.Axes,
     data: ad.AnnData | pd.DataFrame,
-    grouping_column: list[str] | None = None,
-    value_column: list[str] | None = None,
+    grouping_column: str | None = None,
+    value_column: str | None = None,
     direct_columns: list[str] | None = None,
-    color: tuple = BaseColors.get("blue"),
+    color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
     subgroup_column: str | None = None,
     width: float = 0.4,
     alpha: float = 0.5,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     legend_kwargs: dict | None = None,
 ) -> None:
     """Plot a bar chart from a DataFrame or AnnData object
@@ -1851,15 +1858,15 @@ def barplot(
 def boxplot(
     ax: plt.Axes,
     data: ad.AnnData | pd.DataFrame,
-    grouping_column: list[str] | None = None,
-    value_column: list[str] | None = None,
+    grouping_column: str | None = None,
+    value_column: str | None = None,
     direct_columns: list[str] | None = None,
-    color: tuple = BaseColors.get("blue"),
+    color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
     subgroup_column: str | None = None,
     width: float = 0.4,
     alpha: float = 0.5,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     legend_kwargs: dict | None = None,
 ) -> None:
     """Plot a box plot from a DataFrame or AnnData object
@@ -1961,7 +1968,7 @@ def boxplot(
     - The subgroup_column allows for further subdivision within each main group
     - Missing values (NaN) are excluded from the distribution calculations
     """
-    data, labels, positions, color_keys = _extract_groupwise_plotting_data(
+    data_lists, labels, positions, color_keys = _extract_groupwise_plotting_data(
         data=data,
         grouping_column=grouping_column,
         value_column=value_column,
@@ -1971,7 +1978,7 @@ def boxplot(
     )
 
     boxes = ax.boxplot(
-        x=data,
+        x=data_lists,
         positions=positions,
         widths=width,  # no typo: widths argument also takes single floats
         patch_artist=True,
@@ -2026,15 +2033,15 @@ def boxplot(
 def violinplot(
     ax: plt.Axes,
     data: ad.AnnData | pd.DataFrame,
-    grouping_column: list[str] | None = None,
-    value_column: list[str] | None = None,
+    grouping_column: str | None = None,
+    value_column: str | None = None,
     direct_columns: list[str] | None = None,
-    color: tuple = BaseColors.get("blue"),
+    color: tuple | str = BaseColors.get("blue"),
     color_dict: dict | None = None,
     subgroup_column: str | None = None,
     width: float = 0.4,
     alpha: float = 0.5,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     legend_kwargs: dict | None = None,
 ) -> None:
     """Plot a violin plot from a DataFrame or AnnData object
@@ -2136,7 +2143,7 @@ def violinplot(
     - When using direct_columns, each column's distribution is shown separately
     - Missing values (NaN) are excluded from the distribution calculations
     """
-    data, labels, positions, color_keys = _extract_groupwise_plotting_data(
+    data_lists, labels, positions, color_keys = _extract_groupwise_plotting_data(
         data=data,
         grouping_column=grouping_column,
         value_column=value_column,
@@ -2146,14 +2153,14 @@ def violinplot(
     )
 
     violins = ax.violinplot(
-        dataset=data,
+        dataset=data_lists,
         positions=positions,
         widths=width,
         showmedians=True,
     )
 
     # Styling of violins
-    for color_key, violin in zip(color_keys, violins["bodies"], strict=False):
+    for color_key, violin in zip(color_keys, cast("list", violins["bodies"]), strict=False):
         current_color = color_dict.get(color_key, config["na_color"]) if color_dict else color
         violin.set_facecolor(mcolors.to_rgba(current_color, alpha=alpha))
         violin.set_edgecolor(BaseColors.get("black"))
@@ -2198,7 +2205,7 @@ def rank_median_plot(
     color_column: str | None = None,
     palette: list[str | tuple] | None = None,
     color_dict: dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     scatter_kwargs: dict | None = None,
 ) -> None:
     """Rank plot showing median intensities across samples.
@@ -2328,7 +2335,7 @@ def plot_pca(
     ax: plt.Axes | None = None,
     palette: list[str | tuple] | None = None,
     color_dict: dict[str, str | tuple] | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     scatter_kwargs: dict | None = None,
 ) -> None:
     """PCA scatter plot showing principal component projections.
@@ -2442,11 +2449,15 @@ def plot_pca(
     """
     scatter_kwargs = scatter_kwargs or {}
 
+    if ax is None:
+        _, axm = create_figure(1, 1)
+        ax = axm.next()
+
     adata_pca = extract_pca_anndata(
         data,
         dim_space=dim_space,
         embeddings_name=embeddings_name,
-        expression_columns=color_map_column,
+        expression_columns=[color_map_column] if color_map_column is not None else None,
         method=method,
     )
 
@@ -2500,7 +2511,7 @@ def plot_pca(
 
 
 def scree_plot(
-    adata: ad.AnnData | pd.DataFrame,
+    adata: ad.AnnData,
     ax: plt.Axes,
     n_pcs: int = 20,
     dim_space: str = "obs",
@@ -2591,7 +2602,7 @@ def scree_plot(
 
 
 def plot_pca_loadings(
-    data: ad.AnnData | pd.DataFrame,
+    data: ad.AnnData,
     ax: plt.Axes,
     dim_space: str = "obs",
     embeddings_name: str | None = None,
@@ -2702,7 +2713,7 @@ def plot_pca_loadings(
 
 
 def plot_pca_loadings_2d(
-    data: ad.AnnData | pd.DataFrame,
+    data: ad.AnnData,
     ax: plt.Axes,
     dim_space: str = "obs",
     embeddings_name: str | None = None,
@@ -2870,7 +2881,7 @@ def volcano(  # noqa: C901
     scatter_kwargs: dict | None = None,
     line_kwargs: dict | None = None,
     label_kwargs: dict | None = None,
-    legend: str | mpl.legend.Legend | None = None,
+    legend: str | Legend | None = None,
     legend_kwargs: dict | None = None,
     # Default layer parameters
     default_color: str | tuple = BaseColors.get("grey"),
