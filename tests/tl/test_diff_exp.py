@@ -672,7 +672,7 @@ def test__build_design_matrix_basic():
 
 
 def test__build_design_matrix_with_covariate():
-    """A covariate is added in k-1 fashion: the last level is dropped to avoid multicollinearity."""
+    """A covariate is added in k-1 fashion: the first level is dropped to avoid multicollinearity."""
     obs = pd.DataFrame(
         {"group": ["A", "A", "B", "B"], "batch": ["x", "x", "y", "y"]},
         index=[f"s{i}" for i in range(4)],
@@ -681,10 +681,43 @@ def test__build_design_matrix_with_covariate():
 
     dm, col_info = _build_design_matrix(adata, "group", covariate_column="batch")
 
-    # Two condition columns plus one covariate column ("y" dropped).
-    assert list(dm.columns) == ["A", "B", "x"]
-    np.testing.assert_array_equal(dm["x"].to_numpy(), np.array([1, 1, 0, 0]))
-    assert col_info == {"condition_col_idxs": {"A": 0, "B": 1}, "covariate_col_idxs": {"x": 2}}
+    # Two condition columns plus one covariate column ("x", the first level, is dropped).
+    assert list(dm.columns) == ["A", "B", "y"]
+    np.testing.assert_array_equal(dm["y"].to_numpy(), np.array([0, 0, 1, 1]))
+    assert col_info == {"condition_col_idxs": {"A": 0, "B": 1}, "covariate_col_idxs": {"y": 2}}
+
+
+def test__build_design_matrix_column_order_follows_first_appearance():
+    """Columns follow the order levels first appear in, not the lexicographic order get_dummies uses."""
+    obs = pd.DataFrame(
+        {"group": ["treated", "treated", "ctrl", "ctrl"], "batch": ["b", "a", "b", "a"]},
+        index=[f"s{i}" for i in range(4)],
+    )
+    adata = ad.AnnData(X=np.zeros((4, 1), dtype=float), obs=obs)
+
+    dm, col_info = _build_design_matrix(adata, "group", covariate_column="batch")
+
+    # "treated" precedes "ctrl"; the covariate keeps "b" because "a" is the dropped first level.
+    assert list(dm.columns) == ["treated", "ctrl", "b"]
+    assert col_info["condition_col_idxs"] == {"treated": 0, "ctrl": 1}
+
+
+def test__build_design_matrix_ignores_unused_categories():
+    """Categories with no samples left (e.g. after subsetting) must not add all-zero columns."""
+    obs = pd.DataFrame(
+        {
+            "group": pd.Categorical(["A", "A", "B", "B"], categories=["A", "B", "C"]),
+            "batch": pd.Categorical(["x", "x", "y", "y"], categories=["x", "y", "z"]),
+        },
+        index=[f"s{i}" for i in range(4)],
+    )
+    adata = ad.AnnData(X=np.zeros((4, 1), dtype=float), obs=obs)
+
+    dm, col_info = _build_design_matrix(adata, "group", covariate_column="batch")
+
+    # Unobserved levels "C" and "z" would make the design matrix rank-deficient.
+    assert list(dm.columns) == ["A", "B", "y"]
+    assert col_info == {"condition_col_idxs": {"A": 0, "B": 1}, "covariate_col_idxs": {"y": 2}}
 
 
 # Test raise behavior for invalid condition/covariate specifications in _build_design_matrix
@@ -698,14 +731,14 @@ def test__build_design_matrix_with_covariate():
     ],
 )
 def test__build_design_matrix_validation(condition, covariate, between_column, covariate_column):
-    """Invalid condition/covariate specifications raise ValueError."""
+    """Invalid condition/covariate specifications raise KeyError."""
     data = {"group": condition}
     if covariate is not None:
         data["batch"] = covariate
     obs = pd.DataFrame(data, index=[f"s{i}" for i in range(len(condition))])
     adata = ad.AnnData(X=np.zeros((len(condition), 1), dtype=float), obs=obs)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(KeyError):
         _build_design_matrix(adata, between_column, covariate_column=covariate_column)
 
 
@@ -838,21 +871,21 @@ def test__contrasts_from_matrix_naming(control_is, expected_names):
 
 
 @pytest.mark.parametrize(
-    ("matrix", "control_condition"),
+    ("matrix", "control_condition", "expected_exception"),
     [
         # Control condition not present in the matrix columns.
-        (pd.DataFrame([[1, -1, 0]], columns=["A", "B", "C"]), "Z"),
+        (pd.DataFrame([[1, -1, 0]], columns=["A", "B", "C"]), "Z", KeyError),
         # Control column appears more than once.
-        (pd.DataFrame(np.array([[1, -1, 1]]), columns=["A", "B", "A"]), "A"),
+        (pd.DataFrame(np.array([[1, -1, 1]]), columns=["A", "B", "A"]), "A", ValueError),
         # A row with two non-zero treatment columns (not exactly one).
-        (pd.DataFrame([[1, -1, -1]], columns=["A", "B", "C"]), "A"),
+        (pd.DataFrame([[1, -1, -1]], columns=["A", "B", "C"]), "A", ValueError),
         # A row with an invalid sign pattern (both +1).
-        (pd.DataFrame([[1, 1, 0]], columns=["A", "B", "C"]), "A"),
+        (pd.DataFrame([[1, 1, 0]], columns=["A", "B", "C"]), "A", ValueError),
     ],
 )
-def test__contrasts_from_matrix_errors(matrix, control_condition):
-    """Malformed contrast matrices are rejected."""
-    with pytest.raises(ValueError):
+def test__contrasts_from_matrix_errors(matrix, control_condition, expected_exception):
+    """Malformed contrast matrices are rejected: an absent control column raises KeyError, structural defects ValueError."""
+    with pytest.raises(expected_exception):
         _contrasts_from_matrix(matrix, control_condition=control_condition)
 
 
@@ -1155,8 +1188,8 @@ def test__resolve_comparison_all_sentinel_excludes_b():
     ],
 )
 def test__resolve_comparison_validation(between_column, comparison):
-    """An unknown between column or condition raises ValueError before any fitting happens."""
-    with pytest.raises(ValueError):
+    """An unknown between column or condition raises KeyError before any fitting happens."""
+    with pytest.raises(KeyError):
         _resolve_comparison(_abc_adata(), between_column, comparison)
 
 

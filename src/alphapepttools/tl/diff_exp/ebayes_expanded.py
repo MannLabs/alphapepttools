@@ -22,6 +22,36 @@ from alphapepttools.tl.utils import (
 _METHOD_NAME = "limma_ebayes_inmoose_expanded"
 
 
+def _one_hot(labels: pd.Series, *, drop_first: bool = False) -> pd.DataFrame:
+    """One-hot encode sample labels, keeping columns in order of first appearance.
+
+    Casting to ``object`` first is what makes this safe for AnnData: ``pd.get_dummies`` on a
+    categorical column emits one column per *declared* category, so a level that no longer
+    occurs (e.g. after subsetting an AnnData) would contribute an all-zero, rank-deficient
+    column to the design matrix. Casting to ``object`` rather than ``str`` keeps the original
+    label values, which downstream lookups (e.g. contrast matrix columns) are keyed on.
+
+    Parameters
+    ----------
+    labels : pd.Series
+        Sample labels to encode, indexed by sample.
+    drop_first : bool, optional
+        If True, drop the first level to avoid multicollinearity (k-1 encoding). "First" is in
+        the ``pd.get_dummies`` sense, i.e. the lexicographically first level, not the first to
+        appear in the data.
+
+    Returns
+    -------
+    pd.DataFrame
+        Indicator matrix indexed like ``labels``, with columns ordered by first appearance.
+
+    """
+    labels = labels.astype(object)
+    dm = pd.get_dummies(labels, dtype=int, drop_first=drop_first)
+    # get_dummies sorts its columns; restore order of first appearance, minus any dropped level.
+    return dm[[level for level in dict.fromkeys(labels) if level in dm.columns]]
+
+
 def _build_design_matrix(
     adata: ad.AnnData,
     condition_column: str,
@@ -41,7 +71,7 @@ def _build_design_matrix(
     Returns
     -------
     pd.DataFrame
-        A design matrix suitable for linear modeling, where columns are features and rows are samples. Each condition is encoded as a separate column. Covariate levels are added as additional columns in a k-1 fashion (one-hot encoding with one level dropped to avoid multicollinearity).
+        A design matrix suitable for linear modeling, where columns are features and rows are samples. Each condition is encoded as a separate column. Covariate levels are added as additional columns in a k-1 fashion (one-hot encoding with the first level dropped to avoid multicollinearity). Within each block, columns follow the order the levels first appear in adata.obs.
     dict
         A dictionary to navigate the design matrix with the following keys:
         - condition_col_idxs: A dictionary mapping each condition to its corresponding column index in the design matrix.
@@ -49,37 +79,28 @@ def _build_design_matrix(
 
     """
     if condition_column not in adata.obs.columns:
-        raise ValueError(f"Condition column '{condition_column}' not found in adata.obs.")
+        raise KeyError(f"Condition column '{condition_column}' not found in adata.obs.")
 
     if adata.obs[condition_column].isna().any():
-        raise ValueError(f"Condition column '{condition_column}' contains NaN values.")
+        raise KeyError(f"Condition column '{condition_column}' contains NaN values.")
 
     if covariate_column is not None:
         if covariate_column not in adata.obs.columns:
-            raise ValueError(f"Covariate column '{covariate_column}' not found in adata.obs.")
+            raise KeyError(f"Covariate column '{covariate_column}' not found in adata.obs.")
         if adata.obs[covariate_column].isna().any():
-            raise ValueError(f"Covariate column '{covariate_column}' contains NaN values.")
+            raise KeyError(f"Covariate column '{covariate_column}' contains NaN values.")
 
-    condition_names = list(adata.obs[condition_column].unique())
-    covariate_names = (
-        list(adata.obs[covariate_column].unique()[:-1]) if covariate_column is not None else []
-    )  # k-1 for covariates
-
-    nrows = adata.n_obs
-    ncols = len(condition_names) + len(covariate_names)
-
-    dm = pd.DataFrame(
-        data=np.zeros((nrows, ncols), dtype=int), index=adata.obs_names, columns=condition_names + covariate_names
+    condition_dm = _one_hot(adata.obs[condition_column])
+    covariate_dm = (
+        _one_hot(adata.obs[covariate_column], drop_first=True)  # k-1 for covariates
+        if covariate_column is not None
+        else pd.DataFrame(index=adata.obs.index)
     )
 
-    for condition in condition_names:
-        dm.loc[adata.obs[condition_column] == condition, condition] = 1
+    dm = pd.concat([condition_dm, covariate_dm], axis=1)
 
-    for covariate in covariate_names:
-        dm.loc[adata.obs[covariate_column] == covariate, covariate] = 1
-
-    condition_col_idxs = {name: dm.columns.get_loc(name) for name in condition_names}
-    covariate_col_idxs = {name: dm.columns.get_loc(name) for name in covariate_names}
+    condition_col_idxs = {name: dm.columns.get_loc(name) for name in condition_dm.columns}
+    covariate_col_idxs = {name: dm.columns.get_loc(name) for name in covariate_dm.columns}
 
     return dm, {"condition_col_idxs": condition_col_idxs, "covariate_col_idxs": covariate_col_idxs}
 
@@ -235,11 +256,11 @@ def _make_contrasts(
 
     """
     if between_column not in adata.obs.columns:
-        raise ValueError(f"Condition column '{between_column}' not found in adata.obs.")
+        raise KeyError(f"Condition column '{between_column}' not found in adata.obs.")
 
     condition_names = list(adata.obs[between_column].unique())
     if control_condition not in condition_names:
-        raise ValueError(f"Control condition '{control_condition}' not found in condition column '{between_column}'.")
+        raise KeyError(f"Control condition '{control_condition}' not found in condition column '{between_column}'.")
 
     # Treatments are all conditions other than the control; their order defines the row order of the matrix
     treatment_names = [c for c in condition_names if c != control_condition]
@@ -326,9 +347,17 @@ def _contrasts_from_matrix(
     list[str]
         A list of contrast names.
 
+    Raises
+    ------
+    KeyError
+        If `control_condition` is not one of the contrast matrix columns.
+    ValueError
+        If the contrast matrix is malformed: the control column occurs more than once, or a row does
+        not carry exactly one treatment column with the sign opposite to the control.
+
     """
     if control_condition not in contrast_matrix.columns:
-        raise ValueError(f"Control condition '{control_condition}' not found in contrast matrix columns.")
+        raise KeyError(f"Control condition '{control_condition}' not found in contrast matrix columns.")
 
     if list(contrast_matrix.columns).count(control_condition) > 1:
         raise ValueError(f"Control condition '{control_condition}' occurs more than once in contrast matrix columns.")
@@ -445,18 +474,18 @@ def _resolve_comparison(
 
     Raises
     ------
-    ValueError
+    KeyError
         If `between_column` is absent from adata.obs, or if any resolved condition is not a level of it.
 
     """
     if between_column not in adata.obs.columns:
-        raise ValueError(f"Column '{between_column}' not found in adata.obs.")
+        raise KeyError(f"Column '{between_column}' not found in adata.obs.")
     between_levels = adata.obs[between_column].unique()
 
     # Validate the B condition (the single reference, comparison[1])
     b_condition = comparison[1]
     if b_condition not in between_levels:
-        raise ValueError(f"Condition '{b_condition}' not found in column '{between_column}'.")
+        raise KeyError(f"Condition '{b_condition}' not found in column '{between_column}'.")
 
     # Resolve the A conditions (comparison[0]) to an explicit list
     a_conditions = comparison[0]
@@ -467,7 +496,7 @@ def _resolve_comparison(
 
     for a_condition in a_conditions:
         if a_condition not in between_levels:
-            raise ValueError(f"Condition '{a_condition}' not found in column '{between_column}'.")
+            raise KeyError(f"Condition '{a_condition}' not found in column '{between_column}'.")
 
     return list(a_conditions), b_condition
 
@@ -637,7 +666,7 @@ def diff_exp_ebayes(
     ------
     ImportError
         If inmoose is not installed.
-    ValueError
+    KeyError
         If `between_column` is not in adata.obs, or any condition in `comparison` is not a level of it.
 
     """
