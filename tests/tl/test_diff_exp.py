@@ -88,6 +88,19 @@ def test_nan_safe_ttest_ind(ab, expected, min_valid_values):
         assert result == expected, f"Expected {expected}, got {result}"
 
 
+def test_nan_safe_ttest_ind_converts_non_series():
+    """List inputs should be converted to pd.Series and processed normally."""
+    result = tl.nan_safe_ttest_ind([1, 2, 3], [4, 5, 6])
+    expected = ttest_ind([1, 2, 3], [4, 5, 6])
+    assert np.allclose(result, expected)
+
+
+def test_nan_safe_ttest_ind_raises_on_unconvertible_input():
+    """Input that pd.Series cannot accept (e.g. a 2D array) should raise TypeError."""
+    with pytest.raises(TypeError, match="Cannot convert inputs"):
+        tl.nan_safe_ttest_ind(np.array([[1, 2], [3, 4]]), pd.Series([4, 5, 6]))
+
+
 # Test group-wise ttest with ratios
 @pytest.mark.parametrize(
     ("between_column", "comparison", "min_valid_values", "expected_output"),

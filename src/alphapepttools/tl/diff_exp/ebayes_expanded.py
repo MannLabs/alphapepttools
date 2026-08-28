@@ -1,5 +1,7 @@
 # Expanded eBayes differential expression module with multiple contrasts, nan-handling and covariate support
 
+from typing import cast
+
 import anndata as ad
 import numpy as np
 import pandas as pd
@@ -12,6 +14,7 @@ try:
 except ModuleNotFoundError:
     _HAS_INMOOSE = False
 
+from alphapepttools._utils import get_matrix
 from alphapepttools.tl.defaults import tl_defaults
 from alphapepttools.tl.stats import nan_safe_bh_correction
 from alphapepttools.tl.utils import (
@@ -90,9 +93,9 @@ def _build_design_matrix(
         if adata.obs[covariate_column].isna().any():
             raise KeyError(f"Covariate column '{covariate_column}' contains NaN values.")
 
-    condition_dm = _one_hot(adata.obs[condition_column])
+    condition_dm = _one_hot(cast("pd.Series", adata.obs[condition_column]))
     covariate_dm = (
-        _one_hot(adata.obs[covariate_column], drop_first=True)  # k-1 for covariates
+        _one_hot(cast("pd.Series", adata.obs[covariate_column]), drop_first=True)  # k-1 for covariates
         if covariate_column is not None
         else pd.DataFrame(index=adata.obs.index)
     )
@@ -155,7 +158,7 @@ def _nan_lmfit(
 
     # Convert design matrix and response to numpy arrays
     X = design_matrix.to_numpy()
-    Y = adata.X
+    Y = get_matrix(adata)
 
     # Initialize output arrays
     B = np.full((K, P), np.nan)  # linear fit coefficients
@@ -272,7 +275,9 @@ def _make_contrasts(
     for i, treatment in enumerate(treatment_names):
         contrast_matrix[i, condition_names.index(treatment)] = -control_is
 
-    return pd.DataFrame(contrast_matrix, columns=condition_names)
+    # pd.DataFrame does not take a plain list of labels for `columns` (pandas' Axes type covers
+    # Index/ndarray, not builtin list); pd.Index keeps the plain-object column labels.
+    return pd.DataFrame(contrast_matrix, columns=pd.Index(condition_names))
 
 
 def _run_contrasts(
@@ -509,7 +514,7 @@ def _sufficient_values_mask(
 ) -> np.ndarray:
     """Per-feature boolean mask: True where `condition` has at least `min_required` observed values."""
     condition_idxs = np.where(adata.obs[between_column] == condition)[0]
-    n_observed = np.sum(~np.isnan(adata.X[condition_idxs, :]), axis=0)
+    n_observed = np.sum(~np.isnan(get_matrix(adata)[condition_idxs, :]), axis=0)
     return n_observed >= min_required
 
 

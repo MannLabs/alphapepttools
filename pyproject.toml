@@ -205,31 +205,23 @@ python-version = "3.11"
 include = [ "src" ]
 
 [tool.ty.rules]
-# TODO revisit these exclusions
-# anndata types `.X`/`.layers[...]` as a 12+ member union of every storage
-# backend (ndarray | csr_matrix | AwkArray | ZarrArray | CSRDataset | None | ...).
-# The pipeline treats these as dense numpy arrays (it asserts no-NaN and does
-# `data[idx, :] = ...`), so subscripting and in-place assignment are safe at
-# runtime but cannot be proven to a static checker.
+# anndata types `.X`/`.layers[...]` as a 12+ member union of every storage backend
+# (ndarray | csr_matrix | AwkArray | ZarrArray | CSRDataset | None | ...). The pipeline
+# treats these as dense numpy arrays (asserts no-NaN, does `data[idx, :] = ...`, reads
+# `.shape`), so subscripting, in-place assignment and attribute access are safe at runtime
+# but unprovable statically. The rules below fire (almost) exclusively on this union and on
+# untyped/dynamic libraries (cmcrameri's generated colormaps, patsy, matplotlib's lazy
+# submodules, the optional `alphaquant` import). `invalid-argument-type` is deliberately
+# kept active — it carries genuine signal here, and union flows into it are narrowed via
+# `alphapepttools._utils.get_matrix`.
 not-subscriptable = "ignore"
 invalid-assignment = "ignore"
-# Same union flows into helper calls expecting `np.ndarray`; in this stack the
-# rule only ever fires on this union and on external libraries whose stubs
-# declare `str` where the code passes `Path`, so it carries no real signal here.
-invalid-argument-type = "ignore"
-# matplotlib lazily populates submodules (mpl.patches, mpl.legend, ...) that ty
-# cannot see are imported.
-possibly-missing-submodule = "ignore"
-# The remaining rules below fire only on this stack's untyped/dynamic libraries
-# (cmcrameri's generated colormaps, patsy, scanpy/numpy/pandas overloads, the
-# `.X` union) and on the optional `alphaquant` dependency. Genuine issues these
-# surfaced were already fixed in code; disabling them keeps `ty check src` clean
-# so it can run as a pre-commit gate that still enforces every other ty rule.
 unresolved-attribute = "ignore"
 no-matching-overload = "ignore"
 unsupported-operator = "ignore"
 not-iterable = "ignore"
 unresolved-import = "ignore"
+possibly-missing-submodule = "ignore"
 
 [tool.cruft]
 skip = [
