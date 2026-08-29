@@ -58,6 +58,7 @@ extensions = [
     "sphinx_autodoc_typehints",
     "sphinx_tabs.tabs",
     "sphinx.ext.mathjax",
+    "sphinx_llms_txt",
     "IPython.sphinxext.ipython_console_highlighting",
     "sphinxext.opengraph",
     *[p.stem for p in (HERE / "extensions").glob("*.py")],
@@ -106,6 +107,23 @@ intersphinx_mapping = {
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**.ipynb_checkpoints"]
 
+# -- Options for LLM.txt output ----------------------------------------------
+llms_txt_title = "AlphaPeptTools"
+
+llms_txt_summary = """
+AlphaPeptTools implements the full analysis pipeline for mass spectrometry proteomics.
+The package is built on the AnnData container.
+
+Available subpackages are:
+- `.io`: Read search engine outputs into standardized anndata format
+- `.pp`: Quality control and preprocessing of proteomics data
+- `.tl`: Statistical analysis of proteomics data (principal component analysis, differential expression)
+- `.pl`: Plotting and visualization functionalities
+- `.metrics`: Assess quality of analysis steps
+
+The API documentation provides detailed signatures for specific functions.
+Tutorials implement complete analysis pipelines and can be used to identify analysis strategies for specific proteomics experiment types.
+"""
 
 # -- Options for HTML output -------------------------------------------------
 
