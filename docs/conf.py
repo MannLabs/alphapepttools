@@ -122,7 +122,7 @@ Available subpackages are:
 - `.metrics`: Assess quality of analysis steps
 
 The API documentation provides detailed signatures for all public functions. Public functions further contain docstrings with usage examples.
-Tutorials implement complete analysis pipelines and can be used to identify analysis strategies for specific proteomics experiment types.
+Tutorials provide end-to-end analysis pipelines that double as templates for the respective proteomics experiment types.
 """
 
 # -- Options for HTML output -------------------------------------------------
