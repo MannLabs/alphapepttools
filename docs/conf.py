@@ -121,7 +121,7 @@ Available subpackages are:
 - `.pl`: Plotting and visualization functionalities
 - `.metrics`: Assess quality of analysis steps
 
-The API documentation provides detailed signatures for specific functions.
+The API documentation provides detailed signatures for all public functions. Public functions further contain docstrings with usage examples.
 Tutorials implement complete analysis pipelines and can be used to identify analysis strategies for specific proteomics experiment types.
 """
 
