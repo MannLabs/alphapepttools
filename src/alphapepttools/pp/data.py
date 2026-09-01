@@ -831,16 +831,16 @@ def scale_and_center(
     layer
         Name of the layer to scale. If None (default), the data matrix X is used.
     center
-        Whether to center the data distribution around zero before scaling.
-        If `True`
+        Whether to center the feature distribution at zero.
+        If `True`:
             - `standard`: Shifts the feature distribution by its mean.
             - `robust`: Shifts the feature distribution by its median.
-        Not applied if set to `False`
+        Not applied if set to `False`.
     scale
-        Whether to scale the data distribution:
+        Whether to scale the feature distribution.
         If `True`:
-            - `standard`: Will scale the feature distribution by its standard distribution to unit variance.
-            - `scale`: Will scale the feature distribution by its (0.25, 0.75) interquartile range.
+            - `standard`: Divides the feature distribution by its standard deviation to unit variance.
+            - `robust`: Divides the feature distribution by its (0.25, 0.75) interquartile range.
         Not applied if set to `False`.
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
@@ -861,7 +861,6 @@ def scale_and_center(
         import pandas as pd
         import numpy as np
         import alphapepttools as apt
-
 
         adata = ad.AnnData(
             X=np.array([[1, 10], [2, 20], [3, 30], [4, 40]]),
@@ -886,12 +885,10 @@ def scale_and_center(
         # Only scale, do not center
         apt.pp.scale_and_center(adata, scaler="standard", center=False, scale=True)
 
-
     See Also
     --------
     :class:`sklearn.preprocessing.StandardScaler`
     :class:`sklearn.preprocessing.RobustScaler`
-
 
     """
     if not (center or scale):
