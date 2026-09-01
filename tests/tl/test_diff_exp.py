@@ -411,7 +411,7 @@ def test_diff_exp_ebayes(
 
     adata = example_adata_ebayes.copy()
 
-    comparison_key, results = tl.diff_exp_ebayes(
+    results = tl.diff_exp_ebayes(
         adata=adata,
         between_column=between_column,
         comparison=comparison,
@@ -421,13 +421,10 @@ def test_diff_exp_ebayes(
     expected_df = expected_ebayes_base_df.copy()
     expected_df.insert(0, "condition_pair", [expected_comparison_key] * len(expected_df))
 
+    # The comparison key is no longer returned separately, it is carried in condition_pair
     pd.testing.assert_frame_equal(
         results,
         expected_df,
-    )
-
-    assert comparison_key == expected_comparison_key, (
-        f"Expected comparison key {expected_comparison_key}, got {comparison_key}"
     )
 
 
