@@ -766,6 +766,52 @@ class TestScaleAndCenter:
 
         return adata, expected
 
+    @pytest.fixture
+    def anndata_center_only(self, example_data) -> tuple[ad.AnnData, dict[str, pd.DataFrame]]:
+        """Generate example anndata with ground truths (center only)"""
+        adata = _to_anndata(example_data)
+        adata.layers["new_layer"] = adata.X.copy()
+
+        expected = {
+            "standard": pd.DataFrame(
+                {"G1": [-1.0, 0.0, 1.0], "G2": [-1.0, 0.0, 1.0], "G3": [-1.0, 0.0, 1.0]},
+                index=["cell1", "cell2", "cell3"],
+            ),
+            "robust": pd.DataFrame(
+                {"G1": [-1.0, 0.0, 1.0], "G2": [-1.0, 0.0, 1.0], "G3": [-1.0, 0.0, 1.0]},
+                index=["cell1", "cell2", "cell3"],
+            ),
+        }
+
+        return adata, expected
+
+    @pytest.fixture
+    def anndata_scale_only(self, example_data) -> tuple[ad.AnnData, dict[str, pd.DataFrame]]:
+        """Generate example anndata with ground truths (scaling only)"""
+        adata = _to_anndata(example_data)
+        adata.layers["new_layer"] = adata.X.copy()
+
+        expected = {
+            "standard": pd.DataFrame(
+                {
+                    "G1": [1.22474487, 2.44948974, 3.67423461],
+                    "G2": [4.89897949, 6.12372436, 7.34846923],
+                    "G3": [8.5732141, 9.79795897, 11.02270384],
+                },
+                index=["cell1", "cell2", "cell3"],
+            ),
+            "robust": pd.DataFrame(
+                {
+                    "G1": [1.0, 2.0, 3.0],
+                    "G2": [4.0, 5.0, 6.0],
+                    "G3": [7.0, 8.0, 9.0],
+                },
+                index=["cell1", "cell2", "cell3"],
+            ),
+        }
+
+        return adata, expected
+
     @pytest.mark.parametrize("layer", [None, "new_layer"])
     @pytest.mark.parametrize("scaler", ["standard", "robust"])
     def test_scale_and_center_inplace(self, anndata_scale_and_center, scaler: str, layer: str) -> None:
@@ -789,6 +835,54 @@ class TestScaleAndCenter:
         adata_original = adata.copy()
 
         adata_new = apt.pp.scale_and_center(adata, scaler=scaler, layer=layer, copy=True)
+
+        assert isinstance(adata_new, ad.AnnData)
+
+        if layer is None:
+            assert np.all(np.isclose(adata_new.X, expected[scaler].values))
+            # Original object was not modified
+            assert np.all(np.isclose(adata.X, adata_original.X))
+
+        else:
+            assert np.all(np.isclose(adata_new.layers[layer], expected[scaler].values))
+            # Original object was not modified
+            assert np.all(np.isclose(adata.layers[layer], adata_original.layers[layer]))
+
+    @pytest.mark.parametrize(
+        "layer",
+        [None, "new_layer"],
+    )
+    @pytest.mark.parametrize(
+        "scaler",
+        ["standard", "robust"],
+    )
+    def test_scale_and_center__center_only(self, anndata_center_only, scaler: str, layer: str) -> None:
+        """Test that alphapepttools.pp.scale_and_center correctly returns a copy"""
+        adata, expected = anndata_center_only
+        adata_original = adata.copy()
+
+        adata_new = apt.pp.scale_and_center(adata, scaler=scaler, layer=layer, center=True, scale=False, copy=True)
+
+        assert isinstance(adata_new, ad.AnnData)
+
+        if layer is None:
+            assert np.allclose(adata_new.X, expected[scaler].values)
+            # Original object was not modified
+            assert np.allclose(adata.X, adata_original.X)
+
+        else:
+            assert np.allclose(adata_new.layers[layer], expected[scaler].values)
+            # Original object was not modified
+            assert np.allclose(adata.layers[layer], adata_original.layers[layer])
+
+    @pytest.mark.parametrize("layer", [None, "new_layer"])
+    @pytest.mark.parametrize("scaler", ["standard", "robust"])
+    def test_scale_and_center__scale_only(self, anndata_scale_only, scaler: str, layer: str) -> None:
+        """Test that alphapepttools.pp.scale_and_center correctly returns a copy"""
+        adata, expected = anndata_scale_only
+        adata_original = adata.copy()
+
+        adata_new = apt.pp.scale_and_center(adata, scaler=scaler, layer=layer, center=False, scale=True, copy=True)
 
         assert isinstance(adata_new, ad.AnnData)
 
