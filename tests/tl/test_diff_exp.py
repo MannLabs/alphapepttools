@@ -1084,6 +1084,75 @@ def test_diff_exp_ebayes_b_gate(gate_adata, b_min_required, sparse_reported):
         assert sparse.isna().all()
 
 
+# A covariate is modelled as an additive effect, so it must absorb a batch offset that is unevenly
+# distributed across the conditions. Without it, that offset is confounded with the group effect.
+_COVARIATE_TRUE_EFFECT = 1.0
+_COVARIATE_MIN_UNADJUSTED_BIAS = 0.9
+_COVARIATE_MAX_ADJUSTED_ERROR = 0.5
+
+
+@pytest.fixture
+def confounded_batch_adata():
+    """Groups A/B with an unbalanced batch: A is mostly b1, B is mostly b2.
+
+    Every feature carries the same true group effect, plus a feature-specific offset on the b2
+    samples. Because batch is unevenly distributed across the groups, the unadjusted group
+    difference measures the group effect plus most of that offset. Values are already additive,
+    so no nanlog is applied.
+    """
+    sample_names = [f"s{i}" for i in range(8)]
+    groups = np.array(["A", "A", "A", "A", "B", "B", "B", "B"])
+    batches = np.array(["b1", "b1", "b1", "b2", "b1", "b2", "b2", "b2"])
+
+    group_effect = np.where(groups == "B", _COVARIATE_TRUE_EFFECT, 0.0)
+    is_b2 = batches == "b2"
+
+    rng = np.random.default_rng(0)
+    features = {}
+    for feature_idx in range(10):
+        baseline = 10.0 + feature_idx  # feature-specific overall level
+        batch_offset = 2.0 + 0.5 * feature_idx  # feature-specific size of the b2 effect
+        noise_sd = 0.05 + 0.03 * feature_idx  # varies so residual variances stay heterogeneous
+
+        values = baseline + group_effect
+        values = values + np.where(is_b2, batch_offset, 0.0)
+        values = values + rng.normal(0, noise_sd, size=len(sample_names))
+
+        features[f"f{feature_idx}"] = values
+
+    x = pd.DataFrame(features, index=sample_names)
+    obs = pd.DataFrame({"group": groups, "batch": batches}, index=sample_names)
+    return ad.AnnData(X=x, obs=obs)
+
+
+@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
+def test_diff_exp_ebayes_covariate_corrects_confounded_batch(confounded_batch_adata):
+    """covariate_column absorbs the batch offset, recovering the true group effect it otherwise inflates."""
+    unadjusted = diff_exp_ebayes_expanded(
+        adata=confounded_batch_adata,
+        between_column="group",
+        comparison=("B", "A"),
+    )["B_VS_A"]
+    adjusted = diff_exp_ebayes_expanded(
+        adata=confounded_batch_adata,
+        between_column="group",
+        comparison=("B", "A"),
+        covariate_column="batch",
+    )["B_VS_A"]
+
+    # Adding a covariate must not change the output contract.
+    assert list(adjusted.columns) == tl_defaults.DIFF_EXP_COLS
+    assert adjusted.index.equals(confounded_batch_adata.var_names)
+
+    unadjusted_error = (unadjusted["log2fc"] - _COVARIATE_TRUE_EFFECT).abs()
+    adjusted_error = (adjusted["log2fc"] - _COVARIATE_TRUE_EFFECT).abs()
+
+    # Ignoring the batch inflates every fold change; modelling it recovers the true effect.
+    assert (unadjusted_error > _COVARIATE_MIN_UNADJUSTED_BIAS).all()
+    assert (adjusted_error < _COVARIATE_MAX_ADJUSTED_ERROR).all()
+    assert (adjusted_error < unadjusted_error).all()
+
+
 # Comparison resolution turns the user-facing comparison tuple into explicit A conditions and the single B
 # reference, expanding the "_ALL_" sentinel and validating every level up front.
 @pytest.mark.parametrize(
