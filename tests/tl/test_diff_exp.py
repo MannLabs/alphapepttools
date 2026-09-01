@@ -10,7 +10,11 @@ from scipy.stats import ttest_ind
 from alphapepttools import tl
 from alphapepttools.pp import nanlog
 from alphapepttools.tl.defaults import tl_defaults
-from alphapepttools.tl.diff_exp.alphaquant_wrapper import _HAS_ALPHAQUANT, _standardize_alphaquant_results
+from alphapepttools.tl.diff_exp.alphaquant_wrapper import (
+    _HAS_ALPHAQUANT,
+    _STACKED_COLS,
+    _standardize_alphaquant_results,
+)
 from alphapepttools.tl.diff_exp.ebayes import _HAS_INMOOSE
 from alphapepttools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
 
@@ -296,7 +300,7 @@ def test_diff_exp_alphaquant():
                 "max_level_2_samples": [10, 10],  # Added by standardization
                 "proteoform_id": ["PF1", "PF2"],
                 "peptides": ["PEP1;PEP2", "PEP3"],
-                "num_peptides": [2, 1],
+                "num_peptides": [2.0, 1.0],  # float, as stacking with NaN rows upcasts the int column
                 "quality_score": [0.9, 0.8],
             }
         ),
@@ -325,7 +329,7 @@ def test_diff_exp_alphaquant():
             side_effect=[mock_protein_df.copy(), mock_proteoform_df.copy(), mock_peptide_df.copy()],
         ),
     ):
-        comparison_key, results = tl.diff_exp_alphaquant(
+        results = tl.diff_exp_alphaquant(
             adata=adata,
             report=report,
             between_column="condition",
@@ -335,11 +339,31 @@ def test_diff_exp_alphaquant():
             plots="hide",
         )
 
-    assert comparison_key == expected_comparison_key
+    # The three levels are stacked into one frame and separated by the modality column
+    assert list(results.columns) == _STACKED_COLS
+    assert len(results) == sum(len(df) for df in expected_results.values())
+    assert results["feature"].notna().all()
+    assert all(results["condition_pair"] == expected_comparison_key)
+
+    # Level-specific columns are NaN outside their own modality
+    protein_rows = results[results["modality"] == "protein"]
+    assert protein_rows[["sequence", "proteoform_id", "peptides", "num_peptides"]].isna().all().all()
+
+    expected_features = {
+        "protein": ["PROT1", "PROT2"],
+        "proteoform": ["PF1", "PF2"],
+        "peptide": ["PEPTIDE1", "PEPTIDE2"],
+    }
 
     for level in ["protein", "proteoform", "peptide"]:
+        subset = results[results["modality"] == level].reset_index(drop=True)
+        assert subset["feature"].tolist() == expected_features[level]
+
+        # Selecting the expected columns ignores the NaN padding, which is asserted separately above
         # The tolerances are slightly larger, than for the vanilla ttest, albeit still small, as the package is still in development
-        pd.testing.assert_frame_equal(results[level], expected_results[level], rtol=0.01, atol=1e-6)
+        pd.testing.assert_frame_equal(
+            subset[expected_results[level].columns], expected_results[level], rtol=0.01, atol=1e-6
+        )
 
 
 @pytest.fixture

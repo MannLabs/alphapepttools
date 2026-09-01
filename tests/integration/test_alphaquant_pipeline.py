@@ -53,65 +53,31 @@ def test_diff_exp_alphaquant__integration(test_data: tuple[ad.AnnData, pd.DataFr
     adata, report = test_data
 
     expected_comparison = "brain_VS_kidney"
-    expected_results = {
-        "protein": {
-            "columns": (
-                "condition_pair",
-                "protein",
-                "log2fc",
-                "p_value",
-                "-log10(p_value)",
-                "fdr",
-                "-log10(fdr)",
-                "method",
-                "max_level_1_samples",
-                "max_level_2_samples",
-                "quality_score",
-            ),
-            # Report contains 7 proteins
-            "shape": (7, 11),
-        },
-        "proteoform": {
-            "columns": (
-                "condition_pair",
-                "protein",
-                "log2fc",
-                "p_value",
-                "-log10(p_value)",
-                "fdr",
-                "-log10(fdr)",
-                "method",
-                "max_level_1_samples",
-                "max_level_2_samples",
-                "proteoform_id",
-                "peptides",
-                "num_peptides",
-                "quality_score",
-            ),
-            # Report contains 7 proteoforms
-            "shape": (7, 14),
-        },
-        "peptide": {
-            "columns": (
-                "condition_pair",
-                "protein",
-                "log2fc",
-                "p_value",
-                "-log10(p_value)",
-                "fdr",
-                "-log10(fdr)",
-                "method",
-                "max_level_1_samples",
-                "max_level_2_samples",
-                "sequence",
-                "quality_score",
-            ),
-            # Report contains 20 peptides
-            "shape": (20, 12),
-        },
-    }
 
-    comparison_key, results = diff_exp_alphaquant(
+    # The three levels are stacked into a single frame, separated by the modality column
+    expected_columns = (
+        "modality",
+        "feature",
+        "condition_pair",
+        "protein",
+        "log2fc",
+        "p_value",
+        "-log10(p_value)",
+        "fdr",
+        "-log10(fdr)",
+        "method",
+        "max_level_1_samples",
+        "max_level_2_samples",
+        "quality_score",
+        "proteoform_id",
+        "peptides",
+        "num_peptides",
+        "sequence",
+    )
+    # The report contains 7 proteins, 7 proteoforms and 20 peptides
+    expected_row_counts = {"protein": 7, "proteoform": 7, "peptide": 20}
+
+    results = diff_exp_alphaquant(
         adata=adata,
         report=report,
         between_column="condition",
@@ -121,14 +87,14 @@ def test_diff_exp_alphaquant__integration(test_data: tuple[ad.AnnData, pd.DataFr
         plots="hide",
     )
 
-    assert comparison_key == expected_comparison
-    assert len(results) == len(expected_results)
-    assert set(results.keys()) == set(expected_results.keys())
+    assert tuple(results.columns) == expected_columns
+    assert results.shape == (sum(expected_row_counts.values()), len(expected_columns))
+    assert set(results["modality"].unique()) == set(expected_row_counts.keys())
 
-    for feature_level in expected_results:
-        assert results[feature_level].shape == expected_results[feature_level]["shape"]
-        assert tuple(results[feature_level].columns) == expected_results[feature_level]["columns"]
+    for feature_level, expected_n_rows in expected_row_counts.items():
+        assert (results["modality"] == feature_level).sum() == expected_n_rows
 
-        # Sanity checks - the other columns are not tested due to potential changes in the alphaquant backend
-        assert all(results[feature_level]["condition_pair"] == expected_comparison)
-        assert all(results[feature_level]["method"] == "alphaquant")
+    # Sanity checks - the other columns are not tested due to potential changes in the alphaquant backend
+    assert results["feature"].notna().all()
+    assert all(results["condition_pair"] == expected_comparison)
+    assert all(results["method"] == "alphaquant")
