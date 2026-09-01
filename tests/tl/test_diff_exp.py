@@ -625,7 +625,7 @@ def test_diff_exp_ebayes_expanded_agrees_with_original(
     # Expanded implementation fits every feature, so filter incomplete features upfront (as a user would)
     # to match the original's feature set and therefore its eBayes prior.
     adata_complete = filter_data_completeness(adata.copy(), max_missing_count=0, action="drop")
-    expanded_results, _ = diff_exp_ebayes_expanded(
+    expanded_results = diff_exp_ebayes_expanded(
         adata=adata_complete,
         between_column=between_column,
         comparison=comparison,
@@ -1033,7 +1033,7 @@ def gate_adata():
 )
 def test_diff_exp_ebayes_a_gate(gate_adata, a_min_required, sparse_reported):
     """a_min_required suppresses (NaNs) fold changes whose A condition has too few observed values."""
-    results, _ = diff_exp_ebayes_expanded(
+    results = diff_exp_ebayes_expanded(
         adata=gate_adata,
         between_column="group",
         comparison=("X", "Y"),
@@ -1064,7 +1064,7 @@ def test_diff_exp_ebayes_a_gate(gate_adata, a_min_required, sparse_reported):
 )
 def test_diff_exp_ebayes_b_gate(gate_adata, b_min_required, sparse_reported):
     """b_min_required suppresses (NaNs) fold changes whose B condition has too few observed values."""
-    results, _ = diff_exp_ebayes_expanded(
+    results = diff_exp_ebayes_expanded(
         adata=gate_adata,
         between_column="group",
         comparison=("X", "Y"),
@@ -1082,84 +1082,6 @@ def test_diff_exp_ebayes_b_gate(gate_adata, b_min_required, sparse_reported):
         assert sparse.notna().all()
     else:
         assert sparse.isna().all()
-
-
-# return_coefficients optionally hands back the fitted linear coefficients (conditions + covariate levels)
-# alongside the per-contrast results, for inspecting effect sizes directly.
-@pytest.fixture
-def covariate_adata():
-    """eBayes-stable data (mirrors example_adata_ebayes) with a two-level covariate (batch) crossing the groups."""
-    idx = [f"cell{i}" for i in range(10)]
-    x = pd.DataFrame(
-        {
-            "X1": [10, 12, 14, 16, 18, 20, 22, 24, 26, 28],
-            "X2": [1, 2, 3, 4, 5, 10, 15, 20, 25, 30],
-            "X3": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-            "X4": [1, 2, 3, 4, np.nan, 6, 7, 8, 9, np.nan],
-        },
-        index=idx,
-    ).astype(float)
-    obs = pd.DataFrame(
-        {
-            "group": ["B", "B", "B", "B", "B", "A", "A", "A", "A", "A"],
-            "batch": ["b1", "b2", "b1", "b2", "b1", "b2", "b1", "b2", "b1", "b2"],  # crosses the groups
-        },
-        index=idx,
-    )
-    adata = ad.AnnData(X=x, obs=obs)
-    nanlog(adata)
-    return adata
-
-
-@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
-def test_diff_exp_ebayes_default_returns_no_coefficients(covariate_adata):
-    """The return is always a (results, coefficients) tuple; coefficients is None unless requested."""
-    out = diff_exp_ebayes_expanded(
-        adata=covariate_adata, between_column="group", comparison=("A", "B"), covariate_column="batch"
-    )
-    assert isinstance(out, tuple)
-
-    results, coefficients = out
-    assert isinstance(results, dict)
-    assert set(results) == {"A_VS_B"}
-    assert coefficients is None
-
-
-@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
-@pytest.mark.parametrize(
-    ("covariate_column", "n_coefficient_cols"),
-    [
-        ("batch", 3),  # two conditions + one k-1 covariate level
-        (None, 2),  # two conditions only, no covariate column
-    ],
-)
-def test_diff_exp_ebayes_return_coefficients(covariate_adata, covariate_column, n_coefficient_cols):
-    """return_coefficients adds the fitted-coefficient matrix, labelled by feature and design column."""
-    results, coefficients = diff_exp_ebayes_expanded(
-        adata=covariate_adata,
-        between_column="group",
-        comparison=("A", "B"),
-        covariate_column=covariate_column,
-        return_coefficients=True,
-    )
-
-    # results is unchanged: still the plain per-contrast dict
-    assert set(results) == {"A_VS_B"}
-
-    # one row per feature, one column per design coefficient (conditions + any covariate levels)
-    design_matrix, _ = _build_design_matrix(covariate_adata, "group", covariate_column)
-    assert coefficients.index.equals(covariate_adata.var_names)
-    assert list(coefficients.columns) == list(design_matrix.columns)
-    assert {"A", "B"}.issubset(coefficients.columns)
-    assert coefficients.shape == (covariate_adata.n_vars, n_coefficient_cols)
-
-    # values are exactly the fitted coefficients, transposed to (features x design columns)
-    expected = pd.DataFrame(
-        _nan_lmfit(covariate_adata, design_matrix)["B"].T,
-        index=covariate_adata.var_names,
-        columns=design_matrix.columns,
-    )
-    pd.testing.assert_frame_equal(coefficients, expected)
 
 
 # Comparison resolution turns the user-facing comparison tuple into explicit A conditions and the single B
