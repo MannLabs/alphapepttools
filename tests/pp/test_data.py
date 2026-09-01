@@ -857,7 +857,7 @@ class TestScaleAndCenter:
         ["standard", "robust"],
     )
     def test_scale_and_center__center_only(self, anndata_center_only, scaler: str, layer: str) -> None:
-        """Test that alphapepttools.pp.scale_and_center correctly returns a copy"""
+        """Test that alphapepttools.pp.scale_and_center only centers the data if `scale=False`"""
         adata, expected = anndata_center_only
         adata_original = adata.copy()
 
@@ -878,7 +878,7 @@ class TestScaleAndCenter:
     @pytest.mark.parametrize("layer", [None, "new_layer"])
     @pytest.mark.parametrize("scaler", ["standard", "robust"])
     def test_scale_and_center__scale_only(self, anndata_scale_only, scaler: str, layer: str) -> None:
-        """Test that alphapepttools.pp.scale_and_center correctly returns a copy"""
+        """Test that alphapepttools.pp.scale_and_center only scales the data if `center=False`"""
         adata, expected = anndata_scale_only
         adata_original = adata.copy()
 
