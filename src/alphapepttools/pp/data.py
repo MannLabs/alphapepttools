@@ -810,22 +810,34 @@ def data_columns_to_df(
 
 
 def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
-    adata: ad.AnnData, scaler: str = "standard", layer: str | None = None, *, copy: bool = False
+    adata: ad.AnnData,
+    scaler: Literal["standard", "robust"] = "standard",
+    layer: str | None = None,
+    *,
+    center: bool = True,
+    scale: bool = True,
+    copy: bool = False,
 ) -> None | ad.AnnData:
-    """Scale and center data.
-
-    Either use standard or robust scaling. 'robust' scaling relies
-    on interquartile range and is more resistant to outliers. Scaling
-    operates on columns only for now.
+    """Scale and center features
 
     Parameters
     ----------
     adata
         AnnData object with data to scale.
     scaler
-        Sklearn scaler to use. Available scalers are 'standard' and 'robust'.
+        Sklearn scaler to use. Available scalers are
+            - `standard`: Mean centering and scaling by standard deviation
+            - `robust`: Median centering and scaling by provided quantiles.
     layer
         Name of the layer to scale. If None (default), the data matrix X is used.
+    center
+        Whether to center the data distribution around zero before scaling. If True
+            - `standard`: Shifts the feature distribution by its mean.
+            - `robust`: Shifts the feature distribution by its median.
+    scale
+        Whether to scale the data distribution:
+            - `standard`: Will scale the feature distribution by its standard distribution to unit variance.
+            - `scale`: Will scale the feature distribution by its (0.25, 0.75) interquartile range.
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
@@ -861,13 +873,17 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
         scale_and_center(adata, scaler="robust", layer="raw")
 
     """
+    if not (center or scale):
+        raise ValueError(
+            "Setting `center=False` and `scale=False` corresponds to an identity transform. Set at least one argument to `True`"
+        )
     adata = adata.copy() if copy else adata
     logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler.")
 
     if scaler == "standard":
-        scaler = StandardScaler(with_mean=True, with_std=True)
+        scaler = StandardScaler(with_mean=center, with_std=scale)
     elif scaler == "robust":
-        scaler = RobustScaler(with_centering=True, with_scaling=True, quantile_range=(25.0, 75.0))
+        scaler = RobustScaler(with_centering=center, with_scaling=scale, quantile_range=(25.0, 75.0))
     else:
         raise NotImplementedError(f"Scaler {scaler} not implemented.")
 
