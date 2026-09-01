@@ -833,8 +833,8 @@ def scale_and_center(
     center
         Whether to center the feature distribution at zero.
         If `True`:
-            - `standard`: Shifts the feature distribution by its mean.
-            - `robust`: Shifts the feature distribution by its median.
+            - `standard`: Mean-centering of the feature distribution.
+            - `robust`: Median-centering of the feature distribution.
         Not applied if set to `False`.
     scale
         Whether to scale the feature distribution.
