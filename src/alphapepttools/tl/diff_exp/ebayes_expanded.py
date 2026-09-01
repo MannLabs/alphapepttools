@@ -620,7 +620,7 @@ def diff_exp_ebayes(
     covariate_column: str | None = None,
     a_min_required: int | None = None,
     b_min_required: int | None = None,
-) -> dict[str, pd.DataFrame]:
+) -> pd.DataFrame:
     """Run Limma eBayes moderated ttest for differential expression with multiple contrasts and covariate support.
 
     The two conditions in each comparison are referred to positionally as A (comparison[0]) and B (comparison[1]);
@@ -656,10 +656,11 @@ def diff_exp_ebayes(
 
     Returns
     -------
-    dict[str, pd.DataFrame]
-        The per-contrast standardized Limma eBayes results, keyed by contrast name, each carrying the shared
-        `tl_defaults.DIFF_EXP_COLS` columns. Fold changes are reported as A - B (i.e. comparison[0] -
-        comparison[1]), and contrasts are named "A_VS_B".
+    pd.DataFrame
+        The standardized Limma eBayes results for every contrast, stacked into a single frame carrying the
+        shared `tl_defaults.DIFF_EXP_COLS` columns and indexed by feature. Fold changes are reported as
+        A - B (i.e. comparison[0] - comparison[1]), and the `condition_pair` column names each contrast
+        "A_VS_B"; select a single contrast by filtering on it.
 
     Raises
     ------
@@ -714,7 +715,7 @@ def diff_exp_ebayes(
     if len(contrast_names) != contrast_results["log2fc"].shape[0]:
         raise ValueError("Number of contrast names does not match number of contrasts in results.")
 
-    results = {}
+    results = []
     for contrast_idx, contrast_name in enumerate(contrast_names):
         # By convention the contrast is named "A_VS_B" (comparison[0] vs comparison[1]).
         a_level, b_level = contrast_name.split(tl_defaults.CONDITION_SPLIT_STRING)
@@ -730,13 +731,15 @@ def diff_exp_ebayes(
         # Sample counts per level, mirroring ebayes.py. The name is "A_VS_B".
         max_level_1_samples, max_level_2_samples = determine_max_replicates(adata, between_column, a_level, b_level)
 
-        results[contrast_name] = _standardize_contrast_frame(
-            contrast_name=contrast_name,
-            var_names=adata.var_names,
-            log2fc=log2fc,
-            p_values=p_values,
-            max_level_1_samples=max_level_1_samples,
-            max_level_2_samples=max_level_2_samples,
+        results.append(
+            _standardize_contrast_frame(
+                contrast_name=contrast_name,
+                var_names=adata.var_names,
+                log2fc=log2fc,
+                p_values=p_values,
+                max_level_1_samples=max_level_1_samples,
+                max_level_2_samples=max_level_2_samples,
+            )
         )
 
-    return results
+    return pd.concat(results, axis=0)

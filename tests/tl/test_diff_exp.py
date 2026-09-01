@@ -625,13 +625,12 @@ def test_diff_exp_ebayes_expanded_agrees_with_original(
     # Expanded implementation fits every feature, so filter incomplete features upfront (as a user would)
     # to match the original's feature set and therefore its eBayes prior.
     adata_complete = filter_data_completeness(adata.copy(), max_missing_count=0, action="drop")
-    expanded_results = diff_exp_ebayes_expanded(
+    expanded = diff_exp_ebayes_expanded(
         adata=adata_complete,
         between_column=between_column,
         comparison=comparison,
     )
-    assert set(expanded_results) == {expected_comparison_key}
-    expanded = expanded_results[expected_comparison_key]
+    assert expanded["condition_pair"].unique().tolist() == [expected_comparison_key]
 
     # Restrict to the features the original returns and the columns both share (excluding `method`,
     # which is an intentionally distinct label rather than a computed result).
@@ -1039,7 +1038,7 @@ def test_diff_exp_ebayes_a_gate(gate_adata, a_min_required, sparse_reported):
         comparison=("X", "Y"),
         a_min_required=a_min_required,
     )
-    df = results["X_VS_Y"].set_index("protein")
+    df = results[results["condition_pair"] == "X_VS_Y"].set_index("protein")
     result_cols = ["log2fc", "p_value", "fdr"]
 
     # Fully observed features are always reported, regardless of the gate.
@@ -1070,7 +1069,7 @@ def test_diff_exp_ebayes_b_gate(gate_adata, b_min_required, sparse_reported):
         comparison=("X", "Y"),
         b_min_required=b_min_required,
     )
-    df = results["X_VS_Y"].set_index("protein")
+    df = results[results["condition_pair"] == "X_VS_Y"].set_index("protein")
     result_cols = ["log2fc", "p_value", "fdr"]
 
     # Fully observed features are always reported, regardless of the gate.
@@ -1132,13 +1131,13 @@ def test_diff_exp_ebayes_covariate_corrects_confounded_batch(confounded_batch_ad
         adata=confounded_batch_adata,
         between_column="group",
         comparison=("B", "A"),
-    )["B_VS_A"]
+    )
     adjusted = diff_exp_ebayes_expanded(
         adata=confounded_batch_adata,
         between_column="group",
         comparison=("B", "A"),
         covariate_column="batch",
-    )["B_VS_A"]
+    )
 
     # Adding a covariate must not change the output contract.
     assert list(adjusted.columns) == tl_defaults.DIFF_EXP_COLS
@@ -1151,6 +1150,64 @@ def test_diff_exp_ebayes_covariate_corrects_confounded_batch(confounded_batch_ad
     assert (unadjusted_error > _COVARIATE_MIN_UNADJUSTED_BIAS).all()
     assert (adjusted_error < _COVARIATE_MAX_ADJUSTED_ERROR).all()
     assert (adjusted_error < unadjusted_error).all()
+
+
+# Every contrast is returned in one frame, separated by the condition_pair column rather than by a
+# dictionary key, so a multi-contrast run must stack cleanly and keep its blocks distinguishable.
+@pytest.fixture
+def three_condition_adata():
+    """Conditions A, B, C (three samples each), with C shifted twice as far from A as B is.
+
+    Each feature scales the shift differently and carries its own noise level, which keeps the
+    residual variances heterogeneous.
+    """
+    sample_names = [f"s{i}" for i in range(9)]
+    groups = np.array(["A", "A", "A", "B", "B", "B", "C", "C", "C"])
+
+    shift_per_condition = {"A": 0.0, "B": 1.0, "C": 2.0}
+    condition_shift = np.array([shift_per_condition[group] for group in groups])
+
+    rng = np.random.default_rng(0)
+    features = {}
+    for feature_idx in range(8):
+        baseline = 10.0 + feature_idx
+        shift_scale = 1.0 + 0.3 * feature_idx  # feature-specific size of the condition effect
+        noise_sd = 0.05 + 0.04 * feature_idx
+
+        values = baseline + condition_shift * shift_scale
+        values = values + rng.normal(0, noise_sd, size=len(sample_names))
+
+        features[f"f{feature_idx}"] = values
+
+    x = pd.DataFrame(features, index=sample_names)
+    obs = pd.DataFrame({"group": groups}, index=sample_names)
+    return ad.AnnData(X=x, obs=obs)
+
+
+@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
+def test_diff_exp_ebayes_stacks_every_contrast(three_condition_adata):
+    """A multi-contrast run returns one frame holding every contrast as its own condition_pair block."""
+    results = diff_exp_ebayes_expanded(
+        adata=three_condition_adata,
+        between_column="group",
+        comparison=("_ALL_", "A"),
+    )
+
+    assert isinstance(results, pd.DataFrame)
+    assert list(results.columns) == tl_defaults.DIFF_EXP_COLS
+    assert results["condition_pair"].unique().tolist() == ["B_VS_A", "C_VS_A"]
+    assert len(results) == 2 * three_condition_adata.n_vars
+
+    b_block = results[results["condition_pair"] == "B_VS_A"]
+    c_block = results[results["condition_pair"] == "C_VS_A"]
+
+    # Each block carries the full feature set, still indexed by feature.
+    for block in (b_block, c_block):
+        assert block.index.equals(three_condition_adata.var_names)
+        assert list(block["protein"]) == list(three_condition_adata.var_names)
+
+    # C sits twice as far from A as B does, so the blocks must not be interchanged.
+    assert (c_block["log2fc"] > b_block["log2fc"]).all()
 
 
 # Comparison resolution turns the user-facing comparison tuple into explicit A conditions and the single B
