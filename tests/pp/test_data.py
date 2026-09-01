@@ -802,6 +802,13 @@ class TestScaleAndCenter:
             # Original object was not modified
             assert np.all(np.isclose(adata.layers[layer], adata_original.layers[layer]))
 
+    def test_scale_and_center_raises(self, anndata_scale_and_center):
+        """Test that scale_and_center raises when `center=False` and `scale=False`"""
+        adata, _ = anndata_scale_and_center
+
+        with pytest.raises(ValueError, match="Set at least one argument to `True`"):
+            apt.pp.scale_and_center(adata, center=False, scale=False)
+
 
 @pytest.fixture
 def data_test_completeness_filter():
