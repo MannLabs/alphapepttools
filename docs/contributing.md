@@ -42,7 +42,7 @@ pip install -e ".[dev,test,doc]"
 
 ## Handling anndata objects
 
-The central data structure of `alphapepttools` is the `anndata.AnnData` object. All functions should be compatible with `anndata.AnnData`. We default to `inplace` modifications, i.e., functions should default to returning `None` and acting directly on the passed `anndata.AnnData` object. This behaviour is adapted from [`scanpy v1`](https://scanpy.readthedocs.io/en/stable/) and aims to maximize the compatibility of the interfaces.
+The central data structure of `alphapepttools` is the `anndata.AnnData` object. All functions should be compatible with `anndata.AnnData`. We default to in-place modification, i.e., functions return `None` and act directly on the passed `anndata.AnnData` object. This behaviour is adapted from [`scanpy v1`](https://scanpy.readthedocs.io/en/stable/) and aims to maximize the compatibility of the interfaces.
 
 ### Acting on omics measurements
 
@@ -103,7 +103,7 @@ assert np.array_equal(adata.X, adata_original.X)
 
 ### Generating summary statistics from anndata object
 
-Functions that generate new summary statistics and do not act on the measurement layers `.X`/`.layers` (e.g., differential expression analysis results or summary metrics; typically in the `.tl` and `.metrics` modules) _SHOULD_ store the results inplace in the anndata object. They _MAY_ also allow users to return the results as a `pandas.DataFrame` by exposing an `inplace` argument. They should follow this general call signature:
+Functions that generate new summary statistics and do not act on the measurement layers `.X`/`.layers` (e.g., differential expression analysis results or summary metrics; typically in the `.tl` and `.metrics` modules) _SHOULD_ store the results in place in the anndata object. They _MAY_ additionally allow users to return the results as a `pandas.DataFrame` by exposing an `inplace` argument. Functions that expose `inplace` _MUST_ default it to `True` and use the following call signature:
 
 ```python
 alphapepttools.tl.func(adata: ad.AnnData, ..., *, layer: str | None = None, inplace: bool = True) -> None | pd.DataFrame:
@@ -113,15 +113,23 @@ alphapepttools.metrics.func(adata: ad.AnnData, ..., *, layer: str | None = None,
   ...
 ```
 
-Similarly to the `copy` argument, the keyword `inplace` determines whether the anndata object is directly modified or not. `inplace` should always be used when the result is either added to a non-measurement slot of the anndata object (`.obs`, `.var`, `.obsm`, `.varm`, `.uns`) or returned as a `pandas.DataFrame`. In contrast, `copy` should be used when a measurement slot is modified.
+With `inplace=True` (default), the result is written to a non-measurement slot of the anndata object (`.obs`, `.var`, `.obsm`, `.varm`, `.uns`) and the function returns `None`; with `inplace=False`, the result is returned as a `pandas.DataFrame` and the anndata object is left unchanged.
+
+The two outcomes are exclusive: a function _MUST NOT_ both store the result in the anndata object and return it.
+
+### `copy` vs. `inplace`
+
+Like `copy`, the keyword `inplace` determines whether the anndata object is modified, but the two apply to different kinds of results. `copy` applies when a function modifies a measurement slot (`.X`, `.layers[...]`), including changes to the object's shape. `inplace` applies when a function derives a new result from the data.
 
 #### Examples
 
 ```python
-result = apt.tl.func(adata, ..., inplace=False)
+# The result is returned and the anndata object is left untouched
+result = alphapepttools.tl.func(adata, ..., key_added="result", inplace=False)
 assert isinstance(result, pd.DataFrame)
 
-result = apt.tl.func(adata, ..., inplace=True)
+# The result is stored in the anndata object and nothing is returned
+result = alphapepttools.tl.func(adata, ..., key_added="result", inplace=True)
 assert result is None
 ```
 
