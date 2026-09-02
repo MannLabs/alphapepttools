@@ -146,3 +146,9 @@ def test_check_data_integrity(input_data, expected_mask, verbosity, expect_warni
         assert "2 negative values in the data." in caplog.text
         assert "1 inf values in the data." in caplog.text
         assert "1 negative_inf values in the data." in caplog.text
+
+
+def test_detect_special_values_invalid_type():
+    """Non-ndarray input should raise TypeError."""
+    with pytest.raises(TypeError, match="numpy.ndarray"):
+        detect_special_values([1.0, 2.0, 3.0])

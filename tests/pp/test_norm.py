@@ -376,3 +376,25 @@ class TestIRS:
                 copy=False,
                 layer=None,
             )
+
+    def test_irs__reference_column_without_value(self, irs_data__reference_values: tuple[ad.AnnData, dict, np.ndarray]):
+        """Test that a `reference_column` without a `reference_value` warns and then finds no reference"""
+        adata, irs_kwargs, _ = irs_data__reference_values
+
+        with (
+            pytest.warns(UserWarning, match="`reference_value` is None while `reference_column` is set"),
+            pytest.raises(ValueError, match=r"`reference_value` .* does not exist"),
+        ):
+            irs(adata, reference_column="tmt_channel", **irs_kwargs, copy=False, layer=None)
+
+    def test_irs__reference_value_without_column(self, irs_data__mean_reference: tuple[ad.AnnData, dict, np.ndarray]):
+        """Test that a `reference_value` without a `reference_column` warns and is ignored"""
+        adata, irs_kwargs, expected_array = irs_data__mean_reference
+        # the fixture pins reference_column/reference_value to None; only the value is set here
+        irs_kwargs = {**irs_kwargs, "reference_value": True}
+
+        with pytest.warns(UserWarning, match="`reference_value` is set while `reference_column` is None"):
+            result = irs(adata, **irs_kwargs, copy=True, layer=None)
+
+        # ignoring `reference_value` means falling back to the per-group mean reference
+        np.testing.assert_allclose(result.X, expected_array, atol=1e-6)
