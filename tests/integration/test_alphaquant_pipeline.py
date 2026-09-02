@@ -57,7 +57,7 @@ def test_diff_exp_alphaquant__integration(test_data: tuple[ad.AnnData, pd.DataFr
     # The three levels are stacked into a single frame, separated by the modality column
     expected_columns = (
         "modality",
-        "feature",
+        "feature_id",
         "condition_pair",
         "protein",
         "log2fc",
@@ -95,6 +95,6 @@ def test_diff_exp_alphaquant__integration(test_data: tuple[ad.AnnData, pd.DataFr
         assert (results["modality"] == feature_level).sum() == expected_n_rows
 
     # Sanity checks - the other columns are not tested due to potential changes in the alphaquant backend
-    assert results["feature"].notna().all()
+    assert results["feature_id"].notna().all()
     assert all(results["condition_pair"] == expected_comparison)
     assert all(results["method"] == "alphaquant")
