@@ -473,7 +473,7 @@ def _raise_nonoverlapping_indices(
         raise ValueError(f"No matching fields found between data and metadata (axis = {axis}).")
 
 
-# TODO: Add test for this function or refactor to handle indices with suffixes
+# TODO: Refactor to handle indices with suffixes
 def _handle_overlapping_columns(
     metadata: pd.DataFrame,
     _inplace_metadata: pd.DataFrame,

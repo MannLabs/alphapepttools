@@ -281,7 +281,7 @@ def test_add_metadata(
     keep_data_shape,
     keep_existing_metadata,
 ):
-    """"""
+    """Step through parametrized cases of adding metadata to an anndata object via 'add_metadata'"""
 
     # Restrict example metadata to the required size
     if metadata_size == 1:
@@ -345,6 +345,7 @@ def test_add_metadata_nonmatching_sample_metadata(
     axis,
     mismatching_metadata,
 ):
+    """Adding metadata via 'add_metadata' depends on matching indices, i.e. only matching indices are merged. In case no indices match, the function raises an error"""
     # get input datasets
     df = example_data.copy()
 
@@ -413,6 +414,7 @@ def test_add_metadata_nonmatching_sample_metadata(
     ],
 )
 def test_handle_overlapping_columns(metadata, inplace_metadata, verbose, expected_result, expected_warning):
+    """If there is metadata present already, adding new metadata with synonymous columns must be handled predictably. Currently, this means dropping the duplicate columns from the incoming metadata"""
     if expected_warning:
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
@@ -430,10 +432,6 @@ def test_handle_overlapping_columns(metadata, inplace_metadata, verbose, expecte
 
 
 # test filtering of data based on metadata
-
-# TODO: better test logic? Combining parameters exhaustively leads to a huge number or tests
-
-
 @pytest.fixture
 def adata_for_filtering():
     def make_dummy_data():
@@ -745,6 +743,7 @@ def adata_for_filtering():
     ],
 )
 def test_filter_by_metadata(adata_for_filtering, expected_adata_index, filter_dict, axis, logic, action):
+    """Evaluate parametrized filtering of metadata"""
     adata = adata_for_filtering.copy()
     # when
     adata = apt.pp.filter_by_metadata(adata, filter_dict, axis=axis, logic=logic, action=action)
@@ -1235,6 +1234,7 @@ def test_filter_data_completeness(
     action,
     keep_strategy,
 ):
+    """Test filtering of data completeness when specifying either a max fraction of missing values or a max absolute count of missing values"""
     # given
     adata = data_test_completeness_filter.copy()
 
@@ -1259,6 +1259,7 @@ def test_filter_data_completeness(
 
 
 def test_filter_data_completeness_invalid_keep_strategy(data_test_completeness_filter):
+    """Test that an invalid keep_strategy raises a ValueError"""
     with pytest.raises(ValueError, match="Supported keep_strategies"):
         apt.pp.filter_data_completeness(
             adata=data_test_completeness_filter,
@@ -1269,34 +1270,38 @@ def test_filter_data_completeness_invalid_keep_strategy(data_test_completeness_f
 
 
 def test_filter_data_completeness_fraction_out_of_range(data_test_completeness_filter):
+    """Test that a max_missing_fraction outside the range [0, 1] raises a ValueError"""
     with pytest.raises(ValueError, match="between 0 and 1"):
         apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing_fraction=1.5)
 
 
 def test_filter_data_completeness_negative_count(data_test_completeness_filter):
+    """Test that a max_missing_count that is negative raises a ValueError"""
     with pytest.raises(ValueError, match="non-negative"):
         apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing_count=-1)
 
 
 def test_filter_data_completeness_both_thresholds(data_test_completeness_filter):
+    """Test that specifying both max_missing_fraction and max_missing_count raises a ValueError"""
     # the two thresholds are contradictory, so passing both is an error rather than a silent preference
     with pytest.raises(ValueError, match="Exactly one of"):
         apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing_fraction=0.5, max_missing_count=1)
 
 
 def test_filter_data_completeness_no_threshold(data_test_completeness_filter):
+    """Test that not specifying any threshold raises a ValueError"""
     with pytest.raises(ValueError, match="Exactly one of"):
         apt.pp.filter_data_completeness(data_test_completeness_filter)
 
 
 def test_filter_data_completeness_removed_max_missing(data_test_completeness_filter):
-    # the removed argument gets a migration hint rather than the "exactly one threshold" error
+    """Test that using the removed max_missing argument raises a TypeError with a migration hint"""
     with pytest.raises(TypeError, match="`max_missing` has been replaced"):
         apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing=0.5, action="drop")
 
 
 def test_filter_data_completeness_unknown_kwarg(data_test_completeness_filter):
-    # **kwargs must not silently swallow typos
+    """Test that passing an unexpected keyword argument raises a TypeError"""
     with pytest.raises(TypeError, match="Unexpected keyword argument"):
         apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing_fraction=0.5, actoin="drop")
 
@@ -1316,11 +1321,13 @@ def test_filter_data_completeness_unknown_kwarg(data_test_completeness_filter):
 def test_filter_data_completeness_threshold_type_does_not_select_mode(
     data_test_completeness_filter, expected_columns, max_missing_kwargs
 ):
+    """Test that the type of the threshold argument does not affect the selection mode"""
     adata_filtered = apt.pp.filter_data_completeness(data_test_completeness_filter, **max_missing_kwargs, action="drop")
     assert adata_filtered.var.index.to_list() == expected_columns
 
 
 def test_filter_data_completeness_unused_categories_ignored(data_test_completeness_filter):
+    """Test that unused categories in a categorical group column are ignored when filtering data completeness"""
     # unused levels of a categorical group column must not contribute empty groups:
     # an empty group has no missing values to count, and its mean is NaN
     adata = data_test_completeness_filter.copy()
@@ -1357,6 +1364,7 @@ def test_filter_data_completeness_unused_categories_ignored(data_test_completene
     ],
 )
 def test_resolve_max_missing(max_missing_fraction, max_missing_count, expected):
+    """Test the _resolve_max_missing function with various valid inputs."""
     threshold, is_count_mode = _resolve_max_missing(max_missing_fraction, max_missing_count)
 
     assert (threshold, is_count_mode) == expected
@@ -1374,12 +1382,14 @@ def test_resolve_max_missing(max_missing_fraction, max_missing_count, expected):
     ],
 )
 def test_resolve_max_missing_invalid(max_missing_fraction, max_missing_count, match):
+    """Test the _resolve_max_missing function with various invalid inputs that should raise a ValueError."""
     with pytest.raises(ValueError, match=match):
         _resolve_max_missing(max_missing_fraction, max_missing_count)
 
 
 # test _count_or_fraction_missing
 def test_count_or_fraction_missing():
+    """Test decision switching between fraction and count-based missingness based on the is_count_mode flag for a given input array."""
     # per-feature missing values: A=0, B=1, C=2 (out of 3 rows)
     x = np.array([[1.0, np.nan, np.nan], [2.0, 5.0, np.nan], [3.0, 6.0, 9.0]])
 
@@ -1430,6 +1440,7 @@ def test_data_column_to_array(
     column,
     transpose,
 ):
+    """Test that the data_column_to_array function correctly extracts columns from both anndata and dataframe inputs, with optional transposition since it should work on obs and var dimensions."""
     # given
     adata = _to_anndata(example_data)
     adata = apt.pp.add_metadata(adata, example_sample_metadata, axis=0)
@@ -1455,6 +1466,7 @@ def test_data_column_to_array(
     ],
 )
 def test_data_index_to_array(example_data, input_type, dim_space, expected):
+    """Test that the data_index_to_array function correctly extracts the index from both anndata and dataframe inputs."""
     # given
     data = example_data if input_type == "dataframe" else _to_anndata(example_data)
 
@@ -1466,11 +1478,13 @@ def test_data_index_to_array(example_data, input_type, dim_space, expected):
 
 
 def test_data_index_to_array_invalid_dim_space(example_data):
+    """Test that providing an invalid dim_space raises a ValueError"""
     with pytest.raises(ValueError, match="dim_space must be"):
         data_index_to_array(example_data, dim_space="invalid")
 
 
 def test_data_index_to_array_invalid_type():
+    """Test that providing an invalid data type raises a TypeError"""
     with pytest.raises(TypeError, match="Expected pd.DataFrame or ad.AnnData"):
         data_index_to_array([1, 2, 3], dim_space="obs")
 
@@ -1488,6 +1502,7 @@ def test_data_index_to_array_invalid_type():
     ],
 )
 def test_subset_data(example_data, input_type, idxs, expected_index, expected_values):
+    """Test that the subset_data convenience function correctly subsets both anndata and dataframe inputs based on the provided indices."""
     # given
     data = example_data if input_type == "dataframe" else _to_anndata(example_data)
 
@@ -1506,6 +1521,7 @@ def test_subset_data(example_data, input_type, idxs, expected_index, expected_va
 
 
 def test_subset_data_returns_copy(example_data):
+    """Test that the subset_data function returns a copy and does not mutate the original data."""
     # given
     df = example_data.copy()
     adata = _to_anndata(example_data)
@@ -1587,6 +1603,7 @@ def test_coerce_to_dataframe(
 
 
 def test_to_anndata_from_ndarray():
+    """Test that the _to_anndata helper function correctly converts a NumPy ndarray to an AnnData object."""
     # given
     arr = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
 
@@ -1601,6 +1618,7 @@ def test_to_anndata_from_ndarray():
 
 
 def test_add_metadata_invalid_axis(example_data):
+    """Test that add_metadata raises a ValueError when an invalid axis is provided."""
     adata = _to_anndata(example_data)
     md = pd.DataFrame({"x": [1, 2, 3]}, index=["cell1", "cell2", "cell3"])
     with pytest.raises(ValueError, match="Axis must be 0 or 1"):
@@ -1608,6 +1626,7 @@ def test_add_metadata_invalid_axis(example_data):
 
 
 def test_add_metadata_empty_adata(caplog):
+    """Test that add_metadata logs an info message and returns the original AnnData object when the AnnData is empty."""
     # given
     adata = ad.AnnData(np.empty((0, 0)))
     md = pd.DataFrame({"x": []})
@@ -1634,12 +1653,14 @@ def test_add_metadata_empty_adata(caplog):
     ],
 )
 def test_add_metadata_bad_metadata_type(example_data, bad_md):
+    """Test that add_metadata raises a TypeError when the metadata is not a valid DataFrame."""
     adata = _to_anndata(example_data)
     with pytest.raises(TypeError, match="metadata must be a pd.DataFrame"):
         apt.pp.add_metadata(adata, bad_md, axis=0)
 
 
 def test_add_metadata_duplicated_metadata_index(example_data):
+    """Test that add_metadata raises a ValueError when the metadata contains duplicated indices."""
     adata = _to_anndata(example_data)
     md = pd.DataFrame(
         {"cell_type": ["A", "B", "C"]},
@@ -1653,12 +1674,14 @@ def test_add_metadata_duplicated_metadata_index(example_data):
 
 
 def test_filter_by_dict_duplicated_indices():
+    """Test that _filter_by_dict raises a ValueError when the DataFrame contains duplicated indices."""
     df = pd.DataFrame({"x": [1, 2, 3]}, index=["a", "a", "b"])
     with pytest.raises(ValueError, match="Duplicated indices"):
         _filter_by_dict(df, {"x": 1}, logic="and")
 
 
 def test_filter_by_dict_invalid_logic():
+    """Test that _filter_by_dict raises a ValueError when an unsupported logic is provided."""
     df = pd.DataFrame({"x": [1, 2, 3]}, index=["a", "b", "c"])
     with pytest.raises(ValueError, match="Supported logics"):
         _filter_by_dict(df, {"x": 1}, logic="xor")
@@ -1674,12 +1697,14 @@ def test_filter_by_dict_invalid_logic():
     ],
 )
 def test_tuple_based_filter_invalid_tuple(bad_tuple, match):
+    """Test that _tuple_based_filter for ranges raises a ValueError when provided with an invalid tuple."""
     feature = pd.Series([1, 2, 3], index=["a", "b", "c"])
     with pytest.raises(ValueError, match=match):
         _tuple_based_filter(feature, bad_tuple)
 
 
 def test_tuple_based_filter_non_numeric_feature():
+    """Test that _tuple_based_filter raises a ValueError when the feature is non-numeric."""
     feature = pd.Series(["a", "b", "c"], index=["x", "y", "z"])
     with pytest.raises(ValueError, match="numeric features"):
         _tuple_based_filter(feature, (0, 1))
@@ -1697,12 +1722,14 @@ def test_tuple_based_filter_non_numeric_feature():
     ],
 )
 def test_verify_filter_dict(bad_dict, match):
+    """Test that _verify_filter_dict raises a ValueError when the filter dictionary is invalid."""
     df = pd.DataFrame({"x": [1, 2, 3]}, index=["a", "b", "c"])
     with pytest.raises(ValueError, match=match):
         _verify_filter_dict(bad_dict, df)
 
 
 def test_filter_by_metadata_invalid_axis():
+    """Test that filter_by_metadata raises a ValueError when an invalid axis is provided."""
     adata = _to_anndata(pd.DataFrame({"G1": [1.0, 2.0]}, index=["c1", "c2"]))
     with pytest.raises(ValueError, match="Invalid 'axis'"):
         apt.pp.filter_by_metadata(adata, {}, axis=2)
@@ -1712,11 +1739,13 @@ def test_filter_by_metadata_invalid_axis():
 
 
 def test_data_column_to_array_dataframe_missing_column(example_data):
+    """Test that data_column_to_array raises a ValueError when the column is missing in a DataFrame."""
     with pytest.raises(ValueError, match="not found in DataFrame"):
         data_column_to_array(example_data, "nonexistent")
 
 
 def test_data_column_to_array_anndata_from_var_columns(example_data, example_feature_metadata):
+    """Test that data_column_to_array correctly retrieves a column from adata.var.columns."""
     # given — `gene_name` lives only in adata.var.columns (not in var_names or obs.columns)
     adata = _to_anndata(example_data)
     adata = apt.pp.add_metadata(adata, example_feature_metadata, axis=1)
@@ -1729,12 +1758,14 @@ def test_data_column_to_array_anndata_from_var_columns(example_data, example_fea
 
 
 def test_data_column_to_array_anndata_not_found(example_data):
+    """Test that data_column_to_array raises a ValueError when the column is not found in AnnData."""
     adata = _to_anndata(example_data)
     with pytest.raises(ValueError, match="not found in AnnData"):
         data_column_to_array(adata, "nonexistent")
 
 
 def test_data_column_to_array_invalid_type():
+    """Test that data_column_to_array raises a TypeError when the input is not a DataFrame or AnnData."""
     with pytest.raises(TypeError, match="Expected pd.DataFrame or ad.AnnData"):
         data_column_to_array([1, 2, 3], "x")
 
@@ -1755,6 +1786,7 @@ def test_data_column_to_array_invalid_type():
     ],
 )
 def test_tolist(obj, expected):
+    """Test parametrized cases of _tolist for correctness"""
     assert _tolist(obj) == expected
 
 
@@ -1762,6 +1794,7 @@ def test_tolist(obj, expected):
 
 
 def test_data_columns_to_df_anndata_columns_none(example_data):
+    """Test that data_columns_to_df returns the whole X matrix when columns=None for an AnnData object."""
     adata = _to_anndata(example_data)
 
     # when
@@ -1779,6 +1812,7 @@ def test_data_columns_to_df_anndata_columns_none(example_data):
 
 
 def test_data_columns_to_df_invalid_type():
+    """Test that data_columns_to_df raises a TypeError when the input is not a DataFrame or AnnData."""
     with pytest.raises(TypeError, match="Expected pd.DataFrame or ad.AnnData"):
         data_columns_to_df([1, 2, 3])
 
@@ -1787,6 +1821,7 @@ def test_data_columns_to_df_invalid_type():
 
 
 def test_scale_and_center_unknown_scaler(example_data):
+    """Test that scale_and_center raises a NotImplementedError when an unknown scaler is provided."""
     adata = _to_anndata(example_data)
     with pytest.raises(NotImplementedError, match="Scaler .* not implemented"):
         apt.pp.scale_and_center(adata, scaler="unknown")
@@ -1796,23 +1831,27 @@ def test_scale_and_center_unknown_scaler(example_data):
 
 
 def test_validate_completeness_not_anndata():
+    """Test that _validate_adata_for_completeness_filter raises a TypeError when the input is not an AnnData object."""
     with pytest.raises(TypeError, match="adata must be an AnnData object"):
         _validate_adata_for_completeness_filter(pd.DataFrame({"x": [1, 2]}), action="drop", var_colname="x")
 
 
 def test_validate_completeness_no_features():
+    """Test that _validate_adata_for_completeness_filter raises a ValueError when there are no features."""
     adata = ad.AnnData(np.empty((3, 0)))
     with pytest.raises(ValueError, match="no features"):
         _validate_adata_for_completeness_filter(adata, action="drop", var_colname="x")
 
 
 def test_validate_completeness_non_numeric_x():
+    """Test that _validate_adata_for_completeness_filter raises a ValueError when the feature is non-numeric."""
     adata = ad.AnnData(np.array([["a", "b"], ["c", "d"]], dtype=object))
     with pytest.raises(ValueError, match="must be numeric"):
         _validate_adata_for_completeness_filter(adata, action="drop", var_colname="x")
 
 
 def test_validate_completeness_duplicated_obs():
+    """Test that _validate_adata_for_completeness_filter raises a ValueError when there are duplicated observation indices."""
     df = pd.DataFrame({"G1": [1.0, 2.0]}, index=["dup", "dup"])
     adata = _to_anndata(df)
     with pytest.raises(ValueError, match="Duplicated indices"):
@@ -1820,6 +1859,7 @@ def test_validate_completeness_duplicated_obs():
 
 
 def test_validate_completeness_invalid_action():
+    """Test that _validate_adata_for_completeness_filter raises a ValueError when the action is invalid."""
     adata = _to_anndata(pd.DataFrame({"G1": [1.0, 2.0]}, index=["c1", "c2"]))
     with pytest.raises(ValueError, match="must be 'flag' or 'drop'"):
         _validate_adata_for_completeness_filter(adata, action="bogus", var_colname="x")
@@ -1829,6 +1869,7 @@ def test_validate_completeness_invalid_action():
 
 
 def test_filter_data_completeness_unknown_group(data_test_completeness_filter):
+    """Test that filter_data_completeness raises a ValueError when the specified group is not found in the group column."""
     with pytest.raises(ValueError, match="not found in"):
         apt.pp.filter_data_completeness(
             data_test_completeness_filter,
