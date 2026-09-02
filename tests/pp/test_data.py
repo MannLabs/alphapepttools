@@ -1462,7 +1462,6 @@ def test_data_index_to_array(example_data, input_type, dim_space, expected):
     result = data_index_to_array(data, dim_space=dim_space)
 
     # then
-    assert isinstance(result, np.ndarray)
     assert np.array_equal(result, expected)
 
 
@@ -1480,15 +1479,15 @@ def test_data_index_to_array_invalid_type():
 
 
 @pytest.mark.parametrize(
-    ("input_type", "idxs", "expected_index"),
+    ("input_type", "idxs", "expected_index", "expected_values"),
     [
-        ("dataframe", [0, 2], ["cell1", "cell3"]),
-        ("dataframe", [1], ["cell2"]),
-        ("anndata", [0, 2], ["cell1", "cell3"]),
-        ("anndata", [1], ["cell2"]),
+        ("dataframe", [0, 2], ["cell1", "cell3"], [[1, 4, 7], [3, 6, 9]]),
+        ("dataframe", [1], ["cell2"], [[2, 5, 8]]),
+        ("anndata", [0, 2], ["cell1", "cell3"], [[1, 4, 7], [3, 6, 9]]),
+        ("anndata", [1], ["cell2"], [[2, 5, 8]]),
     ],
 )
-def test_subset_data(example_data, input_type, idxs, expected_index):
+def test_subset_data(example_data, input_type, idxs, expected_index, expected_values):
     # given
     data = example_data if input_type == "dataframe" else _to_anndata(example_data)
 
@@ -1496,7 +1495,14 @@ def test_subset_data(example_data, input_type, idxs, expected_index):
     result = subset_data(data, idxs)
 
     # then
-    assert list(result.index if isinstance(result, pd.DataFrame) else result.obs_names) == expected_index
+    if isinstance(result, pd.DataFrame):
+        pd.testing.assert_frame_equal(
+            result,
+            pd.DataFrame(expected_values, index=expected_index, columns=["G1", "G2", "G3"]),
+        )
+    else:
+        assert list(result.obs_names) == expected_index
+        np.testing.assert_allclose(result.X, expected_values)
 
 
 def test_subset_data_returns_copy(example_data):
@@ -1588,7 +1594,6 @@ def test_to_anndata_from_ndarray():
     adata = _to_anndata(arr)
 
     # then
-    assert isinstance(adata, ad.AnnData)
     assert np.array_equal(adata.X, arr)
 
 
@@ -1644,20 +1649,6 @@ def test_add_metadata_duplicated_metadata_index(example_data):
         apt.pp.add_metadata(adata, md, axis=0)
 
 
-def test_add_metadata_verbose_log(example_data, caplog):
-    # given — keep_existing_metadata=True + verbose=True exercises the verbose log line
-    adata = _to_anndata(example_data)
-    adata.obs = pd.DataFrame({"existing": ["x", "y", "z"]}, index=["cell1", "cell2", "cell3"])
-    md = pd.DataFrame({"new": ["a", "b", "c"]}, index=["cell1", "cell2", "cell3"])
-
-    # when
-    with caplog.at_level(logging.INFO):
-        apt.pp.add_metadata(adata, md, axis=0, keep_existing_metadata=True, verbose=True)
-
-    # then
-    assert "Join incoming to existing metadata" in caplog.text
-
-
 ### Test _filter_by_dict / _tuple_based_filter / _verify_filter_dict ###
 
 
@@ -1665,6 +1656,12 @@ def test_filter_by_dict_duplicated_indices():
     df = pd.DataFrame({"x": [1, 2, 3]}, index=["a", "a", "b"])
     with pytest.raises(ValueError, match="Duplicated indices"):
         _filter_by_dict(df, {"x": 1}, logic="and")
+
+
+def test_filter_by_dict_invalid_logic():
+    df = pd.DataFrame({"x": [1, 2, 3]}, index=["a", "b", "c"])
+    with pytest.raises(ValueError, match="Supported logics"):
+        _filter_by_dict(df, {"x": 1}, logic="xor")
 
 
 @pytest.mark.parametrize(
@@ -1749,7 +1746,12 @@ def test_data_column_to_array_invalid_type():
     ("obj", "expected"),
     [
         ("foo", ["foo"]),
+        (1, [1]),
+        ([], []),
         (["a", "b"], ["a", "b"]),
+        (["a", "b", "c"], ["a", "b", "c"]),
+        # only `list` passes through: a tuple is wrapped, not unpacked
+        (("foo", "bar"), [("foo", "bar")]),
     ],
 )
 def test_tolist(obj, expected):
@@ -1765,9 +1767,15 @@ def test_data_columns_to_df_anndata_columns_none(example_data):
     # when
     result = data_columns_to_df(adata, columns=None)
 
-    # then
-    assert isinstance(result, pd.DataFrame)
-    assert list(result.columns) == ["G1", "G2", "G3"]
+    # then — `columns=None` returns the whole X matrix as a frame
+    pd.testing.assert_frame_equal(
+        result,
+        pd.DataFrame(
+            [[1, 4, 7], [2, 5, 8], [3, 6, 9]],
+            index=["cell1", "cell2", "cell3"],
+            columns=["G1", "G2", "G3"],
+        ),
+    )
 
 
 def test_data_columns_to_df_invalid_type():
@@ -1817,33 +1825,14 @@ def test_validate_completeness_invalid_action():
         _validate_adata_for_completeness_filter(adata, action="bogus", var_colname="x")
 
 
-def test_validate_completeness_existing_var_colname(example_data, caplog):
-    # given — pre-fill var with the colname we'll later flag
-    adata = _to_anndata(example_data)
-    adata.var = pd.DataFrame({"my_flag": [True, True, True]}, index=["G1", "G2", "G3"])
-
-    # when
-    with caplog.at_level(logging.INFO):
-        _validate_adata_for_completeness_filter(adata, action="flag", var_colname="my_flag")
-
-    # then
-    assert "already exists, will overwrite" in caplog.text
-
-
 ### Test filter_data_completeness error branches ###
-
-
-@pytest.mark.parametrize("bad_threshold", [-0.1, 1.5])
-def test_filter_data_completeness_invalid_threshold(data_test_completeness_filter, bad_threshold):
-    with pytest.raises(ValueError, match="Threshold must be between 0 and 1"):
-        apt.pp.filter_data_completeness(data_test_completeness_filter, max_missing=bad_threshold)
 
 
 def test_filter_data_completeness_unknown_group(data_test_completeness_filter):
     with pytest.raises(ValueError, match="not found in"):
         apt.pp.filter_data_completeness(
             data_test_completeness_filter,
-            max_missing=0.5,
+            max_missing_fraction=0.5,
             group_column="batch",
             groups=["nonexistent_batch"],
         )

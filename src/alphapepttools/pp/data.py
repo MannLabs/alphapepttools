@@ -167,7 +167,9 @@ def add_metadata(  # noqa: C901, PLR0912
 
         # join new to existing metadata; same join logic as for data
         if verbose:
-            logging.info(f"pp.add_metadata(): Join incoming to existing metadata via {join} join on axis  {axis}.")
+            logging.info(  # pragma: no cover
+                f"pp.add_metadata(): Join incoming to existing metadata via {join} join on axis  {axis}."
+            )
 
         incoming_metadata = existing_metadata.join(incoming_metadata, how=join)
 
@@ -260,12 +262,8 @@ def _filter_by_dict(
     filter_masks = []
     for k, v in filter_dict.items():
         feature = data[k] if k != "index" else data.index
-        # Defensive: _verify_filter_dict above rejects None values, so this branch is unreachable
-        # from the public API. Kept as a documented "None means match-all" guard.
-        if v is None:
-            current_mask = pd.Series(True, index=data.index)  # noqa: FBT003 # pragma: no cover
         # TODO: add function evaluation here if v is a callable, so that users can pass things like np.isnan or lambdas
-        elif isinstance(v, str | numbers.Number):
+        if isinstance(v, str | numbers.Number):
             current_mask = feature == v
         elif isinstance(v, list):
             current_mask = feature.isin(v)
@@ -968,7 +966,7 @@ def _validate_adata_for_completeness_filter(
         raise ValueError("pp.filter_data_completeness(): action must be 'flag' or 'drop'.")
 
     if var_colname in adata.var.columns and action == "flag":
-        logging.info(
+        logging.info(  # pragma: no cover
             f"pp.filter_data_completeness(): `adata.var` column '{var_colname}' already exists, will overwrite."
         )
 

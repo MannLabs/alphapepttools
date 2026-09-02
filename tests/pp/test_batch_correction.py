@@ -128,10 +128,15 @@ def test_scanpy_pycombat_coerces_nan_batches():
     md = pd.DataFrame({"batch": ["x", "x", "x", np.nan, np.nan, np.nan]}, index=list("ABCDEF"))
     adata = ad.AnnData(df, obs=md)
 
+    # expected: NaN batches become one "NA" batch, then combat corrects on that grouping
+    expected_adata = coerce_nans_to_batch(adata.copy(), "batch")
+    expected_adata.X = expected_adata.X.astype(float)
+    scanpy.pp.combat(expected_adata, key="batch", inplace=True)
+
     result = scanpy_pycombat(adata, batch="batch", copy=True)
 
-    assert "NA" in result.obs["batch"].tolist()
-    assert not result.obs["batch"].isna().any()
+    assert result.obs["batch"].tolist() == ["x", "x", "x", "NA", "NA", "NA"]
+    pd.testing.assert_frame_equal(result.to_df(), expected_adata.to_df())
 
 
 def test_scanpy_pycombat_raises_on_nan_data(pycombat_test_data_simple):
