@@ -809,32 +809,47 @@ def data_columns_to_df(
     return cast("pd.DataFrame", dataset)
 
 
-def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
-    adata: ad.AnnData, scaler: str = "standard", layer: str | None = None, *, copy: bool = False
-) -> None | ad.AnnData:
-    """Scale and center data.
-
-    Either use standard or robust scaling. 'robust' scaling relies
-    on interquartile range and is more resistant to outliers. Scaling
-    operates on columns only for now.
+def scale_and_center(
+    adata: ad.AnnData,
+    scaler: Literal["standard", "robust"] = "standard",
+    layer: str | None = None,
+    *,
+    center: bool = True,
+    scale: bool = True,
+    copy: bool = False,
+) -> ad.AnnData | None:
+    """Scale and center features
 
     Parameters
     ----------
     adata
         AnnData object with data to scale.
     scaler
-        Sklearn scaler to use. Available scalers are 'standard' and 'robust'.
+        Sklearn scaler to use. Available scalers are
+            - `standard`: Mean centering and scaling by standard deviation
+            - `robust`: Median centering and scaling by interquartile range.
     layer
         Name of the layer to scale. If None (default), the data matrix X is used.
+    center
+        Whether to center the feature distribution at zero.
+        If `True`:
+            - `standard`: Mean-centering of the feature distribution.
+            - `robust`: Median-centering of the feature distribution.
+        Not applied if set to `False`.
+    scale
+        Whether to scale the feature distribution.
+        If `True`:
+            - `standard`: Divides the feature distribution by its standard deviation to unit variance.
+            - `robust`: Divides the feature distribution by its interquartile range, i.e. range between quantile (0.25, 0.75).
+        Not applied if set to `False`.
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
 
     Returns
     -------
-    None | anndata.AnnData
-        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
-        returns a modified copy.
+    If `copy=False` modifies the anndata object at layer inplace and returns None.
+    If `copy=True`, returns a modified copy.
 
     Examples
     --------
@@ -845,7 +860,7 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
         import anndata as ad
         import pandas as pd
         import numpy as np
-        from alphapepttools.pp.data import scale_and_center
+        import alphapepttools as apt
 
         adata = ad.AnnData(
             X=np.array([[1, 10], [2, 20], [3, 30], [4, 40]]),
@@ -854,20 +869,40 @@ def scale_and_center(  # explicitly tested via test_pp_scale_and_center()
         )
 
         # Standard scaling (in-place)
-        scale_and_center(adata, scaler="standard")
+        apt.pp.scale_and_center(adata, scaler="standard")
 
         # Robust scaling on a specific layer
-        adata.layers["raw"] = adata.X.copy()
-        scale_and_center(adata, scaler="robust", layer="raw")
+        adata.layers["processed"] = adata.X.copy()
+        apt.pp.scale_and_center(adata, scaler="robust", layer="processed")
+
+    You can selectively center or scale the layer:
+
+    .. code-block:: python
+
+        # Only apply median centering
+        apt.pp.scale_and_center(adata, scaler="robust", center=True, scale=False)
+
+        # Only scale, do not center
+        apt.pp.scale_and_center(adata, scaler="standard", center=False, scale=True)
+
+    See Also
+    --------
+    :class:`sklearn.preprocessing.StandardScaler`
+    :class:`sklearn.preprocessing.RobustScaler`
 
     """
+    if not (center or scale):
+        raise ValueError(
+            "Setting `center=False` and `scale=False` leaves data unchanged. Set at least one argument to `True`"
+        )
     adata = adata.copy() if copy else adata
     logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler.")
 
     if scaler == "standard":
-        scaler = StandardScaler(with_mean=True, with_std=True)
+        scaler = StandardScaler(with_mean=center, with_std=scale)
     elif scaler == "robust":
-        scaler = RobustScaler(with_centering=True, with_scaling=True, quantile_range=(25.0, 75.0))
+        interquantile_range = (25.0, 75.0)
+        scaler = RobustScaler(with_centering=center, with_scaling=scale, quantile_range=interquantile_range)
     else:
         raise NotImplementedError(f"Scaler {scaler} not implemented.")
 
