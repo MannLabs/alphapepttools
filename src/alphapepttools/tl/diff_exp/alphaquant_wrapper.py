@@ -22,9 +22,10 @@ logger = logging.getLogger(__name__)
 _FEATURE_COLUMN_PER_LEVEL = {"protein": "protein", "proteoform": "proteoform_id", "peptide": "sequence"}
 
 # Column order of the stacked output; level-specific columns are NaN outside their own modality
+# TODO: Evaluate if individual feature columns and/or collective feature_id column are sufficient in future analyses
 _STACKED_COLS = [
     "modality",
-    "feature",
+    "feature_id",
     *tl_defaults.DIFF_EXP_COLS,
     "quality_score",
     "proteoform_id",  # proteoform only
@@ -123,7 +124,7 @@ def _stack_alphaquant_results(results: dict[str, pd.DataFrame]) -> pd.DataFrame:
 
     Concatenates the standardized protein, proteoform and peptide results into one
     frame that is filtered by the `modality` column instead of a dictionary key. Each
-    row additionally carries its own identifier in the `feature` column, taken from the
+    row additionally carries its own identifier in the `feature_id` column, taken from the
     column appropriate for its level. Columns that only exist at one level are NaN on
     the rows of the other levels.
 
@@ -135,13 +136,13 @@ def _stack_alphaquant_results(results: dict[str, pd.DataFrame]) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        Stacked DataFrame with `modality` and `feature` columns and a uniform column order.
+        Stacked DataFrame with `modality` and `feature_id` columns and a uniform column order.
     """
     stacked = []
     for level, df in results.items():
         level_df = df.copy()
         level_df["modality"] = level
-        level_df["feature"] = level_df[_FEATURE_COLUMN_PER_LEVEL[level]]
+        level_df["feature_id"] = level_df[_FEATURE_COLUMN_PER_LEVEL[level]]
         stacked.append(level_df)
 
     # reindex both enforces the column order and pads the level-specific columns with NaN
@@ -181,7 +182,7 @@ def diff_exp_alphaquant(
     pd.DataFrame
         Standardized results for all three analysis levels stacked into a single frame.
         The `modality` column holds 'protein', 'proteoform' or 'peptide' and is used to
-        select the level of interest; the `feature` column holds each row's own
+        select the level of interest; the `feature_id` column holds each row's own
         identifier (protein accession, proteoform id or peptide sequence) and is never
         NaN. The comparison key (e.g. "Group1_VS_Group2") is carried in the
         `condition_pair` column.

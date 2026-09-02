@@ -355,7 +355,7 @@ def test_diff_exp_alphaquant():
     # The three levels are stacked into one frame and separated by the modality column
     assert list(results.columns) == _STACKED_COLS
     assert len(results) == sum(len(df) for df in expected_results.values())
-    assert results["feature"].notna().all()
+    assert results["feature_id"].notna().all()
     assert all(results["condition_pair"] == expected_comparison_key)
 
     # Level-specific columns are NaN outside their own modality
@@ -370,7 +370,7 @@ def test_diff_exp_alphaquant():
 
     for level in ["protein", "proteoform", "peptide"]:
         subset = results[results["modality"] == level].reset_index(drop=True)
-        assert subset["feature"].tolist() == expected_features[level]
+        assert subset["feature_id"].tolist() == expected_features[level]
 
         # Selecting the expected columns ignores the NaN padding, which is asserted separately above
         # The tolerances are slightly larger, than for the vanilla ttest, albeit still small, as the package is still in development
