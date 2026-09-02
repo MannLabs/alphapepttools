@@ -18,6 +18,22 @@ from alphapepttools.tl.utils import _suppress_plots, determine_max_replicates, n
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Column holding each row's own identifier, per analysis level
+_FEATURE_COLUMN_PER_LEVEL = {"protein": "protein", "proteoform": "proteoform_id", "peptide": "sequence"}
+
+# Column order of the stacked output; level-specific columns are NaN outside their own modality
+# TODO: Evaluate if individual feature columns and/or collective feature_id column are sufficient in future analyses
+_STACKED_COLS = [
+    "modality",
+    "feature_id",
+    *tl_defaults.DIFF_EXP_COLS,
+    "quality_score",
+    "proteoform_id",  # proteoform only
+    "peptides",  # proteoform only
+    "num_peptides",  # proteoform only
+    "sequence",  # peptide only
+]
+
 
 def _standardize_alphaquant_results(
     comparison_key: str,
@@ -103,6 +119,36 @@ def _standardize_alphaquant_results(
     return result_df[diff_exp_columns].copy()
 
 
+def _stack_alphaquant_results(results: dict[str, pd.DataFrame]) -> pd.DataFrame:
+    """Stack the per-level AlphaQuant results into a single long DataFrame.
+
+    Concatenates the standardized protein, proteoform and peptide results into one
+    frame that is filtered by the `modality` column instead of a dictionary key. Each
+    row additionally carries its own identifier in the `feature_id` column, taken from the
+    column appropriate for its level. Columns that only exist at one level are NaN on
+    the rows of the other levels.
+
+    Parameters
+    ----------
+    results
+        Dictionary of standardized results keyed by 'protein', 'proteoform' and 'peptide'.
+
+    Returns
+    -------
+    pd.DataFrame
+        Stacked DataFrame with `modality` and `feature_id` columns and a uniform column order.
+    """
+    stacked = []
+    for level, df in results.items():
+        level_df = df.copy()
+        level_df["modality"] = level
+        level_df["feature_id"] = level_df[_FEATURE_COLUMN_PER_LEVEL[level]]
+        stacked.append(level_df)
+
+    # reindex both enforces the column order and pads the level-specific columns with NaN
+    return pd.concat(stacked, axis=0, ignore_index=True).reindex(columns=_STACKED_COLS)
+
+
 def diff_exp_alphaquant(
     adata: ad.AnnData,
     report: pd.DataFrame,
@@ -111,7 +157,7 @@ def diff_exp_alphaquant(
     min_valid_values: int = 2,
     valid_values_filter_mode: str = "either",
     plots: str = "hide",
-) -> tuple[str, dict[str, pd.DataFrame]]:
+) -> pd.DataFrame:
     """Calculate differential expression using AlphaQuant.
 
     Parameters
@@ -133,11 +179,20 @@ def diff_exp_alphaquant(
 
     Returns
     -------
-    tuple[str, dict[str, pd.DataFrame]]
-        Tuple containing:
-        - comparison_key: String identifier for the comparison (e.g., "Group1_VS_Group2")
-        - results: Dictionary with keys 'protein', 'peptide', 'proteoform' containing
-          standardized differential expression results for each level.
+    pd.DataFrame
+        Standardized results for all three analysis levels stacked into a single frame.
+        The `modality` column holds 'protein', 'proteoform' or 'peptide' and is used to
+        select the level of interest; the `feature_id` column holds each row's own
+        identifier (protein accession, proteoform id or peptide sequence) and is never
+        NaN. The comparison key (e.g. "Group1_VS_Group2") is carried in the
+        `condition_pair` column.
+
+    Notes
+    -----
+    Columns that only exist at one level (`sequence` for peptides, `proteoform_id`,
+    `peptides` and `num_peptides` for proteoforms) are NaN on the rows of the other
+    levels. As a consequence of stacking, `num_peptides` is of dtype float64 rather
+    than int64.
 
     Raises
     ------
@@ -153,7 +208,7 @@ def diff_exp_alphaquant(
 
     .. code-block:: python
 
-        comparison_key, alphaquant_results = at.tl.diff_exp_alphaquant(
+        alphaquant_results = at.tl.diff_exp_alphaquant(
             adata=adata_precursor,
             report=full_report,
             between_column="treatment",
@@ -164,9 +219,9 @@ def diff_exp_alphaquant(
         )
 
         # Access results for different levels
-        protein_results = alphaquant_results["protein"]
-        peptide_results = alphaquant_results["peptide"]
-        proteoform_results = alphaquant_results["proteoform"]
+        protein_results = alphaquant_results[alphaquant_results["modality"] == "protein"]
+        peptide_results = alphaquant_results[alphaquant_results["modality"] == "peptide"]
+        proteoform_results = alphaquant_results[alphaquant_results["modality"] == "proteoform"]
 
     """
     if not _HAS_ALPHAQUANT:  # pragma: no cover - optional dep, env-dependent
@@ -268,4 +323,4 @@ def diff_exp_alphaquant(
             df["max_level_2_samples"] = max_samples_g2
             results[level] = _standardize_alphaquant_results(comparison_key, level, df)
 
-        return comparison_key, results
+        return _stack_alphaquant_results(results)
