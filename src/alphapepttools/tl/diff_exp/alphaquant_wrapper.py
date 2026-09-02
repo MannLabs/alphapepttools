@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 _FEATURE_COLUMN_PER_LEVEL = {"protein": "protein", "proteoform": "proteoform_id", "peptide": "sequence"}
 
 # Column order of the stacked output; level-specific columns are NaN outside their own modality
+# TODO: Evaluate if individual feature columns and/or collective feature_id column are sufficient in future analyses
 _STACKED_COLS = [
     "modality",
     "feature_id",
