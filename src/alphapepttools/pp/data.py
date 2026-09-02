@@ -840,7 +840,7 @@ def scale_and_center(
         Whether to scale the feature distribution.
         If `True`:
             - `standard`: Divides the feature distribution by its standard deviation to unit variance.
-            - `robust`: Divides the feature distribution by its (0.25, 0.75) interquartile range.
+            - `robust`: Divides the feature distribution by its interquartile range, i.e. range between quantile (0.25, 0.75).
         Not applied if set to `False`.
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
@@ -893,7 +893,7 @@ def scale_and_center(
     """
     if not (center or scale):
         raise ValueError(
-            "Setting `center=False` and `scale=False` corresponds to an identity transform. Set at least one argument to `True`"
+            "Setting `center=False` and `scale=False` leaves data unchanged. Set at least one argument to `True`"
         )
     adata = adata.copy() if copy else adata
     logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler.")
@@ -901,7 +901,8 @@ def scale_and_center(
     if scaler == "standard":
         scaler = StandardScaler(with_mean=center, with_std=scale)
     elif scaler == "robust":
-        scaler = RobustScaler(with_centering=center, with_scaling=scale, quantile_range=(25.0, 75.0))
+        interquantile_range = (25.0, 75.0)
+        scaler = RobustScaler(with_centering=center, with_scaling=scale, quantile_range=interquantile_range)
     else:
         raise NotImplementedError(f"Scaler {scaler} not implemented.")
 
