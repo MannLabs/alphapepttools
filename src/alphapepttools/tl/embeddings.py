@@ -468,7 +468,7 @@ def bpca(
         # Optional: Remove features with little data support
         at.pp.filter_data_completeness(
             adata=adata,
-            max_missing=0.25,
+            max_missing_fraction=0.25,
             action="drop",
         )
 
