@@ -340,12 +340,15 @@ class TestPooledCoefficientOfVariation:
     @pytest.mark.parametrize("layer", [None, "layer"])
     def test_pooled_coefficient_of_variation_return(self, adata_pcv: ad.AnnData, layer: str | None) -> None:
         """Test if `pooled_coefficient_of_variation` computes group-wise PCV correctly"""
+        adata = adata_pcv["adata"].copy()
+        original_adata = adata.copy()
+        group_column = adata_pcv["group_column"]
+
         reference = pd.DataFrame.from_dict(adata_pcv["pcv"], orient="index", columns=["pcv"])
 
-        pcv = pooled_coefficient_of_variation(
-            adata_pcv["adata"], group_column=adata_pcv["group_column"], layer=layer, inplace=False
-        )
+        pcv = pooled_coefficient_of_variation(adata, group_column=group_column, layer=layer, inplace=False)
 
+        assert_adata_equal(adata, original_adata)
         pd.testing.assert_frame_equal(pcv, reference, atol=1e-4)
 
     @pytest.mark.parametrize("layer", [None, "layer"])
@@ -354,9 +357,12 @@ class TestPooledCoefficientOfVariation:
         reference = adata_pcv["pcv"]
         adata = adata_pcv["adata"].copy()
 
-        pooled_coefficient_of_variation(adata, group_column=adata_pcv["group_column"], layer=layer, inplace=True)
+        returned_value = pooled_coefficient_of_variation(
+            adata, group_column=adata_pcv["group_column"], layer=layer, inplace=True
+        )
         result = adata.uns.get("metrics").get("pcv")
 
+        assert returned_value is None
         assert all(key == ref_key for key, ref_key in zip(result.keys(), reference.keys(), strict=True))
         assert all(
             np.isclose(value, ref_value, atol=1e-4)
