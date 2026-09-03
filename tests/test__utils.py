@@ -4,7 +4,7 @@ from alphapepttools._utils import resolve_axis
 
 
 class TestResolveAxis:
-    @pytest.mark.parametrize(("axis", "expected"), [("obs", "obs"), (0, "obs"), ("var", "var"), (1, "var")])
+    @pytest.mark.parametrize(("axis", "expected"), [("obs", 0), (0, 0), ("var", 1), (1, 1)])
     def test_valid(self, axis, expected):
         assert resolve_axis(axis) == expected
 
