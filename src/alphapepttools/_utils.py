@@ -30,3 +30,27 @@ def get_matrix(adata: ad.AnnData, layer: str | None = None) -> np.ndarray:
     if sparse.issparse(data):  # this is to cover anndata backends returning sparse data, e.g. csr_matrix
         data = data.toarray()
     return np.asarray(data)
+
+
+def _resolve_axis(axis: str | int) -> str:
+    """Normalize an axis specifier to the canonical "obs" / "var" string.
+
+    Accepts ``"obs"`` or ``0`` for observations (rows), ``"var"`` or ``1`` for features (columns).
+
+    Parameters
+    ----------
+    axis
+        Axis specifier.
+
+    Returns
+    -------
+    Either ``"obs"`` or ``"var"``.
+
+    Raises
+    ------
+    ValueError
+        If ``axis`` is not one of ``{"obs", "var", 0, 1}``.
+    """
+    if axis not in ("obs", "var", 0, 1):
+        raise ValueError(f"axis must be 'obs', 'var', 0, or 1, got '{axis}'")
+    return "obs" if axis in ("obs", 0) else "var"

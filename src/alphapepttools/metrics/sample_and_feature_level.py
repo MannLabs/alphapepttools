@@ -5,32 +5,8 @@ import warnings
 import anndata as ad
 import numpy as np
 
-from alphapepttools._utils import get_matrix
+from alphapepttools._utils import _resolve_axis, get_matrix
 from alphapepttools.pp.transform import detect_special_values
-
-
-def _resolve_axis(axis: str | int) -> str:
-    """Normalize an axis specifier to the canonical "obs" / "var" string.
-
-    Accepts ``"obs"`` or ``0`` for observations (rows), ``"var"`` or ``1`` for features (columns).
-
-    Parameters
-    ----------
-    axis
-        Axis specifier.
-
-    Returns
-    -------
-    Either ``"obs"`` or ``"var"``.
-
-    Raises
-    ------
-    ValueError
-        If ``axis`` is not one of ``{"obs", "var", 0, 1}``.
-    """
-    if axis not in ("obs", "var", 0, 1):
-        raise ValueError(f"axis must be 'obs', 'var', 0, or 1, got '{axis}'")
-    return "obs" if axis in ("obs", 0) else "var"
 
 
 def total_intensity(
