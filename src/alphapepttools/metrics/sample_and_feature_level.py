@@ -1,6 +1,7 @@
 """Summary metrics that operate on observations or features"""
 
 import warnings
+from typing import Literal
 
 import anndata as ad
 import numpy as np
@@ -13,7 +14,7 @@ def total_intensity(
     adata: ad.AnnData,
     *,
     layer: str | None = None,
-    axis: str | int = "obs",
+    axis: Literal[0, 1, "obs", "var"] = "obs",
     features: list[str] | None = None,
     column: str = "total_intensity",
     inplace: bool = True,
@@ -78,7 +79,7 @@ def number_detected(
     adata: ad.AnnData,
     *,
     layer: str | None = None,
-    axis: str | int = "obs",
+    axis: Literal[0, 1, "obs", "var"] = "obs",
     column: str = "number_detected",
     inplace: bool = True,
 ) -> np.ndarray | None:
@@ -134,7 +135,7 @@ def fraction_complete(
     adata: ad.AnnData,
     *,
     layer: str | None = None,
-    axis: str | int = "obs",
+    axis: Literal[0, 1, "obs", "var"] = "obs",
     column: str = "fraction_complete",
     inplace: bool = True,
 ) -> np.ndarray | None:
