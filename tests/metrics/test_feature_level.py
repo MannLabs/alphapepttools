@@ -278,7 +278,7 @@ class TestPooledMedianAbsoluteDeviation:
         return {"adata": adata, "pmad": {"A": pmad, "B": pmad, "C": pmad}, "group_column": "sample_type"}
 
     @pytest.mark.parametrize("layer", [None, "layer"])
-    def test_pooled_median_absolute_deviation_return(self, adata_pmad: ad.AnnData, layer: str | None) -> None:
+    def test_pooled_median_absolute_deviation__return(self, adata_pmad: ad.AnnData, layer: str | None) -> None:
         """Test if `pooled_median_absolute_deviation` computes group-wise PMAD correctly"""
         reference = pd.DataFrame.from_dict(adata_pmad["pmad"], orient="index", columns=["pmad"])
 
@@ -289,13 +289,16 @@ class TestPooledMedianAbsoluteDeviation:
         pd.testing.assert_frame_equal(pmad, reference)
 
     @pytest.mark.parametrize("layer", [None, "layer"])
-    def test_pooled_median_absolute_deviation_inplace(self, adata_pmad: ad.AnnData, layer: str | None) -> None:
+    def test_pooled_median_absolute_deviation__inplace(self, adata_pmad: ad.AnnData, layer: str | None) -> None:
         """Test if `pooled_median_absolute_deviation` sets PMAD correctly in anndata object"""
         reference = adata_pmad["pmad"]
         adata = adata_pmad["adata"].copy()
 
-        pooled_median_absolute_deviation(adata, group_column=adata_pmad["group_column"], layer=layer, inplace=True)
+        returned_result = pooled_median_absolute_deviation(
+            adata, group_column=adata_pmad["group_column"], layer=layer, inplace=True
+        )
 
+        assert returned_result is None
         assert adata.uns.get("metrics").get("pmad") == reference
 
 
