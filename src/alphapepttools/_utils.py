@@ -32,8 +32,8 @@ def get_matrix(adata: ad.AnnData, layer: str | None = None) -> np.ndarray:
     return np.asarray(data)
 
 
-def resolve_axis(axis: str | int) -> str:
-    """Normalize an axis specifier to the canonical "obs" / "var" string.
+def resolve_axis(axis: str | int) -> int:
+    """Normalize an axis specifier to the numpy axis convention.
 
     Accepts ``"obs"`` or ``0`` for observations (rows), ``"var"`` or ``1`` for features (columns).
 
@@ -44,7 +44,8 @@ def resolve_axis(axis: str | int) -> str:
 
     Returns
     -------
-    Either ``"obs"`` or ``"var"``.
+    - `0` for sample-wise (.obs) axis.
+    - `1` for feature-wise (.var) axis.
 
     Raises
     ------
@@ -53,4 +54,4 @@ def resolve_axis(axis: str | int) -> str:
     """
     if axis not in ("obs", "var", 0, 1):
         raise ValueError(f"axis must be 'obs', 'var', 0, or 1, got '{axis}'")
-    return "obs" if axis in ("obs", 0) else "var"
+    return 0 if axis in ("obs", 0) else 1
