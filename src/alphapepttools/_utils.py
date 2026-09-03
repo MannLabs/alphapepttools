@@ -32,7 +32,7 @@ def get_matrix(adata: ad.AnnData, layer: str | None = None) -> np.ndarray:
     return np.asarray(data)
 
 
-def _resolve_axis(axis: str | int) -> str:
+def resolve_axis(axis: str | int) -> str:
     """Normalize an axis specifier to the canonical "obs" / "var" string.
 
     Accepts ``"obs"`` or ``0`` for observations (rows), ``"var"`` or ``1`` for features (columns).

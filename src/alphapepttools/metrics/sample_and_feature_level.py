@@ -5,7 +5,7 @@ import warnings
 import anndata as ad
 import numpy as np
 
-from alphapepttools._utils import _resolve_axis, get_matrix
+from alphapepttools._utils import get_matrix, resolve_axis
 from alphapepttools.pp.transform import detect_special_values
 
 
@@ -47,7 +47,7 @@ def total_intensity(
         If inplace is False, returns the sum values as an array.
         If inplace is True, modifies adata inplace and returns None.
     """
-    axis = _resolve_axis(axis)
+    axis = resolve_axis(axis)
 
     if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
@@ -111,7 +111,7 @@ def number_detected(
         If inplace is False, returns the count values as an array.
         If inplace is True, modifies adata inplace and returns None.
     """
-    axis = _resolve_axis(axis)
+    axis = resolve_axis(axis)
 
     if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
@@ -167,7 +167,7 @@ def fraction_complete(
         If inplace is False, returns the fraction values as an array.
         If inplace is True, modifies adata inplace and returns None.
     """
-    axis = _resolve_axis(axis)
+    axis = resolve_axis(axis)
 
     if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
