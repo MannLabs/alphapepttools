@@ -383,6 +383,7 @@ def pooled_coefficient_of_variation(
 
     if inplace:
         adata.uns = _set_nested_dict(adata.uns, value=pcv_groupwise, keys=[METRICS_KEY, PCV_KEY])
+        return None
     return pd.DataFrame.from_dict(pcv_groupwise, orient="index", columns=pd.Index([PCV_KEY]))
 
 
