@@ -504,4 +504,5 @@ def pooled_median_absolute_deviation(
 
     if inplace:
         adata.uns = _set_nested_dict(adata.uns, value=pmad_groupwise, keys=[METRICS_KEY, PMAD_KEY])
+        return None
     return pd.DataFrame.from_dict(pmad_groupwise, orient="index", columns=pd.Index([PMAD_KEY]))
