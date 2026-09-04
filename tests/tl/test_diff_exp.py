@@ -635,13 +635,14 @@ def test_diff_exp_ebayes_expanded_agrees_with_original(
     """
     adata = example_adata_ebayes.copy()
 
-    # Original implementation: returns (comparison_key, DataFrame), drops incomplete features.
-    comparison_key, original = tl.diff_exp_ebayes(
+    # Original implementation: returns a DataFrame carrying the comparison in `condition_pair`,
+    # and drops incomplete features.
+    original = tl.diff_exp_ebayes(
         adata=adata.copy(),
         between_column=between_column,
         comparison=comparison,
     )
-    assert comparison_key == expected_comparison_key
+    assert original["condition_pair"].unique().tolist() == [expected_comparison_key]
 
     # Expanded implementation fits every feature, so filter incomplete features upfront (as a user would)
     # to match the original's feature set and therefore its eBayes prior.
