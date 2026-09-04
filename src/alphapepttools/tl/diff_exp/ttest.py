@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 import anndata as ad
 import numpy as np
@@ -19,7 +20,7 @@ def nan_safe_ttest_ind(
     b: pd.Series,
     min_valid_values: int | None = None,
     **kwargs,
-) -> tuple[float, float] | tuple[np.nan, np.nan]:
+) -> tuple[float, float]:
     """NaN-safe wrapper around scipy.stats.ttest_ind.
 
     Performs independent t-test between two samples, but returns (nan, nan) if either
@@ -140,7 +141,7 @@ def diff_exp_ttest(
     min_valid_values: int = 2,
     *,
     equal_var: bool = False,
-) -> pd.DataFrame | None:
+) -> pd.DataFrame:
     """Calculate ratios of features between two specific groups using t-test.
 
     Calculate ratios and log2 ratios of each feature in the AnnData object's X
@@ -161,9 +162,9 @@ def diff_exp_ttest(
 
     Returns
     -------
-    pd.DataFrame | None
+    pd.DataFrame
         DataFrame with ratios, deltas, t-statistics, p-values, and adjusted p-values
-        for the comparison between the two specified groups. Returns None if validation fails.
+        for the comparison between the two specified groups.
 
     Examples
     --------
@@ -229,7 +230,7 @@ def diff_exp_ttest(
     )
 
     # adjust pvalues using Benjamini-Hochberg method, accounting for nans
-    p_adj = nan_safe_bh_correction(p_values)
+    p_adj = nan_safe_bh_correction(cast("np.ndarray", p_values))
 
     # store results in dataframe
     result_df = (

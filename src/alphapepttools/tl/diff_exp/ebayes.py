@@ -10,7 +10,7 @@ try:
     from inmoose import limma
 
     _HAS_INMOOSE = True
-except ModuleNotFoundError:
+except ModuleNotFoundError:  # pragma: no cover - optional dep, env-dependent
     _HAS_INMOOSE = False
 
 from alphapepttools.pp.data import filter_data_completeness
@@ -119,7 +119,7 @@ def diff_exp_ebayes(
     adata: ad.AnnData,
     between_column: str,
     comparison: tuple[str, str],
-) -> tuple[str, pd.DataFrame]:
+) -> pd.DataFrame:
     """Run Limma eBayes moderated ttest for differential expression.
 
     Parameters
@@ -133,10 +133,8 @@ def diff_exp_ebayes(
 
     Returns
     -------
-    tuple[str, pd.DataFrame]
-        Tuple containing:
-        - comparison_key: String identifier for the comparison (e.g., "treatment_VS_control")
-        - result_df: DataFrame with standardized Limma eBayes differential expression results.
+    pd.DataFrame
+        DataFrame with standardized Limma eBayes differential expression results.
 
     Raises
     ------
@@ -158,7 +156,7 @@ def diff_exp_ebayes(
 
     .. code-block:: python
 
-        comparison_key, ebayes_results = at.tl.diff_exp_ebayes(
+        ebayes_results = at.tl.diff_exp_ebayes(
             adata=adata_precursor,
             between_column="treatment",
             comparison=("treated", "control"),
@@ -168,7 +166,7 @@ def diff_exp_ebayes(
         significant = ebayes_results[ebayes_results["fdr"] < 0.05]
 
     """
-    if not _HAS_INMOOSE:
+    if not _HAS_INMOOSE:  # pragma: no cover - optional dep, env-dependent
         raise ImportError(
             "inmoose is required for diff_exp_ebayes(). Install it through pip or install alphapepttools with the 'full'/'full-stable' extra."
         )
@@ -194,7 +192,7 @@ def diff_exp_ebayes(
     # This ensures compatibility with inmoose's lmFit which cannot handle NaN values
     adata_subset = filter_data_completeness(
         adata_subset,
-        max_missing=0,
+        max_missing_count=0,
         action="drop",
     )
 
@@ -238,4 +236,4 @@ def diff_exp_ebayes(
     result_df["max_level_2_samples"] = max_samples_level_2
 
     comparison_key = f"{level_1}_VS_{level_2}"
-    return comparison_key, _standardize_limma_results(comparison_key, result_df)
+    return _standardize_limma_results(comparison_key, result_df)

@@ -6,6 +6,7 @@ import pandas as pd
 import pytest
 
 from alphapepttools.tl.plot_data_handling import (
+    _extract_expression_df,
     _validate_pca_loadings_plot_inputs,
     _validate_pca_plot_input,
     _validate_scree_plot_input,
@@ -366,3 +367,23 @@ def test_extract_pca_anndata_custom_embeddings_name():
     out = extract_pca_anndata(adata, dim_space="obs", embeddings_name="custom_emb")
     assert out.X.shape == (adata.n_obs, 2)
     assert out.var_names.tolist() == ["pc_1", "pc_2"]
+
+
+def test_validate_pca_plot_input_missing_variance_key(sample_adata):
+    """`_validate_pca_plot_input` should raise when the variance key is absent from .uns."""
+    with pytest.raises(ValueError, match="PCA metadata layer 'missing_variance' not found"):
+        _validate_pca_plot_input(sample_adata, "X_pca_obs", "missing_variance", "obs")
+
+
+def test_extract_expression_df_string_name_is_normalized(sample_adata):
+    """Passing a single var name as a string should work the same as a one-element list."""
+    result_string = _extract_expression_df(sample_adata, "gene_0")
+    result_list = _extract_expression_df(sample_adata, ["gene_0"])
+    pd.testing.assert_frame_equal(result_string, result_list)
+
+
+def test_extract_expression_df_no_valid_names(sample_adata):
+    """No matching var names should return an empty DataFrame."""
+    result = _extract_expression_df(sample_adata, ["nope_1", "nope_2"])
+    assert isinstance(result, pd.DataFrame)
+    assert result.empty

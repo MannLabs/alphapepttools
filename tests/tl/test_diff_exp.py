@@ -10,7 +10,11 @@ from scipy.stats import ttest_ind
 from alphapepttools import tl
 from alphapepttools.pp import nanlog
 from alphapepttools.tl.defaults import tl_defaults
-from alphapepttools.tl.diff_exp.alphaquant_wrapper import _HAS_ALPHAQUANT, _standardize_alphaquant_results
+from alphapepttools.tl.diff_exp.alphaquant_wrapper import (
+    _HAS_ALPHAQUANT,
+    _STACKED_COLS,
+    _standardize_alphaquant_results,
+)
 from alphapepttools.tl.diff_exp.ebayes import _HAS_INMOOSE
 from alphapepttools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
 
@@ -73,6 +77,19 @@ def test_nan_safe_ttest_ind(ab, expected, min_valid_values):
         assert np.allclose(result, expected_result), f"Expected {expected_result}, got {result}"
     else:
         assert result == expected, f"Expected {expected}, got {result}"
+
+
+def test_nan_safe_ttest_ind_converts_non_series():
+    """List inputs should be converted to pd.Series and processed normally."""
+    result = tl.nan_safe_ttest_ind([1, 2, 3], [4, 5, 6])
+    expected = ttest_ind([1, 2, 3], [4, 5, 6])
+    assert np.allclose(result, expected)
+
+
+def test_nan_safe_ttest_ind_raises_on_unconvertible_input():
+    """Input that pd.Series cannot accept (e.g. a 2D array) should raise TypeError."""
+    with pytest.raises(TypeError, match="Cannot convert inputs"):
+        tl.nan_safe_ttest_ind(np.array([[1, 2], [3, 4]]), pd.Series([4, 5, 6]))
 
 
 # Test group-wise ttest with ratios
@@ -283,7 +300,7 @@ def test_diff_exp_alphaquant():
                 "max_level_2_samples": [10, 10],  # Added by standardization
                 "proteoform_id": ["PF1", "PF2"],
                 "peptides": ["PEP1;PEP2", "PEP3"],
-                "num_peptides": [2, 1],
+                "num_peptides": [2.0, 1.0],  # float, as stacking with NaN rows upcasts the int column
                 "quality_score": [0.9, 0.8],
             }
         ),
@@ -312,7 +329,7 @@ def test_diff_exp_alphaquant():
             side_effect=[mock_protein_df.copy(), mock_proteoform_df.copy(), mock_peptide_df.copy()],
         ),
     ):
-        comparison_key, results = tl.diff_exp_alphaquant(
+        results = tl.diff_exp_alphaquant(
             adata=adata,
             report=report,
             between_column="condition",
@@ -322,11 +339,31 @@ def test_diff_exp_alphaquant():
             plots="hide",
         )
 
-    assert comparison_key == expected_comparison_key
+    # The three levels are stacked into one frame and separated by the modality column
+    assert list(results.columns) == _STACKED_COLS
+    assert len(results) == sum(len(df) for df in expected_results.values())
+    assert results["feature_id"].notna().all()
+    assert all(results["condition_pair"] == expected_comparison_key)
+
+    # Level-specific columns are NaN outside their own modality
+    protein_rows = results[results["modality"] == "protein"]
+    assert protein_rows[["sequence", "proteoform_id", "peptides", "num_peptides"]].isna().all().all()
+
+    expected_features = {
+        "protein": ["PROT1", "PROT2"],
+        "proteoform": ["PF1", "PF2"],
+        "peptide": ["PEPTIDE1", "PEPTIDE2"],
+    }
 
     for level in ["protein", "proteoform", "peptide"]:
+        subset = results[results["modality"] == level].reset_index(drop=True)
+        assert subset["feature_id"].tolist() == expected_features[level]
+
+        # Selecting the expected columns ignores the NaN padding, which is asserted separately above
         # The tolerances are slightly larger, than for the vanilla ttest, albeit still small, as the package is still in development
-        pd.testing.assert_frame_equal(results[level], expected_results[level], rtol=0.01, atol=1e-6)
+        pd.testing.assert_frame_equal(
+            subset[expected_results[level].columns], expected_results[level], rtol=0.01, atol=1e-6
+        )
 
 
 @pytest.fixture
@@ -398,7 +435,7 @@ def test_diff_exp_ebayes(
 
     adata = example_adata_ebayes.copy()
 
-    comparison_key, results = tl.diff_exp_ebayes(
+    results = tl.diff_exp_ebayes(
         adata=adata,
         between_column=between_column,
         comparison=comparison,
@@ -408,13 +445,10 @@ def test_diff_exp_ebayes(
     expected_df = expected_ebayes_base_df.copy()
     expected_df.insert(0, "condition_pair", [expected_comparison_key] * len(expected_df))
 
+    # The comparison key is no longer returned separately, it is carried in condition_pair
     pd.testing.assert_frame_equal(
         results,
         expected_df,
-    )
-
-    assert comparison_key == expected_comparison_key, (
-        f"Expected comparison key {expected_comparison_key}, got {comparison_key}"
     )
 
 
@@ -557,3 +591,59 @@ def test__standardize_alphaquant_results(
     assert result["-log10(fdr)"].iloc[0] == neg_log10_fdr, (
         f"Expected -log10(fdr) {neg_log10_fdr}, got {result['-log10(fdr)'].iloc[0]}"
     )
+
+
+### Test validation raises in diff_exp_alphaquant / diff_exp_ebayes / _standardize_alphaquant_results ###
+
+
+@pytest.fixture
+def adata_for_diff_exp():
+    """Tiny AnnData for triggering validation raises (no real computation needed)."""
+    return ad.AnnData(
+        X=np.array([[1.0, 2.0], [3.0, 4.0]]),
+        obs=pd.DataFrame({"condition": ["A", "B"]}, index=["s1", "s2"]),
+    )
+
+
+def test__standardize_alphaquant_results_unknown_level():
+    """Passing an unknown level should raise ValueError."""
+    with pytest.raises(ValueError, match="Unknown level"):
+        _standardize_alphaquant_results("A_VS_B", "unknown_level", pd.DataFrame())
+
+
+@pytest.mark.skipif(not _HAS_ALPHAQUANT, reason="alphaquant not installed")
+@pytest.mark.parametrize(
+    ("kwargs_override", "match"),
+    [
+        ({"plots": "bogus"}, "Parameter 'plots'"),
+        ({"between_column": "nonexistent"}, "not found in adata.obs"),
+        ({"comparison": ["A", "B"]}, "tuple of exactly two"),
+    ],
+)
+def test_diff_exp_alphaquant_validation_raises(adata_for_diff_exp, kwargs_override, match):
+    """Input validation in diff_exp_alphaquant should raise before any computation."""
+    base_kwargs = {
+        "adata": adata_for_diff_exp,
+        "report": pd.DataFrame(),
+        "between_column": "condition",
+        "comparison": ("A", "B"),
+    }
+    base_kwargs.update(kwargs_override)
+    with pytest.raises(ValueError, match=match):
+        tl.diff_exp_alphaquant(**base_kwargs)
+
+
+@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
+@pytest.mark.parametrize(
+    ("comparison", "match"),
+    [
+        # level_1 missing
+        (("MISSING", "B"), "Level MISSING not found"),
+        # level_2 missing
+        (("A", "MISSING"), "Level MISSING not found"),
+    ],
+)
+def test_diff_exp_ebayes_missing_level_raises(adata_for_diff_exp, comparison, match):
+    """A comparison referencing a level not in `between_column` should raise."""
+    with pytest.raises(ValueError, match=match):
+        tl.diff_exp_ebayes(adata_for_diff_exp, between_column="condition", comparison=comparison)
