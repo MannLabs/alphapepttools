@@ -23,6 +23,8 @@ class TLDefaults:
 
     CEILING_NEGATIVE_LOG10_PVALUE: ClassVar[float] = 300.0
 
+    CONDITION_SPLIT_STRING: ClassVar[str] = "_VS_"
+
 
 # Create a singleton instance for easy import
 tl_defaults = TLDefaults()
