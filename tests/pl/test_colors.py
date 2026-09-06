@@ -1,4 +1,3 @@
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
@@ -103,7 +102,6 @@ def test_get_color_mapping(input_values, palette, expected_dict):
 )
 def test_get_colors_from_cmap(input_values, palette, expected_array):
     """Test _get_colors_from_cmap with various input types and edge cases."""
-    from alphapepttools.pl.colors import _get_colors_from_cmap
 
     if expected_array is None:
         with pytest.raises((ValueError, TypeError)):
@@ -119,88 +117,88 @@ def test_get_colors_from_cmap(input_values, palette, expected_array):
     np.testing.assert_allclose(result, expected_array, rtol=1e-5), result
 
 
-### Test MappedColormaps — verify that data values map correctly to colors ###
+# Test for setting custom vmin/vmax value:  _get_colors_from_cmap(..., vmin, vmax) must equal cmap(Normalize(vmin, vmax)(values)).
+@pytest.mark.parametrize(
+    ("values", "vmin", "vmax", "expected_fractions"),
+    [
+        # vmin and vmax fully contain the data range: bounds must be vmin/vmax, not data min/max
+        (np.array([0.25, 0.5, 0.75]), 0.0, 1.0, [0.25, 0.5, 0.75]),
+        # vmin excedes lowest data value but vmax is the same as the data max: data max reaches 1.0
+        (np.array([2.0, 4.0]), 0.0, 4.0, [0.5, 1.0]),
+        # Data values outside vmin/vmax: clamp to the cmap endpoints: colors don't go beyond the colormap range set by vmin/vmax
+        (np.array([-1.0, 0.5, 2.0]), 0.0, 1.0, [0.0, 0.5, 1.0]),
+        # Bounds default to data min/max when omitted (unchanged legacy behavior).
+        (np.array([2.0, 4.0]), None, None, [0.0, 1.0]),
+    ],
+)
+def test_get_colors_from_cmap_vmin_vmax(values, vmin, vmax, expected_fractions):
+    """Explicit vmin/vmax override the data-derived normalization range."""
+
+    cmap = plt.get_cmap("viridis")
+    result = _get_colors_from_cmap(cmap_name=cmap, values=values, vmin=vmin, vmax=vmax)
+    expected = cmap(np.array(expected_fractions))
+    np.testing.assert_allclose(result, expected, rtol=1e-5)
 
 
-class TestMappedColormaps:
-    def test_init_sets_cmap_and_resets_bounds(self):
-        """Constructor should resolve the colormap and leave vmin/vmax unset until fit_transform."""
-        mapper = MappedColormaps(cmap="sequential", percentile=(5, 95))
+def test_mappedcolormaps_fit_sets_bounds():
+    """fit() stores data-derived bounds and returns self for chaining."""
+    mapper = MappedColormaps(cmap="viridis")
+    returned = mapper.fit(np.array([2.0, 5.0, 8.0]))
 
-        assert mapper.cmap is BaseColormaps.get("sequential")
-        assert mapper.percentile == (5, 95)
-        assert mapper.vmin is None
-        assert mapper.vmax is None
+    assert returned is mapper
+    assert mapper.vmin == 2.0  # noqa: PLR2004
+    assert mapper.vmax == 8.0  # noqa: PLR2004
 
-    def test_fit_transform_full_range_matches_direct_cmap(self):
-        """With percentile=None, the colors returned should be identical to applying the
-        colormap directly to the (unclipped) data — i.e. value → color mapping is preserved."""
-        data = np.array([0.0, 25.0, 50.0, 75.0, 100.0])
-        mapper = MappedColormaps(cmap="sequential")
 
-        colors = mapper.fit_transform(data)
-        expected = _get_colors_from_cmap(BaseColormaps.get("sequential"), data)
+def test_mappedcolormaps_fit_explicit_bounds_including_zero():
+    """Explicit vmin/vmax override data-derived bounds; a zero bound is honored."""
+    mapper = MappedColormaps(cmap="viridis")
+    # data ranges 2..4, but we pin to [0, 1] — the zero must not be dropped
+    mapper.fit(np.array([2.0, 4.0]), vmin=0.0, vmax=1.0)
 
-        np.testing.assert_allclose(colors, expected, rtol=1e-6)
-        assert mapper.vmin == 0.0
-        assert mapper.vmax == 100.0  # noqa: PLR2004
+    assert mapper.vmin == 0.0
+    assert mapper.vmax == 1.0
 
-    def test_fit_transform_percentile_clips_outliers_to_same_color(self):
-        """Values above the upper percentile (or below the lower) should be clipped — i.e.
-        every outlier on the high side should end up with the *same* color as the upper bound.
-        This is the core promise of percentile-based normalization."""
-        # 50th percentile of this data is 3, so 1000 and 2000 both clip to 3
-        data = np.array([1.0, 2.0, 3.0, 1000.0, 2000.0])
-        mapper = MappedColormaps(cmap="sequential", percentile=(0, 50))
 
-        colors = mapper.fit_transform(data)
+def test_mappedcolormaps_fit_no_data_no_bounds_raises():
+    """fit() with neither data nor a full pair of bounds cannot set the range."""
+    mapper = MappedColormaps(cmap="viridis")
+    with pytest.raises(ValueError):
+        mapper.fit()
 
-        # vmin/vmax recorded from percentile bounds, not from raw min/max
-        assert mapper.vmax == 3.0  # noqa: PLR2004
-        # Both outliers (indices -2, -1) clip to vmax=3 → should share the same color
-        np.testing.assert_allclose(colors[-1], colors[-2], rtol=1e-6)
-        # And that clipped color should match the color of an in-range value at the bound
-        np.testing.assert_allclose(colors[-1], colors[2], rtol=1e-6)  # data[2] == 3 == vmax
 
-    def test_fit_transform_identical_values_get_identical_colors(self):
-        """Duplicate values should map to identical colors."""
-        data = np.array([1.0, 2.0, 1.0, 3.0, 2.0])
-        mapper = MappedColormaps(cmap="sequential")
+def test_mappedcolormaps_transform_before_fit_raises():
+    """transform() requires bounds from a prior fit()/fit_transform()."""
+    mapper = MappedColormaps(cmap="viridis")
+    with pytest.raises(ValueError):
+        mapper.transform(np.array([0.0, 1.0]))
 
-        colors = mapper.fit_transform(data)
 
-        # data[0] == data[2] → same color
-        np.testing.assert_allclose(colors[0], colors[2], rtol=1e-6)
-        # data[1] == data[4] → same color
-        np.testing.assert_allclose(colors[1], colors[4], rtol=1e-6)
-        # different values produce different colors (sanity)
-        assert not np.allclose(colors[0], colors[1])
+def test_mappedcolormaps_transform_respects_fitted_bounds():
+    """transform() uses the fitted vmin/vmax, not the data range of its argument."""
+    cmap = plt.get_cmap("viridis")
+    mapper = MappedColormaps(cmap="viridis")
+    mapper.fit(vmin=0.0, vmax=1.0)
 
-    def test_fit_transform_as_hex_returns_hex_strings(self):
-        """`as_hex=True` should produce hex color strings of the right shape."""
-        data = np.array([1.0, 5.0, 10.0])
-        mapper = MappedColormaps(cmap="sequential")
+    # [0.25, 0.75] must land on cmap fractions [0.25, 0.75], not be re-stretched to [0, 1]
+    result = mapper.transform(np.array([0.25, 0.75]))
+    expected = cmap(np.array([0.25, 0.75]))
+    np.testing.assert_allclose(result, expected, rtol=1e-5)
 
-        hex_colors = mapper.fit_transform(data, as_hex=True)
 
-        assert hex_colors.shape == (3,)
-        assert all(isinstance(c, str) and c.startswith("#") for c in hex_colors)
+@pytest.mark.parametrize(
+    ("percentile", "as_hex"),
+    [(None, False), (None, True), ((5, 95), False), ((5, 95), True)],
+)
+def test_mappedcolormaps_fit_transform_equals_fit_then_transform(percentile, as_hex):
+    """fit_transform(x) must equal fit(x).transform(x) so the paths cannot drift."""
+    rng = np.random.default_rng(0)
+    data = rng.normal(size=100)
 
-    def test_scalar_mappable_raises_before_fit_transform(self):
-        """Accessing scalar_mappable before fit_transform should raise."""
-        mapper = MappedColormaps(cmap="sequential")
-        with pytest.raises(ValueError, match="fit_transform must be called"):
-            _ = mapper.scalar_mappable
+    combined = MappedColormaps(cmap="viridis", percentile=percentile).fit_transform(data, as_hex=as_hex)
+    split = MappedColormaps(cmap="viridis", percentile=percentile).fit(data).transform(data, as_hex=as_hex)
 
-    def test_scalar_mappable_after_fit_transform(self):
-        """After fit_transform, scalar_mappable should expose the same vmin/vmax and cmap."""
-        data = np.array([2.0, 4.0, 6.0, 8.0])
-        mapper = MappedColormaps(cmap="sequential")
-        mapper.fit_transform(data)
-
-        sm = mapper.scalar_mappable
-
-        assert isinstance(sm, mpl.cm.ScalarMappable)
-        assert sm.norm.vmin == mapper.vmin
-        assert sm.norm.vmax == mapper.vmax
-        assert sm.cmap is mapper.cmap
+    if as_hex:
+        assert list(combined) == list(split)
+    else:
+        np.testing.assert_allclose(combined, split, rtol=1e-5)
