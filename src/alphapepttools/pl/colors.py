@@ -845,9 +845,12 @@ class MappedColormaps:
     ) -> np.ndarray:
         """Normalize data and transform it to colors
 
-        Fits the colormap normalization to the data (determining vmin/vmax from
-        the data or percentile range) and transforms the data values to colors.
-        Values outside the normalization range are clipped.
+        Convenience wrapper around :meth:`fit` followed by :meth:`transform`: the
+        normalization bounds are derived from the data (the full range, or the
+        configured ``percentile`` range) and the data is then mapped to colors.
+        Values outside the normalization range are clamped to the colormap's end
+        colors. Use :meth:`fit` and :meth:`transform` separately to reuse one color
+        scale across several arrays with differing ranges.
 
         Parameters
         ----------
@@ -897,22 +900,7 @@ class MappedColormaps:
             # Returns array of hex strings like ['#1a2b3c', ...]
 
         """
-        data = np.asarray(data).copy()
-
-        if self.percentile is not None:
-            self.vmin = np.nanpercentile(data, self.percentile[0])
-            self.vmax = np.nanpercentile(data, self.percentile[1])
-        else:
-            self.vmin = np.nanmin(data)
-            self.vmax = np.nanmax(data)
-
-        data = np.clip(data, self.vmin, self.vmax)
-
-        rgba = _get_colors_from_cmap(self.cmap, data)
-
-        if as_hex:
-            return np.apply_along_axis(mpl_colors.to_hex, -1, rgba, keep_alpha=True)
-        return np.asarray(rgba)
+        return self.fit(data).transform(data, as_hex=as_hex)
 
     def fit(
         self,
