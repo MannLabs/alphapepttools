@@ -17,7 +17,7 @@ class AnnDataFactory:
     def __init__(
         self,
         psm_df: pd.DataFrame,
-        reader_type: str,
+        reader_type: str | None = None,
     ):
         """Initialize AnnDataFactory.
 
@@ -30,7 +30,7 @@ class AnnDataFactory:
         psm_df
             Dataframe containing precursor intensity, sample_id and feature_id columns in a longtable
         reader_type
-            Type of PSM reader to use.
+            Type of PSM reader to use. If `None`, no presets are available.
 
         Examples
         --------
