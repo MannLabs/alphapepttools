@@ -16,8 +16,8 @@ from alphapepttools.tl.diff_exp.alphaquant_wrapper import (
     _STACKED_COLS,
     _standardize_alphaquant_results,
 )
-from alphapepttools.tl.diff_exp.ebayes import _HAS_INMOOSE
-from alphapepttools.tl.diff_exp.ebayes_expanded import (
+from alphapepttools.tl.diff_exp.ebayes import (
+    _HAS_INMOOSE,
     _METHOD_NAME,
     _build_design_matrix,
     _contrasts_from_matrix,
@@ -28,7 +28,6 @@ from alphapepttools.tl.diff_exp.ebayes_expanded import (
     _run_contrasts,
     _standardize_contrast_frame,
 )
-from alphapepttools.tl.diff_exp.ebayes_expanded import diff_exp_ebayes as diff_exp_ebayes_expanded
 from alphapepttools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
 
 
@@ -408,8 +407,13 @@ def example_adata_ebayes():
 
 
 @pytest.fixture
-def expected_ebayes_base_df():
-    """Base expected dataframe for eBayes tests with B_VS_A comparison."""
+def expected_ebayes_complete_case_df():
+    """Frozen expected values for the B_VS_A comparison on the complete-case feature set.
+
+    The fixture's X4 carries missing values, so these numbers only hold once the adata has been
+    filtered with `filter_data_completeness(max_missing_count=0)`; the eBayes variance prior is
+    estimated from whichever features are present, so the feature set is part of the expectation.
+    """
     return pd.DataFrame(
         {
             "protein": ["X1", "X2", "X3"],
@@ -422,31 +426,34 @@ def expected_ebayes_base_df():
             "max_level_1_samples": [5, 5, 5],
             "max_level_2_samples": [5, 5, 5],
             "stat": [-3.804007666004946, -6.2764817445960475, -3.9999011197249166],
-            "B": [-1.8736068846693623, 2.010219213410613, -1.5373419998901845],
-            "AveExpr": [4.175828737355294, 2.8008384166375, 2.1791061114716954],
         },
         index=["X1", "X2", "X3"],
     )
 
 
-# Test diff_exp_limma by loading small example datasets
+# Absolute regression anchor: pins the numbers diff_exp_ebayes produces, so a change in our own
+# pipeline or in the inmoose version underneath it shows up here. The companion oracle test below
+# instead re-derives the numbers from limma, and would move along with such a change.
 @pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
 @pytest.mark.parametrize(
     ("comparison", "expected_comparison_key", "between_column"),
     [
-        (("B", "A"), "B_VS_A", "group"),  # ensure that patsy's alphabetical ordering is cancelled out correctly
+        # ("B", "A") is deliberately not alphabetical: it pins the fold change direction as A - B
+        # (i.e. comparison[0] - comparison[1]) independently of how the levels happen to sort.
+        (("B", "A"), "B_VS_A", "group"),
     ],
 )
 def test_diff_exp_ebayes(
     example_adata_ebayes,
-    expected_ebayes_base_df,
+    expected_ebayes_complete_case_df,
     comparison,
     expected_comparison_key,
     between_column,
 ):
-    """Testing function to ascertain stable functionality of diff_exp_limma on a small example dataset."""
+    """diff_exp_ebayes reproduces its frozen reference values on a small complete-case dataset."""
 
-    adata = example_adata_ebayes.copy()
+    # diff_exp_ebayes fits incomplete features too, so filter upfront to pin the feature set.
+    adata = filter_data_completeness(example_adata_ebayes.copy(), max_missing_count=0, action="drop")
 
     results = tl.diff_exp_ebayes(
         adata=adata,
@@ -455,13 +462,15 @@ def test_diff_exp_ebayes(
     )
 
     # Add the condition_pair column to the expected dataframe
-    expected_df = expected_ebayes_base_df.copy()
+    expected_df = expected_ebayes_complete_case_df.copy()
     expected_df.insert(0, "condition_pair", [expected_comparison_key] * len(expected_df))
 
-    # The comparison key is no longer returned separately, it is carried in condition_pair
+    # check_names=False: results are indexed on adata.var_names, whose .name differs from the
+    # plain Index the expectation is built with.
     pd.testing.assert_frame_equal(
         results,
         expected_df,
+        check_names=False,
     )
 
 
@@ -606,11 +615,57 @@ def test__standardize_alphaquant_results(
     )
 
 
-### Expanded eBayes tests
+### eBayes tests
 
 
-# Critical test for the expanded implementation: on complete features it must reproduce
-# the original diff_exp_ebayes exactly.
+def _inmoose_limma_reference(adata, between_column, comparison):
+    """Run the pre-port eBayes chain by calling inmoose.limma directly.
+
+    This is the independent numerical oracle for the numpy reimplementations in
+    `tl.diff_exp.ebayes`: `_nan_lmfit`, `_make_contrasts`, `_run_contrasts` and the topTable
+    equivalent all replaced a limma call that this helper still makes. eBayes moderation itself is
+    shared between the two paths (`_ebayes_moderation` calls `limma.eBayes`), so it is not what is
+    under test here.
+
+    Requires complete (NaN-free) data, which is why callers pre-filter with
+    `filter_data_completeness`. Imports are function-local: patsy only reaches the environment
+    transitively via inmoose, so a module-level import would break collection of this whole file in
+    the non-`full` CI legs. Every caller is gated on `_HAS_INMOOSE`.
+
+    Returns
+    -------
+    pd.DataFrame
+        topTable output indexed by feature, with limma's column names mapped onto `log2fc`,
+        `p_value` and `fdr`.
+    """
+    import patsy
+    from inmoose import limma
+
+    level_1, level_2 = comparison
+    sub = adata[adata.obs[between_column].isin([level_1, level_2])].copy()
+    labels = sub.obs[between_column].to_numpy()
+
+    # The explicit DesignInfo is required: limma.lmFit wraps a bare ndarray/DataFrame in a
+    # patsy.DesignMatrix of its own, which loses the column names makeContrasts(levels=...) keys on.
+    design_matrix = patsy.DesignMatrix(
+        np.column_stack([(labels == level_1).astype(float), (labels == level_2).astype(float)]),
+        patsy.DesignInfo([level_1, level_2]),
+    )
+
+    fit = limma.lmFit(sub.X.T, design_matrix)
+    fit = limma.contrasts_fit(fit, limma.makeContrasts(f"{level_1}-{level_2}", levels=[level_1, level_2]))
+    fit = limma.eBayes(fit)
+
+    # topTable cannot sort_by="none" and sorts by p-value, so restore the original feature order.
+    top = pd.DataFrame(limma.topTable(fit, coef=fit.coefficients.columns[0], number=np.inf)).sort_index()
+    top.index = sub.var_names
+    return top.rename(columns={"log2FoldChange": "log2fc", "pvalue": "p_value", "adj_pvalue": "fdr"})
+
+
+_ORACLE_COLS = ["log2fc", "p_value", "fdr"]
+
+
+# Critical test: on complete data, the numpy port must reproduce the straight limma chain.
 @pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
 @pytest.mark.parametrize(
     ("comparison", "expected_comparison_key", "between_column"),
@@ -618,51 +673,33 @@ def test__standardize_alphaquant_results(
         (("B", "A"), "B_VS_A", "group"),
     ],
 )
-def test_diff_exp_ebayes_expanded_agrees_with_original(
+def test_diff_exp_ebayes_matches_inmoose_limma_reference(
     example_adata_ebayes,
     comparison,
     expected_comparison_key,
     between_column,
 ):
-    """The nan-aware expanded eBayes must reproduce the original diff_exp_ebayes on shared features.
+    """diff_exp_ebayes reproduces a direct inmoose.limma chain on complete data.
 
-    The original drops any feature with a missing value, whereas the expanded version fits every feature.
-    To match, we apply the same upfront completeness filter (the intended workflow) before the expanded
-    version so both estimate the eBayes prior from the same feature set; the moderated statistics must then
-    agree to numerical precision. We compare on the features the original returns and on the columns both
-    implementations share (the expanded output lacks the original's extra `stat`, `B`, `AveExpr`, and carries
-    a distinct `method` label).
+    diff_exp_ebayes fits every feature whereas the limma chain cannot handle NaNs at all, so we
+    filter incomplete features upfront (the intended workflow) to give both paths the same feature
+    set and therefore the same eBayes variance prior. The moderated statistics must then agree to
+    numerical precision.
     """
-    adata = example_adata_ebayes.copy()
+    adata = filter_data_completeness(example_adata_ebayes.copy(), max_missing_count=0, action="drop")
 
-    # Original implementation: returns a DataFrame carrying the comparison in `condition_pair`,
-    # and drops incomplete features.
-    original = tl.diff_exp_ebayes(
+    results = tl.diff_exp_ebayes(
         adata=adata.copy(),
         between_column=between_column,
         comparison=comparison,
     )
-    assert original["condition_pair"].unique().tolist() == [expected_comparison_key]
+    assert results["condition_pair"].unique().tolist() == [expected_comparison_key]
 
-    # Expanded implementation fits every feature, so filter incomplete features upfront (as a user would)
-    # to match the original's feature set and therefore its eBayes prior.
-    adata_complete = filter_data_completeness(adata.copy(), max_missing_count=0, action="drop")
-    expanded = diff_exp_ebayes_expanded(
-        adata=adata_complete,
-        between_column=between_column,
-        comparison=comparison,
-    )
-    assert expanded["condition_pair"].unique().tolist() == [expected_comparison_key]
-
-    # Restrict to the features the original returns and the columns both share (excluding `method`,
-    # which is an intentionally distinct label rather than a computed result).
-    compare_cols = [c for c in tl_defaults.DIFF_EXP_COLS if c != "method"]
-    expanded_shared = expanded.loc[original.index, compare_cols]
-    original_shared = original[compare_cols]
+    reference = _inmoose_limma_reference(adata.copy(), between_column, comparison)
 
     pd.testing.assert_frame_equal(
-        expanded_shared,
-        original_shared,
+        results.loc[reference.index, _ORACLE_COLS],
+        reference[_ORACLE_COLS],
         check_exact=False,
         rtol=1e-5,
         atol=1e-8,
@@ -670,12 +707,31 @@ def test_diff_exp_ebayes_expanded_agrees_with_original(
         check_names=False,
     )
 
-    # The method labels are intentionally distinct between the two implementations.
-    assert original["method"].unique().tolist() == ["limma_ebayes_inmoose"]
-    assert expanded["method"].unique().tolist() == ["limma_ebayes_inmoose_expanded"]
+
+# The multi-contrast path has no counterpart in the old implementation, so the oracle is the only
+# independent check on it: a joint fit over three conditions must place the same fold changes as two
+# separate pairwise limma fits. Only log2fc is comparable -- the joint fit pools residual variance
+# across all three conditions, so its eBayes prior (and hence its p-values) legitimately differs.
+@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
+def test_diff_exp_ebayes_multi_contrast_log2fc_matches_pairwise_reference(three_condition_adata):
+    """A joint ("_ALL_", "A") fit yields the same fold changes as independent pairwise limma fits."""
+    adata = filter_data_completeness(three_condition_adata.copy(), max_missing_count=0, action="drop")
+
+    joint = tl.diff_exp_ebayes(adata=adata.copy(), between_column="group", comparison=("_ALL_", "A"))
+
+    for a_level in ("B", "C"):
+        reference = _inmoose_limma_reference(adata.copy(), "group", (a_level, "A"))
+        block = joint[joint["condition_pair"] == f"{a_level}_VS_A"]
+
+        np.testing.assert_allclose(
+            block.loc[reference.index, "log2fc"].to_numpy(),
+            reference["log2fc"].to_numpy(),
+            rtol=1e-5,
+            atol=1e-8,
+        )
 
 
-# Unit tests for the expanded eBayes components
+# Unit tests for the individual eBayes pipeline stages
 
 
 def _abc_adata():
@@ -991,7 +1047,7 @@ def test__run_contrasts_log2fc_correct_under_interspersed_order(interspersed_ada
 
 
 # Bit of finageling to skip the need for inmoose in this test, which we would need if we ran the entire
-# pipeline of ebayes_expanded.diff_exp_ebayes. Instead, we mock the fit and contrast step and check the correct ordering
+# pipeline of tl.diff_exp_ebayes. Instead, we mock the fit and contrast step and check the correct ordering
 # of the results by name, which is what we are guarding against.
 def test_fit_and_contrasts_invariant_to_sample_permutation(example_adata_ebayes):
     """Permuting the input samples must not change the per-contrast log2fc/variance (matched by name).
@@ -1054,14 +1110,14 @@ def gate_adata():
 )
 def test_diff_exp_ebayes_a_gate(gate_adata, a_min_required, sparse_reported):
     """a_min_required suppresses (NaNs) fold changes whose A condition has too few observed values."""
-    results = diff_exp_ebayes_expanded(
+    results = tl.diff_exp_ebayes(
         adata=gate_adata,
         between_column="group",
         comparison=("X", "Y"),
         a_min_required=a_min_required,
     )
     df = results[results["condition_pair"] == "X_VS_Y"].set_index("protein")
-    result_cols = ["log2fc", "p_value", "fdr"]
+    result_cols = ["log2fc", "p_value", "fdr", "stat"]
 
     # Fully observed features are always reported, regardless of the gate.
     assert df.loc["full_1", result_cols].notna().all()
@@ -1085,14 +1141,14 @@ def test_diff_exp_ebayes_a_gate(gate_adata, a_min_required, sparse_reported):
 )
 def test_diff_exp_ebayes_b_gate(gate_adata, b_min_required, sparse_reported):
     """b_min_required suppresses (NaNs) fold changes whose B condition has too few observed values."""
-    results = diff_exp_ebayes_expanded(
+    results = tl.diff_exp_ebayes(
         adata=gate_adata,
         between_column="group",
         comparison=("X", "Y"),
         b_min_required=b_min_required,
     )
     df = results[results["condition_pair"] == "X_VS_Y"].set_index("protein")
-    result_cols = ["log2fc", "p_value", "fdr"]
+    result_cols = ["log2fc", "p_value", "fdr", "stat"]
 
     # Fully observed features are always reported, regardless of the gate.
     assert df.loc["full_1", result_cols].notna().all()
@@ -1149,12 +1205,12 @@ def confounded_batch_adata():
 @pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
 def test_diff_exp_ebayes_covariate_corrects_confounded_batch(confounded_batch_adata):
     """covariate_column absorbs the batch offset, recovering the true group effect it otherwise inflates."""
-    unadjusted = diff_exp_ebayes_expanded(
+    unadjusted = tl.diff_exp_ebayes(
         adata=confounded_batch_adata,
         between_column="group",
         comparison=("B", "A"),
     )
-    adjusted = diff_exp_ebayes_expanded(
+    adjusted = tl.diff_exp_ebayes(
         adata=confounded_batch_adata,
         between_column="group",
         comparison=("B", "A"),
@@ -1162,7 +1218,7 @@ def test_diff_exp_ebayes_covariate_corrects_confounded_batch(confounded_batch_ad
     )
 
     # Adding a covariate must not change the output contract.
-    assert list(adjusted.columns) == tl_defaults.DIFF_EXP_COLS
+    assert list(adjusted.columns) == [*tl_defaults.DIFF_EXP_COLS, "stat"]
     assert adjusted.index.equals(confounded_batch_adata.var_names)
 
     unadjusted_error = (unadjusted["log2fc"] - _COVARIATE_TRUE_EFFECT).abs()
@@ -1209,14 +1265,14 @@ def three_condition_adata():
 @pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
 def test_diff_exp_ebayes_stacks_every_contrast(three_condition_adata):
     """A multi-contrast run returns one frame holding every contrast as its own condition_pair block."""
-    results = diff_exp_ebayes_expanded(
+    results = tl.diff_exp_ebayes(
         adata=three_condition_adata,
         between_column="group",
         comparison=("_ALL_", "A"),
     )
 
     assert isinstance(results, pd.DataFrame)
-    assert list(results.columns) == tl_defaults.DIFF_EXP_COLS
+    assert list(results.columns) == [*tl_defaults.DIFF_EXP_COLS, "stat"]
     assert results["condition_pair"].unique().tolist() == ["B_VS_A", "C_VS_A"]
     assert len(results) == 2 * three_condition_adata.n_vars
 
@@ -1325,7 +1381,7 @@ def test__replicate_gate_mask(gate_mask_adata, a_min_required, b_min_required, e
 
 
 # Output standardization is the single place the shared diff_exp column contract is applied to the
-# expanded eBayes results, and the only place FDR correction happens.
+# eBayes results, and the only place FDR correction happens.
 _MAX_A_SAMPLES = 4
 _MAX_B_SAMPLES = 5
 
@@ -1335,23 +1391,25 @@ def _contrast_frame_inputs():
     var_names = pd.Index(["p1", "p2", "p3"])
     log2fc = np.array([2.0, -0.5, np.nan])
     p_values = np.array([0.001, 0.5, np.nan])
-    return var_names, log2fc, p_values
+    t_values = np.array([8.0, -0.7, np.nan])
+    return var_names, log2fc, p_values, t_values
 
 
 def test__standardize_contrast_frame_columns_follow_shared_contract():
-    """The frame carries exactly the shared DIFF_EXP_COLS, in that order, indexed by feature."""
-    var_names, log2fc, p_values = _contrast_frame_inputs()
+    """The frame leads with the shared DIFF_EXP_COLS, in that order, then this method's `stat`."""
+    var_names, log2fc, p_values, t_values = _contrast_frame_inputs()
 
     df = _standardize_contrast_frame(
         contrast_name="A_VS_B",
         var_names=var_names,
         log2fc=log2fc,
         p_values=p_values,
+        t_values=t_values,
         max_level_1_samples=_MAX_A_SAMPLES,
         max_level_2_samples=_MAX_B_SAMPLES,
     )
 
-    assert list(df.columns) == tl_defaults.DIFF_EXP_COLS
+    assert list(df.columns) == [*tl_defaults.DIFF_EXP_COLS, "stat"]
     assert df.index.equals(var_names)
     assert list(df["protein"]) == list(var_names)
     assert (df["condition_pair"] == "A_VS_B").all()
@@ -1361,20 +1419,22 @@ def test__standardize_contrast_frame_columns_follow_shared_contract():
 
 
 def test__standardize_contrast_frame_derived_columns():
-    """log2fc/p_value pass through untouched; fdr and both -log10 columns are derived from them."""
-    var_names, log2fc, p_values = _contrast_frame_inputs()
+    """log2fc/p_value/stat pass through untouched; fdr and both -log10 columns are derived."""
+    var_names, log2fc, p_values, t_values = _contrast_frame_inputs()
 
     df = _standardize_contrast_frame(
         contrast_name="A_VS_B",
         var_names=var_names,
         log2fc=log2fc,
         p_values=p_values,
+        t_values=t_values,
         max_level_1_samples=_MAX_A_SAMPLES,
         max_level_2_samples=_MAX_B_SAMPLES,
     )
 
     np.testing.assert_allclose(df["log2fc"].to_numpy(), log2fc, equal_nan=True)
     np.testing.assert_allclose(df["p_value"].to_numpy(), p_values, equal_nan=True)
+    np.testing.assert_allclose(df["stat"].to_numpy(), t_values, equal_nan=True)
 
     # FDR is the nan-safe BH correction of the (already gated) p-values
     np.testing.assert_allclose(df["fdr"].to_numpy(), tl.nan_safe_bh_correction(p_values), equal_nan=True)
@@ -1386,18 +1446,19 @@ def test__standardize_contrast_frame_derived_columns():
 
 def test__standardize_contrast_frame_keeps_gated_features_nan():
     """A feature gated out upstream (NaN p-value) stays NaN across every derived column."""
-    var_names, log2fc, p_values = _contrast_frame_inputs()
+    var_names, log2fc, p_values, t_values = _contrast_frame_inputs()
 
     df = _standardize_contrast_frame(
         contrast_name="A_VS_B",
         var_names=var_names,
         log2fc=log2fc,
         p_values=p_values,
+        t_values=t_values,
         max_level_1_samples=_MAX_A_SAMPLES,
         max_level_2_samples=_MAX_B_SAMPLES,
     )
 
-    derived_cols = ["log2fc", "p_value", "-log10(p_value)", "fdr", "-log10(fdr)"]
+    derived_cols = ["log2fc", "p_value", "-log10(p_value)", "fdr", "-log10(fdr)", "stat"]
     assert df.loc["p3", derived_cols].isna().all()
 
     # The NaN feature must not consume a rank in the BH correction of the others
@@ -1409,7 +1470,7 @@ def test__standardize_contrast_frame_keeps_gated_features_nan():
 def test_diff_exp_ebayes_requires_inmoose():
     """diff_exp_ebayes raises ImportError up front when inmoose is unavailable."""
     with (
-        patch("alphapepttools.tl.diff_exp.ebayes_expanded._HAS_INMOOSE", new=False),
+        patch("alphapepttools.tl.diff_exp.ebayes._HAS_INMOOSE", new=False),
         pytest.raises(ImportError, match="inmoose is required"),
     ):
-        diff_exp_ebayes_expanded(adata=_abc_adata(), between_column="group", comparison=("B", "A"))
+        tl.diff_exp_ebayes(adata=_abc_adata(), between_column="group", comparison=("B", "A"))
