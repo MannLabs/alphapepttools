@@ -17,7 +17,6 @@ class AnnDataFactory:
     def __init__(
         self,
         psm_df: pd.DataFrame,
-        reader_type: str | None = None,
     ):
         """Initialize AnnDataFactory.
 
@@ -29,8 +28,6 @@ class AnnDataFactory:
         ----------
         psm_df
             Dataframe containing precursor intensity, sample_id and feature_id columns in a longtable
-        reader_type
-            Type of PSM reader to use. If `None`, no presets are available.
 
         Examples
         --------
@@ -49,9 +46,7 @@ class AnnDataFactory:
             )
 
             # Initialize factory
-            factory = AnnDataFactory(
-                psm_df=df, intensity_column="intensity", sample_id_column="raw_name", feature_id_column="protein_group"
-            )
+            factory = AnnDataFactory(psm_df=df)
 
             # Create AnnData object and display
             display(factory.create_anndata().to_df())
@@ -60,7 +55,6 @@ class AnnDataFactory:
 
         """
         self._psm_df = psm_df
-        self.reader_type = reader_type
 
     def _add_metadata_from_columns(
         self,
@@ -111,6 +105,7 @@ class AnnDataFactory:
     def create_anndata(
         self,
         level: Literal["proteins", "genes", "peptides", "precursors"] = "proteins",
+        *,
         intensity_column: str | None = None,
         sample_id_column: str | None = None,
         feature_id_column: str | None = None,
@@ -124,15 +119,15 @@ class AnnDataFactory:
         level
             Level of quantification to read.
         intensity_column
-            Name of the standardized column storing intensity data. Default is taken from `alphabase.constants.const_files.psm_reader.yaml` for the respective `level`.
-        feature_id_column
-            Name of the standardized column storing feature ids. Default is taken from `alphabase.constants.const_files.psm_reader.yaml` for the respective `level`.
+            Name of the standardized column storing intensity data. Default is taken from `alphapepttools.io.reader_columns.FEATURE_LEVEL_CONFIG` from the respective level.
         sample_id_column
-            Name of the standardized column storing sample ids. Default is taken from `alphabase.constants.const_files.psm_reader.yaml` for the respective `level`.
+            Name of the standardized column storing sample ids. Default is taken from `alphapepttools.io.reader_columns.FEATURE_LEVEL_CONFIG`.
+        feature_id_column
+            Name of the standardized column storing feature ids. Default is taken from `alphapepttools.io.reader_columns.FEATURE_LEVEL_CONFIG` from the respective level.
         var_columns
-            Additional standardized columns to include in `var` of the AnnData object, by default None
+            Additional standardized columns to include in `var` of the AnnData object, by default None.
         obs_columns
-            Additional standardized columns to include in `obs` of the AnnData object, by default None
+            Additional standardized columns to include in `obs` of the AnnData object, by default None.
 
         Returns
         -------
@@ -159,7 +154,7 @@ class AnnDataFactory:
                 }
             )
 
-            factory = AnnDataFactory(psm_df=df, search_engine="diann")
+            factory = AnnDataFactory(psm_df=df)
 
             # Create AnnData with metadata
             adata = factory.create_anndata(
@@ -181,13 +176,13 @@ class AnnDataFactory:
 
         # Validate that all required columns are present
         if intensity_column is None:
-            msg = f"intensity_column is required but not provided and no default found for reader_type='{self.reader_type}' and level='{level}'"
+            msg = f"intensity_column is required but not provided and no default found for level='{level}'. Please explicitly set `intensity_column`"
             raise ValueError(msg)
         if feature_id_column is None:
-            msg = f"feature_id_column is required but not provided and no default found for reader_type='{self.reader_type}' and level='{level}'"
+            msg = f"feature_id_column is required but not provided and no default found for level='{level}'. Please explicitly set `feature_id_column`"
             raise ValueError(msg)
         if sample_id_column is None:
-            msg = f"sample_id_column is required but not provided and no default found for reader_type='{self.reader_type}' and level='{level}'"
+            msg = f"sample_id_column is required but not provided and no default found for level='{level}'. Please explicitly set `sample_id_column`"
             raise ValueError(msg)
 
         # Create pivot table: raw names x proteins with intensity values
@@ -293,7 +288,4 @@ class AnnDataFactory:
             reader.add_column_mapping({col: col for col in additional_columns})
         psm_df = reader.load(file_paths)
 
-        return cls(
-            psm_df,
-            reader_type=reader_type,
-        )
+        return cls(psm_df)
