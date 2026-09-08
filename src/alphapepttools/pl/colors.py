@@ -235,8 +235,8 @@ def _cycle_palette(
 def _get_colors_from_cmap(
     cmap_name: str | mpl.colors.Colormap,
     values: int | np.ndarray,
-    vmin: float | None = None,
-    vmax: float | None = None,
+    min_value: float | None = None,
+    max_value: float | None = None,
 ) -> list | np.ndarray:
     """Retrieve colors from a colormap for discrete or continuous data
 
@@ -255,9 +255,9 @@ def _get_colors_from_cmap(
         colormap and retrieve the corresponding colors in whatever shape the input
         array was. In the case of 2D input arrays, the output will be a mxnx4 array
         of RGBA tuples.
-    vmin : float, optional
+    min_value : float, optional
         Minimum value for normalization when values is an array. If None, uses the minimum of the array.
-    vmax : float, optional
+    max_value : float, optional
         Maximum value for normalization when values is an array. If None, uses the maximum of the array.
 
     Returns
@@ -301,12 +301,10 @@ def _get_colors_from_cmap(
     if not pd.api.types.is_numeric_dtype(values):
         raise TypeError("values must be an integer or a numeric numpy array")
 
-    if vmin is None:
-        vmin = np.nanmin(values)
-    if vmax is None:
-        vmax = np.nanmax(values)
+    min_value = min_value if min_value is not None else np.nanmin(values)
+    max_value = max_value if max_value is not None else np.nanmax(values)
 
-    values = mpl_colors.Normalize(vmin=vmin, vmax=vmax)(values)
+    values = mpl_colors.Normalize(vmin=min_value, vmax=max_value)(values)
     return cmap(values)
 
 
@@ -824,12 +822,6 @@ class MappedColormaps:
         percentile : tuple[float, float], optional
             Percentile range to be used for normalization. If None, the full range of data is used. For example, (5, 95) will map colors between the 5th and 95th percentile of the data.
 
-        Returns
-        -------
-        None
-
-        Example
-
         """
         # `get` without `n` always returns a continuous Colormap, never the discrete-color list
         self.cmap = cast("Colormap", BaseColormaps.get(cmap))
@@ -998,7 +990,7 @@ class MappedColormaps:
         if self.vmin is None or self.vmax is None:
             raise ValueError("Call fit() or fit_transform() before transform().")
 
-        rgba = _get_colors_from_cmap(self.cmap, np.asarray(data), vmin=self.vmin, vmax=self.vmax)
+        rgba = _get_colors_from_cmap(self.cmap, np.asarray(data), min_value=self.vmin, max_value=self.vmax)
         if as_hex:
             return np.apply_along_axis(mpl_colors.to_hex, -1, rgba, keep_alpha=True)
         return np.asarray(rgba)
@@ -1007,17 +999,23 @@ class MappedColormaps:
     def scalar_mappable(self) -> mpl.cm.ScalarMappable:
         """Return a ScalarMappable for use in colorbars
 
-        This property provides a ScalarMappable instance that can be used to create colorbars consistent with the normalization applied in fit_transform.
+        This property provides a ScalarMappable instance that can be used to create colorbars consistent with
+        the normalization applied by :meth:`fit` or :meth:`fit_transform`.
         It uses the same vmin, vmax, and colormap, ensuring that the colorbar accurately reflects the mapping of data values to colors.
 
         Returns
         -------
         mpl.cm.ScalarMappable
-            ScalarMappable instance with the same colormap and normalization as used in fit_transform.
+            ScalarMappable instance with the same colormap and normalization as the fitted bounds.
+
+        Raises
+        ------
+        ValueError
+            If accessed before :meth:`fit` or :meth:`fit_transform`.
 
         """
         if self.vmin is None or self.vmax is None:
-            raise ValueError("fit_transform must be called before accessing scalar_mappable")
+            raise ValueError("Call fit() or fit_transform() before accessing scalar_mappable.")
         sm = plt.cm.ScalarMappable(norm=mpl_colors.Normalize(vmin=self.vmin, vmax=self.vmax), cmap=self.cmap)
         sm.set_array([])
         return sm
