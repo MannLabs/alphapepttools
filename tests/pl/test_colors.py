@@ -135,7 +135,7 @@ def test_get_colors_from_cmap_vmin_vmax(values, vmin, vmax, expected_fractions):
     """Explicit vmin/vmax override the data-derived normalization range."""
 
     cmap = plt.get_cmap("viridis")
-    result = _get_colors_from_cmap(cmap_name=cmap, values=values, min_value=vmin, max_value=vmax)
+    result = _get_colors_from_cmap(cmap_name=cmap, values=values, vmin=vmin, vmax=vmax)
     expected = cmap(np.array(expected_fractions))
     np.testing.assert_allclose(result, expected, rtol=1e-5)
 

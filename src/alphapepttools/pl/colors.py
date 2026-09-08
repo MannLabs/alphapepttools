@@ -235,8 +235,8 @@ def _cycle_palette(
 def _get_colors_from_cmap(
     cmap_name: str | mpl.colors.Colormap,
     values: int | np.ndarray,
-    min_value: float | None = None,
-    max_value: float | None = None,
+    vmin: float | None = None,
+    vmax: float | None = None,
 ) -> list | np.ndarray:
     """Retrieve colors from a colormap for discrete or continuous data
 
@@ -255,9 +255,9 @@ def _get_colors_from_cmap(
         colormap and retrieve the corresponding colors in whatever shape the input
         array was. In the case of 2D input arrays, the output will be a mxnx4 array
         of RGBA tuples.
-    min_value : float, optional
+    vmin : float, optional
         Minimum value for normalization when values is an array. If None, uses the minimum of the array.
-    max_value : float, optional
+    vmax : float, optional
         Maximum value for normalization when values is an array. If None, uses the maximum of the array.
 
     Returns
@@ -301,10 +301,10 @@ def _get_colors_from_cmap(
     if not pd.api.types.is_numeric_dtype(values):
         raise TypeError("values must be an integer or a numeric numpy array")
 
-    min_value = min_value if min_value is not None else np.nanmin(values)
-    max_value = max_value if max_value is not None else np.nanmax(values)
+    vmin = vmin if vmin is not None else np.nanmin(values)
+    vmax = vmax if vmax is not None else np.nanmax(values)
 
-    values = mpl_colors.Normalize(vmin=min_value, vmax=max_value)(values)
+    values = mpl_colors.Normalize(vmin=vmin, vmax=vmax)(values)
     return cmap(values)
 
 
@@ -806,6 +806,15 @@ class MappedColormaps:
         Percentile range to be used for normalization. If None, the full range of data is used.
         For example, (5, 95) will map colors between the 5th and 95th percentile.
 
+    Attributes
+    ----------
+    vmin : float or None
+        Lower normalization bound. ``None`` until :meth:`fit` or :meth:`fit_transform` has been called.
+        Public and writable by design, mirroring :class:`matplotlib.colors.Normalize`, so callers can pin
+        hard bounds after fitting.
+    vmax : float or None
+        Upper normalization bound. Same semantics as ``vmin``.
+
     """
 
     def __init__(
@@ -940,15 +949,15 @@ class MappedColormaps:
         if data is not None:
             arr = np.asarray(data)
             if self.percentile is not None:
-                d_min = np.nanpercentile(arr, self.percentile[0])
-                d_max = np.nanpercentile(arr, self.percentile[1])
+                data_min = np.nanpercentile(arr, self.percentile[0])
+                data_max = np.nanpercentile(arr, self.percentile[1])
             else:
-                d_min, d_max = np.nanmin(arr), np.nanmax(arr)
+                data_min, data_max = np.nanmin(arr), np.nanmax(arr)
         else:
-            d_min = d_max = None
+            data_min = data_max = None
 
-        self.vmin = vmin if vmin is not None else d_min
-        self.vmax = vmax if vmax is not None else d_max
+        self.vmin = vmin if vmin is not None else data_min
+        self.vmax = vmax if vmax is not None else data_max
 
         if self.vmin is None or self.vmax is None:
             raise ValueError("fit() requires `data`, or both `vmin` and `vmax`, to set the bounds.")
@@ -990,7 +999,7 @@ class MappedColormaps:
         if self.vmin is None or self.vmax is None:
             raise ValueError("Call fit() or fit_transform() before transform().")
 
-        rgba = _get_colors_from_cmap(self.cmap, np.asarray(data), min_value=self.vmin, max_value=self.vmax)
+        rgba = _get_colors_from_cmap(self.cmap, np.asarray(data), vmin=self.vmin, vmax=self.vmax)
         if as_hex:
             return np.apply_along_axis(mpl_colors.to_hex, -1, rgba, keep_alpha=True)
         return np.asarray(rgba)
