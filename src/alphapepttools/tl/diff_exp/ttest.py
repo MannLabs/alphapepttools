@@ -141,7 +141,7 @@ def diff_exp_ttest(
     min_valid_values: int = 2,
     *,
     equal_var: bool = False,
-) -> pd.DataFrame | None:
+) -> pd.DataFrame:
     """Calculate ratios of features between two specific groups using t-test.
 
     Calculate ratios and log2 ratios of each feature in the AnnData object's X
@@ -162,9 +162,9 @@ def diff_exp_ttest(
 
     Returns
     -------
-    pd.DataFrame | None
+    pd.DataFrame
         DataFrame with ratios, deltas, t-statistics, p-values, and adjusted p-values
-        for the comparison between the two specified groups. Returns None if validation fails.
+        for the comparison between the two specified groups.
 
     Examples
     --------
