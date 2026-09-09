@@ -769,7 +769,7 @@ def test__build_design_matrix_with_covariate():
     )
     adata = ad.AnnData(X=np.zeros((4, 1), dtype=float), obs=obs)
 
-    dm, col_info = _build_design_matrix(adata, "group", covariate_column="batch")
+    dm, col_info = _build_design_matrix(adata, "group", categorical_covariate_column="batch")
 
     # Two condition columns plus one covariate column ("x", the first level, is dropped).
     assert list(dm.columns) == ["A", "B", "y"]
@@ -785,7 +785,7 @@ def test__build_design_matrix_column_order_follows_first_appearance():
     )
     adata = ad.AnnData(X=np.zeros((4, 1), dtype=float), obs=obs)
 
-    dm, col_info = _build_design_matrix(adata, "group", covariate_column="batch")
+    dm, col_info = _build_design_matrix(adata, "group", categorical_covariate_column="batch")
 
     # "treated" precedes "ctrl"; the covariate keeps "b" because "a" is the dropped first level.
     assert list(dm.columns) == ["treated", "ctrl", "b"]
@@ -809,7 +809,7 @@ def test__build_design_matrix_column_set_matches_observed_levels():
     )
     adata = ad.AnnData(X=np.zeros((5, 1), dtype=float), obs=obs)
 
-    dm, col_info = _build_design_matrix(adata, "group", covariate_column="batch")
+    dm, col_info = _build_design_matrix(adata, "group", categorical_covariate_column="batch")
 
     conditions = set(obs["group"])
     covariates = set(obs["batch"]) - {"a"}  # "a" is the lexicographically first level, dropped for k-1
@@ -839,7 +839,7 @@ def test_diff_exp_ebayes_invariant_to_design_matrix_column_order(three_condition
         _build_design_matrix(permuted, "group", "batch")[0].columns
     )
 
-    kwargs = {"between_column": "group", "comparison": ("_ALL_", "A"), "covariate_column": "batch"}
+    kwargs = {"between_column": "group", "comparison": ("_ALL_", "A"), "categorical_covariate_column": "batch"}
     original = tl.diff_exp_ebayes(adata=adata.copy(), **kwargs)
     reordered = tl.diff_exp_ebayes(adata=permuted.copy(), **kwargs)
 
@@ -863,7 +863,7 @@ def test__build_design_matrix_ignores_unused_categories():
     )
     adata = ad.AnnData(X=np.zeros((4, 1), dtype=float), obs=obs)
 
-    dm, col_info = _build_design_matrix(adata, "group", covariate_column="batch")
+    dm, col_info = _build_design_matrix(adata, "group", categorical_covariate_column="batch")
 
     # Unobserved levels "C" and "z" would make the design matrix rank-deficient.
     assert list(dm.columns) == ["A", "B", "y"]
@@ -872,7 +872,7 @@ def test__build_design_matrix_ignores_unused_categories():
 
 # Test raise behavior for invalid condition/covariate specifications in _build_design_matrix
 @pytest.mark.parametrize(
-    ("condition", "covariate", "between_column", "covariate_column"),
+    ("condition", "covariate", "between_column", "categorical_covariate_column"),
     [
         (["A", "A"], None, "missing", None),  # condition column absent
         ([np.nan, "A"], None, "group", None),  # NaN in condition column
@@ -880,7 +880,7 @@ def test__build_design_matrix_ignores_unused_categories():
         (["A", "B"], [np.nan, "x"], "group", "batch"),  # NaN in covariate column
     ],
 )
-def test__build_design_matrix_validation(condition, covariate, between_column, covariate_column):
+def test__build_design_matrix_validation(condition, covariate, between_column, categorical_covariate_column):
     """Invalid condition/covariate specifications raise KeyError."""
     data = {"group": condition}
     if covariate is not None:
@@ -889,7 +889,7 @@ def test__build_design_matrix_validation(condition, covariate, between_column, c
     adata = ad.AnnData(X=np.zeros((len(condition), 1), dtype=float), obs=obs)
 
     with pytest.raises(KeyError):
-        _build_design_matrix(adata, between_column, covariate_column=covariate_column)
+        _build_design_matrix(adata, between_column, categorical_covariate_column=categorical_covariate_column)
 
 
 # Nan-aware linear fit (counterpart to inmoose.limma.lmFit)
@@ -1264,7 +1264,7 @@ def confounded_batch_adata():
 
 @pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
 def test_diff_exp_ebayes_covariate_corrects_confounded_batch(confounded_batch_adata):
-    """covariate_column absorbs the batch offset, recovering the true group effect it otherwise inflates."""
+    """categorical_covariate_column absorbs the batch offset, recovering the true group effect it otherwise inflates."""
     unadjusted = tl.diff_exp_ebayes(
         adata=confounded_batch_adata,
         between_column="group",
@@ -1274,7 +1274,7 @@ def test_diff_exp_ebayes_covariate_corrects_confounded_batch(confounded_batch_ad
         adata=confounded_batch_adata,
         between_column="group",
         comparison=("B", "A"),
-        covariate_column="batch",
+        categorical_covariate_column="batch",
     )
 
     # Adding a covariate must not change the output contract.

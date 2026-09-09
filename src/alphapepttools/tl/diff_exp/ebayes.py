@@ -63,7 +63,7 @@ def _one_hot(labels: pd.Series, *, drop_first: bool = False) -> pd.DataFrame:
 def _build_design_matrix(
     adata: ad.AnnData,
     condition_column: str,
-    covariate_column: str | None = None,
+    categorical_covariate_column: str | None = None,
 ) -> tuple[pd.DataFrame, dict]:
     """Build a design matrix for linear modeling.
 
@@ -73,8 +73,9 @@ def _build_design_matrix(
         The AnnData object containing the data.
     condition_column : str
         The name of the column in adata.obs that contains the condition labels.
-    covariate_column : str | None, optional
-        The name of the column in adata.obs that contains the covariate labels. If None, no covariate columns are added.
+    categorical_covariate_column : str | None, optional
+        The name of the column in adata.obs that contains the categorical covariate labels, encoded as k-1
+        indicator columns. If None, no covariate columns are added.
 
     Returns
     -------
@@ -83,7 +84,7 @@ def _build_design_matrix(
     dict
         A dictionary to navigate the design matrix with the following keys:
         - condition_col_idxs: A dictionary mapping each condition to its corresponding column index in the design matrix.
-        - covariate_col_idxs: A dictionary mapping each covariate level to its corresponding column index in the design matrix. Empty if covariate_column is None.
+        - covariate_col_idxs: A dictionary mapping each covariate level to its corresponding column index in the design matrix. Empty if categorical_covariate_column is None.
 
     """
     if condition_column not in adata.obs.columns:
@@ -92,16 +93,16 @@ def _build_design_matrix(
     if adata.obs[condition_column].isna().any():
         raise KeyError(f"Condition column '{condition_column}' contains NaN values.")
 
-    if covariate_column is not None:
-        if covariate_column not in adata.obs.columns:
-            raise KeyError(f"Covariate column '{covariate_column}' not found in adata.obs.")
-        if adata.obs[covariate_column].isna().any():
-            raise KeyError(f"Covariate column '{covariate_column}' contains NaN values.")
+    if categorical_covariate_column is not None:
+        if categorical_covariate_column not in adata.obs.columns:
+            raise KeyError(f"Covariate column '{categorical_covariate_column}' not found in adata.obs.")
+        if adata.obs[categorical_covariate_column].isna().any():
+            raise KeyError(f"Covariate column '{categorical_covariate_column}' contains NaN values.")
 
     condition_dm = _one_hot(cast("pd.Series", adata.obs[condition_column]))
     covariate_dm = (
-        _one_hot(cast("pd.Series", adata.obs[covariate_column]), drop_first=True)  # k-1 for covariates
-        if covariate_column is not None
+        _one_hot(cast("pd.Series", adata.obs[categorical_covariate_column]), drop_first=True)  # k-1 for covariates
+        if categorical_covariate_column is not None
         else pd.DataFrame(index=adata.obs.index)
     )
 
@@ -616,7 +617,7 @@ def diff_exp_ebayes(
     adata: ad.AnnData,
     between_column: str,
     comparison: tuple[str | list[str], str],
-    covariate_column: str | None = None,
+    categorical_covariate_column: str | None = None,
     a_min_required: int | None = None,
     b_min_required: int | None = None,
 ) -> pd.DataFrame:
@@ -645,8 +646,11 @@ def diff_exp_ebayes(
         changes are reported as A - B. Multiple A conditions can be specified as a list in the first element:
         (["A1", "A2"], "B"). If the first element is set to "_ALL_", all conditions except B are compared against
         it: ("_ALL_", "B").
-    covariate_column : str | None, optional
-        Column name in adata.obs containing linear covariate levels, by default None.
+    categorical_covariate_column : str | None, optional
+        Column name in adata.obs containing a categorical covariate to adjust for, by default None. Its levels
+        are added to the design matrix as k-1 indicator columns, so the column must be categorical (numeric
+        labels are fine, as long as they encode a small number of discrete groups). A continuous covariate
+        would produce roughly one column per sample and leave the model with no residual degrees of freedom.
     a_min_required : int | None, optional
         Minimum number of observed values required in the A condition (comparison[0]) of each contrast. Per
         contrast, features with fewer observed values in A have their fold change suppressed (set to NaN) before
@@ -713,7 +717,7 @@ def diff_exp_ebayes(
             adata=adata_protein,
             between_column="treatment",
             comparison=("treated", "control"),
-            covariate_column="batch",
+            categorical_covariate_column="batch",
             a_min_required=3,
             b_min_required=3,
         )
@@ -750,7 +754,7 @@ def diff_exp_ebayes(
     adata = adata[adata.obs[between_column].isin(selected_levels)].copy()
 
     # Step 1: build the design matrix and fit every feature with NaN handling
-    design_matrix, col_info = _build_design_matrix(adata, between_column, covariate_column)
+    design_matrix, col_info = _build_design_matrix(adata, between_column, categorical_covariate_column)
     lm_fit = _nan_lmfit(adata, design_matrix)
 
     # Step 2: Generate contrasts to derive fold changes for each A vs B.
