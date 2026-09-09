@@ -29,11 +29,10 @@ _METHOD_NAME = "limma_ebayes_inmoose"
 def _one_hot(labels: pd.Series, *, drop_first: bool = False) -> pd.DataFrame:
     """One-hot encode sample labels, keeping columns in order of first appearance.
 
-    Casting to ``object`` first is what makes this safe for AnnData: ``pd.get_dummies`` on a
-    categorical column emits one column per *declared* category, so a level that no longer
-    occurs (e.g. after subsetting an AnnData) would contribute an all-zero, rank-deficient
-    column to the design matrix. Casting to ``object`` rather than ``str`` keeps the original
-    label values, which downstream lookups (e.g. contrast matrix columns) are keyed on.
+    Helper function to one-hot encode sample labels while preserving the order of first
+    appearance. Uses the generic Pandas implementation pd.get_dummies and optionally drops
+    the first level to avoid multicollinearity. Ensures proper order of columns in the resulting
+    design matrix.
 
     Parameters
     ----------
@@ -49,11 +48,28 @@ def _one_hot(labels: pd.Series, *, drop_first: bool = False) -> pd.DataFrame:
     pd.DataFrame
         Indicator matrix indexed like ``labels``, with columns ordered by first appearance.
 
+    Raises
+    ------
+    ValueError
+        If reordering would not return every encoded column, i.e. some level of ``labels`` failed to
+        match the ``pd.get_dummies`` column it produced.
+
     """
+    # get rid of categorical dtype to avoid levels with no samples
     labels = labels.astype(object)
+    unique_levels = list(labels.unique())
+
+    # create the one-hot encoded design matrix
     dm = pd.get_dummies(labels, dtype=int, drop_first=drop_first)
+
     # get_dummies sorts its columns; restore order of first appearance, minus any dropped level.
-    return dm[[level for level in dict.fromkeys(labels) if level in dm.columns]]
+    ordered = [level for level in unique_levels if level in dm.columns]
+    if len(ordered) != dm.shape[1]:
+        unmatched = [col for col in dm.columns if col not in unique_levels]
+        raise ValueError(
+            f"One-hot encoding lost {dm.shape[1] - len(ordered)} column(s) while restoring first-appearance order: {unmatched}. Every encoded level must match a label value. Dropping one would leave those samples without a coefficient in the design matrix."
+        )
+    return dm[ordered]
 
 
 def _build_design_matrix(
