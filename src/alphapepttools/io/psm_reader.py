@@ -1,3 +1,5 @@
+from typing import Literal
+
 import anndata as ad
 
 from alphapepttools.io.reader_columns import FEATURE_LEVEL_CONFIG
@@ -8,7 +10,7 @@ from .anndata_factory import AnnDataFactory
 def read_psm_table(
     file_paths: str | list[str],
     search_engine: str,
-    level: str = "proteins",
+    level: Literal["proteins", "genes", "peptides", "precursors"] = "proteins",
     *,
     intensity_column: str | None = None,
     feature_id_column: str | None = None,
@@ -84,8 +86,18 @@ def read_psm_table(
 
         import alphapepttools as at
 
-        alphadia_path = ...
-        adata = at.io.read_psm_table(alhpadia_path, search_engine="alphadia")
+        # Read PSM report (defaults to protein level)
+        adata_proteins = at.io.read_psm_table(alphadia_path, search_engine="alphadia")
+
+        # Read precursor intensities from PSM report
+        adata_precursors = at.io.read_psm_table(alphadia_path, search_engine="alphadia", level="precursors")
+
+        # Read a non-default intensity column
+        adata = at.io.read_psm_table(
+            diann_path, search_engine="alphadia", level="precursors", intensity_column="Precursors.Quantity"
+        )
+
+
 
 
     See Also
@@ -115,13 +127,13 @@ def read_psm_table(
     return AnnDataFactory.from_files(
         file_paths=file_paths,
         reader_type=search_engine,
+        additional_columns=additional_columns,
+        **reader_kwargs,
+    ).create_anndata(
         level=level,
         intensity_column=intensity_column,
         feature_id_column=feature_id_column,
         sample_id_column=sample_id_column,
-        additional_columns=additional_columns,
-        **reader_kwargs,
-    ).create_anndata(
         var_columns=var_columns,
         obs_columns=obs_columns,
     )
