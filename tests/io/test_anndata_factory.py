@@ -122,12 +122,12 @@ def test_create_anndata_with_valid_dataframe(
 
     factory = AnnDataFactory(
         psm_df=psm_df,
-        intensity_column=intensity_column,
-        sample_id_column=sample_id_column,
-        feature_id_column=feature_id_column,
     )
 
     adata = factory.create_anndata(
+        intensity_column=intensity_column,
+        sample_id_column=sample_id_column,
+        feature_id_column=feature_id_column,
         var_columns=var_columns,
         obs_columns=obs_columns,
     )
@@ -170,13 +170,14 @@ def test_create_anndata_with_missing_intensity_values():
     )
     factory = AnnDataFactory(
         psm_df=psm_df,
+    )
+
+    # when
+    adata = factory.create_anndata(
         intensity_column=PsmDfCols.INTENSITY,
         sample_id_column=PsmDfCols.RAW_NAME,
         feature_id_column=PsmDfCols.PROTEINS,
     )
-
-    # when
-    adata = factory.create_anndata()
 
     assert adata.shape == (2, 2)
     assert adata.obs_names.tolist() == ["raw1", "raw2"]
@@ -195,13 +196,14 @@ def test_create_anndata_with_duplicate_proteins():
     )
     factory = AnnDataFactory(
         psm_df=psm_df,
+    )
+
+    # when
+    adata = factory.create_anndata(
         intensity_column=PsmDfCols.INTENSITY,
         sample_id_column=PsmDfCols.RAW_NAME,
         feature_id_column=PsmDfCols.PROTEINS,
     )
-
-    # when
-    adata = factory.create_anndata()
 
     assert adata.shape == (2, 1)
     assert adata.obs_names.tolist() == ["raw1", "raw2"]
@@ -217,13 +219,14 @@ def test_create_anndata_with_empty_dataframe():
     psm_df = pd.DataFrame(columns=[PsmDfCols.RAW_NAME, PsmDfCols.PROTEINS, PsmDfCols.INTENSITY])
     factory = AnnDataFactory(
         psm_df=psm_df,
+    )
+
+    # when
+    adata = factory.create_anndata(
         intensity_column=PsmDfCols.INTENSITY,
         sample_id_column=PsmDfCols.RAW_NAME,
         feature_id_column=PsmDfCols.PROTEINS,
     )
-
-    # when
-    adata = factory.create_anndata()
 
     assert adata.shape == (0, 0)
 
@@ -244,13 +247,14 @@ def test_from_files(mock_get_reader_configuration, mock_reader, test_psm_df, tes
     factory = AnnDataFactory.from_files(
         file_paths=["file1", "file2"],
         reader_type="diann",
+    )
+
+    # when
+    adata = factory.create_anndata(
         intensity_column=PsmDfCols.INTENSITY,
         feature_id_column=PsmDfCols.PROTEINS,
         sample_id_column=PsmDfCols.RAW_NAME,
     )
-
-    # when
-    adata = factory.create_anndata()
 
     comparison_adata = test_protein_anndata
     assert adata.obs.equals(comparison_adata.obs)
@@ -273,11 +277,12 @@ def test_from_files_nan(mock_reader, test_psm_df, test_protein_anndata):
     factory = AnnDataFactory.from_files(
         file_paths=["file1", "file2"],
         reader_type="diann",
-        level="proteins",
     )
 
     # when
-    adata = factory.create_anndata()
+    adata = factory.create_anndata(
+        level="proteins",
+    )
 
     comparison_adata = test_protein_anndata
     assert adata.obs.equals(comparison_adata.obs)
@@ -326,9 +331,6 @@ def test_from_files_forwards_additional_columns_to_reader(
     AnnDataFactory.from_files(
         file_paths=["file1"],
         reader_type="diann",
-        intensity_column=PsmDfCols.INTENSITY,
-        feature_id_column=PsmDfCols.PROTEINS,
-        sample_id_column=PsmDfCols.RAW_NAME,
         additional_columns=["my_col_a", "my_col_b"],
     )
 
@@ -364,6 +366,7 @@ def test_from_files_raises_on_missing_required_column(
         AnnDataFactory.from_files(
             file_paths=["file1"],
             reader_type="diann",
+        ).create_anndata(
             level="unknown_level",  # no defaults for this level
             intensity_column=intensity_column,
             feature_id_column=feature_id_column,

@@ -1,3 +1,5 @@
+from typing import Literal
+
 import anndata as ad
 
 from alphapepttools.io.reader_columns import FEATURE_LEVEL_CONFIG
@@ -8,7 +10,7 @@ from .anndata_factory import AnnDataFactory
 def read_psm_table(
     file_paths: str | list[str],
     search_engine: str,
-    level: str = "proteins",
+    level: Literal["proteins", "genes", "peptides", "precursors"] = "proteins",
     *,
     intensity_column: str | None = None,
     feature_id_column: str | None = None,
@@ -39,23 +41,29 @@ def read_psm_table(
         - MaxQuant (`maxquant`)
         - Spectronaut (`spectronaut`, parquet + tsv)
 
+    Get supported search engines with `alphapepttools.io.list_available_reader(kind="psm_reader")`
+
     Parameters
     ----------
     file_paths
         Path to peptide spectrum match reports. If a list of reports is passed, all must be from the same search engine.
     search_engine
-        Name of search engine that generated the output, pass the method name of the corresponding reader.
+        Name of search engine that generated the output.
     level
-        Level of quantification to read. One of "proteins", "precursors", or "genes". Defaults to "proteins".
+        Level of quantification to read. One of
+            - `proteins`
+            - `precursors`
+            - `genes`
+            - `peptides`
     intensity_column
-        Column that holds the quantified intensities in the PSM table. Defaults to the pre-configured protein intensities value
-        in `alphabase`.
+        Column that holds the quantified intensities in the PSM table. If `None`, defaults to the pre-configured intensity column
+        for the specified level.
     feature_id_column
-        Column that holds the feature identifier in the PSM table. Defaults to proteins and the pre-configured value
-        in `alphabase`.
+        Column that holds the feature identifier in the PSM table. If `None`, defaults to the pre-configured feature identifier column
+        for the specified level.
     sample_id_column
-        Column that holds the sample identifier in the PSM table. Defaults to the pre-configured value
-        in `alphabase`.
+        Column that holds the sample identifier in the PSM table. If `None`, defaults to the pre-configured sample identifier column
+        for the specified level.
     var_columns
         Additional columns to annotate features in the `adata.var` table. Can be a single column name or a list of column names.
         Defaults to None.
@@ -71,11 +79,11 @@ def read_psm_table(
         AnnData object that can be further processed with scVerse packages.
 
         - adata.X
-            Stores values of the intensity columns in the report of shape observations x features
+            Stores values of the intensity columns in the report of shape observations x features.
         - adata.obs
-            Stores observations with protein group matrix sample names as `sample_id` column.
+            Stores observations with protein group matrix sample names as `sample_id` column and additional `obs_columns`.
         - adata.var
-            Stores features and feature metadata with standardized alphabase names.
+            Stores features and feature metadata with standardized alphabase names and additional `var_columns`.
 
     Example
     -------
@@ -84,13 +92,22 @@ def read_psm_table(
 
         import alphapepttools as at
 
-        alphadia_path = ...
-        adata = at.io.read_psm_table(alhpadia_path, search_engine="alphadia")
+        # Read PSM report (defaults to protein level)
+        adata_proteins = at.io.read_psm_table(alphadia_path, search_engine="alphadia")
+
+        # Read precursor intensities from PSM report
+        adata_precursors = at.io.read_psm_table(alphadia_path, search_engine="alphadia", level="precursors")
+
+        # Read a non-default intensity column
+        adata = at.io.read_psm_table(
+            diann_path, search_engine="alphadia", level="precursors", intensity_column="Precursors.Quantity"
+        )
 
 
     See Also
     --------
     :mod:`alphabase.psm_reader`
+    :func:`alphapepttools.io.list_available_reader`
 
     """
     # Determine which data & metadata columns are requested
@@ -115,13 +132,13 @@ def read_psm_table(
     return AnnDataFactory.from_files(
         file_paths=file_paths,
         reader_type=search_engine,
+        additional_columns=additional_columns,
+        **reader_kwargs,
+    ).create_anndata(
         level=level,
         intensity_column=intensity_column,
         feature_id_column=feature_id_column,
         sample_id_column=sample_id_column,
-        additional_columns=additional_columns,
-        **reader_kwargs,
-    ).create_anndata(
         var_columns=var_columns,
         obs_columns=obs_columns,
     )

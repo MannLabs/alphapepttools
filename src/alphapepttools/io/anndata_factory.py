@@ -1,6 +1,6 @@
 """Factory class to convert PSM DataFrames to AnnData format."""
 
-from typing import Any
+from typing import Any, Literal
 
 import anndata as ad
 import pandas as pd
@@ -17,9 +17,6 @@ class AnnDataFactory:
     def __init__(
         self,
         psm_df: pd.DataFrame,
-        intensity_column: str,
-        sample_id_column: str,
-        feature_id_column: str,
     ):
         """Initialize AnnDataFactory.
 
@@ -31,12 +28,6 @@ class AnnDataFactory:
         ----------
         psm_df
             Dataframe containing precursor intensity, sample_id and feature_id columns in a longtable
-        intensity_column
-            Column containing the precursor intensities
-        sample_id_column
-            Column containing the sample identifiers
-        feature_id_column
-            Column dictating which feature ends up as the AnnData's var_names after the pivoting operation
 
         Examples
         --------
@@ -55,9 +46,7 @@ class AnnDataFactory:
             )
 
             # Initialize factory
-            factory = AnnDataFactory(
-                psm_df=df, intensity_column="intensity", sample_id_column="raw_name", feature_id_column="protein_group"
-            )
+            factory = AnnDataFactory(psm_df=df)
 
             # Create AnnData object and display
             display(factory.create_anndata().to_df())
@@ -66,9 +55,6 @@ class AnnDataFactory:
 
         """
         self._psm_df = psm_df
-        self._intensity_column = intensity_column
-        self._sample_id_column = sample_id_column
-        self._feature_id_column = feature_id_column
 
     def _add_metadata_from_columns(
         self,
@@ -118,6 +104,11 @@ class AnnDataFactory:
 
     def create_anndata(
         self,
+        level: Literal["proteins", "genes", "peptides", "precursors"] = "proteins",
+        *,
+        intensity_column: str | None = None,
+        sample_id_column: str | None = None,
+        feature_id_column: str | None = None,
         var_columns: str | list[str] | None = None,
         obs_columns: str | list[str] | None = None,
     ) -> ad.AnnData:
@@ -125,10 +116,18 @@ class AnnDataFactory:
 
         Parameters
         ----------
+        level
+            Level of quantification to read.
+        intensity_column
+            Name of the standardized column storing intensity data. Default is taken from `alphapepttools.io.reader_columns.FEATURE_LEVEL_CONFIG` from the respective level.
+        sample_id_column
+            Name of the standardized column storing sample ids. Default is taken from `alphapepttools.io.reader_columns.FEATURE_LEVEL_CONFIG`.
+        feature_id_column
+            Name of the standardized column storing feature ids. Default is taken from `alphapepttools.io.reader_columns.FEATURE_LEVEL_CONFIG` from the respective level.
         var_columns
-            Additional columns to include in `var` of the AnnData object, by default None
+            Additional standardized columns to include in `var` of the AnnData object, by default None.
         obs_columns
-            Additional columns to include in `obs` of the AnnData object, by default None
+            Additional standardized columns to include in `obs` of the AnnData object, by default None.
 
         Returns
         -------
@@ -155,12 +154,11 @@ class AnnDataFactory:
                 }
             )
 
-            factory = AnnDataFactory(
-                psm_df=df, intensity_column="intensity", sample_id_column="raw_name", feature_id_column="protein_group"
-            )
+            factory = AnnDataFactory(psm_df=df)
 
             # Create AnnData with metadata
             adata = factory.create_anndata(
+                level="precursors",
                 var_columns=["gene_names"],  # Add gene names to var
                 obs_columns=["condition"],  # Add condition to obs
             )
@@ -170,12 +168,29 @@ class AnnDataFactory:
             print(adata.obs["condition"])  # Sample conditions
 
         """
+        # Get defaults for this reader/level, user input overrides
+        defaults = FEATURE_LEVEL_CONFIG.get(level, {})
+        intensity_column = intensity_column or defaults.get("intensity_column")
+        feature_id_column = feature_id_column or defaults.get("feature_id_column")
+        sample_id_column = sample_id_column or defaults.get("sample_id_column")
+
+        # Validate that all required columns are present
+        if intensity_column is None:
+            msg = f"intensity_column is required but not provided and no default found for level='{level}'. Please explicitly set `intensity_column`"
+            raise ValueError(msg)
+        if feature_id_column is None:
+            msg = f"feature_id_column is required but not provided and no default found for level='{level}'. Please explicitly set `feature_id_column`"
+            raise ValueError(msg)
+        if sample_id_column is None:
+            msg = f"sample_id_column is required but not provided and no default found for level='{level}'. Please explicitly set `sample_id_column`"
+            raise ValueError(msg)
+
         # Create pivot table: raw names x proteins with intensity values
         pivot_df = pd.pivot_table(
             self._psm_df,
-            index=self._sample_id_column,
-            columns=self._feature_id_column,
-            values=self._intensity_column,
+            index=sample_id_column,
+            columns=feature_id_column,
+            values=intensity_column,
             aggfunc="first",  # DataFrameGroupBy.first -> will skip NA
             dropna=False,
         )
@@ -188,8 +203,8 @@ class AnnDataFactory:
         )
 
         # Extract additional metadata if needed
-        adata = self._add_metadata_from_columns(adata, var_columns, self._feature_id_column, axis=1)
-        return self._add_metadata_from_columns(adata, obs_columns, self._sample_id_column, axis=0)
+        adata = self._add_metadata_from_columns(adata, var_columns, feature_id_column, axis=1)
+        return self._add_metadata_from_columns(adata, obs_columns, sample_id_column, axis=0)
 
     @classmethod
     def _get_reader_configuration(cls, reader_type: str) -> dict[str, Any]:
@@ -208,12 +223,8 @@ class AnnDataFactory:
     def from_files(
         cls,
         file_paths: str | list[str],
-        reader_type: str = "maxquant",
-        level: str = "proteins",
+        reader_type: str,
         *,
-        intensity_column: str | None = None,
-        feature_id_column: str | None = None,
-        sample_id_column: str | None = None,
         additional_columns: list[str] | None = None,
         **reader_kwargs,
     ) -> "AnnDataFactory":
@@ -224,20 +235,10 @@ class AnnDataFactory:
         file_paths
             Path(s) to PSM file(s)
         reader_type
-            Type of PSM reader to use, by default "maxquant"
-        level
-            Level of quantification to read. One of "proteins", "precursors", or "genes". Defaults to "proteins".
-        intensity_column
-            Name of the column storing intensity data. Default is taken from `psm_reader.yaml`
-        feature_id_column
-            Name of the column storing feature ids. Default is taken from `psm_reader.yaml`
-        sample_id_column
-            Name of the column storing sample ids. Default is taken from `psm_reader.yaml`
+            Type of PSM reader to use.
         additional_columns
-            Names of additional columns from the PSM table to retain for experiment-specific metadata.
-            These columns can be added to the resulting AnnData object as annotations.
-            Note that if a column has a higher cardinality than the `feature_id_column`
-            (i.e., multiple values per feature), only the first value encountered will be kept.
+            Names of additional columns from the PSM report to retain for experiment-specific metadata.
+            These columns might be added to the created AnnData object as additional annotations.
         **reader_kwargs
             Additional arguments passed to PSM reader
 
@@ -254,19 +255,23 @@ class AnnDataFactory:
             # Load DIA-NN data at protein level
             # assuming a diann report called "report.tsv" exists in the current directory
 
-            factory = AnnDataFactory.from_files("report.tsv", reader_type="diann", level="proteins")
-            adata = factory.create_anndata()
+            factory = AnnDataFactory.from_files("report.tsv", reader_type="diann")
+            adata = factory.create_anndata(level="proteins")
 
             # Load with custom column names and additional metadata columns
             factory = AnnDataFactory.from_files(
                 report_path,
                 reader_type="diann",
-                intensity_column="Precursor.Quantity",
-                additional_columns=["Precursor.Quantity"],  # additional columns need to be specified here.
+                additional_columns=[
+                    "Precursor.Quantity"
+                ],  # columns that are not standardized by alphabase can be specified here.
             )
             adata = factory.create_anndata(
-                var_columns=["charge", "sequence"]
-            )  # Add m/z and stripped sequence via their alphabase-standardized column names in var
+                # We use the non-default intensity column "Precursor.Quantity" from the PSM report
+                intensity_column="Precursor.Quantity",
+                # Add m/z and stripped sequence via their alphabase-standardized column names in var
+                var_columns=["charge", "sequence"],
+            )
             display(adata.var)  # Check that additional columns are included in var
 
         """
@@ -283,26 +288,4 @@ class AnnDataFactory:
             reader.add_column_mapping({col: col for col in additional_columns})
         psm_df = reader.load(file_paths)
 
-        # Get defaults for this reader/level, user input overrides
-        defaults = FEATURE_LEVEL_CONFIG.get(level, {})
-        intensity_column = intensity_column or defaults.get("intensity_column")
-        feature_id_column = feature_id_column or defaults.get("feature_id_column")
-        sample_id_column = sample_id_column or defaults.get("sample_id_column")
-
-        # Validate that all required columns are present
-        if intensity_column is None:
-            msg = f"intensity_column is required but not provided and no default found for reader_type='{reader_type}' and level='{level}'"
-            raise ValueError(msg)
-        if feature_id_column is None:
-            msg = f"feature_id_column is required but not provided and no default found for reader_type='{reader_type}' and level='{level}'"
-            raise ValueError(msg)
-        if sample_id_column is None:
-            msg = f"sample_id_column is required but not provided and no default found for reader_type='{reader_type}' and level='{level}'"
-            raise ValueError(msg)
-
-        return cls(
-            psm_df,
-            intensity_column=intensity_column,
-            feature_id_column=feature_id_column,
-            sample_id_column=sample_id_column,
-        )
+        return cls(psm_df)
