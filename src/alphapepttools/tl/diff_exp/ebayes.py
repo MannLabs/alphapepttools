@@ -676,24 +676,6 @@ def diff_exp_ebayes(
     KeyError
         If `between_column` is not in adata.obs, or any condition in `comparison` is not a level of it.
 
-    Notes
-    -----
-    This function replaces an earlier complete-cases-only implementation that wrapped
-    :mod:`inmoose.limma` directly, and differs from it in four ways worth knowing when comparing
-    old and new result frames:
-
-    - **Every feature is returned.** The previous implementation silently dropped any feature with a
-      missing value. This one fits all features and returns all of them, setting `log2fc`, `p_value`,
-      `fdr` and `stat` to NaN only where the replicate gate suppresses them. Filtering on
-      significance still behaves as expected (NaN comparisons are False), but row counts and
-      index-based joins change.
-    - **The variance prior is estimated from all fittable features**, not only complete ones, so
-      p-values differ for otherwise identical input unless the data is filtered upstream with
-      :func:`alphapepttools.pp.filter_data_completeness`.
-    - **Results are stacked over contrasts**, one row per (feature, contrast) pair, so the index
-      repeats for a multi-contrast call. Filter on `condition_pair` to recover a single contrast.
-    - **`B` and `AveExpr` are no longer returned**; `stat` still is.
-
     Examples
     --------
     Compare two conditions:
