@@ -171,7 +171,7 @@ def _nan_lmfit(
         X_obs = X[obs_mask, :]
 
         # Drop those columns from X_obs which only have zeros after subsetting to obs
-        live_col_mask = X_obs.sum(axis=0) > 0
+        live_col_mask = (X_obs != 0).any(axis=0)
         X_live = X_obs[:, live_col_mask]
 
         # X_live shape check
