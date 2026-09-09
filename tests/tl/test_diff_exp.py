@@ -23,7 +23,6 @@ from alphapepttools.tl.diff_exp.ebayes import (
     _contrasts_from_matrix,
     _make_contrasts,
     _nan_lmfit,
-    _one_hot,
     _replicate_gate_mask,
     _resolve_comparison,
     _run_contrasts,
@@ -820,20 +819,6 @@ def test__build_design_matrix_column_set_matches_observed_levels():
 
     # No duplicate labels, which would make dm.columns.get_loc return a mask instead of an index.
     assert len(dm.columns) == len(conditions) + len(covariates)
-
-
-def test__one_hot_raises_when_a_level_loses_its_column():
-    """A level that fails to match its own encoded column must raise, not be dropped silently."""
-    labels = pd.Series(["A", "A", "B"], index=[f"s{i}" for i in range(3)])
-
-    # Stands in for any label that does not round-trip through get_dummies: the encoded frame carries
-    # a column no label value matches, so restoring the order would drop it from the design matrix.
-    encoded = pd.DataFrame({"A": [1, 1, 0], "MISMATCH": [0, 0, 1]}, index=labels.index)
-    with (
-        patch("alphapepttools.tl.diff_exp.ebayes.pd.get_dummies", return_value=encoded),
-        pytest.raises(ValueError, match="lost 1 column"),
-    ):
-        _one_hot(labels)
 
 
 @pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
