@@ -9,13 +9,25 @@ from scipy.stats import ttest_ind
 
 from alphapepttools import tl
 from alphapepttools.pp import nanlog
+from alphapepttools.pp.data import filter_data_completeness
 from alphapepttools.tl.defaults import tl_defaults
 from alphapepttools.tl.diff_exp.alphaquant_wrapper import (
     _HAS_ALPHAQUANT,
     _STACKED_COLS,
     _standardize_alphaquant_results,
 )
-from alphapepttools.tl.diff_exp.ebayes import _HAS_INMOOSE
+from alphapepttools.tl.diff_exp.ebayes import (
+    _HAS_INMOOSE,
+    _METHOD_NAME,
+    _build_design_matrix,
+    _contrasts_from_matrix,
+    _make_contrasts,
+    _nan_lmfit,
+    _replicate_gate_mask,
+    _resolve_comparison,
+    _run_contrasts,
+    _standardize_contrast_frame,
+)
 from alphapepttools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
 
 
@@ -395,8 +407,13 @@ def example_adata_ebayes():
 
 
 @pytest.fixture
-def expected_ebayes_base_df():
-    """Base expected dataframe for eBayes tests with B_VS_A comparison."""
+def expected_ebayes_complete_case_df():
+    """Frozen expected values for the B_VS_A comparison on the complete-case feature set.
+
+    The fixture's X4 carries missing values, so these numbers only hold once the adata has been
+    filtered with `filter_data_completeness(max_missing_count=0)`; the eBayes variance prior is
+    estimated from whichever features are present, so the feature set is part of the expectation.
+    """
     return pd.DataFrame(
         {
             "protein": ["X1", "X2", "X3"],
@@ -409,31 +426,34 @@ def expected_ebayes_base_df():
             "max_level_1_samples": [5, 5, 5],
             "max_level_2_samples": [5, 5, 5],
             "stat": [-3.804007666004946, -6.2764817445960475, -3.9999011197249166],
-            "B": [-1.8736068846693623, 2.010219213410613, -1.5373419998901845],
-            "AveExpr": [4.175828737355294, 2.8008384166375, 2.1791061114716954],
         },
         index=["X1", "X2", "X3"],
     )
 
 
-# Test diff_exp_limma by loading small example datasets
+# Absolute regression anchor: pins the numbers diff_exp_ebayes produces, so a change in our own
+# pipeline or in the inmoose version underneath it shows up here. The companion oracle test below
+# instead re-derives the numbers from limma, and would move along with such a change.
 @pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
 @pytest.mark.parametrize(
     ("comparison", "expected_comparison_key", "between_column"),
     [
-        (("B", "A"), "B_VS_A", "group"),  # ensure that patsy's alphabetical ordering is cancelled out correctly
+        # ("B", "A") is deliberately not alphabetical: it pins the fold change direction as A - B
+        # (i.e. comparison[0] - comparison[1]) independently of how the levels happen to sort.
+        (("B", "A"), "B_VS_A", "group"),
     ],
 )
 def test_diff_exp_ebayes(
     example_adata_ebayes,
-    expected_ebayes_base_df,
+    expected_ebayes_complete_case_df,
     comparison,
     expected_comparison_key,
     between_column,
 ):
-    """Testing function to ascertain stable functionality of diff_exp_limma on a small example dataset."""
+    """diff_exp_ebayes reproduces its frozen reference values on a small complete-case dataset."""
 
-    adata = example_adata_ebayes.copy()
+    # diff_exp_ebayes fits incomplete features too, so filter upfront to pin the feature set.
+    adata = filter_data_completeness(example_adata_ebayes.copy(), max_missing_count=0, action="drop")
 
     results = tl.diff_exp_ebayes(
         adata=adata,
@@ -442,13 +462,15 @@ def test_diff_exp_ebayes(
     )
 
     # Add the condition_pair column to the expected dataframe
-    expected_df = expected_ebayes_base_df.copy()
+    expected_df = expected_ebayes_complete_case_df.copy()
     expected_df.insert(0, "condition_pair", [expected_comparison_key] * len(expected_df))
 
-    # The comparison key is no longer returned separately, it is carried in condition_pair
+    # check_names=False: results are indexed on adata.var_names, whose .name differs from the
+    # plain Index the expectation is built with.
     pd.testing.assert_frame_equal(
         results,
         expected_df,
+        check_names=False,
     )
 
 
@@ -593,57 +615,922 @@ def test__standardize_alphaquant_results(
     )
 
 
-### Test validation raises in diff_exp_alphaquant / diff_exp_ebayes / _standardize_alphaquant_results ###
+### eBayes tests
 
 
-@pytest.fixture
-def adata_for_diff_exp():
-    """Tiny AnnData for triggering validation raises (no real computation needed)."""
-    return ad.AnnData(
-        X=np.array([[1.0, 2.0], [3.0, 4.0]]),
-        obs=pd.DataFrame({"condition": ["A", "B"]}, index=["s1", "s2"]),
+def _inmoose_limma_reference(adata, between_column, comparison):
+    """Run the pre-port eBayes chain by calling inmoose.limma directly.
+
+    This is the independent numerical oracle for the numpy reimplementations in
+    `tl.diff_exp.ebayes`: `_nan_lmfit`, `_make_contrasts`, `_run_contrasts` and the topTable
+    equivalent all replaced a limma call that this helper still makes. eBayes moderation itself is
+    shared between the two paths (`_ebayes_moderation` calls `limma.eBayes`), so it is not what is
+    under test here.
+
+    Requires complete (NaN-free) data, which is why callers pre-filter with
+    `filter_data_completeness`. Imports are function-local: patsy only reaches the environment
+    transitively via inmoose, so a module-level import would break collection of this whole file in
+    the non-`full` CI legs. Every caller is gated on `_HAS_INMOOSE`.
+
+    Returns
+    -------
+    pd.DataFrame
+        topTable output indexed by feature, with limma's column names mapped onto `log2fc`,
+        `p_value` and `fdr`.
+    """
+    import patsy
+    from inmoose import limma
+
+    level_1, level_2 = comparison
+    sub = adata[adata.obs[between_column].isin([level_1, level_2])].copy()
+    labels = sub.obs[between_column].to_numpy()
+
+    # The explicit DesignInfo is required: limma.lmFit wraps a bare ndarray/DataFrame in a
+    # patsy.DesignMatrix of its own, which loses the column names makeContrasts(levels=...) keys on.
+    design_matrix = patsy.DesignMatrix(
+        np.column_stack([(labels == level_1).astype(float), (labels == level_2).astype(float)]),
+        patsy.DesignInfo([level_1, level_2]),
+    )
+
+    fit = limma.lmFit(sub.X.T, design_matrix)
+    fit = limma.contrasts_fit(fit, limma.makeContrasts(f"{level_1}-{level_2}", levels=[level_1, level_2]))
+    fit = limma.eBayes(fit)
+
+    # topTable cannot sort_by="none" and sorts by p-value, so restore the original feature order.
+    top = pd.DataFrame(limma.topTable(fit, coef=fit.coefficients.columns[0], number=np.inf)).sort_index()
+    top.index = sub.var_names
+    return top.rename(columns={"log2FoldChange": "log2fc", "pvalue": "p_value", "adj_pvalue": "fdr"})
+
+
+_ORACLE_COLS = ["log2fc", "p_value", "fdr"]
+
+
+# Critical test: on complete data, the numpy port must reproduce the straight limma chain.
+@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
+@pytest.mark.parametrize(
+    ("comparison", "expected_comparison_key", "between_column"),
+    [
+        (("B", "A"), "B_VS_A", "group"),
+    ],
+)
+def test_diff_exp_ebayes_matches_inmoose_limma_reference(
+    example_adata_ebayes,
+    comparison,
+    expected_comparison_key,
+    between_column,
+):
+    """diff_exp_ebayes reproduces a direct inmoose.limma chain on complete data.
+
+    diff_exp_ebayes fits every feature whereas the limma chain cannot handle NaNs at all, so we
+    filter incomplete features upfront (the intended workflow) to give both paths the same feature
+    set and therefore the same eBayes variance prior. The moderated statistics must then agree to
+    numerical precision.
+    """
+    adata = filter_data_completeness(example_adata_ebayes.copy(), max_missing_count=0, action="drop")
+
+    results = tl.diff_exp_ebayes(
+        adata=adata.copy(),
+        between_column=between_column,
+        comparison=comparison,
+    )
+    assert results["condition_pair"].unique().tolist() == [expected_comparison_key]
+
+    reference = _inmoose_limma_reference(adata.copy(), between_column, comparison)
+
+    pd.testing.assert_frame_equal(
+        results.loc[reference.index, _ORACLE_COLS],
+        reference[_ORACLE_COLS],
+        check_exact=False,
+        rtol=1e-5,
+        atol=1e-8,
+        check_dtype=False,
+        check_names=False,
     )
 
 
-def test__standardize_alphaquant_results_unknown_level():
-    """Passing an unknown level should raise ValueError."""
-    with pytest.raises(ValueError, match="Unknown level"):
-        _standardize_alphaquant_results("A_VS_B", "unknown_level", pd.DataFrame())
+# The multi-contrast path has no counterpart in the old implementation, so the oracle is the only
+# independent check on it: a joint fit over three conditions must place the same fold changes as two
+# separate pairwise limma fits. Only log2fc is comparable -- the joint fit pools residual variance
+# across all three conditions, so its eBayes prior (and hence its p-values) legitimately differs.
+@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
+def test_diff_exp_ebayes_multi_contrast_log2fc_matches_pairwise_reference(three_condition_adata):
+    """A joint ("_ALL_", "A") fit yields the same fold changes as independent pairwise limma fits."""
+    adata = filter_data_completeness(three_condition_adata.copy(), max_missing_count=0, action="drop")
+
+    joint = tl.diff_exp_ebayes(adata=adata.copy(), between_column="group", comparison=("_ALL_", "A"))
+
+    for a_level in ("B", "C"):
+        reference = _inmoose_limma_reference(adata.copy(), "group", (a_level, "A"))
+        block = joint[joint["condition_pair"] == f"{a_level}_VS_A"]
+
+        np.testing.assert_allclose(
+            block.loc[reference.index, "log2fc"].to_numpy(),
+            reference["log2fc"].to_numpy(),
+            rtol=1e-5,
+            atol=1e-8,
+        )
 
 
-@pytest.mark.skipif(not _HAS_ALPHAQUANT, reason="alphaquant not installed")
+# Unit tests for the individual eBayes pipeline stages
+
+
+def _abc_adata():
+    """AnnData with three conditions A, B, C (two samples each); X is unused by the contrast helpers."""
+    obs = pd.DataFrame(
+        {"group": ["A", "A", "B", "B", "C", "C"]},
+        index=[f"s{i}" for i in range(6)],
+    )
+    return ad.AnnData(X=np.zeros((6, 2), dtype=float), obs=obs)
+
+
+# Test building a design matrix with and without covariates, and validate error handling for invalid inputs.
+def test__build_design_matrix_basic():
+    """Without a covariate, the design matrix is a one-hot encoding of the conditions."""
+    obs = pd.DataFrame({"group": ["A", "A", "B", "B"]}, index=[f"s{i}" for i in range(4)])
+    adata = ad.AnnData(X=np.zeros((4, 1), dtype=float), obs=obs)
+
+    dm, col_info = _build_design_matrix(adata, "group")
+
+    # Columns follow the order conditions first appear in.
+    assert list(dm.columns) == ["A", "B"]
+    assert list(dm.index) == list(adata.obs_names)
+    np.testing.assert_array_equal(dm.to_numpy(), np.array([[1, 0], [1, 0], [0, 1], [0, 1]]))
+
+    # Each row is one-hot across the condition columns.
+    np.testing.assert_array_equal(dm.to_numpy().sum(axis=1), np.ones(4, dtype=int))
+    assert col_info == {"condition_col_idxs": {"A": 0, "B": 1}, "covariate_col_idxs": {}}
+
+
+def test__build_design_matrix_with_covariate():
+    """A covariate is added in k-1 fashion: the first level is dropped to avoid multicollinearity."""
+    obs = pd.DataFrame(
+        {"group": ["A", "A", "B", "B"], "batch": ["x", "x", "y", "y"]},
+        index=[f"s{i}" for i in range(4)],
+    )
+    adata = ad.AnnData(X=np.zeros((4, 1), dtype=float), obs=obs)
+
+    dm, col_info = _build_design_matrix(adata, "group", categorical_covariate_column="batch")
+
+    # Two condition columns plus one covariate column ("x", the first level, is dropped).
+    assert list(dm.columns) == ["A", "B", "y"]
+    np.testing.assert_array_equal(dm["y"].to_numpy(), np.array([0, 0, 1, 1]))
+    assert col_info == {"condition_col_idxs": {"A": 0, "B": 1}, "covariate_col_idxs": {"y": 2}}
+
+
+def test__build_design_matrix_column_order_follows_first_appearance():
+    """Columns follow the order levels first appear in, not the lexicographic order get_dummies uses."""
+    obs = pd.DataFrame(
+        {"group": ["treated", "treated", "ctrl", "ctrl"], "batch": ["b", "a", "b", "a"]},
+        index=[f"s{i}" for i in range(4)],
+    )
+    adata = ad.AnnData(X=np.zeros((4, 1), dtype=float), obs=obs)
+
+    dm, col_info = _build_design_matrix(adata, "group", categorical_covariate_column="batch")
+
+    # "treated" precedes "ctrl"; the covariate keeps "b" because "a" is the dropped first level.
+    assert list(dm.columns) == ["treated", "ctrl", "b"]
+    assert col_info["condition_col_idxs"] == {"treated": 0, "ctrl": 1}
+
+
+def test__build_design_matrix_column_set_matches_observed_levels():
+    """The design matrix carries exactly the observed levels, minus the dropped covariate reference.
+
+    The column *set* is the load-bearing part, as opposed to the order: a level missing here leaves
+    its samples without a coefficient to absorb them, which inflates the residual variance of every
+    feature and corrupts the shared eBayes prior -- silently, for a covariate, since covariates never
+    appear in a contrast.
+    """
+    obs = pd.DataFrame(
+        {
+            "group": ["treated", "treated", "ctrl", "ctrl", "ctrl"],
+            "batch": ["b", "a", "c", "b", "a"],
+        },
+        index=[f"s{i}" for i in range(5)],
+    )
+    adata = ad.AnnData(X=np.zeros((5, 1), dtype=float), obs=obs)
+
+    dm, col_info = _build_design_matrix(adata, "group", categorical_covariate_column="batch")
+
+    conditions = set(obs["group"])
+    covariates = set(obs["batch"]) - {"a"}  # "a" is the lexicographically first level, dropped for k-1
+    assert set(dm.columns) == conditions | covariates
+    assert set(col_info["condition_col_idxs"]) == conditions
+    assert set(col_info["covariate_col_idxs"]) == covariates
+
+    # No duplicate labels, which would make dm.columns.get_loc return a mask instead of an index.
+    assert len(dm.columns) == len(conditions) + len(covariates)
+
+
+@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
+def test_diff_exp_ebayes_invariant_to_design_matrix_column_order(three_condition_adata):
+    """Results do not depend on the design matrix column order, only on the name-to-index map.
+
+    _one_hot's first-appearance ordering is presentation only: every consumer resolves columns by
+    name through col_info, and the fit itself is column-permutation-equivariant. Reversing the
+    samples flips the first-appearance order of both the condition and the covariate block, and must
+    leave the results untouched.
+    """
+    adata = three_condition_adata.copy()
+    adata.obs["batch"] = ["p", "q", "r"] * 3  # crossed with group, so the design stays full rank
+    permuted = adata[adata.obs_names[::-1]].copy()
+
+    # Precondition: the two column orders really do differ (conditions A,B,C vs C,B,A).
+    assert list(_build_design_matrix(adata, "group", "batch")[0].columns) != list(
+        _build_design_matrix(permuted, "group", "batch")[0].columns
+    )
+
+    kwargs = {"between_column": "group", "comparison": ("_ALL_", "A"), "categorical_covariate_column": "batch"}
+    original = tl.diff_exp_ebayes(adata=adata.copy(), **kwargs)
+    reordered = tl.diff_exp_ebayes(adata=permuted.copy(), **kwargs)
+
+    sort_cols = ["condition_pair", "protein"]
+    pd.testing.assert_frame_equal(
+        original.sort_values(sort_cols).reset_index(drop=True),
+        reordered.sort_values(sort_cols).reset_index(drop=True),
+        rtol=1e-8,
+        atol=1e-10,
+    )
+
+
+def test__build_design_matrix_ignores_unused_categories():
+    """Categories with no samples left (e.g. after subsetting) must not add all-zero columns."""
+    obs = pd.DataFrame(
+        {
+            "group": pd.Categorical(["A", "A", "B", "B"], categories=["A", "B", "C"]),
+            "batch": pd.Categorical(["x", "x", "y", "y"], categories=["x", "y", "z"]),
+        },
+        index=[f"s{i}" for i in range(4)],
+    )
+    adata = ad.AnnData(X=np.zeros((4, 1), dtype=float), obs=obs)
+
+    dm, col_info = _build_design_matrix(adata, "group", categorical_covariate_column="batch")
+
+    # Unobserved levels "C" and "z" would make the design matrix rank-deficient.
+    assert list(dm.columns) == ["A", "B", "y"]
+    assert col_info == {"condition_col_idxs": {"A": 0, "B": 1}, "covariate_col_idxs": {"y": 2}}
+
+
+# Test raise behavior for invalid condition/covariate specifications in _build_design_matrix
 @pytest.mark.parametrize(
-    ("kwargs_override", "match"),
+    ("condition", "covariate", "between_column", "categorical_covariate_column"),
     [
-        ({"plots": "bogus"}, "Parameter 'plots'"),
-        ({"between_column": "nonexistent"}, "not found in adata.obs"),
-        ({"comparison": ["A", "B"]}, "tuple of exactly two"),
+        (["A", "A"], None, "missing", None),  # condition column absent
+        ([np.nan, "A"], None, "group", None),  # NaN in condition column
+        (["A", "B"], ["x", "x"], "group", "missing"),  # covariate column absent
+        (["A", "B"], [np.nan, "x"], "group", "batch"),  # NaN in covariate column
     ],
 )
-def test_diff_exp_alphaquant_validation_raises(adata_for_diff_exp, kwargs_override, match):
-    """Input validation in diff_exp_alphaquant should raise before any computation."""
-    base_kwargs = {
-        "adata": adata_for_diff_exp,
-        "report": pd.DataFrame(),
-        "between_column": "condition",
-        "comparison": ("A", "B"),
-    }
-    base_kwargs.update(kwargs_override)
-    with pytest.raises(ValueError, match=match):
-        tl.diff_exp_alphaquant(**base_kwargs)
+def test__build_design_matrix_validation(condition, covariate, between_column, categorical_covariate_column):
+    """Invalid condition/covariate specifications raise KeyError."""
+    data = {"group": condition}
+    if covariate is not None:
+        data["batch"] = covariate
+    obs = pd.DataFrame(data, index=[f"s{i}" for i in range(len(condition))])
+    adata = ad.AnnData(X=np.zeros((len(condition), 1), dtype=float), obs=obs)
+
+    with pytest.raises(KeyError):
+        _build_design_matrix(adata, between_column, categorical_covariate_column=categorical_covariate_column)
+
+
+# Nan-aware linear fit (counterpart to inmoose.limma.lmFit)
+@pytest.fixture
+def lmfit_adata():
+    """Three features exercising the complete / control-missing / empty-condition fit paths.
+
+    Samples s0-s2 are control "A", s3-s5 are treatment "B".
+    """
+    x = pd.DataFrame(
+        {
+            "complete": [2, 4, 6, 1, 2, 3],  # full data in both groups
+            "control_missing": [2, 4, np.nan, 1, 2, 3],  # one missing control value
+            "treat_all_missing": [2, 4, 6, np.nan, np.nan, np.nan],  # treatment group entirely missing
+        },
+        index=[f"s{i}" for i in range(6)],
+    ).astype(float)
+    obs = pd.DataFrame({"group": ["A", "A", "A", "B", "B", "B"]}, index=[f"s{i}" for i in range(6)])
+    return ad.AnnData(X=x, obs=obs)
+
+
+# First check the case with complete features
+def test__nan_lmfit_complete_feature(lmfit_adata):
+    """For a fully observed feature the fit recovers group means, residual variance and df exactly."""
+    design_matrix, col_info = _build_design_matrix(lmfit_adata, "group")
+    fit = _nan_lmfit(lmfit_adata, design_matrix)
+    j = list(lmfit_adata.var_names).index("complete")
+
+    # Coefficients are the group means (A=4, B=2); condition order is [A, B].
+    assert col_info["condition_col_idxs"] == {"A": 0, "B": 1}
+    np.testing.assert_allclose(fit["B"][:, j], [4.0, 2.0])
+    # SSR = 8 (A) + 2 (B) = 10, df = 6 - 2 = 4, sigma2 = 10/4.
+    np.testing.assert_allclose(fit["dfs"][j], 4.0)
+    np.testing.assert_allclose(fit["sigma2"][j], 2.5)
+    # Unscaled covariance is pinv(X'X) = diag(1/n_A, 1/n_B) = diag(1/3, 1/3).
+    np.testing.assert_allclose(fit["M_all"][j], np.array([[1 / 3, 0.0], [0.0, 1 / 3]]))
+
+
+# Next check the case with empty condition columns (all missing in one group)
+def test__nan_lmfit_drops_empty_condition_column(lmfit_adata):
+    """A condition with no observed values is dropped and scattered back as NaN, the rest is fit."""
+    design_matrix, _ = _build_design_matrix(lmfit_adata, "group")
+    fit = _nan_lmfit(lmfit_adata, design_matrix)
+    j = list(lmfit_adata.var_names).index("treat_all_missing")
+
+    # Only the control mean is estimable; the dead treatment coefficient is NaN.
+    np.testing.assert_allclose(fit["B"][:, j], [4.0, np.nan], equal_nan=True)
+    # df = 3 - 1 = 2, SSR = 8, sigma2 = 4.
+    np.testing.assert_allclose(fit["dfs"][j], 2.0)
+    np.testing.assert_allclose(fit["sigma2"][j], 4.0)
+    # Only the (A, A) entry of the unscaled covariance is populated.
+    np.testing.assert_allclose(fit["M_all"][j], np.array([[1 / 3, np.nan], [np.nan, np.nan]]), equal_nan=True)
+
+
+# Test making of contrasts from a design matrix, which are needed to compute the actual log2FC as [B_treatment - B_control] for each contrast.
+@pytest.mark.parametrize(
+    ("control_is", "expected"),
+    [
+        (1, np.array([[1, -1, 0], [1, 0, -1]])),  # control = +1, each treatment = -1
+        (-1, np.array([[-1, 1, 0], [-1, 0, 1]])),  # control = -1, each treatment = +1
+    ],
+)
+def test__make_contrasts(control_is, expected):
+    """The contrast matrix has the control on every row and -control_is in each treatment's own row."""
+    adata = _abc_adata()
+    cm = _make_contrasts(adata, between_column="group", control_condition="A", control_is=control_is)
+
+    # Columns are the conditions; rows are the K-1 treatment-vs-control contrasts.
+    assert list(cm.columns) == ["A", "B", "C"]
+    assert cm.shape == (2, 3)
+    np.testing.assert_array_equal(cm.to_numpy(), expected)
+
+
+# Test computing the contrast log2FC, unscaled variance and standard deviation from the contrast matrix into separate arrays
+def test__run_contrasts():
+    """log2fc and unscaled variance are computed per contrast, dropping covariate rows/cols."""
+    # Conditions A, B, C at indices 0-2, plus a covariate at index 3 that must be ignored.
+    col_info = {"condition_col_idxs": {"A": 0, "B": 1, "C": 2}, "covariate_col_idxs": {"cov": 3}}
+    # One feature; condition coefficients [1, 3, 4] and a covariate coefficient (99) to be dropped.
+    b = np.array([[1.0], [3.0], [4.0], [99.0]])
+    # Unscaled covariance: identity on the conditions, large values on the covariate row/col.
+    m = np.full((1, 4, 4), 1000.0)
+    m[0, :3, :3] = np.eye(3)
+    contrast_matrix = _make_contrasts(_abc_adata(), between_column="group", control_condition="A", control_is=1)
+
+    out = _run_contrasts(contrast_matrix, B=b, M_all=m, col_info=col_info)
+
+    # Contrast 0 = A - B = 1 - 3 = -2; contrast 1 = A - C = 1 - 4 = -3 (covariate coef ignored).
+    np.testing.assert_allclose(out["log2fc"], np.array([[-2.0], [-3.0]]))
+    # Quadratic form C @ I @ C = 2 for each contrast (covariate entries excluded by subsetting).
+    np.testing.assert_allclose(out["unscaled_var"], np.array([[2.0], [2.0]]))
+    np.testing.assert_allclose(out["stdev_unscaled"], np.sqrt(np.array([[2.0], [2.0]])))
+
+
+def test__run_contrasts_matches_explicit_quadratic_form():
+    """The einsum-based unscaled variance matches an explicit per-feature, per-contrast loop."""
+    col_info = {"condition_col_idxs": {"A": 0, "B": 1, "C": 2}, "covariate_col_idxs": {}}
+    contrast_matrix = _make_contrasts(_abc_adata(), between_column="group", control_condition="A", control_is=-1)
+    c = contrast_matrix.to_numpy()
+
+    # A few features with distinct, non-trivial (but symmetric) covariance matrices.
+    rng_free = np.array([[2.0, 0.5, 0.1], [0.5, 1.0, 0.2], [0.1, 0.2, 3.0]])
+    m = np.stack([rng_free, rng_free * 2.0, np.eye(3)])
+    b = np.array([[1.0, 0.0, 2.0], [3.0, 1.0, 2.0], [4.0, 2.0, 2.0]])
+
+    out = _run_contrasts(contrast_matrix, B=b, M_all=m, col_info=col_info)
+
+    expected = np.empty((c.shape[0], m.shape[0]))
+    for j in range(m.shape[0]):
+        for contrast in range(c.shape[0]):
+            expected[contrast, j] = c[contrast] @ m[j] @ c[contrast]
+    np.testing.assert_allclose(out["unscaled_var"], expected)
+
+
+# Test the extraction of contrast names from a contrast matrix, to return things like "A_VS_B" or "B_VS_A" depending on the sign of the log2fc and the row order of the matrix.
+@pytest.mark.parametrize(
+    ("control_is", "expected_names"),
+    [
+        (1, ["A_VS_B", "A_VS_C"]),  # log2fc = control - treatment -> "control_VS_treatment"
+        (-1, ["B_VS_A", "C_VS_A"]),  # log2fc = treatment - control -> "treatment_VS_control"
+    ],
+)
+def test__contrasts_from_matrix_naming(control_is, expected_names):
+    """Contrast names follow the sign of log2fc and the row order of the matrix."""
+    adata = _abc_adata()
+    cm = _make_contrasts(adata, between_column="group", control_condition="A", control_is=control_is)
+
+    assert _contrasts_from_matrix(cm, control_condition="A") == expected_names
+
+
+@pytest.mark.parametrize(
+    ("matrix", "control_condition", "expected_exception"),
+    [
+        # Control condition not present in the matrix columns.
+        (pd.DataFrame([[1, -1, 0]], columns=["A", "B", "C"]), "Z", KeyError),
+        # Control column appears more than once.
+        (pd.DataFrame(np.array([[1, -1, 1]]), columns=["A", "B", "A"]), "A", ValueError),
+        # A row with two non-zero treatment columns (not exactly one).
+        (pd.DataFrame([[1, -1, -1]], columns=["A", "B", "C"]), "A", ValueError),
+        # A row with an invalid sign pattern (both +1).
+        (pd.DataFrame([[1, 1, 0]], columns=["A", "B", "C"]), "A", ValueError),
+    ],
+)
+def test__contrasts_from_matrix_errors(matrix, control_condition, expected_exception):
+    """Malformed contrast matrices are rejected: an absent control column raises KeyError, structural defects ValueError."""
+    with pytest.raises(expected_exception):
+        _contrasts_from_matrix(matrix, control_condition=control_condition)
+
+
+# Condition-ordering robustness:
+# The fit and scatter-back must key coefficients by condition name, never by assuming the control
+# comes first or that conditions are contiguous. These tests use a non-control-first, interspersed
+# order (B, A, C with A as the control) to guard against positional mix-ups.
+
+
+@pytest.fixture
+def interspersed_adata():
+    """Conditions in interspersed, non-control-first order (B, A, C; A is the control).
+
+    Each condition has a distinct per-feature mean (A~11, B~21, C~31) so coefficients can be
+    checked by name. The second feature has condition C entirely missing.
+    """
+    x = pd.DataFrame(
+        {
+            "all_present": [20.0, 10.0, 30.0, 22.0, 12.0, 32.0],
+            "C_missing": [20.0, 10.0, np.nan, 22.0, 12.0, np.nan],
+        },
+        index=[f"s{i}" for i in range(6)],
+    )
+    obs = pd.DataFrame({"group": ["B", "A", "C", "B", "A", "C"]}, index=[f"s{i}" for i in range(6)])
+    return ad.AnnData(X=x, obs=obs)
+
+
+def test__nan_lmfit_maps_coefficients_by_name_under_interspersed_order(interspersed_adata):
+    """Coefficients align with conditions by name, not position, for arbitrary input ordering."""
+    design_matrix, col_info = _build_design_matrix(interspersed_adata, "group")
+    fit = _nan_lmfit(interspersed_adata, design_matrix)
+    idx = col_info["condition_col_idxs"]
+
+    # Appearance order is [B, A, C]: the control "A" is deliberately NOT the first column.
+    assert idx == {"B": 0, "A": 1, "C": 2}
+
+    j_all = list(interspersed_adata.var_names).index("all_present")
+    # Each coefficient lands on its own condition (A=11, B=21, C=31).
+    np.testing.assert_allclose(fit["B"][idx["A"], j_all], 11.0)
+    np.testing.assert_allclose(fit["B"][idx["B"], j_all], 21.0)
+    np.testing.assert_allclose(fit["B"][idx["C"], j_all], 31.0)
+
+    j_miss = list(interspersed_adata.var_names).index("C_missing")
+    # The dropped condition (C) scatters back to NaN at its own index; the others are unaffected.
+    np.testing.assert_allclose(fit["B"][idx["A"], j_miss], 11.0)
+    np.testing.assert_allclose(fit["B"][idx["B"], j_miss], 21.0)
+    assert np.isnan(fit["B"][idx["C"], j_miss])
+    # The NaN is confined to C's row/column of the unscaled covariance; the B/A block stays finite.
+    m_miss = fit["M_all"][j_miss]
+    assert np.isnan(m_miss[idx["C"], :]).all()
+    assert np.isnan(m_miss[:, idx["C"]]).all()
+    assert np.isfinite(m_miss[np.ix_([idx["B"], idx["A"]], [idx["B"], idx["A"]])]).all()
+
+
+def test__run_contrasts_log2fc_correct_under_interspersed_order(interspersed_adata):
+    """End-to-end through _run_contrasts: each contrast's log2fc is treatment - control, by name."""
+    design_matrix, col_info = _build_design_matrix(interspersed_adata, "group")
+    fit = _nan_lmfit(interspersed_adata, design_matrix)
+    cm = _make_contrasts(interspersed_adata, between_column="group", control_condition="A", control_is=-1)
+    out = _run_contrasts(cm, B=fit["B"], M_all=fit["M_all"], col_info=col_info)
+    names = _contrasts_from_matrix(cm, control_condition="A")
+
+    j_all = list(interspersed_adata.var_names).index("all_present")
+    log2fc_by_name = {name: out["log2fc"][i, j_all] for i, name in enumerate(names)}
+
+    # control_is=-1 -> treatment - control: B - A = 10, C - A = 20.
+    np.testing.assert_allclose(log2fc_by_name["B_VS_A"], 10.0)
+    np.testing.assert_allclose(log2fc_by_name["C_VS_A"], 20.0)
+
+
+# Bit of finageling to skip the need for inmoose in this test, which we would need if we ran the entire
+# pipeline of tl.diff_exp_ebayes. Instead, we mock the fit and contrast step and check the correct ordering
+# of the results by name, which is what we are guarding against.
+def test_fit_and_contrasts_invariant_to_sample_permutation(example_adata_ebayes):
+    """Permuting the input samples must not change the per-contrast log2fc/variance (matched by name).
+
+    The permutation flips the condition appearance order (B-first to A-first), which reorders the
+    internal design and contrast rows; the named results must nonetheless be identical. This stops
+    before the eBayes step so it runs without inmoose -- the scatter-back is what we are guarding.
+    """
+
+    def fit_and_contrasts_by_name(adata):
+        design_matrix, col_info = _build_design_matrix(adata, "group")
+        fit = _nan_lmfit(adata, design_matrix)
+        cm = _make_contrasts(adata, between_column="group", control_condition="A", control_is=-1)
+        out = _run_contrasts(cm, B=fit["B"], M_all=fit["M_all"], col_info=col_info)
+        names = _contrasts_from_matrix(cm, control_condition="A")
+        return {name: (out["log2fc"][i], out["unscaled_var"][i]) for i, name in enumerate(names)}
+
+    adata = example_adata_ebayes.copy()
+    base = fit_and_contrasts_by_name(adata)
+
+    # A fixed permutation that interleaves the two groups (group becomes A, B, A, B, ...).
+    perm = [5, 0, 7, 2, 9, 1, 6, 3, 8, 4]
+    shuffled = fit_and_contrasts_by_name(adata[perm].copy())
+
+    assert set(base) == set(shuffled)
+    for name, (log2fc, unscaled_var) in base.items():
+        np.testing.assert_allclose(shuffled[name][0], log2fc, equal_nan=True)
+        np.testing.assert_allclose(shuffled[name][1], unscaled_var, equal_nan=True)
+
+
+# The replicate gate suppresses a contrast's fold change when either side has too few observed values. The
+# feature is still fit (and contributes to the eBayes prior); only the reported fold change/p/fdr are NaNed.
+@pytest.fixture
+def gate_adata():
+    """Comparison ("X", "Y"): one feature sparse in X (2 of 5), one sparse in Y (2 of 5), the rest full."""
+    x = pd.DataFrame(
+        {
+            "full_1": [10, 12, 14, 16, 18, 1, 2, 3, 4, 5],
+            "full_2": [1, 2, 3, 4, 5, 10, 15, 20, 25, 30],
+            "full_3": [2, 4, 6, 8, 10, 1, 3, 5, 7, 9],
+            "x_sparse": [np.nan, np.nan, np.nan, 16, 18, 1, 2, 3, 4, 5],  # X has only 2 observed
+            "y_sparse": [10, 12, 14, 16, 18, 1, 2, np.nan, np.nan, np.nan],  # Y has only 2 observed
+        },
+        index=[f"cell{i}" for i in range(10)],
+    ).astype(float)
+    obs = pd.DataFrame({"group": ["X"] * 5 + ["Y"] * 5}, index=[f"cell{i}" for i in range(10)])
+    adata = ad.AnnData(X=x, obs=obs)
+    nanlog(adata)
+    return adata
 
 
 @pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
 @pytest.mark.parametrize(
-    ("comparison", "match"),
+    ("a_min_required", "sparse_reported"),
     [
-        # level_1 missing
-        (("MISSING", "B"), "Level MISSING not found"),
-        # level_2 missing
-        (("A", "MISSING"), "Level MISSING not found"),
+        (3, False),  # only 2 observed A (X) values, below the required 3 -> fold change suppressed
+        (2, True),  # 2 observed A (X) values meet the requirement -> fold change reported
+        (None, True),  # gate disabled -> fold change reported
     ],
 )
-def test_diff_exp_ebayes_missing_level_raises(adata_for_diff_exp, comparison, match):
-    """A comparison referencing a level not in `between_column` should raise."""
-    with pytest.raises(ValueError, match=match):
-        tl.diff_exp_ebayes(adata_for_diff_exp, between_column="condition", comparison=comparison)
+def test_diff_exp_ebayes_a_gate(gate_adata, a_min_required, sparse_reported):
+    """a_min_required suppresses (NaNs) fold changes whose A condition has too few observed values."""
+    results = tl.diff_exp_ebayes(
+        adata=gate_adata,
+        between_column="group",
+        comparison=("X", "Y"),
+        a_min_required=a_min_required,
+    )
+    df = results[results["condition_pair"] == "X_VS_Y"].set_index("protein")
+    result_cols = ["log2fc", "p_value", "fdr", "stat"]
+
+    # Fully observed features are always reported, regardless of the gate.
+    assert df.loc["full_1", result_cols].notna().all()
+
+    # The feature sparse in A (X) is reported only when the requirement admits it.
+    sparse = df.loc["x_sparse", result_cols]
+    if sparse_reported:
+        assert sparse.notna().all()
+    else:
+        assert sparse.isna().all()
+
+
+@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
+@pytest.mark.parametrize(
+    ("b_min_required", "sparse_reported"),
+    [
+        (3, False),  # only 2 observed B (Y) values, below the required 3 -> fold change suppressed
+        (2, True),  # 2 observed B (Y) values meet the requirement -> fold change reported
+        (None, True),  # gate disabled -> fold change reported
+    ],
+)
+def test_diff_exp_ebayes_b_gate(gate_adata, b_min_required, sparse_reported):
+    """b_min_required suppresses (NaNs) fold changes whose B condition has too few observed values."""
+    results = tl.diff_exp_ebayes(
+        adata=gate_adata,
+        between_column="group",
+        comparison=("X", "Y"),
+        b_min_required=b_min_required,
+    )
+    df = results[results["condition_pair"] == "X_VS_Y"].set_index("protein")
+    result_cols = ["log2fc", "p_value", "fdr", "stat"]
+
+    # Fully observed features are always reported, regardless of the gate.
+    assert df.loc["full_1", result_cols].notna().all()
+
+    # The feature sparse in B (Y) is reported only when the requirement admits it.
+    sparse = df.loc["y_sparse", result_cols]
+    if sparse_reported:
+        assert sparse.notna().all()
+    else:
+        assert sparse.isna().all()
+
+
+# A covariate is modelled as an additive effect, so it must absorb a batch offset that is unevenly
+# distributed across the conditions. Without it, that offset is confounded with the group effect.
+_COVARIATE_TRUE_EFFECT = 1.0
+_COVARIATE_MIN_UNADJUSTED_BIAS = 0.9
+_COVARIATE_MAX_ADJUSTED_ERROR = 0.5
+
+
+@pytest.fixture
+def confounded_batch_adata():
+    """Groups A/B with an unbalanced batch: A is mostly b1, B is mostly b2.
+
+    Every feature carries the same true group effect, plus a feature-specific offset on the b2
+    samples. Because batch is unevenly distributed across the groups, the unadjusted group
+    difference measures the group effect plus most of that offset. Values are already additive,
+    so no nanlog is applied.
+    """
+    sample_names = [f"s{i}" for i in range(8)]
+    groups = np.array(["A", "A", "A", "A", "B", "B", "B", "B"])
+    batches = np.array(["b1", "b1", "b1", "b2", "b1", "b2", "b2", "b2"])
+
+    group_effect = np.where(groups == "B", _COVARIATE_TRUE_EFFECT, 0.0)
+    is_b2 = batches == "b2"
+
+    rng = np.random.default_rng(0)
+    features = {}
+    for feature_idx in range(10):
+        baseline = 10.0 + feature_idx  # feature-specific overall level
+        batch_offset = 2.0 + 0.5 * feature_idx  # feature-specific size of the b2 effect
+        noise_sd = 0.05 + 0.03 * feature_idx  # varies so residual variances stay heterogeneous
+
+        values = baseline + group_effect
+        values = values + np.where(is_b2, batch_offset, 0.0)
+        values = values + rng.normal(0, noise_sd, size=len(sample_names))
+
+        features[f"f{feature_idx}"] = values
+
+    x = pd.DataFrame(features, index=sample_names)
+    obs = pd.DataFrame({"group": groups, "batch": batches}, index=sample_names)
+    return ad.AnnData(X=x, obs=obs)
+
+
+@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
+def test_diff_exp_ebayes_covariate_corrects_confounded_batch(confounded_batch_adata):
+    """categorical_covariate_column absorbs the batch offset, recovering the true group effect it otherwise inflates."""
+    unadjusted = tl.diff_exp_ebayes(
+        adata=confounded_batch_adata,
+        between_column="group",
+        comparison=("B", "A"),
+    )
+    adjusted = tl.diff_exp_ebayes(
+        adata=confounded_batch_adata,
+        between_column="group",
+        comparison=("B", "A"),
+        categorical_covariate_column="batch",
+    )
+
+    # Adding a covariate must not change the output contract.
+    assert list(adjusted.columns) == [*tl_defaults.DIFF_EXP_COLS, "stat"]
+    assert adjusted.index.equals(confounded_batch_adata.var_names)
+
+    unadjusted_error = (unadjusted["log2fc"] - _COVARIATE_TRUE_EFFECT).abs()
+    adjusted_error = (adjusted["log2fc"] - _COVARIATE_TRUE_EFFECT).abs()
+
+    # Ignoring the batch inflates every fold change; modelling it recovers the true effect.
+    assert (unadjusted_error > _COVARIATE_MIN_UNADJUSTED_BIAS).all()
+    assert (adjusted_error < _COVARIATE_MAX_ADJUSTED_ERROR).all()
+    assert (adjusted_error < unadjusted_error).all()
+
+
+# Every contrast is returned in one frame, separated by the condition_pair column rather than by a
+# dictionary key, so a multi-contrast run must stack cleanly and keep its blocks distinguishable.
+@pytest.fixture
+def three_condition_adata():
+    """Conditions A, B, C (three samples each), with C shifted twice as far from A as B is.
+
+    Each feature scales the shift differently and carries its own noise level, which keeps the
+    residual variances heterogeneous.
+    """
+    sample_names = [f"s{i}" for i in range(9)]
+    groups = np.array(["A", "A", "A", "B", "B", "B", "C", "C", "C"])
+
+    shift_per_condition = {"A": 0.0, "B": 1.0, "C": 2.0}
+    condition_shift = np.array([shift_per_condition[group] for group in groups])
+
+    rng = np.random.default_rng(0)
+    features = {}
+    for feature_idx in range(8):
+        baseline = 10.0 + feature_idx
+        shift_scale = 1.0 + 0.3 * feature_idx  # feature-specific size of the condition effect
+        noise_sd = 0.05 + 0.04 * feature_idx
+
+        values = baseline + condition_shift * shift_scale
+        values = values + rng.normal(0, noise_sd, size=len(sample_names))
+
+        features[f"f{feature_idx}"] = values
+
+    x = pd.DataFrame(features, index=sample_names)
+    obs = pd.DataFrame({"group": groups}, index=sample_names)
+    return ad.AnnData(X=x, obs=obs)
+
+
+@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
+def test_diff_exp_ebayes_stacks_every_contrast(three_condition_adata):
+    """A multi-contrast run returns one frame holding every contrast as its own condition_pair block."""
+    results = tl.diff_exp_ebayes(
+        adata=three_condition_adata,
+        between_column="group",
+        comparison=("_ALL_", "A"),
+    )
+
+    assert isinstance(results, pd.DataFrame)
+    assert list(results.columns) == [*tl_defaults.DIFF_EXP_COLS, "stat"]
+    assert results["condition_pair"].unique().tolist() == ["B_VS_A", "C_VS_A"]
+    assert len(results) == 2 * three_condition_adata.n_vars
+
+    b_block = results[results["condition_pair"] == "B_VS_A"]
+    c_block = results[results["condition_pair"] == "C_VS_A"]
+
+    # Each block carries the full feature set, still indexed by feature.
+    for block in (b_block, c_block):
+        assert block.index.equals(three_condition_adata.var_names)
+        assert list(block["protein"]) == list(three_condition_adata.var_names)
+
+    # C sits twice as far from A as B does, so the blocks must not be interchanged.
+    assert (c_block["log2fc"] > b_block["log2fc"]).all()
+
+
+# Comparison resolution turns the user-facing comparison tuple into explicit A conditions and the single B
+# reference, expanding the "_ALL_" sentinel and validating every level up front.
+@pytest.mark.parametrize(
+    ("comparison", "expected_a", "expected_b"),
+    [
+        (("B", "A"), ["B"], "A"),  # single A condition is wrapped into a list
+        ((["B", "C"], "A"), ["B", "C"], "A"),  # explicit list of A conditions passes through
+        ((["C"], "A"), ["C"], "A"),  # single-element list needs no expansion
+        (("_ALL_", "A"), ["B", "C"], "A"),  # sentinel expands to every level except B, in appearance order
+    ],
+)
+def test__resolve_comparison(comparison, expected_a, expected_b):
+    """Valid comparisons resolve to an explicit list of A conditions plus the B reference."""
+    a_conditions, b_condition = _resolve_comparison(_abc_adata(), "group", comparison)
+
+    assert isinstance(a_conditions, list)
+    assert a_conditions == expected_a
+    assert b_condition == expected_b
+
+
+def test__resolve_comparison_all_sentinel_excludes_b():
+    """ "_ALL_" never compares the B reference against itself, whichever level B is."""
+    a_conditions, b_condition = _resolve_comparison(_abc_adata(), "group", ("_ALL_", "B"))
+
+    assert b_condition not in a_conditions
+    assert set(a_conditions) == {"A", "C"}
+
+
+@pytest.mark.parametrize(
+    ("between_column", "comparison"),
+    [
+        ("missing", ("B", "A")),  # between column absent from adata.obs
+        ("group", ("B", "missing")),  # B reference is not a level of the between column
+        ("group", ("missing", "A")),  # single A condition is not a level
+        ("group", (["B", "missing"], "A")),  # one A condition of a list is not a level
+        ("group", ("_ALL_", "missing")),  # sentinel cannot expand against an unknown B
+    ],
+)
+def test__resolve_comparison_validation(between_column, comparison):
+    """An unknown between column or condition raises KeyError before any fitting happens."""
+    with pytest.raises(KeyError):
+        _resolve_comparison(_abc_adata(), between_column, comparison)
+
+
+# The replicate gate mask is the per-contrast AND of the two per-condition sufficiency masks; a None
+# requirement disables that side of the gate.
+@pytest.fixture
+def gate_mask_adata():
+    """Conditions X and Y (three samples each) with one feature sparse in X and one sparse in Y."""
+    x = np.array(
+        [
+            # full, x_sparse, y_sparse
+            [1.0, np.nan, 1.0],
+            [2.0, np.nan, 2.0],
+            [3.0, 3.0, 3.0],
+            [4.0, 4.0, np.nan],
+            [5.0, 5.0, np.nan],
+            [6.0, 6.0, 6.0],
+        ]
+    )
+    obs = pd.DataFrame({"group": ["X"] * 3 + ["Y"] * 3}, index=[f"s{i}" for i in range(6)])
+    var = pd.DataFrame(index=["full", "x_sparse", "y_sparse"])
+    return ad.AnnData(X=x, obs=obs, var=var)
+
+
+@pytest.mark.parametrize(
+    ("a_min_required", "b_min_required", "expected"),
+    [
+        (None, None, [True, True, True]),  # both gates disabled -> everything kept
+        (2, None, [True, False, True]),  # A gate only: x_sparse has 1 observed in X
+        (None, 2, [True, True, False]),  # B gate only: y_sparse has 1 observed in Y
+        (2, 2, [True, False, False]),  # both gates -> both sparse features dropped
+        (1, 1, [True, True, True]),  # requirements met everywhere
+        (4, None, [False, False, False]),  # more required than X has samples -> nothing kept
+    ],
+)
+def test__replicate_gate_mask(gate_mask_adata, a_min_required, b_min_required, expected):
+    """The mask keeps a feature only where both conditions meet their (enabled) requirement."""
+    keep = _replicate_gate_mask(
+        gate_mask_adata,
+        between_column="group",
+        a_level="X",
+        b_level="Y",
+        a_min_required=a_min_required,
+        b_min_required=b_min_required,
+    )
+
+    assert keep.dtype == bool
+    assert keep.shape == (gate_mask_adata.n_vars,)
+    np.testing.assert_array_equal(keep, np.array(expected))
+
+
+# Output standardization is the single place the shared diff_exp column contract is applied to the
+# eBayes results, and the only place FDR correction happens.
+_MAX_A_SAMPLES = 4
+_MAX_B_SAMPLES = 5
+
+
+def _contrast_frame_inputs():
+    """A three-feature contrast: one significant, one not, one gated out (NaN)."""
+    var_names = pd.Index(["p1", "p2", "p3"])
+    log2fc = np.array([2.0, -0.5, np.nan])
+    p_values = np.array([0.001, 0.5, np.nan])
+    t_values = np.array([8.0, -0.7, np.nan])
+    return var_names, log2fc, p_values, t_values
+
+
+def test__standardize_contrast_frame_columns_follow_shared_contract():
+    """The frame leads with the shared DIFF_EXP_COLS, in that order, then this method's `stat`."""
+    var_names, log2fc, p_values, t_values = _contrast_frame_inputs()
+
+    df = _standardize_contrast_frame(
+        contrast_name="A_VS_B",
+        var_names=var_names,
+        log2fc=log2fc,
+        p_values=p_values,
+        t_values=t_values,
+        max_level_1_samples=_MAX_A_SAMPLES,
+        max_level_2_samples=_MAX_B_SAMPLES,
+    )
+
+    assert list(df.columns) == [*tl_defaults.DIFF_EXP_COLS, "stat"]
+    assert df.index.equals(var_names)
+    assert list(df["protein"]) == list(var_names)
+    assert (df["condition_pair"] == "A_VS_B").all()
+    assert (df["method"] == _METHOD_NAME).all()
+    assert (df["max_level_1_samples"] == _MAX_A_SAMPLES).all()
+    assert (df["max_level_2_samples"] == _MAX_B_SAMPLES).all()
+
+
+def test__standardize_contrast_frame_derived_columns():
+    """log2fc/p_value/stat pass through untouched; fdr and both -log10 columns are derived."""
+    var_names, log2fc, p_values, t_values = _contrast_frame_inputs()
+
+    df = _standardize_contrast_frame(
+        contrast_name="A_VS_B",
+        var_names=var_names,
+        log2fc=log2fc,
+        p_values=p_values,
+        t_values=t_values,
+        max_level_1_samples=_MAX_A_SAMPLES,
+        max_level_2_samples=_MAX_B_SAMPLES,
+    )
+
+    np.testing.assert_allclose(df["log2fc"].to_numpy(), log2fc, equal_nan=True)
+    np.testing.assert_allclose(df["p_value"].to_numpy(), p_values, equal_nan=True)
+    np.testing.assert_allclose(df["stat"].to_numpy(), t_values, equal_nan=True)
+
+    # FDR is the nan-safe BH correction of the (already gated) p-values
+    np.testing.assert_allclose(df["fdr"].to_numpy(), tl.nan_safe_bh_correction(p_values), equal_nan=True)
+
+    # Both -log10 columns mirror their source column
+    np.testing.assert_allclose(df["-log10(p_value)"].to_numpy(), -np.log10(p_values), equal_nan=True)
+    np.testing.assert_allclose(df["-log10(fdr)"].to_numpy(), -np.log10(df["fdr"].to_numpy()), equal_nan=True)
+
+
+def test__standardize_contrast_frame_keeps_gated_features_nan():
+    """A feature gated out upstream (NaN p-value) stays NaN across every derived column."""
+    var_names, log2fc, p_values, t_values = _contrast_frame_inputs()
+
+    df = _standardize_contrast_frame(
+        contrast_name="A_VS_B",
+        var_names=var_names,
+        log2fc=log2fc,
+        p_values=p_values,
+        t_values=t_values,
+        max_level_1_samples=_MAX_A_SAMPLES,
+        max_level_2_samples=_MAX_B_SAMPLES,
+    )
+
+    derived_cols = ["log2fc", "p_value", "-log10(p_value)", "fdr", "-log10(fdr)", "stat"]
+    assert df.loc["p3", derived_cols].isna().all()
+
+    # The NaN feature must not consume a rank in the BH correction of the others
+    np.testing.assert_allclose(df.loc[["p1", "p2"], "fdr"].to_numpy(), np.array([0.002, 0.5]))
+
+
+# inmoose is an optional dependency; without it the failure must be an explicit ImportError rather than a
+# NameError from inside the moderation step.
+def test_diff_exp_ebayes_requires_inmoose():
+    """diff_exp_ebayes raises ImportError up front when inmoose is unavailable."""
+    with (
+        patch("alphapepttools.tl.diff_exp.ebayes._HAS_INMOOSE", new=False),
+        pytest.raises(ImportError, match="inmoose is required"),
+    ):
+        tl.diff_exp_ebayes(adata=_abc_adata(), between_column="group", comparison=("B", "A"))
