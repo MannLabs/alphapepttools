@@ -109,7 +109,7 @@ If you found a bug, please use the [issue tracker][].
 
 ## Citation
 
-> t.b.a
+Brennsteiner, V., Diedrich, L. et al. "AlphaPeptTools: scverse-native analysis of mass spectrometry-based proteomics" [preprint](https://www.biorxiv.org/content/10.64898/2026.09.11.750886v1)
 
 [mambaforge]: https://github.com/conda-forge/miniforge#mambaforge
 [scverse discourse]: https://discourse.scverse.org/
