@@ -11,7 +11,7 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 from sklearn.preprocessing import RobustScaler, StandardScaler
 
-from alphapepttools._utils import get_matrix
+from alphapepttools._utils import _resolve_axis, get_matrix
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -71,16 +71,17 @@ def _to_anndata(
 def add_metadata(  # noqa: C901, PLR0912
     adata: ad.AnnData,
     incoming_metadata: pd.DataFrame,
-    axis: int,
     *,
+    axis: str | int,
     keep_data_shape: bool = False,
     keep_existing_metadata: bool = False,
     verbose: bool = False,
-) -> ad.AnnData:
+    inplace: bool = True,
+) -> ad.AnnData | None:
     """Add metadata to an AnnData object while checking for matching indices or shape
 
-    If axis is 0, assume metadata.index <-> data.index and add metadata as '.obs' of the AnnData object.
-    If axis is 1, assume metadata.index <-> data.columns and add metadata as '.var' of the AnnData object.
+    If axis is "obs" or 0, assume metadata.index <-> data.index and add metadata as '.obs' of the AnnData object.
+    If axis is "var" or 1, assume metadata.index <-> data.columns and add metadata as '.var' of the AnnData object.
 
     Parameters
     ----------
@@ -88,9 +89,11 @@ def add_metadata(  # noqa: C901, PLR0912
         AnnData object to add metadata to
     incoming_metadata
         Metadata dataframe to add. The matching entity is always the INDEX, depending on axis it is
-        matched against obs (axis = 0) or var (axis = 1)
+        matched against obs (axis = "obs") or var (axis = "var")
     axis
-        Axis to add metadata to. 0 for obs and 1 for var
+        Axis to add metadata to.
+        - "obs" or 0: Add metadata to adata.obs, matching against the observation index.
+        - "var" or 1: Add metadata to adata.var, matching against the feature index.
     keep_data_shape
         If True, the incoming data is left-joined to the existing data, which may result in nan-padded
         rows in the incoming data. If False, incoming data is added via inner join, which may change the
@@ -101,10 +104,16 @@ def add_metadata(  # noqa: C901, PLR0912
         incoming metadata columns are ignored
     verbose
         If True, print additional information about the operation
+    inplace
+        If True (default), modifies adata inplace, adding metadata to the existing .obs or .var, depending on `axis`.
+        Note that with `keep_data_shape=False` this may also shrink `adata` in place.
+        If False, returns a modified copy without touching the original adata.
 
     Returns
     -------
-    AnnData object with metadata added
+    ad.AnnData | None
+        If inplace is False, returns a copy of adata with the metadata added.
+        If inplace is True, modifies adata inplace and returns None.
 
     Examples
     --------
@@ -130,22 +139,30 @@ def add_metadata(  # noqa: C901, PLR0912
 
         # Method 1: Replace existing metadata (keep_existing_metadata=False, default)
         adata1 = adata.copy()
-        adata1 = add_metadata(adata1, new_metadata, axis=0)
+        add_metadata(adata1, new_metadata, axis=0)
         print(adata1.obs.columns.tolist())  # ['condition'] - batch is replaced
+
+        # Method 1 without inplace change
+        adata1 = adata.copy()
+        adata1_with_metadata = add_metadata(adata1, new_metadata, axis=0, inplace=False)
+        print(adata1.obs.columns.tolist())  # ['batch'] - adata1 is untouched
+        print(adata1_with_metadata.obs.columns.tolist())  # ['condition'] - only the copy is modified
 
         # Method 2: Add to existing metadata (keep_existing_metadata=True)
         adata2 = adata.copy()
-        adata2 = add_metadata(adata2, new_metadata, axis=0, keep_existing_metadata=True)
+        add_metadata(adata2, new_metadata, axis=0, keep_existing_metadata=True)
         print(adata2.obs.columns.tolist())  # ['batch', 'condition'] - both preserved
 
     """
     # Basic checks
-    if axis not in [0, 1]:
-        raise ValueError("Axis must be 0 or 1.")
+    axis = _resolve_axis(axis)
+
+    if not inplace:
+        adata = adata.copy()
 
     if adata.shape == (0, 0):
         logging.info("adata is empty")
-        return adata
+        return None if inplace else adata
 
     if not isinstance(incoming_metadata, pd.DataFrame) or incoming_metadata.index.nlevels > 1:
         raise TypeError("metadata must be a pd.DataFrame with single-level index.")
@@ -160,7 +177,7 @@ def add_metadata(  # noqa: C901, PLR0912
 
     ### Handle alignment of incoming and existing metadata
     if keep_existing_metadata:
-        existing_metadata = cast("pd.DataFrame", adata.obs if axis == 0 else adata.var)
+        existing_metadata = cast("pd.DataFrame", adata.obs if axis == "obs" else adata.var)
 
         # if existing metadata should be kept and new metadata contains synonymous fields to existing metadata, drop incoming fields
         incoming_metadata = _handle_overlapping_columns(incoming_metadata, existing_metadata, verbose=verbose)
@@ -172,43 +189,30 @@ def add_metadata(  # noqa: C901, PLR0912
         incoming_metadata = existing_metadata.join(incoming_metadata, how=join)
 
     ### Emulate join on AnnData level without copying
-    # 1. Reindex the AnnData object for inner join
+    # 1. Subset the AnnData object for inner join; _inplace_subset_* is `adata[index, :]`, but inplace
     if join == "inner":
-        existing_fields = adata.obs.index if axis == 0 else adata.var.index
+        existing_fields = adata.obs.index if axis == "obs" else adata.var.index
         shared_fields = existing_fields.intersection(incoming_metadata.index)
-        adata = adata[shared_fields, :] if axis == 0 else adata[:, shared_fields]
+        if not existing_fields.equals(shared_fields):
+            if axis == "obs":
+                adata._inplace_subset_obs(shared_fields)  # noqa: SLF001
+            else:
+                adata._inplace_subset_var(shared_fields)  # noqa: SLF001
 
     # 2. Align the new metadata to obs or var of the AnnData object
-    if axis == 0:
-        incoming_metadata = incoming_metadata.reindex(adata.obs.index)
-    elif axis == 1:
-        incoming_metadata = incoming_metadata.reindex(adata.var.index)
+    existing_index = adata.obs.index if axis == "obs" else adata.var.index
+    incoming_metadata = incoming_metadata.reindex(existing_index)
 
-    # 3. use the [] method to subset the adata object inplace based on the obs and incoming indices
-    if axis == 0:
-        bool_mask = adata.obs.index.isin(incoming_metadata.index)
-        adata = adata[bool_mask, :]
-    elif axis == 1:
-        bool_mask = adata.var.index.isin(incoming_metadata.index)
-        adata = adata[:, bool_mask]
+    # 3. assign the new metadata to the adata object's obs or var attribute
+    if not existing_index.equals(incoming_metadata.index):
+        raise ValueError("Index mismatch between data and metadata.")
 
-    # 4. reindex the incoming metadata to match the adata object's obs or var index
-    if axis == 0:
-        incoming_metadata = incoming_metadata.reindex(adata.obs.index)
-    elif axis == 1:
-        incoming_metadata = incoming_metadata.reindex(adata.var.index)
-
-    # 5. assign the new metadata to the adata object's obs or var attribute
-    if axis == 0:
-        if not adata.obs.index.equals(incoming_metadata.index):
-            raise ValueError("Index mismatch between data and metadata.")
+    if axis == "obs":
         adata.obs = incoming_metadata
-    elif axis == 1:
-        if not adata.var.index.equals(incoming_metadata.index):
-            raise ValueError("Index mismatch between data and metadata.")
+    else:
         adata.var = incoming_metadata
 
-    return adata
+    return None if inplace else adata
 
 
 def _filter_by_dict(
@@ -449,7 +453,7 @@ def filter_by_metadata(
 def _raise_nonoverlapping_indices(
     data: pd.DataFrame,
     metadata: pd.DataFrame,
-    axis: int,
+    axis: str,
 ) -> None:
     """Check if any fields overlap between two dataframes on respective axes.
 
@@ -460,11 +464,11 @@ def _raise_nonoverlapping_indices(
     metadata
         Metadata DataFrame to check against.
     axis
-        Axis to check (0 for rows, 1 for columns).
+        Axis to check ("obs" for rows, "var" for columns), as returned by `_resolve_axis`.
     """
-    if axis == 0:
+    if axis == "obs":
         shared_idx_len = len(data.index.intersection(metadata.index))
-    elif axis == 1:
+    else:
         shared_idx_len = len(data.columns.intersection(metadata.index))
 
     if shared_idx_len == 0:

@@ -94,13 +94,14 @@ class AnnDataFactory:
         metadata.index.name = None
         metadata = metadata[~metadata.index.duplicated(keep="first")]
 
-        return add_metadata(
+        add_metadata(
             adata=adata,
             incoming_metadata=metadata,
             axis=axis,
             keep_data_shape=True,
             verbose=False,
         )
+        return adata
 
     def create_anndata(
         self,
