@@ -62,6 +62,27 @@ def example_metadata():
     return make_dummy_metadata()
 
 
+# Reading from a layer must reproduce the .X results exactly, so rather than pinning a second set of
+# expected numbers, the tests below move the data into a layer and NaN out .X. Any read that still
+# goes to .X then yields all-NaN output and fails the existing assertions.
+_TEST_LAYER = "quant"
+
+
+def _move_data_to_layer(adata: ad.AnnData, layer: str | None) -> ad.AnnData:
+    """Return a copy holding the data in `layer` with .X NaNed out; returns adata unchanged if layer is None.
+
+    Call this last, directly before the function under test: preprocessing such as
+    filter_data_completeness or nanlog reads .X and would see nothing but the NaNs.
+    """
+    if layer is None:
+        return adata
+
+    adata = adata.copy()
+    adata.layers[layer] = adata.X.copy()
+    adata.X = np.full(adata.shape, np.nan, dtype=float)
+    return adata
+
+
 @pytest.mark.parametrize(
     ("ab", "expected", "min_valid_values"),
     [
@@ -138,7 +159,10 @@ def test_nan_safe_ttest_ind_raises_on_unconvertible_input():
         ),
     ],
 )
-def test_diff_exp_ttest(example_data, example_metadata, between_column, comparison, min_valid_values, expected_output):
+@pytest.mark.parametrize("layer", [None, _TEST_LAYER])
+def test_diff_exp_ttest(
+    example_data, example_metadata, between_column, comparison, min_valid_values, expected_output, layer
+):
     """Test diff_exp_ttest with various scenarios."""
 
     adata = ad.AnnData(
@@ -147,10 +171,11 @@ def test_diff_exp_ttest(example_data, example_metadata, between_column, comparis
     )
 
     results = tl.diff_exp_ttest(
-        adata=adata,
+        adata=_move_data_to_layer(adata, layer),
         between_column=between_column,
         comparison=comparison,
         min_valid_values=min_valid_values,
+        layer=layer,
     )
 
     # Iterate over features and perform manual ttests and ratio calculation
@@ -443,12 +468,14 @@ def expected_ebayes_complete_case_df():
         (("B", "A"), "B_VS_A", "group"),
     ],
 )
+@pytest.mark.parametrize("layer", [None, _TEST_LAYER])
 def test_diff_exp_ebayes(
     example_adata_ebayes,
     expected_ebayes_complete_case_df,
     comparison,
     expected_comparison_key,
     between_column,
+    layer,
 ):
     """diff_exp_ebayes reproduces its frozen reference values on a small complete-case dataset."""
 
@@ -456,9 +483,10 @@ def test_diff_exp_ebayes(
     adata = filter_data_completeness(example_adata_ebayes.copy(), max_missing_count=0, action="drop")
 
     results = tl.diff_exp_ebayes(
-        adata=adata,
+        adata=_move_data_to_layer(adata, layer),
         between_column=between_column,
         comparison=comparison,
+        layer=layer,
     )
 
     # Add the condition_pair column to the expected dataframe
@@ -673,11 +701,13 @@ _ORACLE_COLS = ["log2fc", "p_value", "fdr"]
         (("B", "A"), "B_VS_A", "group"),
     ],
 )
+@pytest.mark.parametrize("layer", [None, _TEST_LAYER])
 def test_diff_exp_ebayes_matches_inmoose_limma_reference(
     example_adata_ebayes,
     comparison,
     expected_comparison_key,
     between_column,
+    layer,
 ):
     """diff_exp_ebayes reproduces a direct inmoose.limma chain on complete data.
 
@@ -689,12 +719,14 @@ def test_diff_exp_ebayes_matches_inmoose_limma_reference(
     adata = filter_data_completeness(example_adata_ebayes.copy(), max_missing_count=0, action="drop")
 
     results = tl.diff_exp_ebayes(
-        adata=adata.copy(),
+        adata=_move_data_to_layer(adata.copy(), layer),
         between_column=between_column,
         comparison=comparison,
+        layer=layer,
     )
     assert results["condition_pair"].unique().tolist() == [expected_comparison_key]
 
+    # The oracle reads .X directly, so it gets the unpoisoned object regardless of `layer`.
     reference = _inmoose_limma_reference(adata.copy(), between_column, comparison)
 
     pd.testing.assert_frame_equal(
@@ -1168,13 +1200,15 @@ def gate_adata():
         (None, True),  # gate disabled -> fold change reported
     ],
 )
-def test_diff_exp_ebayes_a_gate(gate_adata, a_min_required, sparse_reported):
+@pytest.mark.parametrize("layer", [None, _TEST_LAYER])
+def test_diff_exp_ebayes_a_gate(gate_adata, a_min_required, sparse_reported, layer):
     """a_min_required suppresses (NaNs) fold changes whose A condition has too few observed values."""
     results = tl.diff_exp_ebayes(
-        adata=gate_adata,
+        adata=_move_data_to_layer(gate_adata, layer),
         between_column="group",
         comparison=("X", "Y"),
         a_min_required=a_min_required,
+        layer=layer,
     )
     df = results[results["condition_pair"] == "X_VS_Y"].set_index("protein")
     result_cols = ["log2fc", "p_value", "fdr", "stat"]
@@ -1199,13 +1233,15 @@ def test_diff_exp_ebayes_a_gate(gate_adata, a_min_required, sparse_reported):
         (None, True),  # gate disabled -> fold change reported
     ],
 )
-def test_diff_exp_ebayes_b_gate(gate_adata, b_min_required, sparse_reported):
+@pytest.mark.parametrize("layer", [None, _TEST_LAYER])
+def test_diff_exp_ebayes_b_gate(gate_adata, b_min_required, sparse_reported, layer):
     """b_min_required suppresses (NaNs) fold changes whose B condition has too few observed values."""
     results = tl.diff_exp_ebayes(
-        adata=gate_adata,
+        adata=_move_data_to_layer(gate_adata, layer),
         between_column="group",
         comparison=("X", "Y"),
         b_min_required=b_min_required,
+        layer=layer,
     )
     df = results[results["condition_pair"] == "X_VS_Y"].set_index("protein")
     result_cols = ["log2fc", "p_value", "fdr", "stat"]
@@ -1424,15 +1460,17 @@ def gate_mask_adata():
         (4, None, [False, False, False]),  # more required than X has samples -> nothing kept
     ],
 )
-def test__replicate_gate_mask(gate_mask_adata, a_min_required, b_min_required, expected):
+@pytest.mark.parametrize("layer", [None, _TEST_LAYER])
+def test__replicate_gate_mask(gate_mask_adata, a_min_required, b_min_required, expected, layer):
     """The mask keeps a feature only where both conditions meet their (enabled) requirement."""
     keep = _replicate_gate_mask(
-        gate_mask_adata,
+        _move_data_to_layer(gate_mask_adata, layer),
         between_column="group",
         a_level="X",
         b_level="Y",
         a_min_required=a_min_required,
         b_min_required=b_min_required,
+        layer=layer,
     )
 
     assert keep.dtype == bool
@@ -1527,6 +1565,21 @@ def test__standardize_contrast_frame_keeps_gated_features_nan():
 
 # inmoose is an optional dependency; without it the failure must be an explicit ImportError rather than a
 # NameError from inside the moderation step.
+def test_diff_exp_ttest_missing_layer_raises(example_data, example_metadata):
+    """An unknown layer name is rejected with the shared validate_layer message."""
+    adata = ad.AnnData(X=example_data, obs=example_metadata)
+
+    with pytest.raises(ValueError, match="not found in adata.layers"):
+        tl.diff_exp_ttest(adata=adata, between_column="group", comparison=("A", "B"), layer="missing_layer")
+
+
+@pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
+def test_diff_exp_ebayes_missing_layer_raises():
+    """An unknown layer name is rejected with the shared validate_layer message."""
+    with pytest.raises(ValueError, match="not found in adata.layers"):
+        tl.diff_exp_ebayes(adata=_abc_adata(), between_column="group", comparison=("B", "A"), layer="missing_layer")
+
+
 def test_diff_exp_ebayes_requires_inmoose():
     """diff_exp_ebayes raises ImportError up front when inmoose is unavailable."""
     with (

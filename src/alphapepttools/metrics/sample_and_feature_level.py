@@ -5,7 +5,7 @@ import warnings
 import anndata as ad
 import numpy as np
 
-from alphapepttools._utils import get_matrix
+from alphapepttools._utils import get_matrix, validate_layer
 from alphapepttools.pp.transform import detect_special_values
 
 
@@ -73,8 +73,7 @@ def total_intensity(
     """
     axis = _resolve_axis(axis)
 
-    if layer is not None and layer not in adata.layers:
-        raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
+    validate_layer(adata, layer)
 
     data = get_matrix(adata, layer)
 
@@ -137,8 +136,7 @@ def number_detected(
     """
     axis = _resolve_axis(axis)
 
-    if layer is not None and layer not in adata.layers:
-        raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
+    validate_layer(adata, layer)
 
     data = get_matrix(adata, layer)
     special_values_mask = detect_special_values(data, verbosity=0)
@@ -193,8 +191,7 @@ def fraction_complete(
     """
     axis = _resolve_axis(axis)
 
-    if layer is not None and layer not in adata.layers:
-        raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")
+    validate_layer(adata, layer)
 
     data = get_matrix(adata, layer)
     special_values_mask = detect_special_values(data, verbosity=0)

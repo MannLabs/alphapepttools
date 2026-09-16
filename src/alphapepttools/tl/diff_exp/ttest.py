@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import ttest_ind
 
+from alphapepttools._utils import validate_layer
 from alphapepttools.pp.data import filter_by_metadata
 from alphapepttools.tl.defaults import tl_defaults
 from alphapepttools.tl.stats import nan_safe_bh_correction
@@ -140,11 +141,12 @@ def diff_exp_ttest(
     comparison: tuple,
     min_valid_values: int = 2,
     *,
+    layer: str | None = None,
     equal_var: bool = False,
 ) -> pd.DataFrame:
     """Calculate ratios of features between two specific groups using t-test.
 
-    Calculate ratios and log2 ratios of each feature in the AnnData object's X
+    Calculate ratios and log2 ratios of each feature in the AnnData object
     between two specific groups defined in the comparison tuple.
 
     Parameters
@@ -157,6 +159,8 @@ def diff_exp_ttest(
         Tuple of exactly two group names to compare (group1, group2).
     min_valid_values
         Minimum number of samples required per group. By default 2.
+    layer
+        Name of the layer in adata.layers to test on. If None (default), adata.X is used.
     equal_var
         Whether to assume equal variance in the t-test. By default False.
 
@@ -165,6 +169,11 @@ def diff_exp_ttest(
     pd.DataFrame
         DataFrame with ratios, deltas, t-statistics, p-values, and adjusted p-values
         for the comparison between the two specified groups.
+
+    Raises
+    ------
+    ValueError
+        If `layer` is not found in adata.layers, or if any check in `validate_ttest_inputs` fails.
 
     Examples
     --------
@@ -183,14 +192,26 @@ def diff_exp_ttest(
         # Access significant peptides
         significant = ttest_peptide_results[ttest_peptide_results["fdr"] < 0.05]
 
+    Test a normalized layer instead of adata.X:
+
+    .. code-block:: python
+
+        ttest_peptide_results = at.tl.diff_exp_ttest(
+            adata=adata_precursor,
+            between_column="treatment",
+            comparison=("treated", "control"),
+            layer="normalized",
+        )
+
     """
     # Validate inputs
     g1, g2 = validate_ttest_inputs(adata, between_column, comparison, min_valid_values)
+    validate_layer(adata, layer)
     print(f"Comparing groups: {g1} vs {g2}")
 
     # perform single comparison between the two specified groups
-    g1_df = filter_by_metadata(adata, {between_column: g1}, axis=0).to_df()
-    g2_df = filter_by_metadata(adata, {between_column: g2}, axis=0).to_df()
+    g1_df = filter_by_metadata(adata, {between_column: g1}, axis=0).to_df(layer=layer)
+    g2_df = filter_by_metadata(adata, {between_column: g2}, axis=0).to_df(layer=layer)
 
     comparison_name = f"{g1}_VS_{g2}"
     features = pd.Series(adata.var_names)

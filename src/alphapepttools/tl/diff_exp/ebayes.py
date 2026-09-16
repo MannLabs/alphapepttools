@@ -15,7 +15,7 @@ try:
 except ModuleNotFoundError:
     _HAS_INMOOSE = False
 
-from alphapepttools._utils import get_matrix
+from alphapepttools._utils import get_matrix, validate_layer
 from alphapepttools.tl.defaults import tl_defaults
 from alphapepttools.tl.stats import nan_safe_bh_correction
 from alphapepttools.tl.utils import (
@@ -117,6 +117,7 @@ def _build_design_matrix(
 def _nan_lmfit(
     adata: ad.AnnData,
     design_matrix: pd.DataFrame,
+    layer: str | None = None,
 ) -> dict:
     """Perform a linear fit on the data in adata while dealing with NaN values.
 
@@ -130,6 +131,8 @@ def _nan_lmfit(
     design_matrix : pd.DataFrame
         Design matrix with samples as rows (aligned to adata.obs_names) and conditions/covariates
         as columns, e.g. as produced by build_design_matrix.
+    layer : str | None, optional
+        Name of the layer in adata.layers to fit on. If None (default), adata.X is used.
 
     Returns
     -------
@@ -152,7 +155,7 @@ def _nan_lmfit(
 
     # Convert design matrix and response to numpy arrays
     X = design_matrix.to_numpy()
-    Y = get_matrix(adata)
+    Y = get_matrix(adata, layer)
 
     # Initialize output arrays
     B = np.full((K, P), np.nan)  # linear fit coefficients
@@ -505,10 +508,11 @@ def _sufficient_values_mask(
     between_column: str,
     condition: str,
     min_required: int,
+    layer: str | None = None,
 ) -> np.ndarray:
     """Per-feature boolean mask: True where `condition` has at least `min_required` observed values."""
     condition_idxs = np.where(adata.obs[between_column] == condition)[0]
-    n_observed = np.sum(~np.isnan(get_matrix(adata)[condition_idxs, :]), axis=0)
+    n_observed = np.sum(~np.isnan(get_matrix(adata, layer)[condition_idxs, :]), axis=0)
     return n_observed >= min_required
 
 
@@ -519,6 +523,7 @@ def _replicate_gate_mask(
     b_level: str,
     a_min_required: int | None,
     b_min_required: int | None,
+    layer: str | None = None,
 ) -> np.ndarray:
     """Per-feature boolean mask: True where both conditions of a contrast have enough observed values.
 
@@ -536,6 +541,8 @@ def _replicate_gate_mask(
         Minimum number of observed values required in A. If None, the A gate is disabled.
     b_min_required : int | None
         Minimum number of observed values required in B. If None, the B gate is disabled.
+    layer : str | None, optional
+        Name of the layer in adata.layers to count observed values in. If None (default), adata.X is used.
 
     Returns
     -------
@@ -545,9 +552,9 @@ def _replicate_gate_mask(
     """
     keep_mask = np.ones(adata.n_vars, dtype=bool)
     if a_min_required is not None:
-        keep_mask &= _sufficient_values_mask(adata, between_column, a_level, a_min_required)
+        keep_mask &= _sufficient_values_mask(adata, between_column, a_level, a_min_required, layer)
     if b_min_required is not None:
-        keep_mask &= _sufficient_values_mask(adata, between_column, b_level, b_min_required)
+        keep_mask &= _sufficient_values_mask(adata, between_column, b_level, b_min_required, layer)
     return keep_mask
 
 
@@ -620,6 +627,7 @@ def diff_exp_ebayes(
     categorical_covariate_column: str | None = None,
     a_min_required: int | None = None,
     b_min_required: int | None = None,
+    layer: str | None = None,
 ) -> pd.DataFrame:
     """Run the Limma eBayes moderated t-test for differential expression.
 
@@ -637,7 +645,7 @@ def diff_exp_ebayes(
     Parameters
     ----------
     adata : ad.AnnData
-        AnnData object with expression data in .X and sample metadata in .obs.
+        AnnData object with expression data in .X (or in a layer, see `layer`) and sample metadata in .obs.
     between_column : str
         Column name in adata.obs containing the contrast levels.
     comparison : tuple[str | list[str], str]
@@ -659,6 +667,9 @@ def diff_exp_ebayes(
         Minimum number of observed values required in the B condition (comparison[1]). Per contrast, features with
         fewer observed values in B have their fold change suppressed (set to NaN) before FDR correction. If None,
         the B gate is disabled. By default None.
+    layer : str | None, optional
+        Name of the layer in adata.layers to test on. Both the linear fit and the replicate gate read it. If
+        None (default), adata.X is used.
 
     Returns
     -------
@@ -675,6 +686,8 @@ def diff_exp_ebayes(
         If inmoose is not installed.
     KeyError
         If `between_column` is not in adata.obs, or any condition in `comparison` is not a level of it.
+    ValueError
+        If `layer` is not found in adata.layers.
 
     Examples
     --------
@@ -718,6 +731,17 @@ def diff_exp_ebayes(
 
         late = de_results[de_results["condition_pair"] == "24h_VS_0h"]
 
+    Test a normalized layer instead of adata.X:
+
+    .. code-block:: python
+
+        de_results = at.tl.diff_exp_ebayes(
+            adata=adata_protein,
+            between_column="treatment",
+            comparison=("treated", "control"),
+            layer="normalized",
+        )
+
     See Also
     --------
     alphapepttools.tl.diff_exp_ttest : Plain Welch/Student t-test, without variance moderation.
@@ -729,6 +753,7 @@ def diff_exp_ebayes(
             "inmoose is required for diff_exp_ebayes(). Install it through pip or install alphapepttools with the 'full'/'full-stable' extra."
         )
 
+    validate_layer(adata, layer)
     a_conditions, b_condition = _resolve_comparison(adata, between_column, comparison)
 
     # Step 0: Filter adata to only include samples from the specified conditions
@@ -737,7 +762,7 @@ def diff_exp_ebayes(
 
     # Step 1: build the design matrix and fit every feature with NaN handling
     design_matrix, col_info = _build_design_matrix(adata, between_column, categorical_covariate_column)
-    lm_fit = _nan_lmfit(adata, design_matrix)
+    lm_fit = _nan_lmfit(adata, design_matrix, layer)
 
     # Step 2: Generate contrasts to derive fold changes for each A vs B.
     # control_is=-1 fixes the direction to A - B (comparison[0] - comparison[1]), named "A_VS_B".
@@ -779,7 +804,7 @@ def diff_exp_ebayes(
         log2fc = contrast_results["log2fc"][contrast_idx].copy()
 
         # Replicate gate: suppress the fold change unless both conditions have enough observed values
-        keep = _replicate_gate_mask(adata, between_column, a_level, b_level, a_min_required, b_min_required)
+        keep = _replicate_gate_mask(adata, between_column, a_level, b_level, a_min_required, b_min_required, layer)
         p_values[~keep] = np.nan
         t_values[~keep] = np.nan
         log2fc[~keep] = np.nan
