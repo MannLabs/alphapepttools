@@ -147,12 +147,12 @@ def test_create_anndata_with_valid_dataframe(
         extra_obs_cols = [obs_columns] if isinstance(obs_columns, str) else obs_columns
         extra_obs_df = psm_df[[sample_id_column, *extra_obs_cols]].set_index(sample_id_column, drop=True)
         extra_obs_df = extra_obs_df[~extra_obs_df.index.duplicated(keep="first")]
-        comparison_adata = add_metadata(comparison_adata, extra_obs_df, axis=0)
+        add_metadata(comparison_adata, extra_obs_df, axis=0)
     if var_columns is not None:
         extra_var_cols = [var_columns] if isinstance(var_columns, str) else var_columns
         extra_var_df = psm_df[[feature_id_column, *extra_var_cols]].set_index(feature_id_column, drop=True)
         extra_var_df = extra_var_df[~extra_var_df.index.duplicated(keep="first")]
-        comparison_adata = add_metadata(comparison_adata, extra_var_df, axis=1)
+        add_metadata(comparison_adata, extra_var_df, axis=1)
 
     assert adata.obs.equals(comparison_adata.obs)
     assert adata.var.equals(comparison_adata.var)

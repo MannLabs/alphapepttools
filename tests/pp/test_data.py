@@ -4,6 +4,7 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import pytest
+from anndata.tests.helpers import assert_adata_equal
 
 import alphapepttools as apt
 from alphapepttools.pp.data import (
@@ -57,18 +58,6 @@ def example_feature_metadata():
         )
         feature_metadata.index = ["G1", "G3", "G2", "G4"]
         return feature_metadata
-
-    return make_dummy_data()
-
-
-# example AnnData object for downstream tests
-@pytest.fixture
-def example_anndata():
-    def make_dummy_data():
-        adata = apt.pp.data._to_anndata(example_data())
-        apt.pp.add_metadata(adata, example_sample_metadata(), axis=0)
-        apt.pp.add_metadata(adata, example_feature_metadata(), axis=1)
-        return adata
 
     return make_dummy_data()
 
@@ -261,6 +250,7 @@ def example_anndata():
         ),
     ],
 )
+@pytest.mark.parametrize("inplace", [True, False])
 def test_add_metadata(
     example_data,
     example_sample_metadata,
@@ -271,6 +261,7 @@ def test_add_metadata(
     metadata_size,
     keep_data_shape,
     keep_existing_metadata,
+    inplace,
 ):
     """"""
 
@@ -296,13 +287,44 @@ def test_add_metadata(
     adata.obs = pd.DataFrame({"batch_new": ["11", "22", "33"]}, index=["cell1", "cell2", "cell3"])
     adata.var = pd.DataFrame({"UniProtID_new": ["P23456", "P34567", "P45678"]}, index=["G1", "G2", "G3"])
 
+    # keep a reference and a copy of the incoming adata to assert the inplace/copy contract below
+    adata_incoming = adata
+    adata_incoming_original = adata.copy()
+
     # Add metadata to data
-    adata = apt.pp.add_metadata(
-        adata, sample_metadata, axis=0, keep_data_shape=keep_data_shape, keep_existing_metadata=keep_existing_metadata
+    result_obs = apt.pp.add_metadata(
+        adata,
+        sample_metadata,
+        axis=0,
+        keep_data_shape=keep_data_shape,
+        keep_existing_metadata=keep_existing_metadata,
+        inplace=inplace,
     )
-    adata = apt.pp.add_metadata(
-        adata, feature_metadata, axis=1, keep_data_shape=keep_data_shape, keep_existing_metadata=keep_existing_metadata
+    if not inplace:
+        adata = result_obs
+    result_var = apt.pp.add_metadata(
+        adata,
+        feature_metadata,
+        axis=1,
+        keep_data_shape=keep_data_shape,
+        keep_existing_metadata=keep_existing_metadata,
+        inplace=inplace,
     )
+    if not inplace:
+        adata = result_var
+
+    # assert the return contract: inplace modifies the incoming object and returns None,
+    # while inplace=False returns a new object and leaves the incoming one untouched
+    if inplace:
+        assert result_obs is None, "add_metadata() should return None when inplace=True"
+        assert result_var is None, "add_metadata() should return None when inplace=True"
+        assert adata is adata_incoming, "The incoming adata object should be modified in place"
+    else:
+        assert isinstance(result_obs, ad.AnnData), "add_metadata() should return an AnnData when inplace=False"
+        assert isinstance(result_var, ad.AnnData), "add_metadata() should return an AnnData when inplace=False"
+        assert adata is not adata_incoming, "The incoming adata object should not be returned when inplace=False"
+        # raises if the incoming adata object was changed when inplace=False
+        assert_adata_equal(adata_incoming, adata_incoming_original)
 
     # main tests for data, sample-, and feature metadata
     assert adata.to_df().equals(expected_data), "Data should be aligned with sample and feature metadata"
@@ -320,6 +342,8 @@ def test_add_metadata(
 
 
 # Test proper failing behavior if resulting anndata object would be empty
+# axis is parametrized over both the integer and the string alias accepted by _resolve_axis
+@pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize(
     ("axis", "mismatching_metadata"),
     [
@@ -327,6 +351,10 @@ def test_add_metadata(
         (1, True),
         (0, False),
         (1, False),
+        ("obs", True),
+        ("var", True),
+        ("obs", False),
+        ("var", False),
     ],
 )
 def test_add_metadata_nonmatching_sample_metadata(
@@ -335,16 +363,17 @@ def test_add_metadata_nonmatching_sample_metadata(
     example_feature_metadata,
     axis,
     mismatching_metadata,
+    inplace,
 ):
     # get input datasets
     df = example_data.copy()
 
     # change sample metadata indices
-    if axis == 0:
+    if axis in (0, "obs"):
         md = example_sample_metadata.copy()
         if mismatching_metadata:
             md.index = md.index + "_changed"
-    elif axis == 1:
+    elif axis in (1, "var"):
         md = example_feature_metadata.copy()
         if mismatching_metadata:
             md.index = md.index + "_changed"
@@ -357,12 +386,22 @@ def test_add_metadata_nonmatching_sample_metadata(
         adata_before = adata.copy()
         with pytest.raises(ValueError):
             # when
-            adata = apt.pp.add_metadata(adata, md, axis=axis)
+            adata = apt.pp.add_metadata(adata, md, axis=axis, inplace=inplace)
         assert adata.obs.equals(adata_before.obs)
         assert adata.var.equals(adata_before.var)
         assert np.array_equal(adata.X, adata_before.X)
     else:
-        adata = apt.pp.add_metadata(adata, md, axis=axis)
+        result = apt.pp.add_metadata(adata, md, axis=axis, inplace=inplace)
+        assert result is None if inplace else isinstance(result, ad.AnnData)
+
+
+# Test that an unknown axis specifier is rejected
+@pytest.mark.parametrize("bad_axis", ["invalid", 2, -1, "0"])
+def test_add_metadata_invalid_axis(example_data, example_sample_metadata, bad_axis):
+    adata = _to_anndata(example_data.copy())
+
+    with pytest.raises(ValueError, match="axis must be 'obs', 'var', 0, or 1"):
+        apt.pp.add_metadata(adata, example_sample_metadata, axis=bad_axis)
 
 
 # Test handling of incoming columns that overlap with existing metadata
@@ -454,8 +493,9 @@ def adata_for_filtering():
             index=df.columns,
         )
         adata = apt.pp.data._to_anndata(df)
-        adata = apt.pp.add_metadata(adata, sample_md, axis=0)
-        return apt.pp.add_metadata(adata, feature_md, axis=1)
+        apt.pp.add_metadata(adata, sample_md, axis=0)
+        apt.pp.add_metadata(adata, feature_md, axis=1)
+        return adata
 
     return make_dummy_data()
 
@@ -1423,8 +1463,8 @@ def test_data_column_to_array(
 ):
     # given
     adata = _to_anndata(example_data)
-    adata = apt.pp.add_metadata(adata, example_sample_metadata, axis=0)
-    adata = apt.pp.add_metadata(adata, example_feature_metadata, axis=1)
+    apt.pp.add_metadata(adata, example_sample_metadata, axis=0)
+    apt.pp.add_metadata(adata, example_feature_metadata, axis=1)
 
     # when
     array = data_column_to_array(adata, column) if not transpose else data_column_to_array(adata.transpose(), column)
