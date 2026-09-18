@@ -99,9 +99,11 @@ def _build_design_matrix(
         if adata.obs[categorical_covariate_column].isna().any():
             raise KeyError(f"Covariate column '{categorical_covariate_column}' contains NaN values.")
 
-    condition_dm = _one_hot(cast("pd.Series", adata.obs[condition_column]))
+    condition_dm = _one_hot(labels=cast("pd.Series", adata.obs[condition_column]))
     covariate_dm = (
-        _one_hot(cast("pd.Series", adata.obs[categorical_covariate_column]), drop_first=True)  # k-1 for covariates
+        _one_hot(
+            labels=cast("pd.Series", adata.obs[categorical_covariate_column]), drop_first=True
+        )  # k-1 for covariates
         if categorical_covariate_column is not None
         else pd.DataFrame(index=adata.obs.index)
     )
@@ -600,7 +602,7 @@ def _standardize_contrast_frame(
         by this method's own `stat` column (the moderated t-statistic).
 
     """
-    fdr_pvalues = nan_safe_bh_correction(p_values)
+    fdr_pvalues = nan_safe_bh_correction(pvals=p_values)
 
     df = pd.DataFrame(
         {
@@ -754,7 +756,7 @@ def diff_exp_ebayes(
             "inmoose is required for diff_exp_ebayes(). Install it through pip or install alphapepttools with the 'full'/'full-stable' extra."
         )
 
-    validate_layer(adata, layer)
+    validate_layer(adata=adata, layer=layer)
     a_conditions, b_condition = _resolve_comparison(adata=adata, between_column=between_column, comparison=comparison)
 
     # Step 0: Filter adata to only include samples from the specified conditions
