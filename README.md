@@ -14,7 +14,6 @@ Search- and quantification-engine agnostic downstream processing of proteomics d
 > [!TIP]
 > Our [preprint is out now][preprint]!
 
-
 ## `alphapepttools` was made to make your life in proteomics easier!
 
 Functionalities are intended to be as close to pure python as possible, avoiding closed end-to-end implementations, which is reflected in several design choices:
