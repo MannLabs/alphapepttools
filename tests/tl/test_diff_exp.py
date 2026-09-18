@@ -62,9 +62,6 @@ def example_metadata():
     return make_dummy_metadata()
 
 
-# Reading from a layer must reproduce the .X results exactly, so rather than pinning a second set of
-# expected numbers, the tests below move the data into a layer and NaN out .X. Any read that still
-# goes to .X then yields all-NaN output and fails the existing assertions.
 _TEST_LAYER = "quant"
 
 
@@ -73,6 +70,11 @@ def _move_data_to_layer(adata: ad.AnnData, layer: str | None) -> ad.AnnData:
 
     Call this last, directly before the function under test: preprocessing such as
     filter_data_completeness or nanlog reads .X and would see nothing but the NaNs.
+
+    Reading from a layer must reproduce the .X results exactly, so rather than pinning a second set of
+    expected numbers, we move the data into a layer and NaN out .X. Any read that still
+    goes to .X then yields all-NaN output and fails the existing assertions.
+
     """
     if layer is None:
         return adata
