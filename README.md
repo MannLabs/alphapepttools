@@ -3,11 +3,16 @@
 ![PyPI - Version](https://img.shields.io/pypi/v/alphapepttools)
 [![Tests][badge-tests]][tests]
 [![Documentation][badge-docs]][documentation]
+[![Preprint][badge-preprint]][preprint]
 
 [badge-tests]: https://img.shields.io/github/actions/workflow/status/MannLabs/alphapepttools/test.yaml?branch=main
 [badge-docs]: https://github.com/MannLabs/alphapepttools/actions/workflows/docs.yaml/badge.svg
+[badge-preprint]: https://img.shields.io/badge/preprint-bioRxiv-b31b1b
 
 Search- and quantification-engine agnostic downstream processing of proteomics data
+
+> [!TIP]
+> Our [preprint is out now][preprint]!
 
 ## `alphapepttools` was made to make your life in proteomics easier!
 
@@ -109,12 +114,14 @@ If you found a bug, please use the [issue tracker][].
 
 ## Citation
 
-Brennsteiner, V., Diedrich, L. et al. "AlphaPeptTools: scverse-native analysis of mass spectrometry-based proteomics" [preprint](https://www.biorxiv.org/content/10.64898/2026.09.11.750886v1)
+> Brennsteiner, V., Diedrich, L. et al.
+> [_AlphaPeptTools: scverse-native analysis of mass spectrometry-based proteomics_][preprint] (preprint), bioRxiv (2026).
 
 [mambaforge]: https://github.com/conda-forge/miniforge#mambaforge
 [scverse discourse]: https://discourse.scverse.org/
 [issue tracker]: https://github.com/MannLabs/alphapepttools/issues
 [tests]: https://github.com/MannLabs/alphapepttools/actions/workflows/test.yml
+[preprint]: https://www.biorxiv.org/content/10.64898/2026.09.11.750886v1
 
 <!-- TODO: Change documentation pages back to readthedocs upon public release -->
 <!-- [documentation]: https://alphapepttools.readthedocs.io -->
