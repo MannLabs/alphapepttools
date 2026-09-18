@@ -11,8 +11,9 @@
 
 Search- and quantification-engine agnostic downstream processing of proteomics data
 
-> **Preprint:** Brennsteiner, V., Diedrich, L. et al.
-> [_AlphaPeptTools: scverse-native analysis of mass spectrometry-based proteomics_][preprint], bioRxiv (2026).
+> [!TIP]
+> Our [preprint is out now][preprint]!
+
 
 ## `alphapepttools` was made to make your life in proteomics easier!
 
@@ -114,7 +115,8 @@ If you found a bug, please use the [issue tracker][].
 
 ## Citation
 
-Brennsteiner, V., Diedrich, L. et al. "AlphaPeptTools: scverse-native analysis of mass spectrometry-based proteomics" [preprint][]
+> Brennsteiner, V., Diedrich, L. et al.
+> [_AlphaPeptTools: scverse-native analysis of mass spectrometry-based proteomics_][preprint] (preprint), bioRxiv (2026).
 
 [mambaforge]: https://github.com/conda-forge/miniforge#mambaforge
 [scverse discourse]: https://discourse.scverse.org/
