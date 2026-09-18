@@ -30,3 +30,22 @@ def get_matrix(adata: ad.AnnData, layer: str | None = None) -> np.ndarray:
     if sparse.issparse(data):  # this is to cover anndata backends returning sparse data, e.g. csr_matrix
         data = data.toarray()
     return np.asarray(data)
+
+
+def validate_layer(adata: ad.AnnData, layer: str | None) -> None:
+    """Raise if ``layer`` is named but absent from ``adata.layers``.
+
+    Parameters
+    ----------
+    adata
+        Annotated data matrix.
+    layer
+        Layer name to check. ``None`` selects ``adata.X`` and always passes.
+
+    Raises
+    ------
+    ValueError
+        If ``layer`` is not a key of ``adata.layers``.
+    """
+    if layer is not None and layer not in adata.layers:
+        raise ValueError(f"Layer '{layer}' not found in adata.layers. Available layers: {list(adata.layers.keys())}")

@@ -15,7 +15,7 @@ try:
 except ModuleNotFoundError:
     _HAS_INMOOSE = False
 
-from alphapepttools._utils import get_matrix
+from alphapepttools._utils import get_matrix, validate_layer
 from alphapepttools.tl.defaults import tl_defaults
 from alphapepttools.tl.stats import nan_safe_bh_correction
 from alphapepttools.tl.utils import (
@@ -36,9 +36,9 @@ def _one_hot(labels: pd.Series, *, drop_first: bool = False) -> pd.DataFrame:
 
     Parameters
     ----------
-    labels : pd.Series
+    labels
         Sample labels to encode, indexed by sample.
-    drop_first : bool, optional
+    drop_first
         If True, drop the first level to avoid multicollinearity (k-1 encoding). "First" is in
         the ``pd.get_dummies`` sense, i.e. the lexicographically first level, not the first to
         appear in the data.
@@ -69,11 +69,11 @@ def _build_design_matrix(
 
     Parameters
     ----------
-    adata : ad.AnnData
+    adata
         The AnnData object containing the data.
-    condition_column : str
+    condition_column
         The name of the column in adata.obs that contains the condition labels.
-    categorical_covariate_column : str | None, optional
+    categorical_covariate_column
         The name of the column in adata.obs that contains the categorical covariate labels, encoded as k-1
         indicator columns. If None, no covariate columns are added.
 
@@ -99,9 +99,11 @@ def _build_design_matrix(
         if adata.obs[categorical_covariate_column].isna().any():
             raise KeyError(f"Covariate column '{categorical_covariate_column}' contains NaN values.")
 
-    condition_dm = _one_hot(cast("pd.Series", adata.obs[condition_column]))
+    condition_dm = _one_hot(labels=cast("pd.Series", adata.obs[condition_column]))
     covariate_dm = (
-        _one_hot(cast("pd.Series", adata.obs[categorical_covariate_column]), drop_first=True)  # k-1 for covariates
+        _one_hot(
+            labels=cast("pd.Series", adata.obs[categorical_covariate_column]), drop_first=True
+        )  # k-1 for covariates
         if categorical_covariate_column is not None
         else pd.DataFrame(index=adata.obs.index)
     )
@@ -117,6 +119,7 @@ def _build_design_matrix(
 def _nan_lmfit(
     adata: ad.AnnData,
     design_matrix: pd.DataFrame,
+    layer: str | None = None,
 ) -> dict:
     """Perform a linear fit on the data in adata while dealing with NaN values.
 
@@ -125,11 +128,13 @@ def _nan_lmfit(
 
     Parameters
     ----------
-    adata : ad.AnnData
+    adata
         Annotated data matrix.
-    design_matrix : pd.DataFrame
+    design_matrix
         Design matrix with samples as rows (aligned to adata.obs_names) and conditions/covariates
         as columns, e.g. as produced by build_design_matrix.
+    layer
+        Name of the layer in adata.layers to fit on. If None, adata.X is used.
 
     Returns
     -------
@@ -152,7 +157,7 @@ def _nan_lmfit(
 
     # Convert design matrix and response to numpy arrays
     X = design_matrix.to_numpy()
-    Y = get_matrix(adata)
+    Y = get_matrix(adata=adata, layer=layer)
 
     # Initialize output arrays
     B = np.full((K, P), np.nan)  # linear fit coefficients
@@ -237,13 +242,13 @@ def _make_contrasts(
 
     Parameters
     ----------
-    adata : ad.AnnData
+    adata
         input data, from whose obs the conditions will be extracted
-    between_column : str
+    between_column
         Column name in adata.obs representing the experimental conditions.
-    control_condition : str
+    control_condition
         The name of the control condition in the between_column.
-    control_is : int
+    control_is
         What the control is in the contrast. If it is 1, the treatment is -1 and the effective fold change is control - treatment. If it is -1, the treatment is 1 and the effective fold change is treatment - control.
 
     Returns
@@ -284,13 +289,13 @@ def _run_contrasts(
 
     Parameters
     ----------
-    contrast_matrix : pd.DataFrame
+    contrast_matrix
         A DataFrame representing the contrast matrix, where rows are contrasts and columns are conditions.
-    B : np.ndarray
+    B
         Coefficients of the linear model, shape (n_conditions, n_features).
-    M_all : np.ndarray
+    M_all
         Unscaled covariance of the coefficients, shape (n_features, n_conditions, n_conditions).
-    col_info : dict
+    col_info
         A dictionary containing information about the design matrix columns, including 'condition_col_idxs' which maps condition names to their corresponding column indices in B and M_all.
 
     Returns
@@ -336,9 +341,9 @@ def _contrasts_from_matrix(
 
     Parameters
     ----------
-    contrast_matrix : pd.DataFrame
+    contrast_matrix
         A DataFrame representing the contrast matrix.
-    control_condition : str
+    control_condition
         The name of the control condition.
 
     Returns
@@ -402,13 +407,13 @@ def _ebayes_moderation(
 
     Parameters
     ----------
-    log2fcs : np.ndarray
+    log2fcs
         Log2 fold changes for each contrast and feature, shape (n_contrasts, n_features).
-    stdevs_unscaled : np.ndarray
+    stdevs_unscaled
         Unscaled standard deviations for each contrast and feature, shape (n_contrasts, n_features).
-    sigma2 : np.ndarray
+    sigma2
         Estimated residual variances for each feature, shape (n_features,).
-    dfs : np.ndarray
+    dfs
         Degrees of freedom for each feature, shape (n_features,).
 
     Returns
@@ -457,11 +462,11 @@ def _resolve_comparison(
 
     Parameters
     ----------
-    adata : ad.AnnData
+    adata
         AnnData object whose .obs carries the condition labels.
-    between_column : str
+    between_column
         Column name in adata.obs containing the contrast levels.
-    comparison : tuple[str | list[str], str]
+    comparison
         Comparison as (A, B), where A is a single condition, a list of conditions, or the "_ALL_"
         sentinel (every level except B), and B is the single reference condition.
 
@@ -505,10 +510,11 @@ def _sufficient_values_mask(
     between_column: str,
     condition: str,
     min_required: int,
+    layer: str | None = None,
 ) -> np.ndarray:
     """Per-feature boolean mask: True where `condition` has at least `min_required` observed values."""
     condition_idxs = np.where(adata.obs[between_column] == condition)[0]
-    n_observed = np.sum(~np.isnan(get_matrix(adata)[condition_idxs, :]), axis=0)
+    n_observed = np.sum(~np.isnan(get_matrix(adata=adata, layer=layer)[condition_idxs, :]), axis=0)
     return n_observed >= min_required
 
 
@@ -519,23 +525,26 @@ def _replicate_gate_mask(
     b_level: str,
     a_min_required: int | None,
     b_min_required: int | None,
+    layer: str | None = None,
 ) -> np.ndarray:
     """Per-feature boolean mask: True where both conditions of a contrast have enough observed values.
 
     Parameters
     ----------
-    adata : ad.AnnData
+    adata
         AnnData object subset to the samples that were fit.
-    between_column : str
+    between_column
         Column name in adata.obs containing the contrast levels.
-    a_level : str
+    a_level
         The A condition of the contrast.
-    b_level : str
+    b_level
         The B condition of the contrast.
-    a_min_required : int | None
+    a_min_required
         Minimum number of observed values required in A. If None, the A gate is disabled.
-    b_min_required : int | None
+    b_min_required
         Minimum number of observed values required in B. If None, the B gate is disabled.
+    layer, optional
+        Name of the layer in adata.layers to count observed values in. If None (default), adata.X is used.
 
     Returns
     -------
@@ -545,9 +554,13 @@ def _replicate_gate_mask(
     """
     keep_mask = np.ones(adata.n_vars, dtype=bool)
     if a_min_required is not None:
-        keep_mask &= _sufficient_values_mask(adata, between_column, a_level, a_min_required)
+        keep_mask &= _sufficient_values_mask(
+            adata=adata, between_column=between_column, condition=a_level, min_required=a_min_required, layer=layer
+        )
     if b_min_required is not None:
-        keep_mask &= _sufficient_values_mask(adata, between_column, b_level, b_min_required)
+        keep_mask &= _sufficient_values_mask(
+            adata=adata, between_column=between_column, condition=b_level, min_required=b_min_required, layer=layer
+        )
     return keep_mask
 
 
@@ -567,19 +580,19 @@ def _standardize_contrast_frame(
 
     Parameters
     ----------
-    contrast_name : str
+    contrast_name
         Name of the contrast, "A_VS_B" by convention. Written to the condition_pair column.
-    var_names : pd.Index
+    var_names
         Feature names, used as both the frame index and the protein column.
-    log2fc : np.ndarray
+    log2fc
         Log2 fold changes for this contrast, shape (n_features,).
-    p_values : np.ndarray
+    p_values
         p-values for this contrast, shape (n_features,).
-    t_values : np.ndarray
+    t_values
         Moderated t-statistics for this contrast, shape (n_features,).
-    max_level_1_samples : int
+    max_level_1_samples
         Number of samples in the A condition.
-    max_level_2_samples : int
+    max_level_2_samples
         Number of samples in the B condition.
 
     Returns
@@ -589,7 +602,7 @@ def _standardize_contrast_frame(
         by this method's own `stat` column (the moderated t-statistic).
 
     """
-    fdr_pvalues = nan_safe_bh_correction(p_values)
+    fdr_pvalues = nan_safe_bh_correction(pvals=p_values)
 
     df = pd.DataFrame(
         {
@@ -597,9 +610,9 @@ def _standardize_contrast_frame(
             "protein": var_names,
             "log2fc": log2fc,
             "p_value": p_values,
-            "-log10(p_value)": [negative_log10_pvalue(p) for p in p_values],
+            "-log10(p_value)": [negative_log10_pvalue(pvalue=p) for p in p_values],
             "fdr": fdr_pvalues,
-            "-log10(fdr)": [negative_log10_pvalue(fdr) for fdr in fdr_pvalues],
+            "-log10(fdr)": [negative_log10_pvalue(pvalue=fdr) for fdr in fdr_pvalues],
             "method": _METHOD_NAME,
             "max_level_1_samples": max_level_1_samples,
             "max_level_2_samples": max_level_2_samples,
@@ -620,6 +633,7 @@ def diff_exp_ebayes(
     categorical_covariate_column: str | None = None,
     a_min_required: int | None = None,
     b_min_required: int | None = None,
+    layer: str | None = None,
 ) -> pd.DataFrame:
     """Run the Limma eBayes moderated t-test for differential expression.
 
@@ -627,38 +641,38 @@ def diff_exp_ebayes(
     in one fit, and optionally adjusts for a covariate.
 
     The two conditions in each comparison are referred to positionally as A (comparison[0]) and B (comparison[1]);
-    the test is symmetric, so no condition is assumed to be a treatment or a control. Missingness handling inside
-    this function is limited to gating the reported fold changes: per contrast, a feature's fold change and
-    p-value are suppressed (set to NaN, before FDR correction) unless both conditions have at least the required
-    number of observed values (a_min_required for A and b_min_required for B). All features are still fit and
-    contribute to the eBayes variance prior. Pre-fit completeness filtering, if wanted, is the caller's
-    responsibility and should be done upstream (e.g. alphapepttools.pp.filter_data_completeness).
+    the test is the fold changes are meant to be read A - B, so by changing the order of these conditions, the sign of
+    the reported fold change will change. Missingness handling inside this function is limited to gating the reported
+    fold changes: per contrast, a feature's fold change and p-value are suppressed (set to NaN, before FDR correction)
+    unless both conditions have at least the required number of observed values (a_min_required for A and
+    b_min_required for B). All features are still fit and contribute to the eBayes variance prior. Pre-fit
+    completeness filtering, if wanted, is the caller's responsibility and should be done upstream (e.g.
+    alphapepttools.pp.filter_data_completeness).
 
     Parameters
     ----------
-    adata : ad.AnnData
+    adata
         AnnData object with expression data in .X and sample metadata in .obs.
-    between_column : str
+    between_column
         Column name in adata.obs containing the contrast levels.
-    comparison : tuple[str | list[str], str]
+    comparison
         Tuple specifying the pair of conditions to compare, ordered as (A, B): the first element is the A
         condition(s), the second is the single B reference each A is compared against, e.g. ("A", "B"). Fold
         changes are reported as A - B. Multiple A conditions can be specified as a list in the first element:
         (["A1", "A2"], "B"). If the first element is set to "_ALL_", all conditions except B are compared against
         it: ("_ALL_", "B").
-    categorical_covariate_column : str | None, optional
-        Column name in adata.obs containing a categorical covariate to adjust for, by default None. Its levels
-        are added to the design matrix as k-1 indicator columns, so the column must be categorical (numeric
-        labels are fine, as long as they encode a small number of discrete groups). A continuous covariate
-        would produce roughly one column per sample and leave the model with no residual degrees of freedom.
-    a_min_required : int | None, optional
+    categorical_covariate_column, optional
+        Column name in adata.obs containing a categorical covariate to adjust for, by default None.
+    a_min_required, optional
         Minimum number of observed values required in the A condition (comparison[0]) of each contrast. Per
-        contrast, features with fewer observed values in A have their fold change suppressed (set to NaN) before
-        FDR correction. If None, the A gate is disabled. By default None.
-    b_min_required : int | None, optional
+        contrast, features with fewer observed values in A have their fold change suppressed (set to NaN).
+        If None, the A gate is disabled. By default None.
+    b_min_required, optional
         Minimum number of observed values required in the B condition (comparison[1]). Per contrast, features with
-        fewer observed values in B have their fold change suppressed (set to NaN) before FDR correction. If None,
-        the B gate is disabled. By default None.
+        fewer observed values in B have their fold change suppressed (set to NaN).
+        If None, the B gate is disabled. By default None.
+    layer, optional
+        Name of the layer in adata.layers to test on. If None (default), adata.X is used.
 
     Returns
     -------
@@ -675,6 +689,8 @@ def diff_exp_ebayes(
         If inmoose is not installed.
     KeyError
         If `between_column` is not in adata.obs, or any condition in `comparison` is not a level of it.
+    ValueError
+        If `layer` is not found in adata.layers.
 
     Examples
     --------
@@ -718,6 +734,17 @@ def diff_exp_ebayes(
 
         late = de_results[de_results["condition_pair"] == "24h_VS_0h"]
 
+    Test a normalized layer instead of adata.X:
+
+    .. code-block:: python
+
+        de_results = at.tl.diff_exp_ebayes(
+            adata=adata_protein,
+            between_column="treatment",
+            comparison=("treated", "control"),
+            layer="normalized",
+        )
+
     See Also
     --------
     alphapepttools.tl.diff_exp_ttest : Plain Welch/Student t-test, without variance moderation.
@@ -729,15 +756,18 @@ def diff_exp_ebayes(
             "inmoose is required for diff_exp_ebayes(). Install it through pip or install alphapepttools with the 'full'/'full-stable' extra."
         )
 
-    a_conditions, b_condition = _resolve_comparison(adata, between_column, comparison)
+    validate_layer(adata=adata, layer=layer)
+    a_conditions, b_condition = _resolve_comparison(adata=adata, between_column=between_column, comparison=comparison)
 
     # Step 0: Filter adata to only include samples from the specified conditions
     selected_levels = [*a_conditions, b_condition]
     adata = adata[adata.obs[between_column].isin(selected_levels)].copy()
 
     # Step 1: build the design matrix and fit every feature with NaN handling
-    design_matrix, col_info = _build_design_matrix(adata, between_column, categorical_covariate_column)
-    lm_fit = _nan_lmfit(adata, design_matrix)
+    design_matrix, col_info = _build_design_matrix(
+        adata=adata, condition_column=between_column, categorical_covariate_column=categorical_covariate_column
+    )
+    lm_fit = _nan_lmfit(adata=adata, design_matrix=design_matrix, layer=layer)
 
     # Step 2: Generate contrasts to derive fold changes for each A vs B.
     # control_is=-1 fixes the direction to A - B (comparison[0] - comparison[1]), named "A_VS_B".
@@ -765,7 +795,7 @@ def diff_exp_ebayes(
     )
 
     # Step 5: Extract contrasts and write output DataFrame with standardized columns for each contrast
-    contrast_names = _contrasts_from_matrix(contrast_matrix, b_condition)
+    contrast_names = _contrasts_from_matrix(contrast_matrix=contrast_matrix, control_condition=b_condition)
     if len(contrast_names) != contrast_results["log2fc"].shape[0]:
         raise ValueError("Number of contrast names does not match number of contrasts in results.")
 
@@ -779,13 +809,23 @@ def diff_exp_ebayes(
         log2fc = contrast_results["log2fc"][contrast_idx].copy()
 
         # Replicate gate: suppress the fold change unless both conditions have enough observed values
-        keep = _replicate_gate_mask(adata, between_column, a_level, b_level, a_min_required, b_min_required)
+        keep = _replicate_gate_mask(
+            adata=adata,
+            between_column=between_column,
+            a_level=a_level,
+            b_level=b_level,
+            a_min_required=a_min_required,
+            b_min_required=b_min_required,
+            layer=layer,
+        )
         p_values[~keep] = np.nan
         t_values[~keep] = np.nan
         log2fc[~keep] = np.nan
 
         # Sample counts per level. The contrast name is "A_VS_B".
-        max_level_1_samples, max_level_2_samples = determine_max_replicates(adata, between_column, a_level, b_level)
+        max_level_1_samples, max_level_2_samples = determine_max_replicates(
+            adata=adata, between_column=between_column, level_1=a_level, level_2=b_level
+        )
 
         results.append(
             _standardize_contrast_frame(
