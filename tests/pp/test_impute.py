@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 import anndata as ad
@@ -12,6 +13,7 @@ from alphapepttools.pp.impute import (
     _impute_knn,
     _impute_nanmedian,
     _raise_on_nan_values,
+    _validate_knn_grouping,
 )
 
 
@@ -127,6 +129,53 @@ def bpca_imputation_dummy_data(imputation_dummy_data: np.ndarray) -> tuple[np.nd
 def test___raise_on_nan_values(dummy_data_all_nan) -> None:
     with pytest.raises(ValueError, match=r"Features with index \[4\]"):
         _raise_on_nan_values(dummy_data_all_nan, mode="all")
+
+
+def test_raise_on_nan_values_all_pandas():
+    """`mode='all'` on a pandas DataFrame raises on all-NaN columns."""
+    df = pd.DataFrame({"good": [1.0, 2.0], "all_nan": [np.nan, np.nan]})
+    with pytest.raises(ValueError, match="contain all nan values"):
+        _raise_on_nan_values(df, mode="all")
+
+
+def test_raise_on_nan_values_invalid_mode():
+    with pytest.raises(ValueError, match="Mode must be either"):
+        _raise_on_nan_values(np.array([1.0, 2.0, np.nan]), mode="invalid")
+
+
+def test_impute_nanmedian_no_nans(caplog):
+    """Complete data hits the short-circuit branch and is returned unchanged."""
+    data = np.array([[1.0, 2.0], [3.0, 4.0]])
+
+    with caplog.at_level(logging.INFO):
+        result = _impute_nanmedian(data)
+
+    assert "no missing values" in caplog.text
+    assert np.array_equal(result, data)
+
+
+def test_impute_knn_no_nans(caplog):
+    """Complete data hits the short-circuit branch in _impute_knn."""
+    data = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])
+
+    with caplog.at_level(logging.INFO):
+        result = _impute_knn(data)
+
+    assert "no missing values" in caplog.text
+    assert np.array_equal(result, data)
+
+
+def test_validate_knn_grouping_nan_key():
+    groups = {np.nan: np.array([0, 1])}
+    with pytest.raises(ValueError, match="contains nans"):
+        _validate_knn_grouping(groups, n_neighbors=2)
+
+
+def test_validate_knn_grouping_group_too_small():
+    """Group with fewer members than n_neighbors must raise."""
+    groups = {"A": np.array([0]), "B": np.array([1, 2])}
+    with pytest.raises(ValueError, match="greater equal number of"):
+        _validate_knn_grouping(groups, n_neighbors=2)
 
 
 def test__impute_nanmedian(median_imputation_dummy_data) -> None:
@@ -564,6 +613,19 @@ class TestImputeBPCAAnnData:
         X_imputed = adata_imputed.X if layer is None else adata_imputed.layers[layer]
 
         assert np.allclose(X_imputed, X_ref, equal_nan=False)
+
+    def test_impute_bpca_group_column(self, bpca_imputation_dummy_anndata) -> None:
+        """BPCA imputation with `group_column` runs the per-group write-back path."""
+        adata, _, _, kwargs = bpca_imputation_dummy_anndata
+        X_original = adata.X.copy()
+        nan_mask = np.isnan(X_original)
+
+        result = impute_bpca(adata, group_column="sample_group", **kwargs, copy=True)
+
+        # NaNs were imputed
+        assert not np.any(np.isnan(result.X))
+        # Non-NaN values were preserved
+        assert np.allclose(result.X[~nan_mask], X_original[~nan_mask])
 
     @pytest.mark.parametrize("group_column", [None, "sample_group"])
     def test_impute_bpca__feature_all_nan(self, bpca_imputation_dummy_anndata_all_nan, group_column: str) -> None:
