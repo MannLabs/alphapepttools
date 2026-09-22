@@ -305,6 +305,8 @@ def _run_contrasts(
         - 'log2fc': Log2 fold changes for each contrast and feature, shape (n_contrasts, n_features).
         - 'unscaled_var': Unscaled variances for each contrast and feature, shape (n_contrasts, n_features).
         - 'stdev_unscaled': Unscaled standard deviations for each contrast and feature, shape (n_contrasts, n_features).
+        Entries are NaN where the contrast involves a condition with no fitted coefficient; contrasts of
+        the same feature that do not involve that condition are unaffected.
 
     """
     # Resolve contrast_matrix columns (condition names) to row indices in B / M_all
@@ -316,13 +318,26 @@ def _run_contrasts(
     M_cond = M_all[:, cond_idxs, :][:, :, cond_idxs]  # (P, n_conditions, n_conditions)
 
     C = contrast_matrix.to_numpy()  # (n_contrasts, n_conditions)
-    log2fc = C @ B_cond  # (n_contrasts, P)
+
+    # When computing contrast * coefficient in C @ B_cond with NaN coefficients, expressions like this one
+    # can arise: (1 * 20.1) + (-1 * 22.5) + (0 * NaN). The coefficient weighted with 0 is not part of the
+    # comparison and should just be ignored, but 0 * NaN = NaN, and subsequently 20.1 - 22.5 + NaN = NaN,
+    # setting the entire fold change to NaN because a coefficient that was not in the comparison was NaN.
+    # The solution is to zero-fill the NaN coefficients so they drop out of the multiplication, and to set
+    # only those contrasts back to NaN whose non-zero weights meet a NaN coefficient (the ones that are
+    # genuinely inestimable). contrast_meets_nan counts, per contrast and feature, how many of the
+    # contrast's non-zero weights meet a NaN coefficient.
+    contrast_meets_nan = (C != 0).astype(float) @ np.isnan(B_cond).astype(float)  # (n_contrasts, P)
+    estimable = contrast_meets_nan == 0
+
+    log2fc = C @ np.nan_to_num(B_cond)  # (n_contrasts, P)
 
     # unscaled variance: per-precursor quadratic form C[c] @ M_cond[j] @ C[c].
     # einsum collapses the (feature, contrast) loops into one vectorized call.
-    # NaN propagation matches the explicit loop: 0 * nan = nan, so any contrast
-    # touching a dropped condition column still yields nan.
-    unscaled_var = np.einsum("ca,jab,cb->cj", C, M_cond, C)  # (n_contrasts, P)
+    unscaled_var = np.einsum("ca,jab,cb->cj", C, np.nan_to_num(M_cond), C)  # (n_contrasts, P)
+
+    log2fc[~estimable] = np.nan
+    unscaled_var[~estimable] = np.nan
 
     stdev_unscaled = np.sqrt(unscaled_var)  # (n_contrasts, P)
     return {"log2fc": log2fc, "unscaled_var": unscaled_var, "stdev_unscaled": stdev_unscaled}
