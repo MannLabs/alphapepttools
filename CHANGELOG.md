@@ -9,8 +9,8 @@ and this project adheres to [Semantic Versioning][].
 [keep a changelog]: https://keepachangelog.com/en/1.0.0/
 [semantic versioning]: https://semver.org/spec/v2.0.0.html
 
-<!-- ## [Unreleased]
+## [Unreleased]
 
 ### Added
 
--   Basic tool, preprocessing and plotting functions -->
+- `tl.pca` and `tl.bpca` record the samples and features the PCA was fitted on as `obs_names` and `var_names` in their `adata.uns` entry

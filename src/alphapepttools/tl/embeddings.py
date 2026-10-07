@@ -127,7 +127,8 @@ def _store_pca_results(
 
     Returns
     -------
-    The updated AnnData object with PCA results added to `adata.obsm`, `adata.varm`, and `adata.uns` attributes
+    The updated AnnData object with PCA results added to `adata.obsm`, `adata.varm`, and `adata.uns` attributes.
+    The `adata.uns` entry holds the variance decomposition and the `obs_names` and `var_names` the PCA was fitted on.
     """
     # get key names for storing PCA results
     if embeddings_name is None:
@@ -143,9 +144,11 @@ def _store_pca_results(
     if meta_data_mask_column_name is None:
         pc_mat = pca_res[0].copy()
         loadings_mat = pca_res[1].T.copy()
+        fitted_var_names = adata.var_names.to_numpy()
     else:
         n_pcs = pca_res[0].shape[1]
         mask = np.where(adata.var[meta_data_mask_column_name].values)[0]
+        fitted_var_names = adata.var_names[mask].to_numpy()
 
         if dim_space == "var":
             # PC coordinates of the features used in PCA (NA to all features not used in PCA)
@@ -182,6 +185,8 @@ def _store_pca_results(
     adata.uns[variance_key] = {
         "variance_ratio": pca_res[2].copy(),  # Ratio of explained variance (n_comp)
         "variance": pca_res[3].copy() if pca_res[3] is not None else None,  # Explained variance (n_comp)
+        "obs_names": adata.obs_names.to_numpy(),  # Samples the PCA was fitted on (n_obs)
+        "var_names": fitted_var_names,  # Features the PCA was fitted on (n_fitted_vars)
     }
 
     return adata
@@ -254,6 +259,10 @@ def pca(
     `.uns['variance_pca_obs' | embeddings_name]['variance']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
         Explained variance, equivalent to the eigenvalues of the
         covariance matrix.
+    `.uns['variance_pca_obs' | embeddings_name]['obs_names']` : :class:`~numpy.ndarray` (shape `(adata.n_obs,)`)
+        Samples the PCA was fitted on.
+    `.uns['variance_pca_obs' | embeddings_name]['var_names']` : :class:`~numpy.ndarray` (shape `(n_fitted_vars,)`)
+        Features the PCA was fitted on.
 
     for `dim_space='var'` (sample projection):
     `.varm['X_pca_var' | embeddings_name]` : :class:`~scipy.sparse.csr_matrix` | :class:`~scipy.sparse.csc_matrix` | :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
@@ -265,6 +274,10 @@ def pca(
     `.uns['variance_pca_var' | embeddings_name]['variance']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
         Explained variance, equivalent to the eigenvalues of the
         covariance matrix.
+    `.uns['variance_pca_var' | embeddings_name]['obs_names']` : :class:`~numpy.ndarray` (shape `(adata.n_obs,)`)
+        Samples the PCA was fitted on.
+    `.uns['variance_pca_var' | embeddings_name]['var_names']` : :class:`~numpy.ndarray` (shape `(n_fitted_vars,)`)
+        Features the PCA was fitted on.
 
     Examples
     --------
@@ -439,6 +452,10 @@ def bpca(
         The principal components containing the loadings.
     `.uns['BPCA' | embeddings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
         Ratio of explained variance.
+    `.uns['BPCA' | embeddings_name]['obs_names']` : :class:`~numpy.ndarray` (shape `(adata.n_obs,)`)
+        Samples the BPCA was fitted on.
+    `.uns['BPCA' | embeddings_name]['var_names']` : :class:`~numpy.ndarray` (shape `(n_fitted_vars,)`)
+        Features the BPCA was fitted on.
 
     for `dim_space='var'` (feature projection):
     `.varm['BPCA' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
@@ -447,6 +464,10 @@ def bpca(
         The principal components containing the loadings.
     `.uns['BPCA' | embeddings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
         Ratio of explained variance.
+    `.uns['BPCA' | embeddings_name]['obs_names']` : :class:`~numpy.ndarray` (shape `(adata.n_obs,)`)
+        Samples the BPCA was fitted on.
+    `.uns['BPCA' | embeddings_name]['var_names']` : :class:`~numpy.ndarray` (shape `(n_fitted_vars,)`)
+        Features the BPCA was fitted on.
 
     Notes
     -----
