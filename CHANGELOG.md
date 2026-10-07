@@ -14,3 +14,12 @@ and this project adheres to [Semantic Versioning][].
 ### Added
 
 - `tl.pca` and `tl.bpca` record the samples and features the PCA was fitted on as `obs_names` and `var_names` in their `adata.uns` entry
+
+### Changed
+
+- `tl.pca` and `tl.bpca` always compute the projection of the observations (samples). For a projection of the features, pass the transposed object: `tl.pca(adata=adata.T)`
+- The default result keys lost their `_obs` suffix: `X_pca`, `PCs_pca`, `variance_pca` and `X_bpca`, `PCs_bpca`, `variance_bpca`. The defaults of `metrics.principal_component_regression` follow. Objects saved with the old keys need PCA to be re-run before plotting
+
+### Removed
+
+- The `dim_space` parameter of `tl.pca`, `tl.bpca`, `tl.extract_pca_anndata`, `tl.prepare_scree_data_to_plot`, `tl.prepare_pca_1d_loadings_data_to_plot`, `tl.prepare_pca_2d_loadings_data_to_plot`, `pl.plot_pca`, `pl.scree_plot`, `pl.plot_pca_loadings` and `pl.plot_pca_loadings_2d`
