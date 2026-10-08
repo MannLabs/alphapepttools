@@ -11,9 +11,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def _check_inputs_for_dim_reduction(
-    adata: ad.AnnData, layer: str | None, meta_data_mask_column_name: str | None
-) -> None:
+def _check_inputs_for_dim_reduction(adata: ad.AnnData, layer: str | None, feature_mask_column: str | None) -> None:
     """Check inputs for PCA and other dimensionality reduction methods.
 
     Parameters
@@ -22,19 +20,19 @@ def _check_inputs_for_dim_reduction(
         The (annotated) data matrix of shape `n_obs` X `n_vars`.
     layer
         Layer name to check. If None, default to `adata.X`
-    meta_data_mask_column_name
+    feature_mask_column
         Colname to check in `adata.var`. Must be of boolean dtype.
 
     Raises
     ------
     TypeError
-        If adata is not an AnnData object or if meta_data_mask_column_name exists but is not boolean dtype.
+        If adata is not an AnnData object or if feature_mask_column exists but is not boolean dtype.
     ValueError
-        If layer is not found in adata.layers or meta_data_mask_column_name is not found in adata.var.
+        If layer is not found in adata.layers or feature_mask_column is not found in adata.var.
     TypeError
-        If adata.var[metadata_mask_column_name] is not boolean dtype
+        If adata.var[feature_mask_column] is not boolean dtype
     ValueError
-        If adata.var[metadata_mask_column_name] does not exist
+        If adata.var[feature_mask_column] does not exist
 
     """
     logger.debug("Checking inputs for dimensionality reduction")
@@ -44,12 +42,12 @@ def _check_inputs_for_dim_reduction(
     if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer {layer} not found in AnnData object, available layers: {adata.layers.keys()}")
 
-    if meta_data_mask_column_name is not None:
-        if meta_data_mask_column_name not in adata.var.columns:
-            raise ValueError(f"Column {meta_data_mask_column_name} not found in data.var")
-        if adata.var[meta_data_mask_column_name].dtype.kind != "b":
+    if feature_mask_column is not None:
+        if feature_mask_column not in adata.var.columns:
+            raise ValueError(f"Column {feature_mask_column} not found in data.var")
+        if adata.var[feature_mask_column].dtype.kind != "b":
             raise TypeError(
-                f"adata.var['{meta_data_mask_column_name}'] must be of boolean dtype, but it's {adata.var[meta_data_mask_column_name].dtype}."
+                f"adata.var['{feature_mask_column}'] must be of boolean dtype, but it's {adata.var[feature_mask_column].dtype}."
             )
 
 
@@ -87,7 +85,7 @@ def _store_pca_results(
     default_loadings_key: str,
     default_uns_key: str,
     embeddings_name: str | None,
-    meta_data_mask_column_name: str | None,
+    feature_mask_column: str | None,
 ) -> ad.AnnData:
     """Store PCA results (coordinates, loadings, and variance) in the AnnData attributes (.obsm, .varm, .uns)
 
@@ -108,7 +106,7 @@ def _store_pca_results(
         Default key of the metadata in `adata.uns`. Overwritten by `embeddings_name`
     embeddings_name
         Custom key name for storing PCA results, used in all attributes. If `None`, the `default_<>_key` names are used
-    meta_data_mask_column_name
+    feature_mask_column
         Column name in adata.var used as a boolean mask for features. If None, all features are used.
 
     Returns
@@ -130,12 +128,12 @@ def _store_pca_results(
     pc_mat = pca_res[0].copy()
 
     # check if PCA was run for all features or only for a subset
-    if meta_data_mask_column_name is None:
+    if feature_mask_column is None:
         loadings_mat = pca_res[1].T.copy()
         fitted_var_names = adata.var_names.to_numpy()
     else:
         n_pcs = pca_res[0].shape[1]
-        mask = np.where(adata.var[meta_data_mask_column_name].values)[0]
+        mask = np.where(adata.var[feature_mask_column].values)[0]
         fitted_var_names = adata.var_names[mask].to_numpy()
 
         # feature loading of the features used in PCA (nan values for all features NOT used in PCA)
@@ -168,7 +166,7 @@ def pca(
     layer: str | None = None,
     embeddings_name: str | None = None,
     n_comps: int | None = None,
-    meta_data_mask_column_name: str | None = None,
+    feature_mask_column: str | None = None,
     *,
     copy: bool = False,
     **pca_kwargs: dict | None,
@@ -200,7 +198,7 @@ def pca(
     n_comps
         Number of principal components to compute. Defaults to 50, or 1 - minimum
         dimension size of selected representation.
-    meta_data_mask_column_name
+    feature_mask_column
         If provided, the colname in `adata.var` to use as a mask for
         the features to be used in PCA. This is useful for running PCA with the
         core proteome as "mask_var" to remove nan values. Must be of boolean dtype.
@@ -263,7 +261,7 @@ def pca(
         )
 
         # Run PCA using only core proteins
-        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2)
+        at.tl.pca(adata, feature_mask_column="is_core", n_comps=2)
 
         # The PCA results are now stored in the AnnData object:
         # adata.obsm['X_pca'] - PCA coordinates for each sample (5 x 2)
@@ -284,14 +282,10 @@ def pca(
     adata = adata.copy() if copy else adata
     logger.info("computing PCA")
 
-    _check_inputs_for_dim_reduction(adata=adata, layer=layer, meta_data_mask_column_name=meta_data_mask_column_name)
+    _check_inputs_for_dim_reduction(adata=adata, layer=layer, feature_mask_column=feature_mask_column)
 
     # Run on array instead of anndata so masked-out features get NaN loadings and results are stored under our keys
-    var_mask = (
-        cast("Iterable[bool]", adata.var[meta_data_mask_column_name])
-        if meta_data_mask_column_name is not None
-        else None
-    )
+    var_mask = cast("Iterable[bool]", adata.var[feature_mask_column]) if feature_mask_column is not None else None
     data_for_pca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask)
     pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, copy=False, **pca_kwargs)
 
@@ -299,7 +293,7 @@ def pca(
         adata=adata,
         pca_res=pca_res,
         embeddings_name=embeddings_name,
-        meta_data_mask_column_name=meta_data_mask_column_name,
+        feature_mask_column=feature_mask_column,
         default_coords_key="X_pca",
         default_loadings_key="PCs_pca",
         default_uns_key="variance_pca",
@@ -343,7 +337,7 @@ def bpca(
     layer: str | None = None,
     embeddings_name: str | None = None,
     n_comps: int = 50,
-    meta_data_mask_column_name: str | None = None,
+    feature_mask_column: str | None = None,
     *,
     copy: bool = False,
     **bpca_kwargs,
@@ -370,7 +364,7 @@ def bpca(
         `variance_bpca` for the variance.
     n_comps
         Number of principal components to compute. Defaults to `min(50, n_obs, n_var)`
-    meta_data_mask_column_name
+    feature_mask_column
         If provided, the colname in `adata.var` to use as a mask for
         the features to be used in PCA. This is useful for running PCA with the
         core proteome as "mask_var" to remove nan values. Must be of boolean dtype.
@@ -435,13 +429,9 @@ def bpca(
     :class:`bpca.BPCA`
     """
     adata = adata.copy() if copy else adata
-    _check_inputs_for_dim_reduction(adata=adata, layer=layer, meta_data_mask_column_name=meta_data_mask_column_name)
+    _check_inputs_for_dim_reduction(adata=adata, layer=layer, feature_mask_column=feature_mask_column)
 
-    var_mask = (
-        cast("Iterable[bool]", adata.var[meta_data_mask_column_name])
-        if meta_data_mask_column_name is not None
-        else None
-    )
+    var_mask = cast("Iterable[bool]", adata.var[feature_mask_column]) if feature_mask_column is not None else None
     data_for_bpca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask)
 
     pca_res = _run_bpca(data_for_bpca=data_for_bpca, n_components=n_comps, **bpca_kwargs)
@@ -450,7 +440,7 @@ def bpca(
         adata=adata,
         pca_res=pca_res,
         embeddings_name=embeddings_name,
-        meta_data_mask_column_name=meta_data_mask_column_name,
+        feature_mask_column=feature_mask_column,
         default_coords_key="X_bpca",
         default_loadings_key="PCs_bpca",
         default_uns_key="variance_bpca",

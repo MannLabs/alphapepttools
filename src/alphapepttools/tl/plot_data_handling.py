@@ -241,7 +241,7 @@ def extract_pca_anndata(
         )
 
         # First run PCA on the samples
-        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2)
+        at.tl.pca(adata, feature_mask_column="is_core", n_comps=2)
 
         # Extract PCA data for plotting/analysis
         pca_adata = at.tl.extract_pca_anndata(adata)
@@ -366,7 +366,7 @@ def prepare_scree_data_to_plot(
         )
 
         # Run PCA on the samples
-        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2)
+        at.tl.pca(adata, feature_mask_column="is_core", n_comps=2)
 
         # Prepare scree plot data
         scree_data = at.tl.prepare_scree_data_to_plot(adata, n_pcs=2)
@@ -455,7 +455,7 @@ def prepare_pca_1d_loadings_data_to_plot(
         )
 
         # Run PCA on the samples
-        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2)
+        at.tl.pca(adata, feature_mask_column="is_core", n_comps=2)
 
         # Get top 3 protein loadings for PC1
         loadings_df = at.tl.prepare_pca_1d_loadings_data_to_plot(
@@ -557,7 +557,7 @@ def prepare_pca_2d_loadings_data_to_plot(
         )
 
         # Run PCA on the samples
-        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2)
+        at.tl.pca(adata, feature_mask_column="is_core", n_comps=2)
 
         # Get loadings for PC1 vs PC2 with top 2 features highlighted
         loadings_2d = at.tl.prepare_pca_2d_loadings_data_to_plot(
