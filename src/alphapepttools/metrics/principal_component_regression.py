@@ -74,8 +74,8 @@ def principal_component_regression(
     adata: ad.AnnData,
     covariate: str,
     n_components: int | None = None,
-    pca_key: str = "X_pca_obs",
-    pca_key_uns: str = "variance_pca_obs",
+    pca_key: str = "X_pca",
+    pca_key_uns: str = "variance_pca",
 ) -> float:
     r"""Compute principal component regression (PCR) score.
 
@@ -130,9 +130,9 @@ def principal_component_regression(
         at.metrics.principal_component_regression(adata, covariate="batch")
 
         # With custom PCA keys
-        at.tl.pca(adata, layer="layer_batch_corrected", key_added="pca_batch_corrected")
+        at.tl.pca(adata, layer="layer_batch_corrected", embeddings_name="pca_batch_corrected")
         at.metrics.principal_component_regression(
-            adata, covariate="batch", pca_key="pca_batch_corrected", pca_uns_key="pca_batch_corrected"
+            adata, covariate="batch", pca_key="pca_batch_corrected", pca_key_uns="pca_batch_corrected"
         )
 
     Notes

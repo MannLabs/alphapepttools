@@ -1,6 +1,6 @@
 import logging
 from collections.abc import Iterable
-from typing import Literal, cast
+from typing import cast
 
 import anndata as ad
 import numpy as np
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def _check_inputs_for_dim_reduction(
-    adata: ad.AnnData, layer: str | None, dim_space: str, meta_data_mask_column_name: str | None
+    adata: ad.AnnData, layer: str | None, meta_data_mask_column_name: str | None
 ) -> None:
     """Check inputs for PCA and other dimensionality reduction methods.
 
@@ -22,8 +22,6 @@ def _check_inputs_for_dim_reduction(
         The (annotated) data matrix of shape `n_obs` X `n_vars`.
     layer
         Layer name to check. If None, default to `adata.X`
-    dim_space
-        Must be "obs" or "var". ValueError otherwise.
     meta_data_mask_column_name
         Colname to check in `adata.var`. Must be of boolean dtype.
 
@@ -32,7 +30,7 @@ def _check_inputs_for_dim_reduction(
     TypeError
         If adata is not an AnnData object or if meta_data_mask_column_name exists but is not boolean dtype.
     ValueError
-        If layer is not found in adata.layers, dim_space is not 'obs' or 'var', or meta_data_mask_column_name is not found in adata.var.
+        If layer is not found in adata.layers or meta_data_mask_column_name is not found in adata.var.
     TypeError
         If adata.var[metadata_mask_column_name] is not boolean dtype
     ValueError
@@ -45,9 +43,6 @@ def _check_inputs_for_dim_reduction(
         raise TypeError(f"Data should be AnnData object, got {type(adata)}")
     if layer is not None and layer not in adata.layers:
         raise ValueError(f"Layer {layer} not found in AnnData object, available layers: {adata.layers.keys()}")
-
-    if dim_space not in ["obs", "var"]:
-        raise ValueError(f"dim_space should be either 'obs' or 'var', got {dim_space}")
 
     if meta_data_mask_column_name is not None:
         if meta_data_mask_column_name not in adata.var.columns:
@@ -62,9 +57,8 @@ def _prepare_pca_data(
     adata: ad.AnnData,
     layer: str | None = None,
     var_mask: Iterable[bool] | None = None,
-    dim_space: Literal["obs", "var"] = "obs",
 ) -> np.ndarray:
-    """Extract data for PCA in correct orientation
+    """Extract data for PCA
 
     Parameters
     ----------
@@ -74,37 +68,31 @@ def _prepare_pca_data(
         Layer in anndata object to consider. If `None` uses `adata.X`.
     var_mask
         Boolean mask indicating whether feature should be considered for PCA or not
-    dim_space
-        PCA projection space. Either "obs" (project observations) or "var" (project features).
 
     Returns
     -------
-    Array with dimensions `(obs, var)` if `dim_space == "obs"`, or `(var, obs)` if
-    `dim_space == "var"`. The var dimension includes only features for which `var_mask`
+    Array with dimensions `(obs, var)`. The var dimension includes only features for which `var_mask`
     is True.
     """
     adata_sub = adata[:, var_mask] if var_mask is not None else adata
     data_for_pca = adata_sub.layers[layer].copy() if layer is not None else adata_sub.X.copy()
 
-    # Transpose if PCA is done on the feature space
-    return cast("np.ndarray", data_for_pca.T if dim_space == "var" else data_for_pca)
+    return cast("np.ndarray", data_for_pca)
 
 
 def _store_pca_results(
     adata: ad.AnnData,
     pca_res: tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray | None],
-    default_coords_prefix: str,
-    default_loadings_prefix: str,
-    default_uns_prefix: str,
-    dim_space: Literal["obs", "var"],
+    default_coords_key: str,
+    default_loadings_key: str,
+    default_uns_key: str,
     embeddings_name: str | None,
     meta_data_mask_column_name: str | None,
 ) -> ad.AnnData:
-    """Store PCA results (coordinates, loadings, and variance) in the appropriate AnnData attributes (.obsm, .varm, .uns)
+    """Store PCA results (coordinates, loadings, and variance) in the AnnData attributes (.obsm, .varm, .uns)
 
-    Per default, keys are generated in the form `{default_<>_key}_{dim_space}` and added to the respective
-    anndata attributes. `embeddings_name` overwrites the defaults in which case all added keys will be called
-    `embeddings_name`.
+    Per default, the `default_<>_key` names are added to the respective anndata attributes. `embeddings_name`
+    overwrites the defaults in which case all added keys will be called `embeddings_name`.
 
     Parameters
     ----------
@@ -112,76 +100,64 @@ def _store_pca_results(
         The AnnData object to update.
     pca_res
         PCA result tuple (coordinates, loadings, variance_ratio, variance).
-    default_coords_prefix
-        Default prefix of coordinates. Overwritten by `embeddings_name`
-    default_loadings_prefix
-        Default prefix of loadings. Overwritten by `embeddings_name`
-    default_uns_prefix
-        Default prefix of metadata in `adata.uns`. Overwritten by `embeddings_name`
-    dim_space
-        Either "obs" or "var", indicating the PCA projection space.
+    default_coords_key
+        Default key of the coordinates in `adata.obsm`. Overwritten by `embeddings_name`
+    default_loadings_key
+        Default key of the loadings in `adata.varm`. Overwritten by `embeddings_name`
+    default_uns_key
+        Default key of the metadata in `adata.uns`. Overwritten by `embeddings_name`
     embeddings_name
-        Custom key name for storing PCA results, used in all attributes. If `None`, keys are {default_<>_prefix}_{dim_space}
+        Custom key name for storing PCA results, used in all attributes. If `None`, the `default_<>_key` names are used
     meta_data_mask_column_name
         Column name in adata.var used as a boolean mask for features. If None, all features are used.
 
     Returns
     -------
-    The updated AnnData object with PCA results added to `adata.obsm`, `adata.varm`, and `adata.uns` attributes
+    The updated AnnData object with PCA results added to `adata.obsm`, `adata.varm`, and `adata.uns` attributes.
+    The `adata.uns` entry holds the variance decomposition and the `obs_names` and `var_names` the PCA was fitted on.
     """
     # get key names for storing PCA results
     if embeddings_name is None:
-        pca_coords_key = f"{default_coords_prefix}_{dim_space}"
-        loadings_key = f"{default_loadings_prefix}_{dim_space}"
-        variance_key = f"{default_uns_prefix}_{dim_space}"
+        pca_coords_key = default_coords_key
+        loadings_key = default_loadings_key
+        variance_key = default_uns_key
     else:
         pca_coords_key = embeddings_name
         loadings_key = embeddings_name
         variance_key = embeddings_name
 
+    # PC coordinates of the samples used in PCA
+    pc_mat = pca_res[0].copy()
+
     # check if PCA was run for all features or only for a subset
     if meta_data_mask_column_name is None:
-        pc_mat = pca_res[0].copy()
         loadings_mat = pca_res[1].T.copy()
+        fitted_var_names = adata.var_names.to_numpy()
     else:
         n_pcs = pca_res[0].shape[1]
         mask = np.where(adata.var[meta_data_mask_column_name].values)[0]
+        fitted_var_names = adata.var_names[mask].to_numpy()
 
-        if dim_space == "var":
-            # PC coordinates of the features used in PCA (NA to all features not used in PCA)
-            pc_mat = np.full((adata.n_vars, n_pcs), np.nan)
-            pc_mat[mask, :] = pca_res[0].copy()
-            # sample loading of the samples used in PCA
-            loadings_mat = pca_res[1].T.copy()
-        else:  # dim_space == "obs":
-            # PC coordinates of the samples used in PCA
-            pc_mat = pca_res[0].copy()
-            # feature loading of the features used in PCA (nan values for all features NOT used in PCA)
-            loadings_mat = np.full((adata.n_vars, n_pcs), np.nan)
-            loadings_mat[mask, :] = pca_res[1].T.copy()
-
-    if dim_space == "obs":
-        coords_dict, loadings_dict = adata.obsm, adata.varm
-        coords_location, loadings_location = "obsm", "varm"
-
-    else:  # dim_space == "var"
-        coords_dict, loadings_dict = adata.varm, adata.obsm
-        coords_location, loadings_location = "varm", "obsm"
+        # feature loading of the features used in PCA (nan values for all features NOT used in PCA)
+        loadings_mat = np.full((adata.n_vars, n_pcs), np.nan)
+        loadings_mat[mask, :] = pca_res[1].T.copy()
 
     # overwrite existing keys if they exist
     if variance_key in adata.uns:
         logger.warning(f"Overwriting existing PCA variance in uns.['{variance_key}']")
-    if pca_coords_key in coords_dict:
-        logger.warning(f"Overwriting existing PCA coordinates {coords_location}.['{pca_coords_key}']")
-    if loadings_key in loadings_dict:
-        logger.warning(f"Overwriting existing PCA loadings {loadings_location}.['{loadings_key}']")
+    if pca_coords_key in adata.obsm:
+        logger.warning(f"Overwriting existing PCA coordinates obsm.['{pca_coords_key}']")
+    if loadings_key in adata.varm:
+        logger.warning(f"Overwriting existing PCA loadings varm.['{loadings_key}']")
 
     # store PCA results in locations
-    coords_dict[pca_coords_key] = pc_mat
-    loadings_dict[loadings_key] = loadings_mat
+    adata.obsm[pca_coords_key] = pc_mat
+    adata.varm[loadings_key] = loadings_mat
     adata.uns[variance_key] = {
         "variance_ratio": pca_res[2].copy(),  # Ratio of explained variance (n_comp)
         "variance": pca_res[3].copy() if pca_res[3] is not None else None,  # Explained variance (n_comp)
+        "obs_names": adata.obs_names.to_numpy(),  # Samples the PCA was fitted on (n_obs)
+        "var_names": fitted_var_names,  # Features the PCA was fitted on (n_fitted_vars)
     }
 
     return adata
@@ -190,7 +166,6 @@ def _store_pca_results(
 def pca(
     adata: ad.AnnData,
     layer: str | None = None,
-    dim_space: Literal["obs", "var"] = "obs",
     embeddings_name: str | None = None,
     n_comps: int | None = None,
     meta_data_mask_column_name: str | None = None,
@@ -200,11 +175,11 @@ def pca(
 ) -> None | ad.AnnData:
     """Principal component analysis :cite:p:`Pedregosa2011`.
 
-    Computes PCA coordinates, loadings and variance decomposition. The passed adata will be changed as a result to include the pca calculations.
-    depending on the `dim_space` parameter, the PCA result is dimensionality reduction projection of samples (`obs`) or of features (`var`).
-    After PCA, the updated adata object will include `adata.obsm` layer for the PCA coordinates,`adata.varm` layer (for PCA feature loadings),
-    and `adata.uns` layer (for PCA variance decomposition) for PCA done on the feature space.
-    For PCA done on the sample space, the PCA coordinates will be stored in `adata.varm`, the PCA loadings in `adata.obsm`, and the variance decomposition in `adata.uns`.
+    Computes PCA coordinates, loadings and variance decomposition of the observations (samples) in `adata`.
+    The passed adata will be changed as a result to include the pca calculations: the PCA coordinates are stored in
+    `adata.obsm`, the feature loadings in `adata.varm`, and the variance decomposition together with the fitted
+    sample and feature names in `adata.uns`.
+    For a PCA of the features instead of the samples, pass the transposed object: ``pca(adata=adata.T)``.
     Uses the implementation of Scanpy, which in turn uses implementation of
     *scikit-learn* :cite:p:`Pedregosa2011`.
 
@@ -216,15 +191,11 @@ def pca(
     layer
         If provided, which element of layers to use for PCA.
         If None, the `.X` attribute of `adata` is used.
-    dim_space
-        The dimension to project PCA on. Can be either "obs" (default) for
-        sample projection or "var" for feature projection.
     embeddings_name
         If provided, this will be used as the key under which to store the PCA results in
         `adata.obsm`, `adata.varm`, and `adata.uns` (see Returns).
-        If None, the default keys will be used:
-        - For `dim_space='obs'`: `X_pca_obs` for PC coordinates, `PCs_pca_obs` for the feature loadings, `variance_pca_obs` for the variance.
-        - For `dim_space='var'`: `X_pca_var` for PC corrdinates, `PCs_pca_var` for the sample loadings, `variance_pca_var` for the variance.
+        If None, the default keys will be used: `X_pca` for PC coordinates, `PCs_pca` for the feature loadings,
+        `variance_pca` for the variance.
         If provided, the keys will be `embeddings_name` for all three data frames.
     n_comps
         Number of principal components to compute. Defaults to 50, or 1 - minimum
@@ -244,27 +215,19 @@ def pca(
     If `copy=True` and an updated `adata` object, else changes anndata object inplace.
 
     Sets the following fields:
-    for `dim_space='obs'` (sample projection):
-    `.obsm['X_pca_obs' | embeddings_name]` : :class:`~scipy.sparse.csr_matrix` | :class:`~scipy.sparse.csc_matrix` | :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
+    `.obsm['X_pca' | embeddings_name]` : :class:`~scipy.sparse.csr_matrix` | :class:`~scipy.sparse.csc_matrix` | :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
         PCA representation of data.
-    `.varm['PCs_pca_obs' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
+    `.varm['PCs_pca' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
         The principal components containing the loadings.
-    `.uns['variance_pca_obs' | embeddings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
+    `.uns['variance_pca' | embeddings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
         Ratio of explained variance.
-    `.uns['variance_pca_obs' | embeddings_name]['variance']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
+    `.uns['variance_pca' | embeddings_name]['variance']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
         Explained variance, equivalent to the eigenvalues of the
         covariance matrix.
-
-    for `dim_space='var'` (sample projection):
-    `.varm['X_pca_var' | embeddings_name]` : :class:`~scipy.sparse.csr_matrix` | :class:`~scipy.sparse.csc_matrix` | :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
-        PCA representation of data.
-    `.obsm['PCs_pca_var' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
-        The principal components containing the loadings.
-    `.uns['variance_pca_var' | embeddings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
-        Ratio of explained variance.
-    `.uns['variance_pca_var' | embeddings_name]['variance']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
-        Explained variance, equivalent to the eigenvalues of the
-        covariance matrix.
+    `.uns['variance_pca' | embeddings_name]['obs_names']` : :class:`~numpy.ndarray` (shape `(adata.n_obs,)`)
+        Samples the PCA was fitted on.
+    `.uns['variance_pca' | embeddings_name]['var_names']` : :class:`~numpy.ndarray` (shape `(n_fitted_vars,)`)
+        Features the PCA was fitted on.
 
     Examples
     --------
@@ -299,50 +262,47 @@ def pca(
             ),
         )
 
-        # Run PCA on feature space using only core proteins
-        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2, dim_space="var")
+        # Run PCA using only core proteins
+        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2)
 
         # The PCA results are now stored in the AnnData object:
-        # adata.varm['X_pca_var'] - PCA coordinates for each protein (5 x 2)
-        # adata.obsm['PCs_pca_var'] - Sample loadings (5 x 2)
-        # adata.uns['variance_pca_var'] - Variance explained by each PC
+        # adata.obsm['X_pca'] - PCA coordinates for each sample (5 x 2)
+        # adata.varm['PCs_pca'] - Feature loadings (5 x 2)
+        # adata.uns['variance_pca'] - Variance explained by each PC and the fitted sample and feature names
 
-        # To get the PCA embedding of proteins in the reduced space:
-        protein_pca_coords = adata.varm["X_pca_var"]
-        # First 4 proteins have coordinates, P5 has NaN (not used in PCA)
+        # To get the PCA embedding of samples in the reduced space:
+        sample_pca_coords = adata.obsm["X_pca"]
 
-        # To project samples into the PC space:
-        sample_loadings = adata.obsm["PCs_pca_var"]
+        # To get the feature loadings:
+        protein_loadings = adata.varm["PCs_pca"]
+        # First 4 proteins have loadings, P5 has NaN (not used in PCA)
 
         # To see variance explained by each component:
-        variance_ratio = adata.uns["variance_pca_var"]["variance_ratio"]
+        variance_ratio = adata.uns["variance_pca"]["variance_ratio"]
 
     """
     adata = adata.copy() if copy else adata
     logger.info("computing PCA")
 
-    _check_inputs_for_dim_reduction(
-        adata=adata, layer=layer, dim_space=dim_space, meta_data_mask_column_name=meta_data_mask_column_name
-    )
+    _check_inputs_for_dim_reduction(adata=adata, layer=layer, meta_data_mask_column_name=meta_data_mask_column_name)
 
-    # Run on array instead of anndata to allow for PCA on variables instead of observations)
+    # Run on array instead of anndata so masked-out features get NaN loadings and results are stored under our keys
     var_mask = (
         cast("Iterable[bool]", adata.var[meta_data_mask_column_name])
         if meta_data_mask_column_name is not None
         else None
     )
-    data_for_pca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask, dim_space=dim_space)
+    data_for_pca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask)
     pca_res = sc.pp.pca(data_for_pca, return_info=True, n_comps=n_comps, copy=False, **pca_kwargs)
 
     adata = _store_pca_results(
         adata=adata,
         pca_res=pca_res,
-        dim_space=dim_space,
         embeddings_name=embeddings_name,
         meta_data_mask_column_name=meta_data_mask_column_name,
-        default_coords_prefix="X_pca",
-        default_loadings_prefix="PCs_pca",
-        default_uns_prefix="variance_pca",
+        default_coords_key="X_pca",
+        default_loadings_key="PCs_pca",
+        default_uns_key="variance_pca",
     )
 
     return adata if copy else None
@@ -381,7 +341,6 @@ def _run_bpca(
 def bpca(
     adata: ad.AnnData,
     layer: str | None = None,
-    dim_space: Literal["obs", "var"] = "obs",
     embeddings_name: str | None = None,
     n_comps: int = 50,
     meta_data_mask_column_name: str | None = None,
@@ -391,15 +350,10 @@ def bpca(
 ) -> None | ad.AnnData:
     """Bayesian Principal Component Analysis
 
-    Bayesian implementation of PCA that explicitly supports missing values. Computes latent space coordinates, loadings and variance decomposition.
-
-    The dimensionality-reduced representation can be computed either for samples (`dim_space="obs"`) or for features (`dim_space="var"`).
-    Depending on the chosen `dim_space`, the BPCA results are stored in different AnnData containers.
-
-    - For BPCA computed in feature space (`dim_space='var'`)
-      The low-dimensional coordinates are stored in `adata.obsm`, the feature loadings in `adata.varm`, and the variance decomposition in `adata.uns`.
-    - For BPCA computed in sample space (`dim_space='obs'`)
-      The coordinates are stored in `adata.varm`, the loadings in `adata.obsm`, and the variance decomposition in `adata.uns`.
+    Bayesian implementation of PCA that explicitly supports missing values. Computes latent space coordinates, loadings and
+    variance decomposition of the observations (samples) in `adata`. The coordinates are stored in `adata.obsm`, the feature
+    loadings in `adata.varm`, and the variance decomposition together with the fitted sample and feature names in `adata.uns`.
+    For a BPCA of the features instead of the samples, pass the transposed object: ``bpca(adata=adata.T)``.
 
     Parameters
     ----------
@@ -409,13 +363,11 @@ def bpca(
     layer
         If provided, which element of layers to use for PCA.
         If None, the `.X` attribute of `adata` is used.
-    dim_space
-        The dimension to project PCA on. Can be either "obs" (default) for
-        sample projection or "var" for feature projection.
     embeddings_name
         If provided, this will be used as the key under which to store the PCA results in
         `adata.obsm`, `adata.varm`, and `adata.uns` (see Returns).
-        If None, the default key `"BPCA"` is used for storing results in `adata.obsm`, `adata.varm`, and `adata.uns`.
+        If None, the default keys will be used: `X_bpca` for the coordinates, `PCs_bpca` for the feature loadings,
+        `variance_bpca` for the variance.
     n_comps
         Number of principal components to compute. Defaults to `min(50, n_obs, n_var)`
     meta_data_mask_column_name
@@ -432,21 +384,16 @@ def bpca(
     If `copy=True` and an updated `adata` object, else changes anndata object inplace.
 
     Sets the following fields:
-    for `dim_space='obs'` (sample projection):
-    `.obsm['BPCA' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
+    `.obsm['X_bpca' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
         BPCA representation of data.
-    `.varm['BPCA' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
+    `.varm['PCs_bpca' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
         The principal components containing the loadings.
-    `.uns['BPCA' | embeddings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
+    `.uns['variance_bpca' | embeddings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
         Ratio of explained variance.
-
-    for `dim_space='var'` (feature projection):
-    `.varm['BPCA' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_obs, n_comps)`)
-        BPCA representation of data.
-    `.obsm['BPCA' | embeddings_name]` : :class:`~numpy.ndarray` (shape `(adata.n_vars, n_comps)`)
-        The principal components containing the loadings.
-    `.uns['BPCA' | embeddings_name]['variance_ratio']` : :class:`~numpy.ndarray` (shape `(n_comps,)`)
-        Ratio of explained variance.
+    `.uns['variance_bpca' | embeddings_name]['obs_names']` : :class:`~numpy.ndarray` (shape `(adata.n_obs,)`)
+        Samples the BPCA was fitted on.
+    `.uns['variance_bpca' | embeddings_name]['var_names']` : :class:`~numpy.ndarray` (shape `(n_fitted_vars,)`)
+        Features the BPCA was fitted on.
 
     Notes
     -----
@@ -488,28 +435,25 @@ def bpca(
     :class:`bpca.BPCA`
     """
     adata = adata.copy() if copy else adata
-    _check_inputs_for_dim_reduction(
-        adata=adata, layer=layer, dim_space=dim_space, meta_data_mask_column_name=meta_data_mask_column_name
-    )
+    _check_inputs_for_dim_reduction(adata=adata, layer=layer, meta_data_mask_column_name=meta_data_mask_column_name)
 
     var_mask = (
         cast("Iterable[bool]", adata.var[meta_data_mask_column_name])
         if meta_data_mask_column_name is not None
         else None
     )
-    data_for_bpca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask, dim_space=dim_space)
+    data_for_bpca = _prepare_pca_data(adata=adata, layer=layer, var_mask=var_mask)
 
     pca_res = _run_bpca(data_for_bpca=data_for_bpca, n_components=n_comps, **bpca_kwargs)
 
     adata = _store_pca_results(
         adata=adata,
         pca_res=pca_res,
-        dim_space=dim_space,
         embeddings_name=embeddings_name,
         meta_data_mask_column_name=meta_data_mask_column_name,
-        default_coords_prefix="X_bpca",
-        default_loadings_prefix="PCs_bpca",
-        default_uns_prefix="variance_bpca",
+        default_coords_key="X_bpca",
+        default_loadings_key="PCs_bpca",
+        default_uns_key="variance_bpca",
     )
 
     return adata if copy else None
