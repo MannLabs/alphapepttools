@@ -19,35 +19,27 @@ logging.basicConfig(level=logging.INFO)
 ## Helper function to validate plots inputs
 
 
-def _validate_adata_and_dim_space(adata: ad.AnnData, dim_space: str) -> None:
-    """Validate that data is an AnnData object and dim_space is either 'obs' or 'var'.
+def _validate_adata(adata: ad.AnnData) -> None:
+    """Validate that data is an AnnData object.
 
     Parameters
     ----------
     adata
         The object to check for AnnData type.
-    dim_space
-        The dimension space, must be 'obs' or 'var'.
 
     Raises
     ------
     TypeError
         If adata is not an AnnData object.
-    ValueError
-        If dim_space is not 'obs' or 'var'.
     """
     if not isinstance(adata, ad.AnnData):
         raise TypeError("data must be an AnnData object")
-
-    if dim_space not in ["obs", "var"]:
-        raise ValueError(f"dim_space must be either 'obs' or 'var', got {dim_space}")
 
 
 def _validate_pca_plot_input(
     adata: ad.AnnData,
     pca_embeddings_layer_name: str,
     pca_var_key: str,
-    dim_space: str,
 ) -> None:
     """Validates the AnnData object for PCA-related data and dimensions.
 
@@ -56,22 +48,17 @@ def _validate_pca_plot_input(
     adata
         AnnData object to be validated.
     pca_embeddings_layer_name
-        Name of the PCA layer to be checked.
+        Name of the PCA layer to be checked, stored in `data.obsm`.
     pca_var_key
         Name of the PCA variance metadata layer to be checked, stored in `data.uns`.
-    dim_space
-        The dimension space used in PCA. Can be either "obs" or "var".
     """
-    _validate_adata_and_dim_space(adata, dim_space)
+    _validate_adata(adata=adata)
 
-    # Determine which attribute to check based on dim_space
-    pca_coors_attr = "obsm" if dim_space == "obs" else "varm"
-
-    # Check if the PCA embeddings layer exists in the correct attribute
-    if pca_embeddings_layer_name not in getattr(adata, pca_coors_attr):
-        available_layers = list(getattr(adata, pca_coors_attr).keys())
+    # Check if the PCA embeddings layer exists in obsm
+    if pca_embeddings_layer_name not in adata.obsm:
+        available_layers = list(adata.obsm.keys())
         raise ValueError(
-            f"PCA embeddings layer '{pca_embeddings_layer_name}' not found in data.{pca_coors_attr}"
+            f"PCA embeddings layer '{pca_embeddings_layer_name}' not found in data.obsm. "
             f"Found layers: {available_layers}"
         )
 
@@ -85,7 +72,6 @@ def _validate_pca_plot_input(
 def _validate_scree_plot_input(
     adata: ad.AnnData,
     n_pcs: int,
-    dim_space: str,
     pca_variance_layer_name: str,
 ) -> None:
     """Validate inputs for scree plot of the PCA dimension.
@@ -96,12 +82,10 @@ def _validate_scree_plot_input(
         The AnnData object containing PCA results.
     n_pcs
         The number of principal components requested for plotting.
-    dim_space
-        The dimension space used in PCA. Can be either "obs" or "var".
     pca_variance_layer_name
         The name of the PCA layer (used to construct the embedding key as `data.uns[pca_name]`).
     """
-    _validate_adata_and_dim_space(adata, dim_space)
+    _validate_adata(adata=adata)
 
     if pca_variance_layer_name not in adata.uns:
         raise ValueError(
@@ -117,7 +101,7 @@ def _validate_scree_plot_input(
 
 
 def _validate_pca_loadings_plot_inputs(
-    adata: ad.AnnData, loadings_name: str, dim: int, dim2: int | None, nfeatures: int, dim_space: str
+    adata: ad.AnnData, loadings_name: str, dim: int, dim2: int | None, nfeatures: int
 ) -> None:
     """Validate inputs for accessing PCA feature loadings from an AnnData object.
 
@@ -126,38 +110,32 @@ def _validate_pca_loadings_plot_inputs(
     adata
         The AnnData object containing PCA loadings data.
     loadings_name
-        The key that stores PCA feature loadings (e.g., "PCs_pca").
+        The key in `adata.varm` that stores PCA feature loadings (e.g., "PCs_pca").
     dim
         The principal component index (1-based) to extract loadings for.
     dim2
         The second principal component index (1-based) to extract loadings for, if applicable.
     nfeatures
         The number of top features to consider for the given component.
-    dim_space
-        The dimension space used in PCA. Can be either "obs" or "var".
     """
-    _validate_adata_and_dim_space(adata, dim_space)
+    _validate_adata(adata=adata)
 
-    # Determine which attribute to check based on dim_space
-    loadings_attr = "varm" if dim_space == "obs" else "obsm"
-
-    # Check if the loadings layer exists in the correct attribute
-    if loadings_name not in getattr(adata, loadings_attr):
-        available_layers = list(getattr(adata, loadings_attr).keys())
+    # Check if the loadings layer exists in varm
+    if loadings_name not in adata.varm:
+        available_layers = list(adata.varm.keys())
         raise ValueError(
-            f"PCA feature loadings layer '{loadings_name}' not found in adata.{loadings_attr} "
-            f"Found layers: {available_layers}"
+            f"PCA feature loadings layer '{loadings_name}' not found in adata.varm. Found layers: {available_layers}"
         )
 
     # Check PC dimensions
-    n_pcs = getattr(adata, loadings_attr)[loadings_name].shape[1]
+    n_pcs = adata.varm[loadings_name].shape[1]
     if not (1 <= dim <= n_pcs):
         raise ValueError(f"PC must be between 1 and {n_pcs} (inclusive). Got {dim=}")
     if dim2 is not None and not (1 <= dim2 <= n_pcs):
         raise ValueError(f"second PC must be between 1 and {n_pcs} (inclusive). Got pc_y={dim2}")
 
     # Check number of features
-    n_features = getattr(adata, loadings_attr)[loadings_name].shape[0]
+    n_features = adata.varm[loadings_name].shape[0]
     if not (1 <= nfeatures <= n_features):
         raise ValueError(f"Number of features must be between 1 and {n_features} (inclusive). Got {nfeatures=}")
 
@@ -205,7 +183,6 @@ def _extract_expression_df(
 
 def extract_pca_anndata(
     adata: ad.AnnData,
-    dim_space: str = "obs",
     embeddings_name: str | None = None,
     method: Literal["pca", "bpca"] = "pca",
     expression_columns: list[str] | None = None,
@@ -216,8 +193,6 @@ def extract_pca_anndata(
     ----------
     adata
         AnnData object containing PCA/BPCA results.
-    dim_space
-        Either "obs" or "var", indicating the PCA/BPCA projection space.
     embeddings_name
         Custom embeddings name or None to use the default naming scheme.
     method
@@ -226,16 +201,12 @@ def extract_pca_anndata(
     expression_columns
         List of `var_names` to include as additional numerical column(s) in
         the returned AnnData's `.obs` for coloring PCA plots by expression.
-        Note that this is only applicable when `dim_space="obs"`, as there's no
-        equivalent in observations when projecting in feature space (`dim_space="var"`).
 
     Returns
     -------
     ad.AnnData
         An AnnData object containing the PCA results.
-        - `.X` stores the PCA embeddings:
-            - shape (observations x components) if `dim_space="obs"`
-            - shape (variables x components) if `dim_space="var"`
+        - `.X` stores the PCA embeddings, shape (observations x components)
         - `.var` contains the PCA variance information
         - `.obs` contains the corresponding metadata, and, if specified,
           additional expression values for coloring plots.
@@ -243,7 +214,7 @@ def extract_pca_anndata(
 
     Examples
     --------
-    Extract PCA projections after running PCA on sample space:
+    Extract PCA projections after running PCA:
 
     .. code-block:: python
 
@@ -269,11 +240,11 @@ def extract_pca_anndata(
             var=pd.DataFrame({"protein": ["P1", "P2", "P3", "P4", "P5"], "is_core": [True, True, True, True, False]}),
         )
 
-        # First run PCA on observation space (samples)
-        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2, dim_space="obs")
+        # First run PCA on the samples
+        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2)
 
         # Extract PCA data for plotting/analysis
-        pca_adata = at.tl.extract_pca_anndata(adata, dim_space="obs")
+        pca_adata = at.tl.extract_pca_anndata(adata)
         display(pca_adata.to_df())  # DataFrame with PC1 and PC2 coordinates for each sample
 
         # The PCA projections are now in pca_adata.X (5 samples x 2 PCs)
@@ -290,32 +261,13 @@ def extract_pca_anndata(
         # Variance explained is in pca_adata.var
         print(pca_adata.var["variance_ratio"])  # Proportion of variance per PC
 
-    Extract PCA projections from feature space with expression data:
-
-    .. code-block:: python
-
-        # Run PCA on feature space (proteins)
-        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2, dim_space="var")
-
-        # Extract PCA data - now proteins are the "observations"
-        pca_adata = at.tl.extract_pca_anndata(adata, dim_space="var")
-
-        # The PCA projections are now in pca_adata.X (5 proteins x 2 PCs)
-        print(pca_adata.X.shape)  # (5, 2)
-
-        # Protein metadata is in pca_adata.obs (proteins are "observations" when dim_space="var")
-        print(pca_adata.obs["protein"])  # ['P1', 'P2', 'P3', 'P4', 'P5']
-
-        # Note: P5 will have NaN coordinates since it wasn't included in PCA (is_core=False)
-
     Include expression values for plotting:
 
     .. code-block:: python
 
-        # When extracting sample PCA, include protein expression for coloring
+        # Include protein expression for coloring
         pca_adata = at.tl.extract_pca_anndata(
             adata,
-            dim_space="obs",
             expression_columns=["P1", "P2"],  # Include P1 and P2 expression values
         )
 
@@ -327,28 +279,23 @@ def extract_pca_anndata(
 
     """
     # Resolve PCA keys
-    pca_coors_key = f"X_{method}_{dim_space}" if embeddings_name is None else embeddings_name
-    pca_var_key = f"variance_{method}_{dim_space}" if embeddings_name is None else embeddings_name
+    pca_coors_key = f"X_{method}" if embeddings_name is None else embeddings_name
+    pca_var_key = f"variance_{method}" if embeddings_name is None else embeddings_name
 
     # Validate inputs
-    _validate_pca_plot_input(adata, pca_coors_key, pca_var_key, dim_space)
+    _validate_pca_plot_input(adata=adata, pca_embeddings_layer_name=pca_coors_key, pca_var_key=pca_var_key)
 
     # Select PCA coordinates and metadata
-    if dim_space == "obs":
-        pca_coordinates = adata.obsm[pca_coors_key]
-        obs_df = adata.obs
+    pca_coordinates = adata.obsm[pca_coors_key]
+    obs_df = adata.obs
 
-        # Add expression columns if provided
-        if expression_columns is not None:
-            expr_data = _extract_expression_df(
-                adata=adata,
-                names=expression_columns,
-            )
-            obs_df = obs_df.join(expr_data)
-
-    else:  # dim_space == "var":
-        pca_coordinates = adata.varm[pca_coors_key]
-        obs_df = adata.var
+    # Add expression columns if provided
+    if expression_columns is not None:
+        expr_data = _extract_expression_df(
+            adata=adata,
+            names=expression_columns,
+        )
+        obs_df = obs_df.join(expr_data)
 
     # the uns entry also holds the fitted obs/var names, which are not per-component
     pca_variance = adata.uns[pca_var_key]
@@ -368,7 +315,6 @@ def extract_pca_anndata(
 def prepare_scree_data_to_plot(
     adata: ad.AnnData,
     n_pcs: int,
-    dim_space: str,
     embeddings_name: str | None = None,
     method: Literal["pca", "bpca"] = "pca",
 ) -> pd.DataFrame:
@@ -380,8 +326,6 @@ def prepare_scree_data_to_plot(
         AnnData object containing PCA results.
     n_pcs
         Number of principal components to include.
-    dim_space
-        The dimension space used in PCA. Can be either "obs" or "var".
     embeddings_name
         Custom embeddings name or None for default.
     method
@@ -421,11 +365,11 @@ def prepare_scree_data_to_plot(
             var=pd.DataFrame({"protein": ["P1", "P2", "P3", "P4", "P5"], "is_core": [True, True, True, True, False]}),
         )
 
-        # Run PCA on observation space (samples)
-        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2, dim_space="obs")
+        # Run PCA on the samples
+        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2)
 
         # Prepare scree plot data
-        scree_data = at.tl.prepare_scree_data_to_plot(adata, n_pcs=2, dim_space="obs")
+        scree_data = at.tl.prepare_scree_data_to_plot(adata, n_pcs=2)
         display(scree_data)
 
         # DataFrame contains:
@@ -435,10 +379,10 @@ def prepare_scree_data_to_plot(
 
     """
     # Generate the correct variance key name
-    variance_key = f"variance_{method}_{dim_space}" if embeddings_name is None else embeddings_name
+    variance_key = f"variance_{method}" if embeddings_name is None else embeddings_name
 
     # Input checks
-    _validate_scree_plot_input(adata, n_pcs, dim_space, variance_key)
+    _validate_scree_plot_input(adata=adata, n_pcs=n_pcs, pca_variance_layer_name=variance_key)
 
     n_pcs_avail = len(adata.uns[variance_key]["variance_ratio"])
     n_pcs = min(n_pcs, n_pcs_avail)
@@ -456,7 +400,6 @@ def prepare_scree_data_to_plot(
 
 def prepare_pca_1d_loadings_data_to_plot(
     data: ad.AnnData,
-    dim_space: str,
     dim: int,
     nfeatures: int,
     embeddings_name: str | None = None,
@@ -468,8 +411,6 @@ def prepare_pca_1d_loadings_data_to_plot(
     ----------
     data
         AnnData to plot.
-    dim_space
-        The dimension space used in PCA. Can be either "obs" (default) for sample projection or "var" for feature projection.
     dim
         The PC number from which to get loadings (1-indexed, i.e. the first PC is 1, not 0).
     nfeatures
@@ -513,13 +454,12 @@ def prepare_pca_1d_loadings_data_to_plot(
             var=pd.DataFrame({"protein": ["P1", "P2", "P3", "P4", "P5"], "is_core": [True, True, True, True, False]}),
         )
 
-        # Run PCA on observation space
-        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2, dim_space="obs")
+        # Run PCA on the samples
+        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2)
 
         # Get top 3 protein loadings for PC1
         loadings_df = at.tl.prepare_pca_1d_loadings_data_to_plot(
             adata,
-            dim_space="obs",  # Since PCA was on obs, loadings are in varm
             dim=1,  # PC1
             nfeatures=3,  # Top 3 proteins
         )
@@ -533,25 +473,15 @@ def prepare_pca_1d_loadings_data_to_plot(
 
     """
     # Generate the correct loadings key name
-    loadings_key = f"PCs_{method}_{dim_space}" if embeddings_name is None else embeddings_name
+    loadings_key = f"PCs_{method}" if embeddings_name is None else embeddings_name
 
-    # Determine which attribute to use for loadings based on dim_space
-    loadings_attr = "varm" if dim_space == "obs" else "obsm"
-
-    _validate_pca_loadings_plot_inputs(
-        adata=data, loadings_name=loadings_key, dim=dim, dim2=None, nfeatures=nfeatures, dim_space=dim_space
-    )
+    _validate_pca_loadings_plot_inputs(adata=data, loadings_name=loadings_key, dim=dim, dim2=None, nfeatures=nfeatures)
 
     # create the dataframe for plotting
     dim_z = dim - 1  # to account from 0 indexing
-    loadings_matrix = getattr(data, loadings_attr)[loadings_key]
+    loadings_matrix = data.varm[loadings_key]
     loadings_df = pd.DataFrame({"dim_loadings": loadings_matrix[:, dim_z]})
-
-    # Use appropriate index for features based on dim_space
-    if dim_space == "obs":
-        loadings_df["feature"] = data.var.index.astype("string")
-    else:  # dim_space == "var"
-        loadings_df["feature"] = data.obs.index.astype("string")
+    loadings_df["feature"] = data.var.index.astype("string")
 
     loadings_df["abs_loadings"] = loadings_df["dim_loadings"].abs()
     # Sort the DataFrame by absolute loadings and select the top features
@@ -567,7 +497,6 @@ def prepare_pca_2d_loadings_data_to_plot(
     pc_x: int,
     pc_y: int,
     nfeatures: int,
-    dim_space: str,
     embeddings_name: str | None = None,
     method: Literal["pca", "bpca"] = "pca",
 ) -> pd.DataFrame:
@@ -581,19 +510,17 @@ def prepare_pca_2d_loadings_data_to_plot(
     ----------
     data
         The AnnData object containing PCA results.
-    embiddings_name
-        The custom embeddings name used in PCA. If None, uses default naming convention.
-    method
-        The method used for dimensionality reduction. Options are "pca" or "bpca" with "pca" as the default.
-        This is used to construct the default keys if `embeddings_name` is None.
     pc_x
         The first principal component index (1-based) to extract loadings for.
     pc_y
         The second principal component index (1-based) to extract loadings for.
     nfeatures
         Number of top features per PC to highlight based on absolute loadings.
-    dim_space
-        The dimension space used in PCA. Can be either "obs" or "var".
+    embeddings_name
+        The custom embeddings name used in PCA. If None, uses default naming convention.
+    method
+        The method used for dimensionality reduction. Options are "pca" or "bpca" with "pca" as the default.
+        This is used to construct the default keys if `embeddings_name` is None.
 
     Returns
     -------
@@ -629,8 +556,8 @@ def prepare_pca_2d_loadings_data_to_plot(
             var=pd.DataFrame({"protein": ["P1", "P2", "P3", "P4", "P5"], "is_core": [True, True, True, True, False]}),
         )
 
-        # Run PCA on observation space
-        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2, dim_space="obs")
+        # Run PCA on the samples
+        at.tl.pca(adata, meta_data_mask_column_name="is_core", n_comps=2)
 
         # Get loadings for PC1 vs PC2 with top 2 features highlighted
         loadings_2d = at.tl.prepare_pca_2d_loadings_data_to_plot(
@@ -638,7 +565,6 @@ def prepare_pca_2d_loadings_data_to_plot(
             pc_x=1,  # PC1
             pc_y=2,  # PC2
             nfeatures=2,  # Top 2 features per PC
-            dim_space="obs",
         )
         display(loadings_2d)
 
@@ -650,18 +576,14 @@ def prepare_pca_2d_loadings_data_to_plot(
         # - is_top: Boolean flag for top features in either dimension
 
     """
-    loadings_key = f"PCs_{method}_{dim_space}" if embeddings_name is None else embeddings_name
+    loadings_key = f"PCs_{method}" if embeddings_name is None else embeddings_name
 
-    _validate_pca_loadings_plot_inputs(
-        adata=data, loadings_name=loadings_key, dim=pc_x, dim2=pc_y, nfeatures=nfeatures, dim_space=dim_space
-    )
+    _validate_pca_loadings_plot_inputs(adata=data, loadings_name=loadings_key, dim=pc_x, dim2=pc_y, nfeatures=nfeatures)
 
     dim1_z = pc_x - 1  # convert to 0-based index
     dim2_z = pc_y - 1  # convert to 0-based index
 
-    # Determine which attribute to use based on dim_space
-    loadings_attr = "varm" if dim_space == "obs" else "obsm"
-    orig_loadings = getattr(data, loadings_attr)[loadings_key]
+    orig_loadings = data.varm[loadings_key]
 
     loadings = pd.DataFrame(
         {
@@ -669,12 +591,7 @@ def prepare_pca_2d_loadings_data_to_plot(
             "dim2_loadings": orig_loadings[:, dim2_z],
         }
     )
-
-    # Add feature names based on dim_space
-    if dim_space == "obs":
-        loadings["feature"] = data.var_names
-    else:  # dim_space == "var"
-        loadings["feature"] = data.obs_names
+    loadings["feature"] = data.var_names
 
     # get only features that were used in the PCA (e.g., those that are part of the core proteome)
     # these would be features with all-NaN loadings in all PC dimensions
