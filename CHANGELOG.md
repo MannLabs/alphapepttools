@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning][].
 ### Changed
 
 - `tl.pca` and `tl.bpca` always compute the projection of the observations (samples). For a projection of the features, pass the transposed object: `tl.pca(adata=adata.T)`
+- The `meta_data_mask_column_name` parameter of `tl.pca` and `tl.bpca` is renamed to `feature_mask_column`
 - The default result keys lost their `_obs` suffix: `X_pca`, `PCs_pca`, `variance_pca` and `X_bpca`, `PCs_bpca`, `variance_bpca`. The defaults of `metrics.principal_component_regression` follow. Objects saved with the old keys need PCA to be re-run before plotting
 
 ### Removed
