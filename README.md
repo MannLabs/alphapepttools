@@ -39,7 +39,7 @@ in particular, the [API documentation][].
 
 ## Installation
 
-You need to have Python 3.11 or newer installed on your system.
+You need to have Python 3.11 or newer installed on your system (Linus/MacOS/Windows).
 If you don't have Python installed, we recommend installing [Mambaforge][].
 
 There are several alternative options to install alphapepttools:
@@ -57,6 +57,9 @@ As the package is still under development, consider installing the latest develo
 ```bash
 pip install git+https://github.com/MannLabs/alphapepttools.git@main
 ```
+
+For a full list of dependencies, see the dependencies section in the [pyproject.toml](pyproject.toml).
+Installation should take less than 5 minutes.
 
 ### Installation extras
 
