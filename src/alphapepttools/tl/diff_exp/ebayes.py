@@ -316,13 +316,22 @@ def _run_contrasts(
     M_cond = M_all[:, cond_idxs, :][:, :, cond_idxs]  # (P, n_conditions, n_conditions)
 
     C = contrast_matrix.to_numpy()  # (n_contrasts, n_conditions)
-    log2fc = C @ B_cond  # (n_contrasts, P)
+
+    # When computing contrast * coefficient in C @ B_cond with NaN coefficients, cases can arise where
+    # all contrasts involving a NaN coefficient are set to NaN, even if their coefficient is valid.
+    # The solution is to zero-fill the NaN coefficients and to set only those contrasts back to NaN
+    # whose non-zero weights meet a NaN coefficient, i.e. the ones that are actually inestimable.
+    contrast_meets_nan = (C != 0) @ np.isnan(B_cond)  # (n_contrasts, P)
+    estimable = contrast_meets_nan == 0
+
+    log2fc = C @ np.nan_to_num(B_cond, nan=0.0)  # (n_contrasts, P)
 
     # unscaled variance: per-precursor quadratic form C[c] @ M_cond[j] @ C[c].
     # einsum collapses the (feature, contrast) loops into one vectorized call.
-    # NaN propagation matches the explicit loop: 0 * nan = nan, so any contrast
-    # touching a dropped condition column still yields nan.
-    unscaled_var = np.einsum("ca,jab,cb->cj", C, M_cond, C)  # (n_contrasts, P)
+    unscaled_var = np.einsum("ca,jab,cb->cj", C, np.nan_to_num(M_cond, nan=0.0), C)  # (n_contrasts, P)
+
+    log2fc[~estimable] = np.nan
+    unscaled_var[~estimable] = np.nan
 
     stdev_unscaled = np.sqrt(unscaled_var)  # (n_contrasts, P)
     return {"log2fc": log2fc, "unscaled_var": unscaled_var, "stdev_unscaled": stdev_unscaled}

@@ -1140,6 +1140,29 @@ def test__run_contrasts_log2fc_correct_under_interspersed_order(interspersed_ada
     np.testing.assert_allclose(log2fc_by_name["C_VS_A"], 20.0)
 
 
+def test__run_contrasts_dead_condition_only_nulls_its_own_contrast(interspersed_adata):
+    """A condition with no fitted coefficient NaNs only the contrasts that involve it.
+
+    The B_VS_A contrast weights C with a zero; that zero must not let C's NaN coefficient
+    (0 * nan = nan) leak into an otherwise complete contrast.
+    """
+    design_matrix, col_info = _build_design_matrix(interspersed_adata, "group")
+    fit = _nan_lmfit(interspersed_adata, design_matrix)
+    cm = _make_contrasts(interspersed_adata, between_column="group", control_condition="A", control_is=-1)
+    out = _run_contrasts(cm, B=fit["B"], M_all=fit["M_all"], col_info=col_info)
+    names = _contrasts_from_matrix(cm, control_condition="A")
+
+    j_miss = list(interspersed_adata.var_names).index("C_missing")
+    i_b, i_c = names.index("B_VS_A"), names.index("C_VS_A")
+
+    # B and A are fully observed for C_missing: B - A = 10 with a finite variance.
+    np.testing.assert_allclose(out["log2fc"][i_b, j_miss], 10.0)
+    assert np.isfinite(out["unscaled_var"][i_b, j_miss])
+    # C is entirely unobserved, so C - A is inestimable.
+    assert np.isnan(out["log2fc"][i_c, j_miss])
+    assert np.isnan(out["unscaled_var"][i_c, j_miss])
+
+
 # Bit of finageling to skip the need for inmoose in this test, which we would need if we ran the entire
 # pipeline of tl.diff_exp_ebayes. Instead, we mock the fit and contrast step and check the correct ordering
 # of the results by name, which is what we are guarding against.
