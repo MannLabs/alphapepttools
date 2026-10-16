@@ -657,10 +657,12 @@ def _inmoose_limma_reference(adata, between_column, comparison):
     shared between the two paths (`_ebayes_moderation` calls `limma.eBayes`), so it is not what is
     under test here.
 
-    Requires complete (NaN-free) data, which is why callers pre-filter with
-    `filter_data_completeness`. Imports are function-local: patsy only reaches the environment
-    transitively via inmoose, so a module-level import would break collection of this whole file in
-    the non-`full` CI legs. Every caller is gated on `_HAS_INMOOSE`.
+    inmoose raises `LinAlgError` once a feature has no observation left in a design column, and
+    an all-NaN feature turns its `adj_pvalue` column NaN for every feature. Callers pre-filter
+    with `filter_data_completeness` to give both paths the same feature set. Imports are
+    function-local: patsy only reaches the environment transitively via inmoose, so a module-level
+    import would break collection of this whole file in the non-`full` CI legs. Every caller is
+    gated on `_HAS_INMOOSE`.
 
     Returns
     -------
@@ -713,9 +715,9 @@ def test_diff_exp_ebayes_matches_inmoose_limma_reference(
 ):
     """diff_exp_ebayes reproduces a direct inmoose.limma chain on complete data.
 
-    diff_exp_ebayes fits every feature whereas the limma chain cannot handle NaNs at all, so we
-    filter incomplete features upfront (the intended workflow) to give both paths the same feature
-    set and therefore the same eBayes variance prior. The moderated statistics must then agree to
+    The limma chain does not tolerate features with unobserved conditions, so we filter
+    incomplete features upfront (the intended workflow) to give both paths the same feature set
+    and therefore the same eBayes variance prior. The moderated statistics must then agree to
     numerical precision.
     """
     adata = filter_data_completeness(example_adata_ebayes.copy(), max_missing_count=0, action="drop")
