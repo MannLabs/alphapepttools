@@ -4,6 +4,8 @@ import anndata as ad
 import numpy as np
 import scanpy
 
+from alphapepttools._utils import get_matrix
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -50,7 +52,8 @@ def coerce_nans_to_batch(
 
     if adata.obs[batch].isna().sum() > 0:
         logger.info(f" coerce_nans_to_batch: Replacing NaNs in {batch} with 'NA'...")
-        adata.obs[batch] = adata.obs[batch].fillna("NA")
+        # Categorical columns reject fill values that are not among their categories
+        adata.obs[batch] = adata.obs[batch].astype(object).fillna("NA")
     else:
         logger.info(f" No NaNs found in {batch}.")
 
@@ -115,7 +118,7 @@ def drop_singleton_batches(
 
 
 def scanpy_pycombat(
-    adata: ad.AnnData, batch: str, covariates: None | list[str] = None, layer: str | None = None, *, copy: bool = False
+    adata: ad.AnnData, batch: str, covariates: list[str] | None = None, layer: str | None = None, *, copy: bool = False
 ) -> ad.AnnData | None:
     """Correct batch effects using the ComBat method :cite:`Johnson.2007`.
 
@@ -132,11 +135,12 @@ def scanpy_pycombat(
         cannot contain NaN values
     batch
         Name of the batch feature in obs, the variation associated with this feature will be corrected.
-        Missing values in this column will be replaced by one single "NA" batch
+        Missing values in this column are treated as one single "NA" batch.
     covariates
         Columns in `adata.obs` indicating biological variation. Variation associated with these columns will be retained.
     layer
-        Name of the layer to batch correct. If None (default), the attribute adata.X is used
+        Name of the layer to batch correct. The corrected values overwrite this layer.
+        If None (default), adata.X is corrected
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
@@ -178,35 +182,35 @@ def scanpy_pycombat(
     .. [2] Wolf, F. A., Angerer, P., & Theis, F. J. (2018). SCANPY: large-scale single-cell gene expression data analysis. Genome biology, 19(1), 15. https://doi.org/10.1186/s13059-017-1382-0
     """
     adata = adata.copy() if copy else adata
-    logger.info(f" scanpy_pycombat: pply pyComBat to correct for {batch}")
-
-    # Ensure that X is numeric
-    adata.X = adata.X.astype(float)
-
-    # Harmonize NA values in the batch column into a single "NA" batch
-    if any(adata.obs[batch].isna()):
-        logger.info(f" scanpy_pycombat: Found NaNs in {batch}, coercing them into a 'NA' batch...")
-        adata = coerce_nans_to_batch(adata, batch)
-
+    logger.info(f" scanpy_pycombat: Apply pyComBat to correct for {batch}")
+    data = get_matrix(adata, layer=layer)
     # NaN check: if any nans are present in the data, batch correction cannot be performed
-    if any(np.isnan(adata.X).sum(axis=1) > 0):
+    if np.isnan(data).any():
         logger.warning(
-            " scanpy_pycombat: Error in batch correction: Data matrix contains NaN values. This causes scanpy.pp.combat to fail and return all nans, therefore batch correction can not be performed. Consider running 'impute_gaussian' or another imputation prior to batch correction to remove these samples."
+            " scanpy_pycombat: Error in batch correction: Data matrix contains NaN values. This causes scanpy.pp.combat to fail and return all nans, therefore batch correction can not be performed. Consider running 'impute_gaussian' or another imputation prior to batch correction to remove the missing values."
         )
         raise ValueError(" scanpy_pycombat: Data matrix contains NaN values.")
+
+    # scanpy.pp.combat only operates on .X and casts obs[batch] to categorical, so it runs on a minimal
+    # proxy holding the target matrix as .X. This keeps all side effects off the caller's object.
+    proxy = ad.AnnData(X=data, obs=adata.obs[[batch, *(covariates or [])]].copy())
+
+    # Harmonize NA values in the batch column into a single "NA" batch
+    if proxy.obs[batch].isna().any():
+        logger.info(f" scanpy_pycombat: Found NaNs in {batch}, coercing them into a 'NA' batch...")
+        proxy = coerce_nans_to_batch(proxy, batch)
 
     # Batch correct; apparently pyCombat from scanpy sets everything to nan if there is a batch that contains only one cell
     # i.e. if a sample only occurs once per plate, everything fails and we get all nans
     # this is a known issue, but it is not clear how to fix it https://github.com/scverse/scanpy/issues/1175
     # for now, we will just catch the error and report it.
-    if any(adata.obs[batch].value_counts() == 1):
+    if (proxy.obs[batch].value_counts() == 1).any():
         logger.warning(
             f" scanpy_pycombat: Error in batch correction: At least one batch of {batch} contains only one single sample. This causes scanpy.pp.combat to fail and return all nans, therefore batch correction can not be performed. Consider running 'drop_singleton_batches' prior to batch correction to remove these samples."
         )
         raise ValueError(" scanpy_pycombat: At least one batch contains only one single sample.")
 
-    # Adjust to scanpy API
-    batch_corrected_result = scanpy.pp.combat(adata, key=batch, covariates=covariates, inplace=False)
+    batch_corrected_result = scanpy.pp.combat(proxy, key=batch, covariates=covariates, inplace=False)
 
     if layer is None:
         adata.X = batch_corrected_result
