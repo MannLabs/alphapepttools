@@ -39,7 +39,7 @@ in particular, the [API documentation][].
 
 ## Installation
 
-You need to have Python 3.11 or newer installed on your system (Linus/MacOS/Windows).
+You need to have Python 3.11 or newer installed on your system (Linux/MacOS/Windows).
 If you don't have Python installed, we recommend installing [Mambaforge][].
 
 There are several alternative options to install alphapepttools:
