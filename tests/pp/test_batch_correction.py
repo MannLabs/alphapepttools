@@ -74,7 +74,7 @@ def _expected_combat(adata: ad.AnnData, batch: str, covariates: list[str] | None
     return expected
 
 
-@pytest.mark.parametrize("copy", [False, True])
+@pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("layer", [None, "new_layer"])
 @pytest.mark.parametrize("covariates", [None])
 @pytest.mark.parametrize(
@@ -87,7 +87,7 @@ def _expected_combat(adata: ad.AnnData, batch: str, covariates: list[str] | None
     ],
 )
 def test_scanpy_pycombat(
-    datatype, pycombat_test_data_simple, pycombat_test_data_complex, covariates, layer: str | None, *, copy: bool
+    datatype, pycombat_test_data_simple, pycombat_test_data_complex, covariates, layer: str, *, inplace: bool
 ):
     """
     Test the scanpy_pycombat function with various scenarios.
@@ -99,7 +99,7 @@ def test_scanpy_pycombat(
         df, md = pycombat_test_data_complex
 
     adata = ad.AnnData(df, obs=md)
-    adata = impute_gaussian(adata, copy=True)
+    adata = impute_gaussian(adata, inplace=False)
     adata = drop_singleton_batches(adata, batch="batch")
     # Layer must differ from X, otherwise correcting the wrong matrix goes unnoticed
     adata.layers["new_layer"] = adata.X * 2 + 3
@@ -108,8 +108,10 @@ def test_scanpy_pycombat(
     expected = _expected_combat(original, batch="batch", covariates=covariates, layer=layer)
 
     result = scanpy_pycombat(adata, batch="batch", covariates=covariates, layer=layer, copy=copy)
+    # Get comparison data from wrapper
+    result = scanpy_pycombat(adata, batch="batch", covariates=covariates, layer=layer, inplace=inplace)
 
-    if copy:
+    if not inplace:
         assert isinstance(result, ad.AnnData)
         assert_adata_equal(adata, original)
         adata = result

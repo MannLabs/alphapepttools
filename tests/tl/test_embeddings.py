@@ -54,7 +54,7 @@ def test_pca__default(toy_adata):
 
 def test_pca__copy(toy_adata) -> None:
     """Test the pca function correctly handles copy behaviour."""
-    new_adata = apt.tl.pca(toy_adata, n_comps=5, copy=True)
+    new_adata = apt.tl.pca(toy_adata, n_comps=5, inplace=False)
 
     # Check that original data was not modified
     assert "X_pca_obs" not in toy_adata.obsm
@@ -207,7 +207,7 @@ def test_bpca__default(toy_adata):
 
 def test_bpca__copy(toy_adata) -> None:
     """Test the bpca function correctly handles copy behaviour."""
-    new_adata = apt.tl.bpca(toy_adata, n_comps=5, copy=True)
+    new_adata = apt.tl.bpca(toy_adata, n_comps=5, inplace=False)
 
     # Make sure that original adata was not modified
     assert "X_bpca_obs" not in toy_adata.obsm
