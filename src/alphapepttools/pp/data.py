@@ -505,7 +505,6 @@ def _handle_overlapping_columns(
         overlapping_fields,
         axis=1,
         errors="ignore",
-        inplace=False,
     )
 
 
