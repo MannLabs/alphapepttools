@@ -4,6 +4,8 @@ import anndata as ad
 import numpy as np
 import scanpy
 
+from alphapepttools._decorator import deprecated_copy
+
 from alphapepttools._utils import get_matrix
 
 logging.basicConfig(level=logging.INFO)
@@ -117,8 +119,15 @@ def drop_singleton_batches(
     return adata
 
 
+@deprecated_copy(since="0.5.0", removed_in="0.6.0")
 def scanpy_pycombat(
-    adata: ad.AnnData, batch: str, covariates: list[str] | None = None, layer: str | None = None, *, copy: bool = False
+    adata: ad.AnnData,
+    batch: str,
+    covariates: list[str] | None = None,
+    layer: str | None = None,
+    *,
+    inplace: bool = True,
+    copy: bool | None = None,
 ) -> ad.AnnData | None:
     """Correct batch effects using the ComBat method :cite:`Johnson.2007`.
 
@@ -141,6 +150,9 @@ def scanpy_pycombat(
     layer
         Name of the layer to batch correct. The corrected values overwrite this layer.
         If None (default), adata.X is corrected
+    inplace
+        If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
+        of `adata`.
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
@@ -148,7 +160,7 @@ def scanpy_pycombat(
     Returns
     -------
     AnnData with batch correction applied to layer.
-    If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
+    If `inplace=True` modifies the anndata object at layer inplace and returns None. If `inplace=False`,
     returns a modified copy
 
     Examples
@@ -181,7 +193,8 @@ def scanpy_pycombat(
     .. [1] Johnson, W. E., Li, C., & Rabinovic, A. (2007). Adjusting batch effects in microarray expression data using empirical Bayes methods. Biostatistics (Oxford, England), 8(1), 118-127. https://doi.org/10.1093/biostatistics/kxj037
     .. [2] Wolf, F. A., Angerer, P., & Theis, F. J. (2018). SCANPY: large-scale single-cell gene expression data analysis. Genome biology, 19(1), 15. https://doi.org/10.1186/s13059-017-1382-0
     """
-    adata = adata.copy() if copy else adata
+    adata = adata if inplace else adata.copy()
+
     logger.info(f" scanpy_pycombat: Apply pyComBat to correct for {batch}")
     data = get_matrix(adata, layer=layer)
     # NaN check: if any nans are present in the data, batch correction cannot be performed
@@ -217,4 +230,4 @@ def scanpy_pycombat(
     else:
         adata.layers[layer] = batch_corrected_result
 
-    return adata if copy else None
+    return None if inplace else adata

@@ -9,6 +9,7 @@ import pandas as pd
 from bpca import BPCA
 from sklearn.impute import KNNImputer
 
+from alphapepttools._decorator import deprecated_copy
 from alphapepttools._utils import get_matrix
 
 from ._utils import _is_data_complete, _raise_on_nan_values
@@ -70,6 +71,7 @@ def _impute_gaussian(
     return data
 
 
+@deprecated_copy(since="0.5.0", removed_in="0.6.0")
 def impute_gaussian(
     adata: ad.AnnData,
     group_column: str | None = None,
@@ -78,7 +80,8 @@ def impute_gaussian(
     std_factor: float = 0.3,
     random_state: int = 42,
     *,
-    copy: bool = False,
+    inplace: bool = True,
+    copy: bool | None = None,
 ) -> ad.AnnData | None:
     """Impute missing values in each column by random sampling from a gaussian distribution.
 
@@ -107,16 +110,18 @@ def impute_gaussian(
         get the standard deviation of the gaussian distribution.
     random_state
         Random seed for reproducibility
+    inplace
+        If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
+        of `adata`.
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
 
     Returns
     -------
-    None | anndata.AnnData
-        AnnData object with imputed values in layer.
-        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
-        returns a modified copy.
+    AnnData object with imputed values in layer.
+    If `inplace=True` modifies the anndata object at layer inplace and returns None.
+    If `inplace=False`, returns a modified copy.
 
     Raises
     ------
@@ -153,7 +158,7 @@ def impute_gaussian(
         adata = at.pp.impute_gaussian(adata, group_column="cell_type")
         # Imputes group-wise gaussian distributions
     """
-    adata = adata.copy() if copy else adata
+    adata = adata if inplace else adata.copy()
 
     data = get_matrix(adata, layer)
 
@@ -180,7 +185,7 @@ def impute_gaussian(
     else:
         adata.layers[layer] = data
 
-    return adata if copy else None
+    return None if inplace else adata
 
 
 def _impute_nanmedian(data: np.ndarray) -> np.ndarray:
@@ -198,8 +203,14 @@ def _impute_nanmedian(data: np.ndarray) -> np.ndarray:
     return np.where(np.isnan(data), np.nanmedian(data, axis=0), data)
 
 
+@deprecated_copy(since="0.5.0", removed_in="0.6.0")
 def impute_median(
-    adata: ad.AnnData, group_column: str | None = None, layer: str | None = None, *, copy: bool = False
+    adata: ad.AnnData,
+    group_column: str | None = None,
+    layer: str | None = None,
+    *,
+    inplace: bool = True,
+    copy: bool | None = None,
 ) -> ad.AnnData | None:
     """Impute missing values using median imputation
 
@@ -220,14 +231,18 @@ def impute_median(
         If specified, computes median separately for each group and imputes
         missing values using the group-specific median.
         If `group_column` contains NaNs, the respective observations are ignored.
+    inplace
+        If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
+        of `adata`.
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
 
     Returns
     -------
-    :class:`ad.AnnData`
-        Copy of anndata object with modified layer
+    AnnData object with imputed values in layer.
+    If `inplace=True` modifies the anndata object at layer inplace and returns None.
+    If `inplace=False`, returns a modified copy.
 
     Raises
     ------
@@ -264,7 +279,7 @@ def impute_median(
         adata = at.pp.impute_median(adata, group_column="cell_type")
         # Imputes group-wise medians
     """
-    adata = adata.copy() if copy else adata
+    adata = adata if inplace else adata.copy()
 
     data = get_matrix(adata, layer)
 
@@ -289,7 +304,7 @@ def impute_median(
     else:
         adata.layers[layer] = data
 
-    return adata if copy else None
+    return None if inplace else adata
 
 
 def _impute_knn(data: np.ndarray, **kwargs) -> np.ndarray:
@@ -339,6 +354,7 @@ def _validate_knn_grouping(groups: dict, n_neighbors: int) -> None:
         raise ValueError("Number of members per group must be greater equal number of `n_neighbors` for all groups.")
 
 
+@deprecated_copy(since="0.5.0", removed_in="0.6.0")
 def impute_knn(
     adata: ad.AnnData,
     group_column: str | None = None,
@@ -346,7 +362,8 @@ def impute_knn(
     n_neighbors: int = 2,
     weights: Literal["distance", "uniform"] = "distance",
     *,
-    copy: bool = False,
+    inplace: bool = True,
+    copy: bool | None = None,
     **kwargs,
 ) -> ad.AnnData | None:
     """Impute missing values using median imputation
@@ -372,6 +389,9 @@ def impute_knn(
         Weighting strategy for kNN imputation.
             - uniform: All k-nearest neighbors are weighted equally for feature imputation
             - distance: The k-nearest neighbors are weighted based on their inverse distance to the imputed observation
+    inplace
+        If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
+        of `adata`.
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
@@ -380,10 +400,9 @@ def impute_knn(
 
     Returns
     -------
-    None | anndata.AnnData
-        AnnData object with imputed values in layer.
-        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
-        returns a modified copy.
+    AnnData object with imputed values in layer.
+    If `inplace=True` modifies the anndata object at layer inplace and returns None.
+    If `inplace=False`, returns a modified copy.
 
     Raises
     ------
@@ -425,7 +444,7 @@ def impute_knn(
         adata = at.pp.impute_knn(adata, group_column="cell_type")
         # Group-wise imputation
     """
-    adata = adata.copy() if copy else adata
+    adata = adata if inplace else adata.copy()
 
     data = get_matrix(adata, layer)
 
@@ -446,7 +465,7 @@ def impute_knn(
     else:
         adata.layers[layer] = data
 
-    return adata if copy else None
+    return None if inplace else adata
 
 
 def _impute_bpca(data: np.ndarray, n_components: int, **kwargs) -> np.ndarray:
@@ -471,13 +490,15 @@ def _impute_bpca(data: np.ndarray, n_components: int, **kwargs) -> np.ndarray:
     return np.where(np.isnan(data), X_reconstructed, data)
 
 
+@deprecated_copy(since="0.5.0", removed_in="0.6.0")
 def impute_bpca(
     adata: ad.AnnData,
     *,
     n_components: int = 50,
     layer: str | None = None,
     group_column: str | None = None,
-    copy: bool = False,
+    inplace: bool = True,
+    copy: bool | None = None,
     **kwargs,
 ) -> ad.AnnData | None:
     r"""Impute missing values using Bayesian Principal Component Analysis (BPCA)
@@ -508,6 +529,9 @@ def impute_bpca(
             - `None` (default, recommended), imputes all samples.
             - `str` Computes median separately for each group
         If `group_column` contains NaNs, the respective observations are ignored.
+    inplace
+        If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
+        of `adata`.
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
@@ -516,10 +540,9 @@ def impute_bpca(
 
     Returns
     -------
-    None | anndata.AnnData
-        AnnData object with imputed values in layer.
-        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
-        returns a modified copy.
+    AnnData object with imputed values in layer.
+    If `inplace=True` modifies the anndata object at layer inplace and returns None.
+    If `inplace=False`, returns a modified copy.
 
     Raises
     ------
@@ -540,7 +563,7 @@ def impute_bpca(
         at.pp.impute_bpca(adata, n_components=50, layer=None)
 
         # Returns a new anndata object with imputed .X layer
-        adata_new = at.pp.impute_bpca(adata, n_components=50, layer=None, copy=True)
+        adata_new = at.pp.impute_bpca(adata, n_components=50, layer=None, inplace=False)
 
     References
     ----------
@@ -550,7 +573,7 @@ def impute_bpca(
     --------
     :class:`bpca.BPCA`
     """
-    adata = adata.copy() if copy else adata
+    adata = adata if inplace else adata.copy()
 
     data = get_matrix(adata, layer)
 
@@ -570,4 +593,4 @@ def impute_bpca(
     else:
         adata.layers[layer] = data
 
-    return adata if copy else None
+    return None if inplace else adata

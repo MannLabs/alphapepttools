@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import gmean
 
+from alphapepttools._decorator import deprecated_copy
 from alphapepttools._utils import get_matrix
 
 from ._utils import _raise_on_missing_value, _raise_on_nan_values
@@ -121,6 +122,7 @@ def _total_median_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarra
     return data * norm_factors.reshape(-1, 1), norm_factors
 
 
+@deprecated_copy(since="0.5.0", removed_in="0.6.0")
 def normalize(
     adata: ad.AnnData,
     layer: str | None = None,
@@ -128,7 +130,8 @@ def normalize(
     group_column: str | None = None,
     key_added: str | None = None,
     *,
-    copy: bool = False,
+    inplace: bool = True,
+    copy: bool | None = None,
 ) -> ad.AnnData | None:
     """Normalize measured counts per sample
 
@@ -152,16 +155,18 @@ def normalize(
         This is useful when working with data from different batches with different intensity distributions.
     key_added
         If not None, adds normalization factors to column in `adata.obs`
+    inplace
+        If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
+        of `adata`.
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
 
     Returns
     -------
-    None | anndata.AnnData
-        AnnData object with normalized measurement layer.
-        If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
-        returns a modified copy.
+    AnnData object with normalized measurement layer.
+    If `inplace=True` modifies the anndata object at layer inplace and returns None.
+    If `inplace=False`, returns a modified copy.
 
     Examples
     --------
@@ -204,11 +209,11 @@ def normalize(
 
     .. code-block:: python
 
-        new_adata = normalize(adata, copy=True)
+        new_adata = normalize(adata, inplace=False)
     """
     _validate_strategies(strategy=strategy)
 
-    adata = adata.copy() if copy else adata
+    adata = adata if inplace else adata.copy()
 
     data = get_matrix(adata, layer)
 
@@ -240,9 +245,10 @@ def normalize(
     if key_added is not None:
         adata.obs[key_added] = norm_factors
 
-    return adata if copy else None
+    return None if inplace else adata
 
 
+@deprecated_copy(since="0.5.0", removed_in="0.6.0")
 def irs(
     adata: ad.AnnData,
     group_column: str,
@@ -250,8 +256,9 @@ def irs(
     reference_value: object | None = None,
     *,
     layer: str | None = None,
-    copy: bool = False,
-) -> None | ad.AnnData:
+    inplace: bool = True,
+    copy: bool | None = None,
+) -> ad.AnnData | None:
     """Internal Reference Scaling (IRS) normalization.
 
     Normalize features across multiple runs (e.g. TMT plexes) using a shared
@@ -280,9 +287,18 @@ def irs(
         each run. Ignored when `reference_column` is `None`.
     layer
         Layer in `adata` to normalize. If `None`, uses `adata.X`.
+    inplace
+        If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
+        of `adata`.
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
+
+    Returns
+    -------
+    AnnData object with IRS-normalized layer.
+    If `inplace=True` modifies the anndata object at layer inplace and returns None.
+    If `inplace=False`, returns a modified copy.
 
     Reference
     ---------
@@ -300,7 +316,7 @@ def irs(
             stacklevel=2,
         )
 
-    adata = adata.copy() if copy else adata
+    adata = adata if inplace else adata.copy()
 
     data = adata.layers[layer].copy() if layer is not None else adata.X.copy()
 
@@ -348,4 +364,4 @@ def irs(
     else:
         adata.layers[layer] = data
 
-    return adata if copy else None
+    return None if inplace else adata

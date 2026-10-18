@@ -7,6 +7,7 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 
+from alphapepttools._decorator import deprecated_copy
 from alphapepttools._utils import get_matrix
 
 logging.basicConfig(level=logging.INFO)
@@ -87,8 +88,15 @@ def detect_special_values(
     return special_values_mask
 
 
+@deprecated_copy(since="0.5.0", removed_in="0.6.0")
 def nanlog(
-    adata: ad.AnnData, base: int = 2, verbosity: int = 1, layer: str | None = None, *, copy: bool = False
+    adata: ad.AnnData,
+    base: int = 2,
+    verbosity: int = 1,
+    layer: str | None = None,
+    *,
+    inplace: bool = True,
+    copy: bool | None = None,
 ) -> ad.AnnData | None:
     """Logarithmize a data matrix.
 
@@ -113,6 +121,9 @@ def nanlog(
         If 1, log warnings for invalid values found in the data.
     layer
         Name of the layer to transform. If None (default), the data matrix X is used.
+    inplace
+        If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
+        of `adata`.
     copy
         Whether to return a modified copy (True) of the anndata object. If False (default)
         modifies the object inplace
@@ -120,7 +131,7 @@ def nanlog(
     Returns
     -------
     Log-transformed data with invalid values replaced by np.nan.
-    If `copy=False` modifies the anndata object at layer inplace and returns None. If `copy=True`,
+    If `inplace=True` modifies the anndata object at layer inplace and returns None. If `inplace=False`,
     returns a modified copy.
 
     Examples
@@ -150,7 +161,7 @@ def nanlog(
         nanlog(adata, base=10, layer="raw")
 
         # Return a copy instead of modifying inplace
-        adata_log = nanlog(adata, base=2, copy=True)
+        adata_log = nanlog(adata, base=2, inplace=False)
 
     """
     if not isinstance(adata, ad.AnnData):
@@ -159,7 +170,7 @@ def nanlog(
     if base in {0, 1} or base < 0:
         raise ValueError("Base cannot be 0 (divide by -Inf) or 1 (divide by 0) or negative (invalid log).")
 
-    adata = adata.copy() if copy else adata
+    adata = adata if inplace else adata.copy()
 
     def _log_func(
         x: np.ndarray | pd.DataFrame | pd.Series,
@@ -182,4 +193,4 @@ def nanlog(
     else:
         adata.layers[layer] = _log_func(np.where(~special_values_mask, input_data, np.nan), base)
 
-    return adata if copy else None
+    return None if inplace else adata

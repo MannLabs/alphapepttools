@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import median_abs_deviation
 
+from alphapepttools._decorator import deprecated_copy
 from alphapepttools._utils import get_matrix
 
 METRICS_KEY = "metrics"
@@ -46,6 +47,7 @@ def _cv(data: np.ndarray, *, min_valid: int = 3, axis: int = 0) -> np.ndarray:
     return cv
 
 
+@deprecated_copy(since="0.5.0", removed_in="0.6.0")
 def coefficient_of_variation(
     adata: ad.AnnData,
     *,
@@ -53,8 +55,9 @@ def coefficient_of_variation(
     min_valid: int = 3,
     key_added: str = "cv",
     layer: str | None = None,
-    copy: bool = False,
-) -> None | ad.AnnData:
+    inplace: bool = True,
+    copy: bool | None = None,
+) -> ad.AnnData | None:
     r"""Coefficient of variation
 
     Compute the coefficient of variation (CV) per feature, either across all samples or
@@ -94,6 +97,9 @@ def coefficient_of_variation(
         Name of the column added to `adata.var` (ungrouped) or the key added to `adata.varm` (grouped)
     layer
         Name of the layer to compute metric on. If None (default), the data matrix X is used
+    inplace
+        If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
+        of `adata`.
     copy
         If `False` (default), modifies `adata` inplace and returns `None`. If `True`, returns a copy of the `adata` object.
 
@@ -102,7 +108,7 @@ def coefficient_of_variation(
     AnnData object with computed CVs.
     If `group_column=None`, results are written to `adata.var[key_added]`.
     If `group_column` is set, results are written to `adata.varm[key_added]` as a DataFrame.
-    If `copy=False` modifies the anndata object inplace and returns None. If `copy=True`,
+    If `inplace=True` modifies the anndata object inplace and returns None. If `inplace=False`,
     returns a modified copy
 
     Raises
@@ -147,7 +153,7 @@ def coefficient_of_variation(
     Features with fewer than `min_valid` non-missing values will return NaN for CV
 
     """
-    adata = adata.copy() if copy else adata
+    adata = adata if inplace else adata.copy()
     data = get_matrix(adata, layer)
 
     if group_column is None:
@@ -165,7 +171,7 @@ def coefficient_of_variation(
             index=adata.var_names,
         )
 
-    return adata if copy else None
+    return None if inplace else adata
 
 
 def _set_nested_dict(
