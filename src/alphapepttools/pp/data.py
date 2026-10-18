@@ -818,7 +818,6 @@ def scale_and_center(
     center: bool = True,
     scale: bool = True,
     inplace: bool = True,
-    copy: bool | None = None,
 ) -> ad.AnnData | None:
     """Scale and center features
 
@@ -847,9 +846,6 @@ def scale_and_center(
     inplace
         If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
         of `adata`.
-    copy
-        Whether to return a modified copy (True) of the anndata object. If False (default)
-        modifies the object inplace
 
     Returns
     -------

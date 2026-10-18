@@ -81,7 +81,6 @@ def impute_gaussian(
     random_state: int = 42,
     *,
     inplace: bool = True,
-    copy: bool | None = None,
 ) -> ad.AnnData | None:
     """Impute missing values in each column by random sampling from a gaussian distribution.
 
@@ -113,9 +112,6 @@ def impute_gaussian(
     inplace
         If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
         of `adata`.
-    copy
-        Whether to return a modified copy (True) of the anndata object. If False (default)
-        modifies the object inplace
 
     Returns
     -------
@@ -210,7 +206,6 @@ def impute_median(
     layer: str | None = None,
     *,
     inplace: bool = True,
-    copy: bool | None = None,
 ) -> ad.AnnData | None:
     """Impute missing values using median imputation
 
@@ -234,9 +229,6 @@ def impute_median(
     inplace
         If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
         of `adata`.
-    copy
-        Whether to return a modified copy (True) of the anndata object. If False (default)
-        modifies the object inplace
 
     Returns
     -------
@@ -363,7 +355,6 @@ def impute_knn(
     weights: Literal["distance", "uniform"] = "distance",
     *,
     inplace: bool = True,
-    copy: bool | None = None,
     **kwargs,
 ) -> ad.AnnData | None:
     """Impute missing values using median imputation
@@ -392,9 +383,6 @@ def impute_knn(
     inplace
         If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
         of `adata`.
-    copy
-        Whether to return a modified copy (True) of the anndata object. If False (default)
-        modifies the object inplace
     **kwargs
         Passed to :class:`sklearn.impute.KNNImputer`
 
@@ -498,7 +486,6 @@ def impute_bpca(
     layer: str | None = None,
     group_column: str | None = None,
     inplace: bool = True,
-    copy: bool | None = None,
     **kwargs,
 ) -> ad.AnnData | None:
     r"""Impute missing values using Bayesian Principal Component Analysis (BPCA)
@@ -532,9 +519,6 @@ def impute_bpca(
     inplace
         If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
         of `adata`.
-    copy
-        Whether to return a modified copy (True) of the anndata object. If False (default)
-        modifies the object inplace
     **kwargs
         Passed to :class:`bpca.BPCA`
 

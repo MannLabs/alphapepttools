@@ -131,7 +131,6 @@ def normalize(
     key_added: str | None = None,
     *,
     inplace: bool = True,
-    copy: bool | None = None,
 ) -> ad.AnnData | None:
     """Normalize measured counts per sample
 
@@ -158,9 +157,6 @@ def normalize(
     inplace
         If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
         of `adata`.
-    copy
-        Whether to return a modified copy (True) of the anndata object. If False (default)
-        modifies the object inplace
 
     Returns
     -------
@@ -205,7 +201,7 @@ def normalize(
                 [1.93333333, 0.        ],
                 [0.        , 1.93333333]])
 
-    Or we return a copy of the object:
+    Or, with `inplace=False`, we leave `adata` unchanged and return a normalized object:
 
     .. code-block:: python
 
@@ -257,7 +253,6 @@ def irs(
     *,
     layer: str | None = None,
     inplace: bool = True,
-    copy: bool | None = None,
 ) -> ad.AnnData | None:
     """Internal Reference Scaling (IRS) normalization.
 
@@ -290,9 +285,6 @@ def irs(
     inplace
         If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
         of `adata`.
-    copy
-        Whether to return a modified copy (True) of the anndata object. If False (default)
-        modifies the object inplace
 
     Returns
     -------

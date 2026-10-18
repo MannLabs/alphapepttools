@@ -199,7 +199,6 @@ def pca(
     meta_data_mask_column_name: str | None = None,
     *,
     inplace: bool = True,
-    copy: bool | None = None,
     **pca_kwargs: dict | None,
 ) -> ad.AnnData | None:
     """Principal component analysis :cite:p:`Pedregosa2011`.
@@ -241,8 +240,6 @@ def pca(
     inplace
         If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
         of `adata`.
-    copy
-        If `False` (default), modifies `adata` inplace and returns `None`. If `True`, returns a copy of the `adata` object.
     **pca_kwargs
         Additional keyword arguments for the :func:`scanpy.pp.pca` By default None.
 
@@ -396,7 +393,6 @@ def bpca(
     meta_data_mask_column_name: str | None = None,
     *,
     inplace: bool = True,
-    copy: bool | None = None,
     **bpca_kwargs,
 ) -> ad.AnnData | None:
     """Bayesian Principal Component Analysis
@@ -435,8 +431,6 @@ def bpca(
     inplace
         If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
         of `adata`.
-    copy
-        If `False` (default), modifies `adata` inplace and returns `None`. If `True`, returns a copy of the `adata` object.
     **bpca_kwargs
         Additional keyword arguments to :class:`bpca.BPCA`. By default None.
 

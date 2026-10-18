@@ -56,7 +56,6 @@ def coefficient_of_variation(
     key_added: str = "cv",
     layer: str | None = None,
     inplace: bool = True,
-    copy: bool | None = None,
 ) -> ad.AnnData | None:
     r"""Coefficient of variation
 
@@ -100,8 +99,6 @@ def coefficient_of_variation(
     inplace
         If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
         of `adata`.
-    copy
-        If `False` (default), modifies `adata` inplace and returns `None`. If `True`, returns a copy of the `adata` object.
 
     Returns
     -------

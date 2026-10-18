@@ -96,7 +96,6 @@ def nanlog(
     layer: str | None = None,
     *,
     inplace: bool = True,
-    copy: bool | None = None,
 ) -> ad.AnnData | None:
     """Logarithmize a data matrix.
 
@@ -124,9 +123,6 @@ def nanlog(
     inplace
         If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
         of `adata`.
-    copy
-        Whether to return a modified copy (True) of the anndata object. If False (default)
-        modifies the object inplace
 
     Returns
     -------
@@ -160,7 +156,7 @@ def nanlog(
         adata.layers["raw"] = adata.X.copy()
         nanlog(adata, base=10, layer="raw")
 
-        # Return a copy instead of modifying inplace
+        # With `inplace=False`, leave `adata` unchanged and return a transformed object
         adata_log = nanlog(adata, base=2, inplace=False)
 
     """

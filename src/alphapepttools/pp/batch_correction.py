@@ -127,7 +127,6 @@ def scanpy_pycombat(
     layer: str | None = None,
     *,
     inplace: bool = True,
-    copy: bool | None = None,
 ) -> ad.AnnData | None:
     """Correct batch effects using the ComBat method :cite:`Johnson.2007`.
 
@@ -153,9 +152,6 @@ def scanpy_pycombat(
     inplace
         If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
         of `adata`.
-    copy
-        Whether to return a modified copy (True) of the anndata object. If False (default)
-        modifies the object inplace
 
     Returns
     -------
