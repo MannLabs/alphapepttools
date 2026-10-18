@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import scanpy
+from anndata.tests.helpers import assert_adata_equal
 
 from alphapepttools.pp.batch_correction import coerce_nans_to_batch, drop_singleton_batches, scanpy_pycombat
 from alphapepttools.pp.impute import impute_gaussian
@@ -48,9 +49,10 @@ def test_drop_singleton_batches():
     assert result.obs["batch"].tolist() == expected_batch
 
 
-def test_convert_na_to_batch():
+@pytest.mark.parametrize("batch_dtype", [object, "category"])
+def test_convert_na_to_batch(batch_dtype):
     df = pd.DataFrame({"A": [1, 2, 3], "B": [1, 2, 3]}, index=list("ABC"))
-    md = pd.DataFrame({"batch": ["x", np.nan, "y"]}, index=list("ABC"))
+    md = pd.DataFrame({"batch": ["x", np.nan, "y"]}, index=list("ABC")).astype(batch_dtype)
     adata = ad.AnnData(df, obs=md)
 
     result = coerce_nans_to_batch(adata, "batch")
@@ -59,8 +61,21 @@ def test_convert_na_to_batch():
     assert result.obs["batch"].tolist() == expected_batch
 
 
+def _expected_combat(adata: ad.AnnData, batch: str, covariates: list[str] | None, layer: str | None) -> ad.AnnData:
+    """Reference result: copy of `adata` where only the target matrix is replaced by its scanpy.pp.combat correction."""
+    proxy = coerce_nans_to_batch(ad.AnnData(X=adata.to_df(layer=layer).to_numpy(), obs=adata.obs.copy()), batch)
+    corrected = scanpy.pp.combat(proxy, key=batch, covariates=covariates, inplace=False)
+
+    expected = adata.copy()
+    if layer is None:
+        expected.X = corrected
+    else:
+        expected.layers[layer] = corrected
+    return expected
+
+
 @pytest.mark.parametrize("copy", [False, True])
-@pytest.mark.parametrize("layer", [False, True])
+@pytest.mark.parametrize("layer", [None, "new_layer"])
 @pytest.mark.parametrize("covariates", [None])
 @pytest.mark.parametrize(
     ("datatype"),
@@ -72,7 +87,7 @@ def test_convert_na_to_batch():
     ],
 )
 def test_scanpy_pycombat(
-    datatype, pycombat_test_data_simple, pycombat_test_data_complex, covariates, layer: str, *, copy: bool
+    datatype, pycombat_test_data_simple, pycombat_test_data_complex, covariates, layer: str | None, *, copy: bool
 ):
     """
     Test the scanpy_pycombat function with various scenarios.
@@ -86,19 +101,38 @@ def test_scanpy_pycombat(
     adata = ad.AnnData(df, obs=md)
     adata = impute_gaussian(adata, copy=True)
     adata = drop_singleton_batches(adata, batch="batch")
-    adata.layers["new_layer"] = adata.X.copy()
+    # Layer must differ from X, otherwise correcting the wrong matrix goes unnoticed
+    adata.layers["new_layer"] = adata.X * 2 + 3
+    original = adata.copy()
 
-    # Compute expected results
-    expected_adata = adata.copy()
-    scanpy.pp.combat(expected_adata, key="batch", covariates=covariates, inplace=True)
+    expected = _expected_combat(original, batch="batch", covariates=covariates, layer=layer)
 
-    # Get comparison data from wrapper
     result = scanpy_pycombat(adata, batch="batch", covariates=covariates, layer=layer, copy=copy)
 
     if copy:
         assert isinstance(result, ad.AnnData)
+        assert_adata_equal(adata, original)
         adata = result
     else:
         assert result is None
 
-    pd.testing.assert_frame_equal(adata.to_df(layer=layer), expected_adata.to_df())
+    assert_adata_equal(adata, expected)
+
+
+@pytest.mark.parametrize("batch_dtype", [object, "category"])
+@pytest.mark.parametrize("copy", [False, True])
+def test_scanpy_pycombat_nan_batch(pycombat_test_data_simple, batch_dtype, *, copy: bool):
+    """NaNs in the batch column are corrected as a single 'NA' batch, also when modifying inplace."""
+    df, _ = pycombat_test_data_simple
+    md = pd.DataFrame({"batch": ["x", "x", "x", np.nan, np.nan, "y", "y", "y", "y"]}, index=df.index).astype(
+        batch_dtype
+    )
+    adata = ad.AnnData(df, obs=md)
+    original = adata.copy()
+
+    expected = _expected_combat(original, batch="batch", covariates=None, layer=None)
+
+    result = scanpy_pycombat(adata, batch="batch", copy=copy)
+    adata = result if copy else adata
+
+    assert_adata_equal(adata, expected)
