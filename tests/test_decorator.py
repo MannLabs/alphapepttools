@@ -1,3 +1,4 @@
+import re
 import warnings
 
 import pytest
@@ -8,24 +9,24 @@ SINCE = "0.5.0"
 REMOVED_IN = "0.6.0"
 
 
-def _func(data: list, *, inplace: bool = True, copy: bool | None = None) -> tuple[bool, bool | None]:
+def _func(data: list, *, inplace: bool = True) -> bool:
     """Dummy function
 
     Parameters
     ----------
     data
         Input data
-    copy
-        Whether to return a copy.
-        Second line of description
     inplace
-        Whether to modify inplace
+        Whether to modify inplace.
+        Second line of description
+    other
+        Other parameter
 
     Returns
     -------
-    Received `inplace` and `copy` values
+    Received `inplace` value
     """
-    return inplace, copy
+    return inplace
 
 
 @pytest.fixture
@@ -40,7 +41,7 @@ class TestDeprecatedCopyCall:
             warnings.simplefilter("error")
             result = decorated_func([1])
 
-        assert result == (True, None)
+        assert result is True
 
     @pytest.mark.parametrize("inplace", [True, False])
     def test_inplace_only_does_not_warn(self, decorated_func, *, inplace: bool) -> None:
@@ -49,7 +50,7 @@ class TestDeprecatedCopyCall:
             warnings.simplefilter("error")
             result = decorated_func([1], inplace=inplace)
 
-        assert result == (inplace, None)
+        assert result is inplace
 
     @pytest.mark.parametrize(
         ("kwargs", "expected_inplace"),
@@ -61,11 +62,11 @@ class TestDeprecatedCopyCall:
         ],
     )
     def test_maps_copy_to_inplace(self, decorated_func, kwargs: dict, *, expected_inplace: bool) -> None:
-        """Explicit `copy` warns and is forwarded as `inplace = not copy`"""
+        """Explicit `copy` warns and is forwarded as `inplace = not copy` without reaching the function"""
         with pytest.warns(FutureWarning, match=rf"`copy`.*deprecated.*{SINCE}.*{REMOVED_IN}"):
             result = decorated_func([1], **kwargs)
 
-        assert result == (expected_inplace, None)
+        assert result is expected_inplace
 
     @pytest.mark.parametrize("value", [True, False])
     def test_raises_on_contradicting_arguments(self, decorated_func, *, value: bool) -> None:
@@ -80,25 +81,23 @@ class TestDeprecatedCopyCall:
 
 
 class TestDeprecatedCopyDocstring:
-    def test_updates_docstring(self, decorated_func) -> None:
-        """`copy` description is replaced by a deprecation notice"""
+    def test_adds_copy_after_inplace(self, decorated_func) -> None:
+        """A deprecated `copy` entry is inserted directly after the complete `inplace` entry"""
         docstring = decorated_func.__doc__
 
         assert f".. deprecated:: {SINCE}" in docstring
         assert f"removed in version {REMOVED_IN}" in docstring
-        assert "Second line of description" not in docstring
-        # Neighbouring parameters must stay untouched
-        assert "Input data" in docstring
-        assert "Whether to modify inplace" in docstring
+        assert re.search(r"Second line of description\n[ \t]*copy\n", docstring)
+        assert docstring.index("copy\n") < docstring.index("other\n")
 
-    def test_raises_on_undocumented_copy(self) -> None:
-        """Decorating a function whose docstring lacks `copy` raises"""
+    def test_raises_on_undocumented_inplace(self) -> None:
+        """Decorating a function whose docstring lacks `inplace` raises"""
 
-        def func(*, inplace: bool = True, copy: bool | None = None) -> None:
+        def func(*, inplace: bool = True) -> None:
             """Parameters
             ----------
-            inplace
-                Whether to modify inplace
+            other
+                Other parameter
             """
 
         decorator = deprecated_copy(since=SINCE, removed_in=REMOVED_IN)
