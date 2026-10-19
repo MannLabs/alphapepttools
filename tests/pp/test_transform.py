@@ -27,7 +27,7 @@ def log_dummy_data():
     return create_data()
 
 
-@pytest.mark.parametrize("copy", [False, True])
+@pytest.mark.parametrize("inplace", [True, False])
 @pytest.mark.parametrize("layer", [None, "new_layer"])
 @pytest.mark.parametrize(
     ("base", "expected"),
@@ -67,18 +67,18 @@ def log_dummy_data():
         ),
     ],
 )
-def test_nanlog(log_dummy_data: ad.AnnData, base: float, expected: pd.DataFrame, layer: str, *, copy: bool) -> None:
+def test_nanlog(log_dummy_data: ad.AnnData, base: float, expected: pd.DataFrame, layer: str, *, inplace: bool) -> None:
     """Test nanlog function with different input types and log bases."""
 
     # AnnData
-    result = nanlog(log_dummy_data, base, layer=layer, copy=copy)
+    result = nanlog(log_dummy_data, base, layer=layer, inplace=inplace)
 
-    if copy:
+    if not inplace:
         assert isinstance(result, ad.AnnData)
     else:
         assert result is None
 
-    adata_updated = result if copy else log_dummy_data
+    adata_updated = result if not inplace else log_dummy_data
 
     pd.testing.assert_frame_equal(adata_updated.to_df(layer=layer), expected.to_df())
 
