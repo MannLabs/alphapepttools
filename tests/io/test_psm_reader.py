@@ -15,18 +15,21 @@ class TestReadPsmTable:
         mock_factory_instance.create_anndata.return_value = mock_anndata
         mock_factory_class.from_files.return_value = mock_factory_instance
 
-        result = read_psm_table("/path/to/file.txt", "alphadia")
+        result = read_psm_table("/path/to/file.txt", "alphadia", level="proteins")
 
         mock_factory_class.from_files.assert_called_once_with(
             file_paths="/path/to/file.txt",
             reader_type="alphadia",
+            additional_columns=None,
+        )
+        mock_factory_instance.create_anndata.assert_called_once_with(
             level="proteins",
             intensity_column=None,
             feature_id_column=None,
             sample_id_column=None,
-            additional_columns=None,
+            var_columns=None,
+            obs_columns=None,
         )
-        mock_factory_instance.create_anndata.assert_called_once()
         assert result == mock_anndata
 
     @patch("alphapepttools.io.psm_reader.AnnDataFactory")
@@ -44,18 +47,23 @@ class TestReadPsmTable:
             intensity_column="custom_intensity",
             feature_id_column="custom_feature",
             sample_id_column="custom_sample",
-            extra_param="extra_value",
+            var_columns="additional_var_column",
+            extra_reader_param="extra_value",
         )
 
         mock_factory_class.from_files.assert_called_once_with(
             file_paths=["/path/to/file1.txt", "/path/to/file2.txt"],
             reader_type="maxquant",
+            additional_columns=["custom_intensity", "custom_feature", "custom_sample", "additional_var_column"],
+            extra_reader_param="extra_value",
+        )
+        mock_factory_instance.create_anndata.assert_called_once_with(
             level="precursors",
             intensity_column="custom_intensity",
             feature_id_column="custom_feature",
             sample_id_column="custom_sample",
-            additional_columns=["custom_intensity", "custom_feature", "custom_sample"],
-            extra_param="extra_value",
+            var_columns="additional_var_column",
+            obs_columns=None,
         )
 
     @patch("alphapepttools.io.psm_reader.AnnDataFactory")
@@ -77,14 +85,14 @@ class TestReadPsmTable:
         mock_factory_class.from_files.assert_called_once_with(
             file_paths="/path/to/file.txt",
             reader_type="alphadia",
-            level="proteins",
-            intensity_column=None,
-            feature_id_column=None,
-            sample_id_column=None,
             additional_columns=["my_var_a", "my_var_b", "my_obs"],
         )
         # The original var_columns / obs_columns are forwarded to create_anndata
         mock_factory_instance.create_anndata.assert_called_once_with(
+            level="proteins",
+            intensity_column=None,
+            feature_id_column=None,
+            sample_id_column=None,
             var_columns=["my_var_a", "my_var_b"],
             obs_columns="my_obs",
         )

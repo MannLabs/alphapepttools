@@ -7,6 +7,7 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import pytest
+from anndata.tests.helpers import assert_adata_equal
 
 from alphapepttools.metrics import (
     coefficient_of_variation,
@@ -278,24 +279,28 @@ class TestPooledMedianAbsoluteDeviation:
         return {"adata": adata, "pmad": {"A": pmad, "B": pmad, "C": pmad}, "group_column": "sample_type"}
 
     @pytest.mark.parametrize("layer", [None, "layer"])
-    def test_pooled_median_absolute_deviation_return(self, adata_pmad: ad.AnnData, layer: str | None) -> None:
+    def test_pooled_median_absolute_deviation__return(self, adata_pmad: ad.AnnData, layer: str | None) -> None:
         """Test if `pooled_median_absolute_deviation` computes group-wise PMAD correctly"""
+        adata = adata_pmad["adata"].copy()
+        original_adata = adata.copy()
+        group_column = adata_pmad["group_column"]
         reference = pd.DataFrame.from_dict(adata_pmad["pmad"], orient="index", columns=["pmad"])
 
-        pmad = pooled_median_absolute_deviation(
-            adata_pmad["adata"], group_column=adata_pmad["group_column"], layer=layer, inplace=False
-        )
+        pmad = pooled_median_absolute_deviation(adata, group_column=group_column, layer=layer, inplace=False)
 
+        assert_adata_equal(adata, original_adata)
         pd.testing.assert_frame_equal(pmad, reference)
 
     @pytest.mark.parametrize("layer", [None, "layer"])
-    def test_pooled_median_absolute_deviation_inplace(self, adata_pmad: ad.AnnData, layer: str | None) -> None:
+    def test_pooled_median_absolute_deviation__inplace(self, adata_pmad: ad.AnnData, layer: str | None) -> None:
         """Test if `pooled_median_absolute_deviation` sets PMAD correctly in anndata object"""
-        reference = adata_pmad["pmad"]
         adata = adata_pmad["adata"].copy()
+        group_column = adata_pmad["group_column"]
+        reference = adata_pmad["pmad"].copy()
 
-        pooled_median_absolute_deviation(adata, group_column=adata_pmad["group_column"], layer=layer, inplace=True)
+        returned_result = pooled_median_absolute_deviation(adata, group_column=group_column, layer=layer, inplace=True)
 
+        assert returned_result is None
         assert adata.uns.get("metrics").get("pmad") == reference
 
 
@@ -335,12 +340,15 @@ class TestPooledCoefficientOfVariation:
     @pytest.mark.parametrize("layer", [None, "layer"])
     def test_pooled_coefficient_of_variation_return(self, adata_pcv: ad.AnnData, layer: str | None) -> None:
         """Test if `pooled_coefficient_of_variation` computes group-wise PCV correctly"""
+        adata = adata_pcv["adata"].copy()
+        original_adata = adata.copy()
+        group_column = adata_pcv["group_column"]
+
         reference = pd.DataFrame.from_dict(adata_pcv["pcv"], orient="index", columns=["pcv"])
 
-        pcv = pooled_coefficient_of_variation(
-            adata_pcv["adata"], group_column=adata_pcv["group_column"], layer=layer, inplace=False
-        )
+        pcv = pooled_coefficient_of_variation(adata, group_column=group_column, layer=layer, inplace=False)
 
+        assert_adata_equal(adata, original_adata)
         pd.testing.assert_frame_equal(pcv, reference, atol=1e-4)
 
     @pytest.mark.parametrize("layer", [None, "layer"])
@@ -349,9 +357,12 @@ class TestPooledCoefficientOfVariation:
         reference = adata_pcv["pcv"]
         adata = adata_pcv["adata"].copy()
 
-        pooled_coefficient_of_variation(adata, group_column=adata_pcv["group_column"], layer=layer, inplace=True)
+        returned_value = pooled_coefficient_of_variation(
+            adata, group_column=adata_pcv["group_column"], layer=layer, inplace=True
+        )
         result = adata.uns.get("metrics").get("pcv")
 
+        assert returned_value is None
         assert all(key == ref_key for key, ref_key in zip(result.keys(), reference.keys(), strict=True))
         assert all(
             np.isclose(value, ref_value, atol=1e-4)
