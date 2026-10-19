@@ -65,6 +65,7 @@ def example_metadata():
 _TEST_LAYER = "quant"
 
 
+# Helper function to move data to a specific layer in an AnnData object
 def _move_data_to_layer(adata: ad.AnnData, layer: str | None) -> ad.AnnData:
     """Return a copy holding the data in `layer` with .X NaNed out; returns adata unchanged if layer is None.
 
@@ -399,7 +400,7 @@ def test_diff_exp_alphaquant():
         assert subset["feature_id"].tolist() == expected_features[level]
 
         # Selecting the expected columns ignores the NaN padding, which is asserted separately above
-        # The tolerances are slightly larger, than for the vanilla ttest, albeit still small, as the package is still in development
+
         pd.testing.assert_frame_equal(
             subset[expected_results[level].columns], expected_results[level], rtol=0.01, atol=1e-6
         )
@@ -435,12 +436,7 @@ def example_adata_ebayes():
 
 @pytest.fixture
 def expected_ebayes_complete_case_df():
-    """Frozen expected values for the B_VS_A comparison on the complete-case feature set.
-
-    The fixture's X4 carries missing values, so these numbers only hold once the adata has been
-    filtered with `filter_data_completeness(max_missing_count=0)`; the eBayes variance prior is
-    estimated from whichever features are present, so the feature set is part of the expectation.
-    """
+    """Frozen expected values for the B_VS_A comparison on the complete-case feature set."""
     return pd.DataFrame(
         {
             "protein": ["X1", "X2", "X3"],
@@ -651,17 +647,8 @@ def test__standardize_alphaquant_results(
 def _inmoose_limma_reference(adata, between_column, comparison):
     """Run the pre-port eBayes chain by calling inmoose.limma directly.
 
-    This is the independent numerical oracle for the numpy reimplementations in
-    `tl.diff_exp.ebayes`: `_nan_lmfit`, `_make_contrasts`, `_run_contrasts` and the topTable
-    equivalent all replaced a limma call that this helper still makes. eBayes moderation itself is
-    shared between the two paths (`_ebayes_moderation` calls `limma.eBayes`), so it is not what is
-    under test here.
-
-    Requires complete (NaN-free) data, which is why callers pre-filter with
-    `filter_data_completeness`. Imports are function-local: patsy only reaches the environment
-    transitively via inmoose, so a module-level import would break collection of this whole file in
-    the non-`full` CI legs. Every caller is gated on `_HAS_INMOOSE`.
-
+    This is the independent numerical reference for the numpy reimplementations in
+    `tl.diff_exp.ebayes`.
     Returns
     -------
     pd.DataFrame
@@ -713,9 +700,8 @@ def test_diff_exp_ebayes_matches_inmoose_limma_reference(
 ):
     """diff_exp_ebayes reproduces a direct inmoose.limma chain on complete data.
 
-    diff_exp_ebayes fits every feature whereas the limma chain cannot handle NaNs at all, so we
-    filter incomplete features upfront (the intended workflow) to give both paths the same feature
-    set and therefore the same eBayes variance prior. The moderated statistics must then agree to
+    Test the numpy reimplementation and the inmoose.limma reference on the same complete feature set,
+    and therefore the same eBayes variance prior. The moderated statistics must then agree to
     numerical precision.
     """
     adata = filter_data_completeness(example_adata_ebayes.copy(), max_missing_count=0, action="drop")
@@ -827,13 +813,7 @@ def test__build_design_matrix_column_order_follows_first_appearance():
 
 
 def test__build_design_matrix_column_set_matches_observed_levels():
-    """The design matrix carries exactly the observed levels, minus the dropped covariate reference.
-
-    The column *set* is the load-bearing part, as opposed to the order: a level missing here leaves
-    its samples without a coefficient to absorb them, which inflates the residual variance of every
-    feature and corrupts the shared eBayes prior -- silently, for a covariate, since covariates never
-    appear in a contrast.
-    """
+    """The design matrix carries exactly the observed levels, minus the dropped covariate reference."""
     obs = pd.DataFrame(
         {
             "group": ["treated", "treated", "ctrl", "ctrl", "ctrl"],
@@ -857,13 +837,7 @@ def test__build_design_matrix_column_set_matches_observed_levels():
 
 @pytest.mark.skipif(not _HAS_INMOOSE, reason="inmoose not installed")
 def test_diff_exp_ebayes_invariant_to_design_matrix_column_order(three_condition_adata):
-    """Results do not depend on the design matrix column order, only on the name-to-index map.
-
-    _one_hot's first-appearance ordering is presentation only: every consumer resolves columns by
-    name through col_info, and the fit itself is column-permutation-equivariant. Reversing the
-    samples flips the first-appearance order of both the condition and the covariate block, and must
-    leave the results untouched.
-    """
+    """Results do not depend on the design matrix column order, only on the name-to-index map."""
     adata = three_condition_adata.copy()
     adata.obs["batch"] = ["p", "q", "r"] * 3  # crossed with group, so the design stays full rank
     permuted = adata[adata.obs_names[::-1]].copy()
@@ -1141,11 +1115,9 @@ def test__run_contrasts_log2fc_correct_under_interspersed_order(interspersed_ada
 
 
 def test__run_contrasts_dead_condition_only_nulls_its_own_contrast(interspersed_adata):
-    """A condition with no fitted coefficient NaNs only the contrasts that involve it.
-
-    The B_VS_A contrast weights C with a zero; that zero must not let C's NaN coefficient
-    (0 * nan = nan) leak into an otherwise complete contrast.
-    """
+    """A condition with no fitted coefficient NaNs only the contrasts that involve it."""
+    # The B_VS_A contrast weights C with a zero; that zero must not let C's NaN coefficient
+    # (0 * nan = nan) leak into an otherwise complete contrast.
     design_matrix, col_info = _build_design_matrix(interspersed_adata, "group")
     fit = _nan_lmfit(interspersed_adata, design_matrix)
     cm = _make_contrasts(interspersed_adata, between_column="group", control_condition="A", control_is=-1)
@@ -1167,12 +1139,7 @@ def test__run_contrasts_dead_condition_only_nulls_its_own_contrast(interspersed_
 # pipeline of tl.diff_exp_ebayes. Instead, we mock the fit and contrast step and check the correct ordering
 # of the results by name, which is what we are guarding against.
 def test_fit_and_contrasts_invariant_to_sample_permutation(example_adata_ebayes):
-    """Permuting the input samples must not change the per-contrast log2fc/variance (matched by name).
-
-    The permutation flips the condition appearance order (B-first to A-first), which reorders the
-    internal design and contrast rows; the named results must nonetheless be identical. This stops
-    before the eBayes step so it runs without inmoose -- the scatter-back is what we are guarding.
-    """
+    """Permuting the input samples must not change the per-contrast log2fc/variance (matched by name)."""
 
     def fit_and_contrasts_by_name(adata):
         design_matrix, col_info = _build_design_matrix(adata, "group")
@@ -1294,9 +1261,7 @@ def confounded_batch_adata():
     """Groups A/B with an unbalanced batch: A is mostly b1, B is mostly b2.
 
     Every feature carries the same true group effect, plus a feature-specific offset on the b2
-    samples. Because batch is unevenly distributed across the groups, the unadjusted group
-    difference measures the group effect plus most of that offset. Values are already additive,
-    so no nanlog is applied.
+    samples.
     """
     sample_names = [f"s{i}" for i in range(8)]
     groups = np.array(["A", "A", "A", "A", "B", "B", "B", "B"])
@@ -1355,11 +1320,7 @@ def test_diff_exp_ebayes_covariate_corrects_confounded_batch(confounded_batch_ad
 # dictionary key, so a multi-contrast run must stack cleanly and keep its blocks distinguishable.
 @pytest.fixture
 def three_condition_adata():
-    """Conditions A, B, C (three samples each), with C shifted twice as far from A as B is.
-
-    Each feature scales the shift differently and carries its own noise level, which keeps the
-    residual variances heterogeneous.
-    """
+    """Conditions A, B, C (three samples each), with C shifted twice as far from A as B is."""
     sample_names = [f"s{i}" for i in range(9)]
     groups = np.array(["A", "A", "A", "B", "B", "B", "C", "C", "C"])
 
