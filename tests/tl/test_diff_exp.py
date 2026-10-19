@@ -651,19 +651,8 @@ def test__standardize_alphaquant_results(
 def _inmoose_limma_reference(adata, between_column, comparison):
     """Run the pre-port eBayes chain by calling inmoose.limma directly.
 
-    This is the independent numerical oracle for the numpy reimplementations in
-    `tl.diff_exp.ebayes`: `_nan_lmfit`, `_make_contrasts`, `_run_contrasts` and the topTable
-    equivalent all replaced a limma call that this helper still makes. eBayes moderation itself is
-    shared between the two paths (`_ebayes_moderation` calls `limma.eBayes`), so it is not what is
-    under test here.
-
-    inmoose raises `LinAlgError` once a feature has no observation left in a design column, and
-    an all-NaN feature turns its `adj_pvalue` column NaN for every feature. Callers pre-filter
-    with `filter_data_completeness` to give both paths the same feature set. Imports are
-    function-local: patsy only reaches the environment transitively via inmoose, so a module-level
-    import would break collection of this whole file in the non-`full` CI legs. Every caller is
-    gated on `_HAS_INMOOSE`.
-
+    This is the independent numerical reference for the numpy reimplementations in
+    `tl.diff_exp.ebayes`.
     Returns
     -------
     pd.DataFrame
@@ -715,8 +704,7 @@ def test_diff_exp_ebayes_matches_inmoose_limma_reference(
 ):
     """diff_exp_ebayes reproduces a direct inmoose.limma chain on complete data.
 
-    The limma chain does not tolerate features with unobserved conditions, so we filter
-    incomplete features upfront (the intended workflow) to give both paths the same feature set
+    Test the numpy reimplementation and the inmoose.limma reference on the same complete feature set,
     and therefore the same eBayes variance prior. The moderated statistics must then agree to
     numerical precision.
     """
