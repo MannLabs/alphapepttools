@@ -107,8 +107,6 @@ def test_scanpy_pycombat(
 
     expected = _expected_combat(original, batch="batch", covariates=covariates, layer=layer)
 
-    result = scanpy_pycombat(adata, batch="batch", covariates=covariates, layer=layer, copy=copy)
-    # Get comparison data from wrapper
     result = scanpy_pycombat(adata, batch="batch", covariates=covariates, layer=layer, inplace=inplace)
 
     if not inplace:
@@ -122,8 +120,8 @@ def test_scanpy_pycombat(
 
 
 @pytest.mark.parametrize("batch_dtype", [object, "category"])
-@pytest.mark.parametrize("copy", [False, True])
-def test_scanpy_pycombat_nan_batch(pycombat_test_data_simple, batch_dtype, *, copy: bool):
+@pytest.mark.parametrize("inplace", [False, True])
+def test_scanpy_pycombat_nan_batch(pycombat_test_data_simple, batch_dtype, *, inplace: bool):
     """NaNs in the batch column are corrected as a single 'NA' batch, also when modifying inplace."""
     df, _ = pycombat_test_data_simple
     md = pd.DataFrame({"batch": ["x", "x", "x", np.nan, np.nan, "y", "y", "y", "y"]}, index=df.index).astype(
@@ -134,7 +132,7 @@ def test_scanpy_pycombat_nan_batch(pycombat_test_data_simple, batch_dtype, *, co
 
     expected = _expected_combat(original, batch="batch", covariates=None, layer=None)
 
-    result = scanpy_pycombat(adata, batch="batch", copy=copy)
-    adata = result if copy else adata
+    result = scanpy_pycombat(adata, batch="batch", inplace=inplace)
+    adata = adata if inplace else result
 
     assert_adata_equal(adata, expected)
