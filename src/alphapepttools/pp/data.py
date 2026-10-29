@@ -511,7 +511,7 @@ def _handle_overlapping_columns(
 
 def data_column_to_array(
     data: pd.DataFrame | ad.AnnData,
-    column: str,
+    column: str | None,
 ) -> np.ndarray:
     """Get a column from a DataFrame or an AnnData object.
 
@@ -519,8 +519,8 @@ def data_column_to_array(
     ----------
     data
         Data to extract the column from.
-    column : str
-        Column to extract. If data is of type ad.AnnData, the hierarchy to match fields is
+    column : str | None
+        Column to extract. If None, the index is returned. If data is of type ad.AnnData, the hierarchy to match fields is
         - var_names first
         - obs columns
         - var columns
@@ -568,6 +568,9 @@ def data_column_to_array(
         print(arr)  # ['A' 'A' 'B']
 
     """
+    if column is None:
+        return data_index_to_array(data=data, dim_space="obs")
+
     if isinstance(data, pd.DataFrame):
         if column not in data.columns:
             raise ValueError(f"Column {column} not found in DataFrame.")
