@@ -38,17 +38,32 @@ def sample_adata():
     n_pcs = 10
     adata.obsm["X_pca_obs"] = np.random.randn(n_obs, n_pcs)
     adata.varm["PCs_pca_obs"] = np.random.randn(n_vars, n_pcs)
-    adata.uns["variance_pca_obs"] = {"variance_ratio": np.random.rand(n_pcs), "variance": np.random.rand(n_pcs) * 100}
+    adata.uns["variance_pca_obs"] = {
+        "variance_ratio": np.random.rand(n_pcs),
+        "variance": np.random.rand(n_pcs) * 100,
+        "obs_names": adata.obs_names.to_numpy(),
+        "var_names": adata.var_names.to_numpy(),
+    }
 
     # Add PCA results for var space
     adata.varm["X_pca_var"] = np.random.randn(n_vars, n_pcs)
     adata.obsm["PCs_pca_var"] = np.random.randn(n_obs, n_pcs)
-    adata.uns["variance_pca_var"] = {"variance_ratio": np.random.rand(n_pcs), "variance": np.random.rand(n_pcs) * 100}
+    adata.uns["variance_pca_var"] = {
+        "variance_ratio": np.random.rand(n_pcs),
+        "variance": np.random.rand(n_pcs) * 100,
+        "obs_names": adata.obs_names.to_numpy(),
+        "var_names": adata.var_names.to_numpy(),
+    }
 
     # Add custom embeddings
     adata.obsm["custom_embedding"] = np.random.randn(n_obs, 5)
     adata.varm["custom_loadings"] = np.random.randn(n_vars, 5)
-    adata.uns["custom_embedding"] = {"variance_ratio": np.random.rand(5), "variance": np.random.rand(5) * 100}
+    adata.uns["custom_embedding"] = {
+        "variance_ratio": np.random.rand(5),
+        "variance": np.random.rand(5) * 100,
+        "obs_names": adata.obs_names.to_numpy(),
+        "var_names": adata.var_names.to_numpy(),
+    }
 
     return adata
 
@@ -307,13 +322,14 @@ def make_basic_anndata(n_obs=100, n_vars=200, n_pcs=2):
     # default PCA embeddings for obs and var
     adata.obsm["X_pca_obs"] = np.linspace(0, 1, n_obs * n_pcs).reshape(n_obs, n_pcs)
     adata.varm["X_pca_var"] = np.linspace(0, 1, n_vars * n_pcs).reshape(n_vars, n_pcs)
-    # variance metadata
-    adata.uns["variance_pca_obs"] = {"variance_ratio": np.array([0.7, 0.3])}
-    adata.uns["variance_pca_var"] = {"variance_ratio": np.array([0.5, 0.5])}
+    # variance metadata, shaped like the output of _store_pca_results
+    names = {"obs_names": adata.obs_names.to_numpy(), "var_names": adata.var_names.to_numpy()}
+    adata.uns["variance_pca_obs"] = {"variance_ratio": np.array([0.7, 0.3]), "variance": np.array([7.0, 3.0]), **names}
+    adata.uns["variance_pca_var"] = {"variance_ratio": np.array([0.5, 0.5]), "variance": np.array([5.0, 5.0]), **names}
 
     # costom embeddings names
     adata.obsm["custom_emb"] = np.ones((n_obs, n_pcs))
-    adata.uns["custom_emb"] = {"variance_ratio": np.array([0.6, 0.4])}
+    adata.uns["custom_emb"] = {"variance_ratio": np.array([0.6, 0.4]), "variance": np.array([6.0, 4.0]), **names}
     return adata
 
 

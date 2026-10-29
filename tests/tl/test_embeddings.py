@@ -2,7 +2,7 @@ from typing import Any
 
 import numpy as np
 import pytest
-from anndata import AnnData
+from anndata import AnnData, read_h5ad
 
 import alphapepttools as apt
 
@@ -51,6 +51,10 @@ def test_pca__default(toy_adata):
     assert "variance_ratio" in toy_adata.uns["variance_pca_obs"]
     assert "variance" in toy_adata.uns["variance_pca_obs"]
 
+    # Check that the fitted sample and feature names are recorded
+    np.testing.assert_array_equal(toy_adata.uns["variance_pca_obs"]["obs_names"], toy_adata.obs_names)
+    np.testing.assert_array_equal(toy_adata.uns["variance_pca_obs"]["var_names"], toy_adata.var_names)
+
 
 def test_pca__copy(toy_adata) -> None:
     """Test the pca function correctly handles copy behaviour."""
@@ -87,6 +91,10 @@ def test_pca__var_space(toy_adata):
     # Check shapes
     assert toy_adata.varm["X_pca_var"].shape[0] == toy_adata.n_vars
     assert toy_adata.obsm["PCs_pca_var"].shape[0] == toy_adata.n_obs
+
+    # Fitted names describe the sample and feature axes regardless of dim_space
+    np.testing.assert_array_equal(toy_adata.uns["variance_pca_var"]["obs_names"], toy_adata.obs_names)
+    np.testing.assert_array_equal(toy_adata.uns["variance_pca_var"]["var_names"], toy_adata.var_names)
 
 
 def test_pca__with_layer(toy_adata_with_layers):
@@ -127,6 +135,26 @@ def test_pca__with_mask(toy_adata_with_mask):
     assert np.isnan(loadings[~mask, :]).all(), "Masked features should have NaN loadings"
     # Features in mask should not have NaN loadings
     assert not np.isnan(loadings[mask, :]).any(), "Unmasked features should not have NaN loadings"
+
+    # Only the masked-in features are recorded as fitted; all samples are
+    variance = toy_adata_with_mask.uns["variance_pca_obs"]
+    np.testing.assert_array_equal(variance["var_names"], toy_adata_with_mask.var_names[mask])
+    np.testing.assert_array_equal(variance["obs_names"], toy_adata_with_mask.obs_names)
+
+
+def test_pca__uns_round_trips_h5ad(toy_adata_with_mask, tmp_path):
+    """The recorded names must survive writing to and reading from h5ad."""
+    apt.tl.pca(toy_adata_with_mask, meta_data_mask_column_name="feature_mask", n_comps=5)
+    path = tmp_path / "pca.h5ad"
+    toy_adata_with_mask.write_h5ad(path)
+
+    loaded = read_h5ad(path)
+
+    variance = loaded.uns["variance_pca_obs"]
+    np.testing.assert_array_equal(variance["obs_names"], toy_adata_with_mask.obs_names)
+    np.testing.assert_array_equal(
+        variance["var_names"], toy_adata_with_mask.var_names[toy_adata_with_mask.var["feature_mask"].values]
+    )
 
 
 def test_pca__var_space_with_mask(toy_adata_with_mask):
@@ -204,6 +232,9 @@ def test_bpca__default(toy_adata):
     assert "variance_ratio" in toy_adata.uns["variance_bpca_obs"]
     assert len(toy_adata.uns["variance_bpca_obs"]["variance_ratio"]) == 5  # noqa: PLR2004
 
+    np.testing.assert_array_equal(toy_adata.uns["variance_bpca_obs"]["obs_names"], toy_adata.obs_names)
+    np.testing.assert_array_equal(toy_adata.uns["variance_bpca_obs"]["var_names"], toy_adata.var_names)
+
 
 def test_bpca__copy(toy_adata) -> None:
     """Test the bpca function correctly handles copy behaviour."""
@@ -265,6 +296,10 @@ def test_bpca__with_mask(toy_adata_with_mask):
     assert np.isnan(loadings[~mask, :]).all(), "Masked features should have NaN loadings"
     # Features in mask should not have NaN loadings
     assert not np.isnan(loadings[mask, :]).any(), "Unmasked features should not have NaN loadings"
+
+    variance = toy_adata_with_mask.uns["variance_bpca_obs"]
+    np.testing.assert_array_equal(variance["var_names"], toy_adata_with_mask.var_names[mask])
+    np.testing.assert_array_equal(variance["obs_names"], toy_adata_with_mask.obs_names)
 
 
 def test_bpca__var_space_with_mask(toy_adata_with_mask):

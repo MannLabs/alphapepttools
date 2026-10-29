@@ -350,7 +350,9 @@ def extract_pca_anndata(
         pca_coordinates = adata.varm[pca_coors_key]
         obs_df = adata.var
 
-    var_df = pd.DataFrame(adata.uns[pca_var_key])
+    # the uns entry also holds the fitted obs/var names, which are not per-component
+    pca_variance = adata.uns[pca_var_key]
+    var_df = pd.DataFrame({"variance_ratio": pca_variance["variance_ratio"], "variance": pca_variance["variance"]})
 
     # Initialize PCA AnnData
     adata_pca = ad.AnnData(X=pca_coordinates)
