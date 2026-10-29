@@ -16,6 +16,7 @@ from alphapepttools.pl.plots import (
     drop_nan_coordinate_points,
     label_plot,
     make_scatter_config,
+    scatter,
 )
 from alphapepttools.pp.data import data_columns_to_df
 
@@ -306,6 +307,32 @@ def test_data_columns_to_df_failures(which_data, example_data, example_sample_me
             ["A", "B", "age"],
             [0, 1, 2],
         ),
+        # Group left empty after dropping NaNs does not occupy a position
+        (
+            "cell_type",
+            "A",
+            None,
+            [[2.0], [3.0]],
+            ["B", "C"],
+            [0, 1],
+        ),
+        # No grouping column: each row is its own group labelled by the index
+        (
+            None,
+            "B",
+            None,
+            [[4.0], [5.0], [6.0]],
+            ["cell1", "cell2", "cell3"],
+            [0, 1, 2],
+        ),
+        (
+            None,
+            "A",
+            None,
+            [[2.0], [3.0]],
+            ["cell2", "cell3"],
+            [0, 1],
+        ),
     ],
 )
 def test__extract_groupwise_plotting_data(
@@ -402,6 +429,34 @@ def test_extract_groupwise_plotting_data_warns_on_conflicting_args(example_data,
         )
 
     assert "ignoring 'grouping_column' and 'value_column'" in caplog.text
+
+
+def test_extract_groupwise_plotting_data_requires_value_column(example_data):
+    with pytest.raises(ValueError, match="'value_column' must be provided"):
+        _extract_groupwise_plotting_data(data=example_data, grouping_column="A")
+
+
+### Test scatter with index as axis ###
+
+
+@pytest.mark.parametrize(("x_column", "y_column", "axis"), [(None, "B", "x"), ("B", None, "y")])
+def test_scatter_uses_index_when_column_is_none(example_data, example_ax, x_column, y_column, axis):
+    fig, ax = example_ax
+
+    scatter(data=example_data, x_column=x_column, y_column=y_column, ax=ax, order="original")
+    fig.canvas.draw()
+
+    tick_labels = ax.get_xticklabels() if axis == "x" else ax.get_yticklabels()
+    assert [t.get_text() for t in tick_labels] == ["cell1", "cell2", "cell3"]
+    offsets = ax.collections[0].get_offsets()
+    assert offsets[:, 0 if axis == "x" else 1].tolist() == [0.0, 1.0, 2.0]
+    assert offsets[:, 1 if axis == "x" else 0].tolist() == [4.0, 5.0, 6.0]
+
+
+def test_scatter_requires_one_column(example_data, example_ax):
+    _, ax = example_ax
+    with pytest.raises(ValueError, match="At least one of 'x_column' or 'y_column'"):
+        scatter(data=example_data, ax=ax)
 
 
 ### Test _array_to_str ###
@@ -571,4 +626,26 @@ def test__extract_groupwise_plotting_data_subgrouped():
     assert labels == ["P1", "P1", "P2", "P2"]
     assert color_keys == ["ctrl", "treat", "ctrl", "treat"]
     # With width=0.4 and 2 subgroups: offsets = [-0.2, +0.2] around each main-group integer.
+    assert positions == pytest.approx([-0.2, 0.2, 0.8, 1.2])
+
+
+def test__extract_groupwise_plotting_data_subgrouped_skips_empty_main_group():
+    """A main group whose values are all NaN is dropped and does not leave a gap in positions."""
+    df = pd.DataFrame(
+        {
+            "precursor": ["P1", "P1", "P2", "P2", "P3", "P3"],
+            "condition": ["ctrl", "treat"] * 3,
+            "intensity": [1.0, 2.0, np.nan, np.nan, 3.0, 4.0],
+        }
+    )
+
+    _, labels, positions, _ = _extract_groupwise_plotting_data(
+        data=df,
+        grouping_column="precursor",
+        value_column="intensity",
+        subgroup_column="condition",
+        width=0.4,
+    )
+
+    assert labels == ["P1", "P1", "P3", "P3"]
     assert positions == pytest.approx([-0.2, 0.2, 0.8, 1.2])
