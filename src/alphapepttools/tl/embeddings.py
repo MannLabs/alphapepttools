@@ -51,6 +51,27 @@ def _check_inputs_for_dim_reduction(adata: ad.AnnData, layer: str | None, featur
             )
 
 
+def _reject_renamed_mask_kwarg(kwargs: dict) -> None:
+    """Raise an informative TypeError if the pre-rename mask argument is passed.
+
+    Parameters
+    ----------
+    kwargs
+        The ``**kwargs`` catch-all of :func:`pca` or :func:`bpca`.
+
+    Raises
+    ------
+    TypeError
+        If ``meta_data_mask_column_name`` is among the keyword arguments.
+    """
+    # Without this, the old name falls through to the backend and fails with an error that does not mention the rename
+    if "meta_data_mask_column_name" in kwargs:
+        raise TypeError(
+            "The 'meta_data_mask_column_name' argument was renamed to 'feature_mask_column'. "
+            "Please update the call, e.g. apt.tl.pca(adata, feature_mask_column='is_core')."
+        )
+
+
 def _prepare_pca_data(
     adata: ad.AnnData,
     layer: str | None = None,
@@ -279,6 +300,8 @@ def pca(
         variance_ratio = adata.uns["variance_pca"]["variance_ratio"]
 
     """
+    # raise on outdated argument, remove on release after v0.5.0
+    _reject_renamed_mask_kwarg(kwargs=pca_kwargs)
     adata = adata.copy() if copy else adata
     logger.info("computing PCA")
 
@@ -428,6 +451,8 @@ def bpca(
     --------
     :class:`bpca.BPCA`
     """
+    # raise on outdated argument, remove on release after v0.5.0
+    _reject_renamed_mask_kwarg(kwargs=bpca_kwargs)
     adata = adata.copy() if copy else adata
     _check_inputs_for_dim_reduction(adata=adata, layer=layer, feature_mask_column=feature_mask_column)
 

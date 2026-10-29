@@ -332,6 +332,18 @@ def test_pca__missing_mask_column_raises(toy_adata):
         apt.tl.pca(toy_adata, feature_mask_column="nonexistent_column")
 
 
+def test_pca__renamed_mask_argument_raises(toy_adata):
+    """Passing the pre-rename `meta_data_mask_column_name` should raise an informative TypeError."""
+    with pytest.raises(TypeError, match="renamed to 'feature_mask_column'"):
+        apt.tl.pca(toy_adata, meta_data_mask_column_name="feature_mask")
+
+
+def test_bpca__renamed_mask_argument_raises(toy_adata):
+    """Passing the pre-rename `meta_data_mask_column_name` should raise an informative TypeError."""
+    with pytest.raises(TypeError, match="renamed to 'feature_mask_column'"):
+        apt.tl.bpca(toy_adata, meta_data_mask_column_name="feature_mask")
+
+
 def test_pca__non_boolean_mask_column_raises(toy_adata):
     """A mask column that is not boolean should raise TypeError."""
     toy_adata.var["int_mask"] = list(range(toy_adata.n_vars))  # int, not bool
