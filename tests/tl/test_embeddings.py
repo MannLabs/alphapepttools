@@ -102,7 +102,7 @@ def test_pca__with_custom_embeddings_name(toy_adata):
 
 def test_pca__with_mask(toy_adata_with_mask):
     """Test the pca function with feature mask."""
-    apt.tl.pca(toy_adata_with_mask, meta_data_mask_column_name="feature_mask")
+    apt.tl.pca(toy_adata_with_mask, feature_mask_column="feature_mask")
 
     # Check that PCA results exist
     assert "X_pca" in toy_adata_with_mask.obsm
@@ -138,7 +138,7 @@ def test_pca__transposed_adata(toy_adata):
 
 def test_pca__uns_round_trips_h5ad(toy_adata_with_mask, tmp_path):
     """The recorded names must survive writing to and reading from h5ad."""
-    apt.tl.pca(toy_adata_with_mask, meta_data_mask_column_name="feature_mask", n_comps=5)
+    apt.tl.pca(toy_adata_with_mask, feature_mask_column="feature_mask", n_comps=5)
     path = tmp_path / "pca.h5ad"
     toy_adata_with_mask.write_h5ad(path)
 
@@ -244,7 +244,7 @@ def test_bpca__with_layer(toy_adata_with_layers):
 
 def test_bpca__with_mask(toy_adata_with_mask):
     """Test the bpca function with feature mask."""
-    apt.tl.bpca(toy_adata_with_mask, meta_data_mask_column_name="feature_mask", n_comps=5)
+    apt.tl.bpca(toy_adata_with_mask, feature_mask_column="feature_mask", n_comps=5)
 
     assert "X_bpca" in toy_adata_with_mask.obsm
     assert "PCs_bpca" in toy_adata_with_mask.varm
@@ -327,16 +327,16 @@ def test_pca__missing_layer_raises(toy_adata):
 
 
 def test_pca__missing_mask_column_raises(toy_adata):
-    """Unknown `meta_data_mask_column_name` should raise ValueError."""
+    """Unknown `feature_mask_column` should raise ValueError."""
     with pytest.raises(ValueError, match="not found in data.var"):
-        apt.tl.pca(toy_adata, meta_data_mask_column_name="nonexistent_column")
+        apt.tl.pca(toy_adata, feature_mask_column="nonexistent_column")
 
 
 def test_pca__non_boolean_mask_column_raises(toy_adata):
     """A mask column that is not boolean should raise TypeError."""
     toy_adata.var["int_mask"] = list(range(toy_adata.n_vars))  # int, not bool
     with pytest.raises(TypeError, match="must be of boolean dtype"):
-        apt.tl.pca(toy_adata, meta_data_mask_column_name="int_mask")
+        apt.tl.pca(toy_adata, feature_mask_column="int_mask")
 
 
 ### Test _store_pca_results overwrite warnings ###
