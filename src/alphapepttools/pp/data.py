@@ -11,6 +11,7 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 from sklearn.preprocessing import RobustScaler, StandardScaler
 
+from alphapepttools._decorator import deprecated_copy
 from alphapepttools._utils import get_matrix
 
 # logging configuration
@@ -808,6 +809,7 @@ def data_columns_to_df(
     return cast("pd.DataFrame", dataset)
 
 
+@deprecated_copy(since="0.5.0", removed_in="0.6.0")
 def scale_and_center(
     adata: ad.AnnData,
     scaler: Literal["standard", "robust"] = "standard",
@@ -815,7 +817,7 @@ def scale_and_center(
     *,
     center: bool = True,
     scale: bool = True,
-    copy: bool = False,
+    inplace: bool = True,
 ) -> ad.AnnData | None:
     """Scale and center features
 
@@ -841,14 +843,14 @@ def scale_and_center(
             - `standard`: Divides the feature distribution by its standard deviation to unit variance.
             - `robust`: Divides the feature distribution by its interquartile range, i.e. range between quantile (0.25, 0.75).
         Not applied if set to `False`.
-    copy
-        Whether to return a modified copy (True) of the anndata object. If False (default)
-        modifies the object inplace
+    inplace
+        If `True` (default), modifies `adata` inplace and returns `None`. If `False`, returns a modified copy
+        of `adata`.
 
     Returns
     -------
-    If `copy=False` modifies the anndata object at layer inplace and returns None.
-    If `copy=True`, returns a modified copy.
+    If `inplace=True` modifies the anndata object at layer inplace and returns None.
+    If `inplace=False`, returns a modified copy.
 
     Examples
     --------
@@ -894,7 +896,7 @@ def scale_and_center(
         raise ValueError(
             "Setting `center=False` and `scale=False` leaves data unchanged. Set at least one argument to `True`"
         )
-    adata = adata.copy() if copy else adata
+    adata = adata if inplace else adata.copy()
     logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler.")
 
     if scaler == "standard":
@@ -912,7 +914,7 @@ def scale_and_center(
     else:
         adata.layers[layer] = result
 
-    return adata if copy else None
+    return None if inplace else adata
 
 
 # TODO: Abstract class for validation of AnnData objects?

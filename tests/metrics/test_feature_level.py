@@ -71,16 +71,16 @@ class TestCV:
 
 class TestCoefficientOfVariation:
     @pytest.mark.parametrize("min_valid", [3, 4, 5])
-    @pytest.mark.parametrize("copy", [True, False])
+    @pytest.mark.parametrize("inplace", [False, True])
     @pytest.mark.parametrize("layer", [None, "layer"])
-    def test_coefficient_of_variation(self, example_adata, layer: str | None, min_valid: int, *, copy: bool):
+    def test_coefficient_of_variation(self, example_adata, layer: str | None, min_valid: int, *, inplace: bool):
         """Test CV computation for data with nan values"""
         adata, cv = example_adata
         expected_cv = cv[min_valid]
 
-        result = coefficient_of_variation(adata, layer=layer, min_valid=min_valid, copy=copy)
+        result = coefficient_of_variation(adata, layer=layer, min_valid=min_valid, inplace=inplace)
 
-        if copy:
+        if not inplace:
             assert isinstance(result, ad.AnnData)
             adata_result = result
         else:
@@ -158,9 +158,9 @@ class TestCoefficientOfVariationGrouped:
         assert "cv" not in adata.varm
 
     def test_grouped_copy_does_not_modify_original(self, grouped_adata) -> None:
-        """copy=True returns a modified copy and leaves the original alone"""
+        """inplace=False returns a modified copy and leaves the original alone"""
         adata, _ = grouped_adata
-        result = coefficient_of_variation(adata, group_column="group", copy=True)
+        result = coefficient_of_variation(adata, group_column="group", inplace=False)
 
         assert result is not None
         assert "cv" in result.varm

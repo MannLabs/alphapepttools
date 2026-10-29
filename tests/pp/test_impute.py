@@ -231,18 +231,18 @@ class TestImputeGaussianAnnData:
 
         return ad.AnnData(X=dummy_data_all_nan, obs=obs)
 
-    @pytest.mark.parametrize("copy", [False, True])
+    @pytest.mark.parametrize("inplace", [True, False])
     @pytest.mark.parametrize("layer", [None, "layer2"])
     @pytest.mark.parametrize("group_column", [None, "sample_group"])
     def test_impute_gaussian(
-        self, gaussian_imputation_dummy_anndata, layer: str, group_column: str, *, copy: bool
+        self, gaussian_imputation_dummy_anndata, layer: str, group_column: str, *, inplace: bool
     ) -> None:
         """Test gaussian imputation for data with nan values"""
         adata, X_ref, X_ref_grouped = gaussian_imputation_dummy_anndata
 
-        result = impute_gaussian(adata, layer=layer, group_column=group_column, copy=copy)
+        result = impute_gaussian(adata, layer=layer, group_column=group_column, inplace=inplace)
 
-        if copy:
+        if not inplace:
             assert isinstance(result, ad.AnnData)
             adata_imputed = result
         else:
@@ -338,17 +338,19 @@ class TestImputeMedianAnnData:
 
         return ad.AnnData(X=dummy_data_all_nan, obs=obs)
 
-    @pytest.mark.parametrize("copy", [False, True])
+    @pytest.mark.parametrize("inplace", [True, False])
     @pytest.mark.parametrize(
         ("layer", "group_column"),
         [(None, None), ("layer2", None), (None, "sample_group"), ("layer2", "sample_group")],
     )
-    def test_impute_median(self, median_imputation_dummy_anndata, layer: str, group_column: str, *, copy: bool) -> None:
+    def test_impute_median(
+        self, median_imputation_dummy_anndata, layer: str, group_column: str, *, inplace: bool
+    ) -> None:
         """Test median imputation for data with nan values"""
         adata, X_ref, X_ref_grouped = median_imputation_dummy_anndata
-        result = impute_median(adata, layer=layer, group_column=group_column, copy=copy)
+        result = impute_median(adata, layer=layer, group_column=group_column, inplace=inplace)
 
-        if copy:
+        if not inplace:
             assert isinstance(result, ad.AnnData)
             adata_imputed = result
         else:
@@ -442,16 +444,16 @@ class TestImputeKNNAnnData:
 
         return ad.AnnData(X=dummy_data_all_nan, obs=obs)
 
-    @pytest.mark.parametrize("copy", [True, False])
+    @pytest.mark.parametrize("inplace", [False, True])
     @pytest.mark.parametrize("layer", [None, "layer2"])
     @pytest.mark.parametrize("group_column", [None, "sample_group"])
-    def test_impute_knn(self, knn_imputation_dummy_anndata, layer: str, group_column: str, *, copy: bool) -> None:
+    def test_impute_knn(self, knn_imputation_dummy_anndata, layer: str, group_column: str, *, inplace: bool) -> None:
         """Test median imputation for data with nan values"""
         adata, X_ref, X_ref_grouped, kwargs = knn_imputation_dummy_anndata
 
-        result = impute_knn(adata, layer=layer, group_column=group_column, **kwargs, copy=copy)
+        result = impute_knn(adata, layer=layer, group_column=group_column, **kwargs, inplace=inplace)
 
-        if copy:
+        if not inplace:
             assert isinstance(result, ad.AnnData)
             adata_imputed = result
         else:
@@ -481,7 +483,7 @@ class TestImputeKNNAnnData:
         adata, _, _, _ = knn_imputation_dummy_anndata_all_nan
 
         with pytest.raises(ValueError, match="Features with index"):
-            _ = impute_knn(adata, layer=None, group_column="sample_group_with_nan", n_neighbors=1, copy=True)
+            _ = impute_knn(adata, layer=None, group_column="sample_group_with_nan", n_neighbors=1, inplace=False)
 
     def test_impute_median__missing_group_column(
         self,
@@ -491,7 +493,7 @@ class TestImputeKNNAnnData:
         adata, _, _, _ = knn_imputation_dummy_anndata_all_nan
 
         with pytest.raises(KeyError):
-            _ = impute_knn(adata, group_column="non_existent_column", n_neighbors=1, copy=True)
+            _ = impute_knn(adata, group_column="non_existent_column", n_neighbors=1, inplace=False)
 
     def test_impute_median__missing_layer(
         self,
@@ -501,7 +503,7 @@ class TestImputeKNNAnnData:
         adata, _, _, _ = knn_imputation_dummy_anndata_all_nan
 
         with pytest.raises(KeyError):
-            _ = impute_knn(adata, layer="non_existent_layer", copy=True)
+            _ = impute_knn(adata, layer="non_existent_layer", inplace=False)
 
 
 class TestImputeBPCAAnnData:
@@ -546,15 +548,15 @@ class TestImputeBPCAAnnData:
 
         return ad.AnnData(X=dummy_data_all_nan, obs=obs)
 
-    @pytest.mark.parametrize("copy", [True, False])
+    @pytest.mark.parametrize("inplace", [False, True])
     @pytest.mark.parametrize("layer", [None, "layer2"])
-    def test_impute_bpca(self, bpca_imputation_dummy_anndata, layer: str, *, copy: bool) -> None:
+    def test_impute_bpca(self, bpca_imputation_dummy_anndata, layer: str, *, inplace: bool) -> None:
         """Test BPCA imputation for data with nan values"""
         adata, X_ref, _, kwargs = bpca_imputation_dummy_anndata
 
-        result = impute_bpca(adata, layer=layer, **kwargs, copy=copy)
+        result = impute_bpca(adata, layer=layer, **kwargs, inplace=inplace)
 
-        if copy:
+        if not inplace:
             assert isinstance(result, ad.AnnData)
             adata_imputed = result
         else:
