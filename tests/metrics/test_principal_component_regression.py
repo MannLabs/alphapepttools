@@ -22,9 +22,9 @@ def adata_dummy():
     obs["categorical"] = pd.Series(np.random.choice(["A", "B", "C"], size=n_cells), dtype="category")
     obs["string"] = ["label"] * n_cells  # unsupported type
 
-    obsm = {"X_pca_obs": np.random.randn(n_cells, n_pcs), "custom_pca": np.random.randn(n_cells, n_pcs)}
+    obsm = {"X_pca": np.random.randn(n_cells, n_pcs), "custom_pca": np.random.randn(n_cells, n_pcs)}
     uns = {
-        "variance_pca_obs": {"variance_ratio": np.linspace(0.1, 0.01, n_pcs)},
+        "variance_pca": {"variance_ratio": np.linspace(0.1, 0.01, n_pcs)},
         "custom_pca": {"variance_ratio": np.linspace(0.1, 0.01, n_pcs)},
     }
 

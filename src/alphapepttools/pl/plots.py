@@ -2327,7 +2327,6 @@ def plot_pca(
     color: str = "blue",
     color_map_column: str | None = None,
     color_column: str | None = None,
-    dim_space: str = "obs",
     embeddings_name: str | None = None,
     method: Literal["pca", "bpca"] = "pca",
     label: bool = False,  # noqa: FBT001, FBT002
@@ -2341,9 +2340,7 @@ def plot_pca(
     """PCA scatter plot showing principal component projections.
 
     Visualizes PCA results by plotting two principal components against each other.
-    The function retrieves PCA embeddings from the AnnData object based on the dim_space
-    parameter: use "obs" for sample projections (most common, shows how samples relate)
-    or "var" for feature projections (shows how features/genes relate). Axes are
+    The function retrieves the sample projections from the AnnData object. Axes are
     automatically labeled with explained variance percentages.
 
     Parameters
@@ -2357,27 +2354,21 @@ def plot_pca(
     color
         Single color for all points. Overridden by color_map_column or color_column.
     color_map_column
-        Column in data.obs (for dim_space="obs") or data.var (for dim_space="var") to use
-        for color encoding. Values are mapped to colors using palette or color_dict.
-        Overrides the color parameter.
+        Column in data.obs to use for color encoding. Values are mapped to colors using
+        palette or color_dict. Overrides the color parameter.
     color_column
         Column containing actual color values (hex, RGBA, etc.). Overrides both color
         and color_map_column parameters.
-    dim_space
-        PCA space to visualize:
-        - "obs": Sample projections (default) - shows samples in PC space
-        - "var": Feature projections - shows features/genes in PC space
     embeddings_name
         Custom embeddings name if non-default name was used in the PCA function.
-        If None, uses default naming convention ("X_pca_obs" or "X_pca_var").
+        If None, uses default naming convention ("X_pca" or "X_bpca" depending on `method`).
     method
         The method used for dimensionality reduction. Options are "pca" or "bpca" with "pca" as the default.
         This is used to construct the default keys if `embeddings_name` is None.
     label
         Whether to add text labels to points in the scatter plot.
     label_column
-        Column to use for point labels. If None and label=True, uses the index
-        (data.obs.index for dim_space="obs", data.var.index for dim_space="var").
+        Column to use for point labels. If None and label=True, uses data.obs.index.
     ax
         Matplotlib axes to plot on. If None, a new figure is created.
     palette
@@ -2421,28 +2412,10 @@ def plot_pca(
             color_dict={"Control": "gray", "Drug": "red"},
         )
 
-    Feature space PCA (var projection):
-
-    .. code-block:: python
-
-        # Show how proteins/genes relate to each other in PC space
-        fig, ax = plt.subplots()
-        Plots.plot_pca(
-            data=adata,
-            ax=ax,
-            x_column=1,
-            y_column=2,
-            dim_space="var",  # Feature projection instead of sample
-            color_map_column="protein_type",
-            scatter_kwargs={"s": 20, "alpha": 0.6},
-        )
-
     Notes
     -----
     - PCA must be run on the AnnData object before calling this function
     - Axis labels automatically include explained variance percentages (e.g., "PC1 (45.2%)")
-    - dim_space="obs" retrieves sample projections from obsm (most common usage)
-    - dim_space="var" retrieves feature projections from varm (less common)
     - PC numbers are 1-indexed: x_column=1 corresponds to the first principal component
     - This is a convenience wrapper around scatter() with automatic PCA data extraction
 
@@ -2454,8 +2427,7 @@ def plot_pca(
         ax = axm.next()
 
     adata_pca = extract_pca_anndata(
-        data,
-        dim_space=dim_space,
+        adata=data,
         embeddings_name=embeddings_name,
         expression_columns=[color_map_column] if color_map_column is not None else None,
         method=method,
@@ -2488,11 +2460,7 @@ def plot_pca(
 
     # add labels if requested
     if label:
-        # For labeling, we need to consider the appropriate observation space
-        if dim_space == "obs":
-            labels = data.obs.index if label_column is None else data_column_to_array(data, label_column)
-        else:  # dim_space == "var"
-            labels = data.var.index if label_column is None else data_column_to_array(data, label_column)
+        labels = data.obs.index if label_column is None else data_column_to_array(data, label_column)
 
         # Create a DataFrame with the PCA coordinates and labels for the new label_plot interface
         label_df = pd.DataFrame({"x": adata_pca.X[:, x_column - 1], "y": adata_pca.X[:, y_column - 1], "label": labels})
@@ -2514,7 +2482,6 @@ def scree_plot(
     adata: ad.AnnData,
     ax: plt.Axes,
     n_pcs: int = 20,
-    dim_space: str = "obs",
     color: str = "blue",
     embeddings_name: str | None = None,
     method: Literal["pca", "bpca"] = "pca",
@@ -2534,10 +2501,6 @@ def scree_plot(
         Matplotlib axes object to plot on.
     n_pcs
         Number of principal components to plot on the x-axis.
-    dim_space
-        PCA space to retrieve variance from:
-        - "obs": Sample space PCA (default) - variance explained across samples
-        - "var": Feature space PCA - variance explained across features
     color
         Color for the scatter points.
     embeddings_name
@@ -2565,27 +2528,17 @@ def scree_plot(
         fig, ax = plt.subplots()
         Plots.scree_plot(adata=adata, ax=ax, n_pcs=30, color="red", scatter_kwargs={"s": 50, "alpha": 0.8})
 
-    Feature space scree plot:
-
-    .. code-block:: python
-
-        # Show variance explained in feature space PCA
-        fig, ax = plt.subplots()
-        Plots.scree_plot(adata=adata, ax=ax, n_pcs=20, dim_space="var")
-
     Notes
     -----
     - PCA must be run on the AnnData object before calling this function
     - Y-axis shows percentage of total variance explained by each PC
-    - dim_space="obs" shows variance for sample projections (most common)
-    - dim_space="var" shows variance for feature projections
     - This is a convenience wrapper around scatter() with automatic variance data extraction
 
     """
     scatter_kwargs = scatter_kwargs or {}
 
     # create the dataframe for plotting, X = pcs, y = explained variance
-    values = prepare_scree_data_to_plot(adata, n_pcs, dim_space, embeddings_name, method=method)
+    values = prepare_scree_data_to_plot(adata=adata, n_pcs=n_pcs, embeddings_name=embeddings_name, method=method)
 
     scatter(
         data=values,
@@ -2597,14 +2550,12 @@ def scree_plot(
     )
 
     # set labels
-    space_suffix = " (samples)" if dim_space == "obs" else " (features)"
-    label_axes(ax, xlabel="PC number", ylabel=f"Explained variance (%){space_suffix}")
+    label_axes(ax, xlabel="PC number", ylabel="Explained variance (%)")
 
 
 def plot_pca_loadings(
     data: ad.AnnData,
     ax: plt.Axes,
-    dim_space: str = "obs",
     embeddings_name: str | None = None,
     method: Literal["pca", "bpca"] = "pca",
     dim: int = 1,
@@ -2624,10 +2575,6 @@ def plot_pca_loadings(
         AnnData object containing PCA results (must have run PCA first).
     ax
         Matplotlib axes object to plot on.
-    dim_space
-        PCA space to retrieve loadings from:
-        - "obs": Sample space PCA (default) - shows which features drive sample separation
-        - "var": Feature space PCA - shows which samples drive feature separation
     embeddings_name
         Custom embeddings name if non-default name was used in the PCA function.
         If None, uses default naming convention.
@@ -2662,27 +2609,11 @@ def plot_pca_loadings(
         fig, ax = plt.subplots()
         Plots.plot_pca_loadings(data=adata, ax=ax, dim=3, nfeatures=30, scatter_kwargs={"s": 50, "alpha": 0.8})
 
-    Feature space loadings (var projection):
-
-    .. code-block:: python
-
-        # Show which samples most influence feature PC1
-        fig, ax = plt.subplots()
-        Plots.plot_pca_loadings(
-            data=adata,
-            ax=ax,
-            dim=1,
-            dim_space="var",
-            nfeatures=15,
-        )
-
     Notes
     -----
     - PCA must be run on the AnnData object before calling this function
     - Features are ranked by absolute loading value (magnitude, not sign)
     - Y-axis shows feature names, X-axis shows loading values
-    - dim_space="obs" shows feature loadings (most common - which proteins/genes matter)
-    - dim_space="var" shows sample loadings (which samples matter)
     - This is a convenience wrapper around scatter() with automatic loadings data extraction
 
     """
@@ -2690,7 +2621,6 @@ def plot_pca_loadings(
 
     top_loadings = prepare_pca_1d_loadings_data_to_plot(
         data=data,
-        dim_space=dim_space,
         embeddings_name=embeddings_name,
         method=method,
         dim=dim,
@@ -2706,8 +2636,7 @@ def plot_pca_loadings(
     )
 
     # set axis labels
-    space_suffix = " features" if dim_space == "obs" else " samples"
-    label_axes(ax, xlabel=f"PC{dim} loadings", ylabel=f"Top{space_suffix}")
+    label_axes(ax, xlabel=f"PC{dim} loadings", ylabel="Top features")
     ax.set_yticks(top_loadings["index_int"])
     ax.set_yticklabels(top_loadings["feature"], rotation=0, ha="right")
 
@@ -2715,7 +2644,6 @@ def plot_pca_loadings(
 def plot_pca_loadings_2d(
     data: ad.AnnData,
     ax: plt.Axes,
-    dim_space: str = "obs",
     embeddings_name: str | None = None,
     method: Literal["pca", "bpca"] = "pca",
     pc_x: int = 1,
@@ -2739,9 +2667,6 @@ def plot_pca_loadings_2d(
         AnnData to plot.
     ax
         Matplotlib axes object to plot on.
-    dim_space
-        The dimension space used in PCA. Can be either "obs" (default) for sample projection
-        or "var" for feature projection. By default "obs".
     embeddings_name
         The custom embeddings name used in PCA. If None, uses default naming convention. By default None.
     method
@@ -2788,8 +2713,6 @@ def plot_pca_loadings_2d(
     - PCA must be run on the AnnData object before calling this function
     - Features are ranked by absolute loading value (magnitude, not sign)
     - X and Y axes show loading values for the specified principal components
-    - dim_space="obs" shows feature loadings (most common - which proteins/genes matter)
-    - dim_space="var" shows sample loadings (which samples matter)
     - This is a convenience wrapper around scatter() with automatic loadings data extraction
 
     """
@@ -2804,7 +2727,6 @@ def plot_pca_loadings_2d(
         pc_x=pc_x,
         pc_y=pc_y,
         nfeatures=nfeatures,
-        dim_space=dim_space,
     )
 
     # plot the loadings of all features (used in PCA) first
@@ -2851,8 +2773,7 @@ def plot_pca_loadings_2d(
             ax.plot([0, xi], [0, yi], color="gray", linestyle="-", linewidth=0.2)
 
     # set axis labels
-    space_suffix = " (samples)" if dim_space == "obs" else " (features)"
-    label_axes(ax, xlabel=f"PC{pc_x}{space_suffix}", ylabel=f"PC{pc_y}{space_suffix}")
+    label_axes(ax, xlabel=f"PC{pc_x} loadings", ylabel=f"PC{pc_y} loadings")
 
 
 def volcano(  # noqa: C901
