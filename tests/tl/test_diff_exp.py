@@ -65,7 +65,6 @@ def example_metadata():
 _TEST_LAYER = "quant"
 
 
-# Helper function to move data to a specific layer in an AnnData object
 def _move_data_to_layer(adata: ad.AnnData, layer: str | None) -> ad.AnnData:
     """Return a copy holding the data in `layer` with .X NaNed out; returns adata unchanged if layer is None.
 
