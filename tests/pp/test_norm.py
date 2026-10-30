@@ -156,14 +156,14 @@ class TestNormalizeFunction:
         assert len(adata.obs.columns) == 1
         assert "norm_factors" in adata.obs.columns
 
-    @pytest.mark.parametrize("copy", [False, True])
+    @pytest.mark.parametrize("inplace", [True, False])
     @pytest.mark.parametrize("layer", [None, "new_layer", "different_layer"])
     @pytest.mark.parametrize("strategy", ["total_mean", "total_median"])
     def test_normalize_function_layer_operations(
         self,
         strategy: str,
         layer: str,
-        copy: bool,  # noqa: FBT001
+        inplace: bool,  # noqa: FBT001
         test_data_factory,
     ) -> None:
         """Test that results are stored in the correct layers"""
@@ -173,9 +173,9 @@ class TestNormalizeFunction:
         layers = {layer: X.copy()} if layer is not None else None
         adata = ad.AnnData(X=X.copy(), layers=layers)
 
-        result = normalize(adata, strategy=strategy, key_added="norm_factors", layer=layer, copy=copy)
+        result = normalize(adata, strategy=strategy, key_added="norm_factors", layer=layer, inplace=inplace)
 
-        if copy:
+        if not inplace:
             assert isinstance(result, ad.AnnData)
             modified_adata = result
 
@@ -266,7 +266,7 @@ class TestIRS:
 
         return ad.AnnData(X=X, obs=obs, layers={"new_layer": X.copy()}), irs_kwargs, ref
 
-    @pytest.mark.parametrize("copy", [False, True])
+    @pytest.mark.parametrize("inplace", [True, False])
     @pytest.mark.parametrize("layer", [None, "new_layer"])
     @pytest.mark.parametrize(
         "reference_kwargs",
@@ -281,16 +281,16 @@ class TestIRS:
         *,
         reference_kwargs,
         layer: str | None,
-        copy: bool,
+        inplace: bool,
     ) -> None:
         """Test internal reference scaling"""
         adata, irs_kwargs, expected_array = irs_data__reference_values
 
         original_X = adata.X.copy()
 
-        result = irs(adata, **reference_kwargs, **irs_kwargs, copy=copy, layer=layer)
+        result = irs(adata, **reference_kwargs, **irs_kwargs, inplace=inplace, layer=layer)
 
-        if copy:
+        if not inplace:
             assert isinstance(result, ad.AnnData)
             modified_adata = result
 
@@ -305,23 +305,23 @@ class TestIRS:
         if layer is not None:
             assert np.array_equal(modified_adata.X, original_X)
 
-    @pytest.mark.parametrize("copy", [False, True])
+    @pytest.mark.parametrize("inplace", [True, False])
     @pytest.mark.parametrize("layer", [None, "new_layer"])
     def test_irs__mean_reference(
         self,
         irs_data__mean_reference: tuple[ad.AnnData, dict, np.ndarray],
         *,
         layer: str | None,
-        copy: bool,
+        inplace: bool,
     ) -> None:
         """Test internal reference scaling"""
         adata, irs_kwargs, expected_array = irs_data__mean_reference
 
         original_X = adata.X.copy()
 
-        result = irs(adata, **irs_kwargs, copy=copy, layer=layer)
+        result = irs(adata, **irs_kwargs, inplace=inplace, layer=layer)
 
-        if copy:
+        if not inplace:
             assert isinstance(result, ad.AnnData)
             modified_adata = result
 
@@ -350,7 +350,7 @@ class TestIRS:
         adata, irs_kwargs, _ = irs_data__reference_values
 
         with pytest.raises(ValueError, match="`reference_value` .* does not exist"):
-            irs(adata, **reference_kwargs, **irs_kwargs, copy=False, layer=None)
+            irs(adata, **reference_kwargs, **irs_kwargs, inplace=True, layer=None)
 
     def test_irs__reference_value_missing_in_group(
         self, irs_data__reference_values: tuple[ad.AnnData, dict, np.ndarray]
@@ -373,6 +373,6 @@ class TestIRS:
                 reference_column="is_reference__one_missing",
                 reference_value=True,
                 **irs_kwargs,
-                copy=False,
+                inplace=True,
                 layer=None,
             )

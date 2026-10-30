@@ -818,7 +818,7 @@ class TestScaleAndCenter:
         """Test that alphapepttools.pp.scale_and_center modifies anndata correctly inplace"""
         adata, expected = anndata_scale_and_center
 
-        return_value = apt.pp.scale_and_center(adata, scaler=scaler, layer=layer, copy=False)
+        return_value = apt.pp.scale_and_center(adata, scaler=scaler, layer=layer, inplace=True)
 
         assert return_value is None  # inplace expected
 
@@ -834,7 +834,7 @@ class TestScaleAndCenter:
         adata, expected = anndata_scale_and_center
         adata_original = adata.copy()
 
-        adata_new = apt.pp.scale_and_center(adata, scaler=scaler, layer=layer, copy=True)
+        adata_new = apt.pp.scale_and_center(adata, scaler=scaler, layer=layer, inplace=False)
 
         assert isinstance(adata_new, ad.AnnData)
 
@@ -861,7 +861,7 @@ class TestScaleAndCenter:
         adata, expected = anndata_center_only
         adata_original = adata.copy()
 
-        adata_new = apt.pp.scale_and_center(adata, scaler=scaler, layer=layer, center=True, scale=False, copy=True)
+        adata_new = apt.pp.scale_and_center(adata, scaler=scaler, layer=layer, center=True, scale=False, inplace=False)
 
         assert isinstance(adata_new, ad.AnnData)
 
@@ -882,7 +882,7 @@ class TestScaleAndCenter:
         adata, expected = anndata_scale_only
         adata_original = adata.copy()
 
-        adata_new = apt.pp.scale_and_center(adata, scaler=scaler, layer=layer, center=False, scale=True, copy=True)
+        adata_new = apt.pp.scale_and_center(adata, scaler=scaler, layer=layer, center=False, scale=True, inplace=False)
 
         assert isinstance(adata_new, ad.AnnData)
 
