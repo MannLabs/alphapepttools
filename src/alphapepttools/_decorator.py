@@ -1,10 +1,16 @@
 """Utility decorators for package"""
 
 import functools
+import inspect
+import json
 import re
 import warnings
 from collections.abc import Callable
-from typing import ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar
+
+import anndata as ad
+
+from alphapepttools.settings import settings
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -88,3 +94,121 @@ def deprecated_copy(*, since: str = "0.5.0", removed_in: str = "0.6.0") -> Calla
         return wrapper
 
     return decorator
+
+
+def _serialize_args(arguments: dict[str, Any]) -> str:
+    """Serialize bound call arguments to a JSON string
+
+    Scalars are kept as they are; any other value, including `adata`, is reduced to its type name
+    and, where available, its shape.
+    """
+
+    # break down complex objects into summaries
+    def summarize(value: object) -> str | int | float | bool | None:
+        if value is None or isinstance(value, str | int | float | bool):
+            return value
+        shape = getattr(value, "shape", None)
+        if shape is not None:
+            return f"{type(value).__name__}{tuple(shape)}"
+        return type(value).__name__
+
+    return json.dumps({name: summarize(value) for name, value in arguments.items()}, default=repr)
+
+
+def _record_provenance(func: Callable[..., Any], *, adata: object, result: object, args_json: str) -> None:
+    """Append an entry for a call to `adata.uns["provenance"]` of the AnnData it produced or modified
+
+    Parameters
+    ----------
+    func
+        The called function
+    adata
+        Value of the call's `adata` argument, if any
+    result
+        Return value of the call
+    args_json
+        Serialized call arguments, see :func:`_serialize_args`
+    """
+    # avoid circular import
+    from alphapepttools import __version__
+
+    target = result if isinstance(result, ad.AnnData) else adata
+    if not isinstance(target, ad.AnnData):
+        return
+
+    entry = {
+        "function": f"{func.__module__}.{func.__qualname__}",
+        "version": __version__,
+        "args": args_json,
+    }
+    log = target.uns.setdefault("provenance", {})
+    log[f"{len(log):04d}"] = entry
+
+
+def track_provenance(func: Callable[P, R]) -> Callable[P, R]:
+    """Decorator to record the provenance of a function call for an AnnData object.
+
+    If provenance tracking is enabled via `settings.track_provenance`, this decorator will record the function call, its arguments and the current alphapepttools version in the `provenance` entry in `AnnData.uns`. Depending on the `inplace` behavior, the record will be either added directly to the input AnnData object or the returned copy.
+
+    Tracking is disabled for nested calls, i.e. if a decorated function calls another decorated function, the inner call will not be recorded (i.e. if function XYZ uses pp.nanlog internally, there will be only a recording for the call to XYZ, not pp.nanlog).
+
+    Functions decorated with this decorator should have an `adata` argument representing an AnnData object.
+
+    Parameters
+    ----------
+    func
+        Function taking an AnnData as argument `adata`, or returning one
+
+    Returns
+    -------
+    The wrapped function
+
+    Examples
+    --------
+    Entries are recorded by default and can be read back from `uns`:
+
+    .. code-block:: python
+
+
+        import alphapepttools as apt
+        import anndata as ad
+        import pandas as pd
+
+        adata = ad.AnnData(
+            pd.DataFrame(
+                {
+                    "col1": [1, 2, 3],
+                    "col2": [4, 5, 6],
+                }
+            )
+        )
+
+        apt.pp.nanlog(adata)
+        adata.uns["provenance"]["0000"]["function"]  # 'alphapepttools.pp.transform.nanlog'
+
+    Switch tracking off for a block of code:
+
+    .. code-block:: python
+
+        with apt.settings.override(track_provenance=False):
+            apt.pp.nanlog(adata)  # not recorded
+
+
+    """
+
+    @functools.wraps(func)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+        record = settings.track_provenance
+        if record:
+            # Serialized before the call so that `adata` is recorded with its input shape
+            bound = inspect.signature(func).bind(*args, **kwargs)
+            # Fill in args not provided by the caller, needed to track defaults
+            bound.apply_defaults()
+            args_json = _serialize_args(bound.arguments)
+        with settings.override(track_provenance=False):
+            result = func(*args, **kwargs)
+        if record:
+            _record_provenance(func, adata=bound.arguments.get("adata"), result=result, args_json=args_json)
+        return result
+
+    return wrapper

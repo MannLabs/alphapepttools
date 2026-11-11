@@ -1,4 +1,5 @@
-from . import data, io, metrics, pl, pp, settings, tl
+from . import data, io, metrics, pl, pp, tl
+from .settings import settings
 
 __all__: list[str] = ["data", "io", "metrics", "pl", "pp", "settings", "tl"]
 
