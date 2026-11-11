@@ -4,7 +4,7 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from contextvars import ContextVar
 
-_TRACK_PROVENANCE_DEFAULT = True
+_TRACK_PROVENANCE_DEFAULT = False
 _track_provenance: ContextVar[bool] = ContextVar("track_provenance", default=_TRACK_PROVENANCE_DEFAULT)
 
 

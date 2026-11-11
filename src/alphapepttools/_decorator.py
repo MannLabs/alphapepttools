@@ -141,8 +141,10 @@ def _record_provenance(func: Callable[..., Any], *, adata: object, result: objec
         "version": __version__,
         "args": args_json,
     }
-    log = target.uns.setdefault("provenance", {})
+    # Rebuilt rather than mutated in place: a view shares the nested dict with its parent
+    log = dict(target.uns.get("provenance", {}))
     log[f"{len(log):04d}"] = entry
+    target.uns["provenance"] = log
 
 
 def track_provenance(func: Callable[P, R]) -> Callable[P, R]:
@@ -165,10 +167,9 @@ def track_provenance(func: Callable[P, R]) -> Callable[P, R]:
 
     Examples
     --------
-    Entries are recorded by default and can be read back from `uns`:
+    Tracking is off by default. Once enabled, entries can be read back from `uns`:
 
     .. code-block:: python
-
 
         import alphapepttools as apt
         import anndata as ad
@@ -182,6 +183,8 @@ def track_provenance(func: Callable[P, R]) -> Callable[P, R]:
                 }
             )
         )
+
+        apt.settings.track_provenance = True
 
         apt.pp.nanlog(adata)
         adata.uns["provenance"]["0000"]["function"]  # 'alphapepttools.pp.transform.nanlog'

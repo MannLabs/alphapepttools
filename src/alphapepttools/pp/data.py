@@ -11,7 +11,7 @@ import pandas as pd
 from pandas.api.types import is_numeric_dtype
 from sklearn.preprocessing import RobustScaler, StandardScaler
 
-from alphapepttools._decorator import deprecated_copy
+from alphapepttools._decorator import deprecated_copy, track_provenance
 from alphapepttools._utils import get_matrix
 
 # logging configuration
@@ -69,6 +69,7 @@ def _to_anndata(
     return adata
 
 
+@track_provenance
 def add_metadata(  # noqa: C901, PLR0912
     adata: ad.AnnData,
     incoming_metadata: pd.DataFrame,
@@ -364,6 +365,7 @@ def _verify_filter_dict(
         raise ValueError("Errors found in filter_dict:\n" + "\n".join(errors))
 
 
+@track_provenance
 def filter_by_metadata(
     adata: ad.AnnData,
     filter_dict: dict,
@@ -664,6 +666,7 @@ def _tolist(
     return obj if isinstance(obj, list) else [obj]
 
 
+@track_provenance
 def subset_data(
     data: pd.DataFrame | ad.AnnData,
     idxs: pd.Index | list[int],
@@ -810,6 +813,7 @@ def data_columns_to_df(
 
 
 @deprecated_copy(since="0.5.0", removed_in="0.6.0")
+@track_provenance
 def scale_and_center(
     adata: ad.AnnData,
     scaler: Literal["standard", "robust"] = "standard",
@@ -1045,6 +1049,7 @@ def _count_or_fraction_missing(
     return nan.sum(axis=0) if is_count_mode else nan.mean(axis=0)
 
 
+@track_provenance
 def filter_data_completeness(
     adata: ad.AnnData,
     max_missing_fraction: float | None = None,
