@@ -9,7 +9,7 @@ import pandas as pd
 from bpca import BPCA
 from sklearn.impute import KNNImputer
 
-from alphapepttools._decorator import deprecated_copy
+from alphapepttools._decorator import deprecated_copy, track_provenance
 from alphapepttools._utils import get_matrix
 
 from ._utils import _is_data_complete, _raise_on_nan_values
@@ -72,6 +72,7 @@ def _impute_gaussian(
 
 
 @deprecated_copy(since="0.5.0", removed_in="0.6.0")
+@track_provenance
 def impute_gaussian(
     adata: ad.AnnData,
     group_column: str | None = None,
@@ -200,6 +201,7 @@ def _impute_nanmedian(data: np.ndarray) -> np.ndarray:
 
 
 @deprecated_copy(since="0.5.0", removed_in="0.6.0")
+@track_provenance
 def impute_median(
     adata: ad.AnnData,
     group_column: str | None = None,
@@ -347,6 +349,7 @@ def _validate_knn_grouping(groups: dict, n_neighbors: int) -> None:
 
 
 @deprecated_copy(since="0.5.0", removed_in="0.6.0")
+@track_provenance
 def impute_knn(
     adata: ad.AnnData,
     group_column: str | None = None,
@@ -479,6 +482,7 @@ def _impute_bpca(data: np.ndarray, n_components: int, **kwargs) -> np.ndarray:
 
 
 @deprecated_copy(since="0.5.0", removed_in="0.6.0")
+@track_provenance
 def impute_bpca(
     adata: ad.AnnData,
     *,

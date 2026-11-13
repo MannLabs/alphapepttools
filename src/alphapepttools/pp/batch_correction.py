@@ -4,13 +4,14 @@ import anndata as ad
 import numpy as np
 import scanpy
 
-from alphapepttools._decorator import deprecated_copy
+from alphapepttools._decorator import deprecated_copy, track_provenance
 from alphapepttools._utils import get_matrix
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
+@track_provenance
 def coerce_nans_to_batch(
     adata: ad.AnnData,
     batch: str,
@@ -61,6 +62,7 @@ def coerce_nans_to_batch(
     return adata
 
 
+@track_provenance
 def drop_singleton_batches(
     adata: ad.AnnData,
     batch: str,
@@ -119,6 +121,7 @@ def drop_singleton_batches(
 
 
 @deprecated_copy(since="0.5.0", removed_in="0.6.0")
+@track_provenance
 def scanpy_pycombat(
     adata: ad.AnnData,
     batch: str,
