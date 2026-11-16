@@ -1,6 +1,6 @@
 [build-system]
 build-backend = "hatchling.build"
-requires = [ "hatchling" ]
+requires = [ "hatch-vcs", "hatchling" ]
 
 [project]
 name = "alphapepttools"
@@ -94,7 +94,7 @@ urls.Homepage = "https://github.com/MannLabs/alphapepttools"
 urls.Source = "https://github.com/MannLabs/alphapepttools"
 
 [tool.hatch.version]
-path = "src/alphapepttools/__init__.py"
+source = "vcs"
 
 [tool.hatch.envs.default]
 installer = "uv"
