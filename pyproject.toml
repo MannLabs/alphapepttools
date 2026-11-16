@@ -23,7 +23,6 @@ classifiers = [
   "Programming Language :: Python :: 3.15",
 ]
 dynamic = [ "version" ]
-
 dependencies = [
   "alphabase",
   "anndata",
@@ -94,51 +93,40 @@ urls.Documentation = "https://alphapepttools.readthedocs.io/"
 urls.Homepage = "https://github.com/MannLabs/alphapepttools"
 urls.Source = "https://github.com/MannLabs/alphapepttools"
 
-[tool.hatch.version]
-path = "src/alphapepttools/__init__.py"
-
-[tool.hatch.envs.default]
-installer = "uv"
-features = [ "dev" ]
-
-[tool.hatch.envs.docs]
-features = [ "doc" ]
-scripts.build = "sphinx-build -M html docs docs/_build {args}"
-scripts.open = "python -m webbrowser -t docs/_build/html/index.html"
-scripts.clean = "git clean -fdX -- {args:docs}"
-
-[tool.hatch.envs.hatch-test]
-features = [ "test" ]
-
-[tool.hatch.metadata]
-allow-direct-references = true # TODO remove once alphabase with anndata is released
+[tool.hatch]
+version.path = "src/alphapepttools/__init__.py"
+metadata.allow-direct-references = true  # TODO remove once alphabase with anndata is released
+envs.default.installer = "uv"
+envs.default.features = [ "dev" ]
+envs.docs.features = [ "doc" ]
+envs.docs.scripts.build = "sphinx-build -M html docs docs/_build {args}"
+envs.docs.scripts.clean = "git clean -fdX -- {args:docs}"
+envs.docs.scripts.open = "python -m webbrowser -t docs/_build/html/index.html"
+envs.hatch-test.features = [ "test" ]
 
 [tool.ruff]
 line-length = 120
 src = [ "src" ]
 extend-include = [ "*.ipynb" ]
-
 format.docstring-code-format = true
-
 lint.select = [
   "ALL",
 ]
-
 ### STOP: Before adding rules to ignore here, consider disabling them on a per-file or per-line basis!
 lint.ignore = [
-  "ANN002", # Missing type annotation for `*args`
-  "ANN003", # Missing type annotation for `**kwargs
-  "ANN204", # Missing return type annotation for special method `__init__`
-  "ARG001", # TODO: remove soon
-  "ARG002", # TODO: remove soon
-  "B008",   # Errors from function calls in argument defaults. These are fine when the result is immutable.
-  "B023",   # Function definition does not bind loop variable
-  "B028",   #  No explicit `stacklevel` keyword argument found (for warnings)
-  "COM812", #may cause conflicts when used with the formatter
-  "D100",   # Missing docstring in public module
-  "D104",   # Missing docstring in public package
-  "D105",   # __magic__ methods are often self-explanatory, allow missing docstrings
-  "D107",   # Missing docstring in __init__
+  "ANN002",  # Missing type annotation for `*args`
+  "ANN003",  # Missing type annotation for `**kwargs
+  "ANN204",  # Missing return type annotation for special method `__init__`
+  "ARG001",  # TODO: remove soon
+  "ARG002",  # TODO: remove soon
+  "B008",    # Errors from function calls in argument defaults. These are fine when the result is immutable.
+  "B023",    # Function definition does not bind loop variable
+  "B028",    #  No explicit `stacklevel` keyword argument found (for warnings)
+  "COM812",  #may cause conflicts when used with the formatter
+  "D100",    # Missing docstring in public module
+  "D104",    # Missing docstring in public package
+  "D105",    # __magic__ methods are often self-explanatory, allow missing docstrings
+  "D107",    # Missing docstring in __init__
   # Disable one in each pair of mutually incompatible rules
   "D203",    # We don’t want a blank line before a class docstring
   "D211",    # no-blank-line-before-class
@@ -182,33 +170,18 @@ lint.per-file-ignores."tests/*" = [
   "PT011",  #pytest.raises(ValueError) is too broad
   "S101",   # use of "assert" detected
   "SLF001", # Private member accessed
-
 ]
 lint.pydocstyle.convention = "numpy"
 
-[tool.pytest.ini_options]
-testpaths = [ "tests" ]
-xfail_strict = true
-addopts = [
-  "--import-mode=importlib", # allow using test files with same name
-]
-
-[tool.coverage.run]
-source = [ "alphapepttools" ]
-omit = [
-  "**/test_*.py",
-]
-
-[tool.ty.environment]
-python-version = "3.11"
-
+[tool.ty]
 # Type-check only the shipped package; tests are exempt from annotation checks
 # (mirroring ruff's `tests/* -> ANN` ignore) and stray top-level scripts are not
 # part of the distribution.
-[tool.ty.src]
-include = [ "src" ]
-
-[tool.ty.rules]
+src.include = [ "src" ]
+environment.python-version = "3.11"
+rules.invalid-assignment = "ignore"
+rules.no-matching-overload = "ignore"
+rules.not-iterable = "ignore"
 # anndata types `.X`/`.layers[...]` as a 12+ member union of every storage backend
 # (ndarray | csr_matrix | AwkArray | ZarrArray | CSRDataset | None | ...). The pipeline
 # treats these as dense numpy arrays (asserts no-NaN, does `data[idx, :] = ...`, reads
@@ -218,14 +191,24 @@ include = [ "src" ]
 # submodules, the optional `alphaquant` import). `invalid-argument-type` is deliberately
 # kept active — it carries genuine signal here, and union flows into it are narrowed via
 # `alphapepttools._utils.get_matrix`.
-not-subscriptable = "ignore"
-invalid-assignment = "ignore"
-unresolved-attribute = "ignore"
-no-matching-overload = "ignore"
-unsupported-operator = "ignore"
-not-iterable = "ignore"
-unresolved-import = "ignore"
-possibly-missing-submodule = "ignore"
+rules.not-subscriptable = "ignore"
+rules.possibly-missing-submodule = "ignore"
+rules.unresolved-attribute = "ignore"
+rules.unresolved-import = "ignore"
+rules.unsupported-operator = "ignore"
+
+[tool.pytest]
+ini_options.testpaths = [ "tests" ]
+ini_options.addopts = [
+  "--import-mode=importlib", # allow using test files with same name
+]
+ini_options.xfail_strict = true
+
+[tool.coverage]
+run.source = [ "alphapepttools" ]
+run.omit = [
+  "**/test_*.py",
+]
 
 [tool.cruft]
 skip = [
