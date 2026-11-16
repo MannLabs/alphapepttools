@@ -197,7 +197,15 @@ gives you time to fix the issue or reach out to the developers of the dependency
 
 ### Updating the version number
 
-Before making a release, you need to update the version number in the `pyproject.toml` file.
+We use [`hatch-vcs`][] to dynamically create version numbers from git tags. Making a new release thus corresponds to creating a new tag on the main branch of the repo
+
+```shell
+git tag -a "vX.Y.Z" -m "vX.Y.Z"
+git push origin --tags
+```
+
+You can also create a tag on the fly on the GitHub Releases page.
+
 Please adhere to [Semantic Versioning][semver], in brief
 
 > Given a version number MAJOR.MINOR.PATCH, increment the:
@@ -216,6 +224,7 @@ This will automatically create a git tag and trigger a Github workflow that crea
 [semver]: https://semver.org/
 [managing GitHub releases]: https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository
 [pypi]: https://pypi.org/
+[`hatch-vcs`]: https://github.com/ofek/hatch-vcs.git
 
 ## Writing documentation
 
