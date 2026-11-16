@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/MannLabs/alphapepttools/main/docs/_static/logo/alphapepttools.svg" alt="alphapepttools logo" width="25%">
+</p>
+
 # alphapepttools
 
 ![PyPI - Version](https://img.shields.io/pypi/v/alphapepttools)
