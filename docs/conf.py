@@ -135,6 +135,7 @@ html_static_path = ["_static"]
 html_css_files = ["css/custom.css"]
 
 html_title = project_name
+html_logo = "_static/logo/alphapepttools.svg"
 
 html_theme_options = {
     "repository_url": repository_url,
