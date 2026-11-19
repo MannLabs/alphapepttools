@@ -110,9 +110,8 @@ The following labels are used (should be safe-explanatory):
 
 #### Release a new version
 
-This package uses a shared release process defined in the
-[alphashared](https://github.com/MannLabs/alphashared) repository. Please see the instructions
-[there](https://github.com/MannLabs/alphashared/blob/reusable-release-workflow/.github/workflows/README.md#release-a-new-version)
+The version number is derived from git tags. Publishing a GitHub release with a `vX.Y.Z` tag builds the package and uploads it to PyPI.
+See [Publishing a release](docs/contributing.md#publishing-a-release) in the contributing guide for step-by-step instructions.
 
 ## Contact
 
