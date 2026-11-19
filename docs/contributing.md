@@ -217,9 +217,6 @@ Create the tag `vX.Y.Z` in one of the two following ways, but not both:
 1. Navigate to the "Releases" page of this project on GitHub, enter `vX.Y.Z` as a new tag name targeting `main`, and publish the release.
    GitHub creates the tag for you.
 
-For more information, see [managing GitHub releases][].
-Publishing the release triggers the `Release` GitHub workflow (`.github/workflows/release.yaml`), which builds the package from the tagged commit and uploads it to [PyPI][].
-
 2. Tag the commit locally and push only this tag:
 
     ```shell
@@ -230,6 +227,15 @@ Publishing the release triggers the `Release` GitHub workflow (`.github/workflow
     ```
 
     Then navigate to the "Releases" page of this project on GitHub, select the existing tag `vX.Y.Z`, and publish the release.
+
+In both cases, publishing the release triggers the `Release` GitHub workflow (`.github/workflows/release.yaml`), which builds the package from the tagged commit and uploads it to [PyPI][].
+Pushing a tag alone does not trigger an upload.
+For more information, see [managing GitHub releases][].
+
+```{note}
+In an editable install (`pip install -e .`), `alphapepttools.__version__` is read from the metadata written at install time.
+After creating new commits or tags, reinstall the package to update the reported version.
+```
 
 [semver]: https://semver.org/
 [managing GitHub releases]: https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository
