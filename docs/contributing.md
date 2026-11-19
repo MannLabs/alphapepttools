@@ -134,11 +134,11 @@ While the [pre-commit.ci][] is useful, we strongly encourage installing and runn
 -->
 
 Finally, most editors have an _autoformat on save_ feature.
-Consider enabling this option for [ruff][ruff-editors] and [prettier][prettier-editors].
+Consider enabling this option for [ruff][ruff-editors] and [biome][biome-editors].
 
 [pre-commit]: https://pre-commit.com/
 [ruff-editors]: https://docs.astral.sh/ruff/integrations/
-[prettier-editors]: https://prettier.io/docs/en/editors.html
+[biome-editors]: https://biomejs.dev/guides/editors/first-party-extensions/
 
 ## Writing modules
 
