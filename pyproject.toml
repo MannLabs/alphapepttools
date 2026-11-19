@@ -95,7 +95,7 @@ urls.Source = "https://github.com/MannLabs/alphapepttools"
 
 [tool.hatch.version]
 source = "vcs"
-raw-options.version_scheme = "release-branch-semver"
+raw-options.version_scheme = "guess-next-dev"
 
 [tool.hatch.envs.default]
 installer = "uv"
