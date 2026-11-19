@@ -212,9 +212,9 @@ Please adhere to [Semantic Versioning][semver], in brief
 
 ### Creating the release
 
-Create the tag `vX.Y.Z` in one of the two following ways, but not both:
+Create the tag `vMAJOR.MINOR.PATCH` in one of the two following ways, but not both:
 
-1. Navigate to the "Releases" page of this project on GitHub, enter `vX.Y.Z` as a new tag name targeting `main`, and publish the release.
+1. Navigate to the "Releases" page of this project on GitHub, enter `vMAJOR.MINOR.PATCH` as a new tag name targeting `main`, and publish the release.
    GitHub creates the tag for you.
 
 2. Tag the commit locally and push only this tag:
@@ -222,11 +222,11 @@ Create the tag `vX.Y.Z` in one of the two following ways, but not both:
     ```shell
     git checkout main
     git pull
-    git tag -a "vX.Y.Z" -m "vX.Y.Z"
-    git push origin "vX.Y.Z"
+    git tag -a "vMAJOR.MINOR.PATCH" -m "vMAJOR.MINOR.PATCH"
+    git push origin "vMAJOR.MINOR.PATCH"
     ```
 
-    Then navigate to the "Releases" page of this project on GitHub, select the existing tag `vX.Y.Z`, and publish the release.
+    Then navigate to the "Releases" page of this project on GitHub, select the existing tag `vMAJOR.MINOR.PATCH`, and publish the release.
 
 In both cases, publishing the release triggers the `Release` GitHub workflow (`.github/workflows/release.yaml`), which builds the package from the tagged commit and uploads it to [PyPI][].
 Pushing a tag alone does not trigger an upload.
