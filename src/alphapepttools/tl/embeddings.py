@@ -7,7 +7,7 @@ import numpy as np
 import scanpy as sc
 from bpca import BPCA
 
-from alphapepttools._decorator import deprecated_copy
+from alphapepttools._decorator import deprecated_copy, track_provenance
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -190,6 +190,7 @@ def _store_pca_results(
 
 
 @deprecated_copy(since="0.5.0", removed_in="0.6.0")
+@track_provenance
 def pca(
     adata: ad.AnnData,
     layer: str | None = None,
@@ -384,6 +385,7 @@ def _run_bpca(
 
 
 @deprecated_copy(since="0.5.0", removed_in="0.6.0")
+@track_provenance
 def bpca(
     adata: ad.AnnData,
     layer: str | None = None,
