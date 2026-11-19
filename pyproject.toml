@@ -197,7 +197,7 @@ omit = [
 ]
 
 [tool.ty.environment]
-python-version = "3.12"
+python-version = "3.13"
 
 # Type-check only the shipped package; tests are exempt from annotation checks
 # (mirroring ruff's `tests/* -> ANN` ignore) and stray top-level scripts are not
