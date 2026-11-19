@@ -24,7 +24,7 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            python: "3.11"
+            python: "3.12"
             name: LOOSE-FULL
             extras: "full"
           - os: ubuntu-latest
@@ -32,7 +32,7 @@ jobs:
             name: LOOSE-FULL
             extras: "full"
           - os: ubuntu-latest
-            python: "3.11"
+            python: "3.12"
             name: STABLE-FULL
             extras: "full-stable"
           - os: ubuntu-latest
