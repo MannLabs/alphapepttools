@@ -13,10 +13,9 @@ maintainers = [
 authors = [
   { name = "MannLabs" },
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 classifiers = [
   "Programming Language :: Python :: 3 :: Only",
-  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
@@ -200,7 +199,7 @@ omit = [
 ]
 
 [tool.ty.environment]
-python-version = "3.11"
+python-version = "3.12"
 
 # Type-check only the shipped package; tests are exempt from annotation checks
 # (mirroring ruff's `tests/* -> ANN` ignore) and stray top-level scripts are not
