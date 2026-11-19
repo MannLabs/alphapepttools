@@ -72,7 +72,7 @@ def _extract_groupwise_plotting_data(
     data
         Data containing grouping and value columns
     grouping_column
-        Column containing the groups to compare
+        Column containing the groups to compare. If None, each row is its own group labelled by the index.
     value_column
         Column whose values should be plotted
     direct_columns
@@ -153,10 +153,11 @@ def _extract_groupwise_plotting_data(
         df = df.melt(var_name="variable", value_name="value")
         grouping_column, value_column = "variable", "value"
     else:
-        if grouping_column is None or value_column is None:
-            raise ValueError("Either 'direct_columns' or both 'grouping_column' and 'value_column' must be provided.")
+        if value_column is None:
+            raise ValueError("Either 'direct_columns' or 'value_column' must be provided.")
         columns = [column for column in (grouping_column, value_column, subgroup_column) if column is not None]
-        df = data_columns_to_df(data, columns=columns)
+        df = data_columns_to_df(data, columns=columns).assign(__index=data_index_to_array(data=data, dim_space="obs"))
+        grouping_column = grouping_column or "__index"
 
     # Handle single vs subgrouped plotting
     data_lists: list[list] = []
@@ -166,12 +167,14 @@ def _extract_groupwise_plotting_data(
 
     if subgroup_column is None:
         groups_to_plot = df[grouping_column].dropna().unique().tolist()
-        for i, group in enumerate(groups_to_plot):
+        for group in groups_to_plot:
+            # Only non-empty groups count towards positions
+            slot = len(labels)
             group_data = df.loc[df[grouping_column] == group, value_column].dropna()
             if not group_data.empty:
                 data_lists.append(group_data.tolist())
                 labels.append(group)
-                positions.append(float(i))
+                positions.append(float(slot))
                 color_keys.append(group)
     else:
         main_order = df[grouping_column].dropna().unique().tolist()
@@ -180,7 +183,8 @@ def _extract_groupwise_plotting_data(
         offsets = [
             (j - (n_sub - 1) / 2) * width for j in range(n_sub)
         ]  # symmetric offsets around the main-group integer position
-        for i, group in enumerate(main_order):
+        for group in main_order:
+            slot = len(dict.fromkeys(labels))
             for j, sub in enumerate(sub_order):
                 group_data = df.loc[
                     (df[grouping_column] == group) & (df[subgroup_column] == sub), value_column
@@ -188,7 +192,7 @@ def _extract_groupwise_plotting_data(
                 if not group_data.empty:
                     data_lists.append(group_data.tolist())
                     labels.append(group)
-                    positions.append(i + offsets[j])
+                    positions.append(slot + offsets[j])
                     color_keys.append(sub)
 
     return data_lists, labels, positions, color_keys
@@ -1398,8 +1402,8 @@ def histogram(
 
 def scatter(
     data: ad.AnnData | pd.DataFrame,
-    x_column: str,
-    y_column: str,
+    x_column: str | None = None,
+    y_column: str | None = None,
     color: str | None = None,
     color_map_column: str | None = None,
     color_column: str | None = None,
@@ -1438,9 +1442,9 @@ def scatter(
     data
         Data to plot, must contain the x_column and y_column and optionally the color_column or color_map_column.
     x_column
-        Column in data to plot on the x-axis. Must contain numeric data.
+        Column in data to plot on the x-axis. If None, the index is used. By default None.
     y_column
-        Column in data to plot on the y-axis. Must contain numeric data.
+        Column in data to plot on the y-axis. If None, the index is used. By default None.
     color
         Color to use for the scatterplot. By default "blue".
     color_map_column
@@ -1610,6 +1614,9 @@ def scatter(
     - Unmapped values in color_dict default to grey
     - NaN values in color columns are handled as strings
     """
+    if x_column is None and y_column is None:
+        raise ValueError("At least one of 'x_column' or 'y_column' must be provided.")
+
     scatter_kwargs = scatter_kwargs or {}
     legend_kwargs = legend_kwargs or {}
     figure_kwargs = figure_kwargs or {"figsize": (3, 3)}
