@@ -222,8 +222,9 @@ Create the tag `vMAJOR.MINOR.PATCH` in one of the two following ways, but not bo
     ```shell
     git checkout main
     git pull
-    git tag -a "vMAJOR.MINOR.PATCH" -m "vMAJOR.MINOR.PATCH"
-    git push origin "vMAJOR.MINOR.PATCH"
+    TAG="vMAJOR.MINOR.PATCH"
+    git tag -a "$TAG" -m "$TAG"
+    git push origin "$TAG"
     ```
 
     Then navigate to the "Releases" page of this project on GitHub, select the existing tag `vMAJOR.MINOR.PATCH`, and publish the release.
