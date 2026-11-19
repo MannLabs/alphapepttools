@@ -197,7 +197,9 @@ gives you time to fix the issue or reach out to the developers of the dependency
 
 ### Updating the version number
 
-Before making a release, you need to update the version number in the `pyproject.toml` file.
+We use [`hatch-vcs`][] to derive the version number dynamically from git tags.
+There is no version number to edit in the code; creating a release corresponds to tagging a commit on the `main` branch.
+
 Please adhere to [Semantic Versioning][semver], in brief
 
 > Given a version number MAJOR.MINOR.PATCH, increment the:
@@ -208,14 +210,38 @@ Please adhere to [Semantic Versioning][semver], in brief
 >
 > Additional labels for pre-release and build metadata are available as extensions to the MAJOR.MINOR.PATCH format.
 
-Once you are done, commit and push your changes and navigate to the "Releases" page of this project on GitHub.
-Specify `vX.X.X` as a tag name and create a release.
+### Creating the release
+
+Create the tag `vMAJOR.MINOR.PATCH` in one of the two following ways, but not both:
+
+1. Navigate to the "Releases" page of this project on GitHub, enter `vMAJOR.MINOR.PATCH` as a new tag name targeting `main`, and publish the release.
+   GitHub creates the tag for you.
+
+2. Tag the commit locally and push only this tag:
+
+    ```shell
+    git checkout main
+    git pull
+    TAG="vMAJOR.MINOR.PATCH"
+    git tag -a "$TAG" -m "$TAG"
+    git push origin "$TAG"
+    ```
+
+    Then navigate to the "Releases" page of this project on GitHub, select the existing tag `vMAJOR.MINOR.PATCH`, and publish the release.
+
+In both cases, publishing the release triggers the `Release` GitHub workflow (`.github/workflows/release.yaml`), which builds the package from the tagged commit and uploads it to [PyPI][].
+Pushing a tag alone does not trigger an upload.
 For more information, see [managing GitHub releases][].
-This will automatically create a git tag and trigger a Github workflow that creates a release on [PyPI][].
+
+```{note}
+In an editable install (`pip install -e .`), `alphapepttools.__version__` is read from the metadata written at install time.
+After creating new commits or tags, reinstall the package to update the reported version.
+```
 
 [semver]: https://semver.org/
 [managing GitHub releases]: https://docs.github.com/en/repositories/releasing-projects-on-github/managing-releases-in-a-repository
 [pypi]: https://pypi.org/
+[`hatch-vcs`]: https://github.com/ofek/hatch-vcs
 
 ## Writing documentation
 

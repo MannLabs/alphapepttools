@@ -19,6 +19,7 @@ jobs:
         with:
           filter: blob:none
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/setup-python@v7
         with:
           python-version: "3.x"
