@@ -5,6 +5,8 @@ from . import data, io, metrics, pl, pp, tl
 __all__: list[str] = ["data", "io", "metrics", "pl", "pp", "tl"]
 
 try:
+    # Hard-coded __version__ tags have been dropped in favor of git tags.
+    # Use `git describe --tags` to read the current version in the git repository.
     __version__ = metadata.version("alphapepttools")
 except metadata.PackageNotFoundError:
     __version__ = "0.0.0+unknown"
