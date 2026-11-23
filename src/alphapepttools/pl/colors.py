@@ -21,9 +21,10 @@ import pandas as pd
 from matplotlib import colors as mpl_colors
 from matplotlib.colors import Colormap
 
+from alphapepttools._logging import get_logger
 from alphapepttools.pl import defaults
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 config = defaults.plot_settings.to_dict()
 

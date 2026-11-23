@@ -1,6 +1,5 @@
 # Imputation methods for proteomics data
 
-import logging
 from typing import Literal, cast
 
 import anndata as ad
@@ -10,11 +9,12 @@ from bpca import BPCA
 from sklearn.impute import KNNImputer
 
 from alphapepttools._decorator import deprecated_copy
+from alphapepttools._logging import get_logger
 from alphapepttools._utils import get_matrix
 
 from ._utils import _is_data_complete, _raise_on_nan_values
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 def _impute_gaussian(

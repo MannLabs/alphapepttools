@@ -1,11 +1,9 @@
-import logging
-
 import numpy as np
 from scipy.stats import false_discovery_control
 
-# logging configuration
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from alphapepttools._logging import get_logger
+
+logger = get_logger()
 
 
 def nan_safe_bh_correction(

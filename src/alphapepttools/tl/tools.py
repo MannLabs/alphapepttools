@@ -1,6 +1,5 @@
 # Tools for data processing
 
-import logging
 from collections.abc import Iterable
 from io import StringIO
 from pathlib import Path
@@ -9,8 +8,9 @@ import numpy as np
 import regex as re
 from Bio import SeqIO
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from alphapepttools._logging import get_logger
+
+logger = get_logger()
 
 
 def get_id2gene_map(

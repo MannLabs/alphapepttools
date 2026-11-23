@@ -1,14 +1,14 @@
 import contextlib
-import logging
 from collections.abc import Iterable
 
 import anndata as ad
 import matplotlib.pyplot as plt
 import numpy as np
 
+from alphapepttools._logging import get_logger
 from alphapepttools.tl.defaults import tl_defaults
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 def negative_log10_pvalue(pvalue: float, ceiling: float = tl_defaults.CEILING_NEGATIVE_LOG10_PVALUE) -> float:
