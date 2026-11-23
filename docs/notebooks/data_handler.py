@@ -13,8 +13,12 @@ with warnings.catch_warnings():
     warnings.filterwarnings("ignore", message=".*'progressbar' not installed.*")
     from alphabase.tools.data_downloader import DataShareDownloader
 
+from alphapepttools._logging import get_logger
+
 # update this in case the file is moved
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+logger = get_logger()
 
 
 def create_synthetic_data_3x2() -> ad.AnnData:
@@ -111,7 +115,7 @@ class DataHandler:
             either a string with the downloaded data file or an AnnData object.
         """
         if (function := self._test_case.get(Keys.FUNCTION)) is not None:
-            print(f"Creating synthetic data using {function}() .. ")
+            logger.info(f"Creating synthetic data using {function}() .. ")
             return function(**kwargs)
 
         file_info = self._test_case.get(data_type)
@@ -126,12 +130,12 @@ class DataHandler:
         file_path = DataShareDownloader(file_info[Keys.Lvl2.URL], self._target_folder).download(limit_kb)
 
         if (file_format := file_info.get(Keys.Lvl2.FORMAT)) == "csv":
-            print(f"Creating dataframe from downloaded {file_format} data .. ")
+            logger.info(f"Creating dataframe from downloaded {file_format} data .. ")
             return pd.read_csv(file_path)
 
         if file_format is not None:
-            print(f"Creating anndata object from downloaded {file_format} data .. ")
+            logger.info(f"Creating anndata object from downloaded {file_format} data .. ")
             return AnnDataFactory.from_files(file_paths=file_path, reader_type=file_format).create_anndata()
 
-        print("Returning file path to downloaded data .. ")
+        logger.info("Returning file path to downloaded data .. ")
         return file_path

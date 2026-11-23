@@ -7,14 +7,17 @@ from pathlib import Path
 
 import pytest
 
+from alphapepttools._logging import get_logger
+
+logger = get_logger()
+
 
 def get_public_members(module_name: str) -> set[str]:
     """Get all public functions, classes, and constants from a module."""
     try:
         module = importlib.import_module(module_name)
-    except ImportError as e:
-        print(f"Module {module_name} not found")
-        print(e)
+    except ImportError:
+        logger.exception(f"Module {module_name} not found")
 
     public_members = set()
 
