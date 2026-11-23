@@ -393,7 +393,7 @@ def test_extract_groupwise_plotting_data_warns_on_conflicting_args(example_data,
     and use `direct_columns`."""
     adata = anndata.AnnData(X=example_data, obs=example_sample_metadata)
 
-    with caplog.at_level(logging.INFO):
+    with caplog.at_level(logging.INFO, logger="scverse.alphapepttools"):
         _extract_groupwise_plotting_data(
             data=adata,
             grouping_column="batch",
