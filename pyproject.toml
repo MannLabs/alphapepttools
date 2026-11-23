@@ -34,6 +34,7 @@ dependencies = [
   "pyarrow",
   "scanpy",
   "scikit-learn",
+  "scverse-misc",
   # for debug logging (referenced from the issue template)
   "session-info2",
   "tqdm",
@@ -77,8 +78,9 @@ optional-dependencies.stable = [
   "mulink==0.0.1",
   "openpyxl==3.1.5",
   "pyarrow==23.0.1",
-  "scanpy==1.11.5",     # scanpy version 1.12 dropped support for python<3.12
+  "scanpy==1.11.5",      # scanpy version 1.12 dropped support for python<3.12
   "scikit-learn==1.8",
+  "scverse-misc==0.1.9",
   "session-info2==0.4",
   "tqdm==4.70",
 ]
