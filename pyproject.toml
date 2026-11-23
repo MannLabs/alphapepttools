@@ -26,15 +26,15 @@ dependencies = [
   "alphabase",
   "anndata",
   "bpca>=0.1",
-  "cmcrameri",          # TODO: remove this to optional dependencies?
-  "matplotlib>=3.10.5", # 3.10.5 contains a critical fix (https://github.com/matplotlib/matplotlib/pull/30217) to make matplotlib compatible with python 3.14
+  "cmcrameri",           # TODO: remove this to optional dependencies?
+  "matplotlib>=3.10.5",  # 3.10.5 contains a critical fix (https://github.com/matplotlib/matplotlib/pull/30217) to make matplotlib compatible with python 3.14
   "mudata",
   "mulink",
   "openpyxl",
   "pyarrow",
   "scanpy",
   "scikit-learn",
-  "scverse-misc>0.1.8", # bounded by logging functionality added in 0.1.8
+  "scverse-misc>=0.1.8", # bounded by logging functionality added in 0.1.8
   # for debug logging (referenced from the issue template)
   "session-info2",
   "tqdm",
