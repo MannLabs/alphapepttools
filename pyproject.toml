@@ -34,7 +34,7 @@ dependencies = [
   "pyarrow",
   "scanpy",
   "scikit-learn",
-  "scverse-misc",
+  "scverse-misc>0.1.8", # bounded by logging functionality added in 0.1.8
   # for debug logging (referenced from the issue template)
   "session-info2",
   "tqdm",
