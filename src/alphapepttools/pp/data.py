@@ -1,6 +1,5 @@
 # Create and manipulate AnnData objects
 
-import logging
 import numbers
 import warnings
 from typing import Literal, cast
@@ -12,10 +11,10 @@ from pandas.api.types import is_numeric_dtype
 from sklearn.preprocessing import RobustScaler, StandardScaler
 
 from alphapepttools._decorator import deprecated_copy
+from alphapepttools._logging import get_logger
 from alphapepttools._utils import get_matrix
 
-# logging configuration
-logging.basicConfig(level=logging.INFO)
+logger = get_logger()
 
 
 def _to_anndata(
@@ -145,7 +144,7 @@ def add_metadata(  # noqa: C901, PLR0912
         raise ValueError("Axis must be 0 or 1.")
 
     if adata.shape == (0, 0):
-        logging.info("adata is empty")
+        logger.info("adata is empty")
         return adata
 
     if not isinstance(incoming_metadata, pd.DataFrame) or incoming_metadata.index.nlevels > 1:
@@ -168,7 +167,7 @@ def add_metadata(  # noqa: C901, PLR0912
 
         # join new to existing metadata; same join logic as for data
         if verbose:
-            logging.info(f"pp.add_metadata(): Join incoming to existing metadata via {join} join on axis  {axis}.")
+            logger.info(f"pp.add_metadata(): Join incoming to existing metadata via {join} join on axis  {axis}.")
 
         incoming_metadata = existing_metadata.join(incoming_metadata, how=join)
 
@@ -897,7 +896,7 @@ def scale_and_center(
             "Setting `center=False` and `scale=False` leaves data unchanged. Set at least one argument to `True`"
         )
     adata = adata if inplace else adata.copy()
-    logging.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler.")
+    logger.info(f"pp.scale_and_center(): Scaling data with {scaler} scaler.")
 
     if scaler == "standard":
         scaler = StandardScaler(with_mean=center, with_std=scale)
@@ -965,7 +964,7 @@ def _validate_adata_for_completeness_filter(
         raise ValueError("pp.filter_data_completeness(): action must be 'flag' or 'drop'.")
 
     if var_colname in adata.var.columns and action == "flag":
-        logging.info(
+        logger.info(
             f"pp.filter_data_completeness(): `adata.var` column '{var_colname}' already exists, will overwrite."
         )
 
@@ -1222,7 +1221,7 @@ def filter_data_completeness(
 
     n_dropped = (~keep_mask).sum()
     threshold_desc = f"{max_missing} missing values" if is_count_mode else f"{max_missing:.2f} missing fraction"
-    logging.info(
+    logger.info(
         f"pp.filter_data_completeness(): {action} {n_dropped} / {keep_mask.size} features with >{threshold_desc}."
     )
     return adata

@@ -8,7 +8,6 @@
 # data), and then in the obs.columns (for example, when plotting a numeric value from X and
 # coloring it by a metadata column from obs, see 03_basic_workflow.ipynb).
 
-import logging
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -23,6 +22,7 @@ from matplotlib.font_manager import FontProperties
 from matplotlib.legend import Legend
 from matplotlib.patches import Patch
 
+from alphapepttools._logging import get_logger
 from alphapepttools.pl import defaults
 from alphapepttools.pl.colors import BaseColors, BasePalettes, _get_colors_from_cmap, get_color_mapping
 from alphapepttools.pl.figure import create_figure, label_axes
@@ -42,9 +42,7 @@ from alphapepttools.tl.plot_data_handling import (
 )
 from alphapepttools.tl.utils import find_iterable_kwargs
 
-# logging configuration
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 config = defaults.plot_settings.to_dict()
 
@@ -455,9 +453,9 @@ def add_legend_to_axes(
             patches = make_legend_patches(color_dict)
             add_legend_to_axes_from_patches(ax, patches, **legend_kwargs)
         else:
-            logging.warning("No valid 'levels' parameter provided. Skipping legend creation.")
+            logger.warning("No valid 'levels' parameter provided. Skipping legend creation.")
     else:
-        logging.warning("No valid 'legend' parameter provided. Skipping legend creation.")
+        logger.warning("No valid 'legend' parameter provided. Skipping legend creation.")
 
 
 def drop_nan_coordinate_points(
