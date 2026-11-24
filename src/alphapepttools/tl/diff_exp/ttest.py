@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import ttest_ind
 
-from alphapepttools._utils import validate_layer
+from alphapepttools._layers import validate_layer
 from alphapepttools.pp.data import filter_by_metadata
 from alphapepttools.tl.defaults import tl_defaults
 from alphapepttools.tl.stats import nan_safe_bh_correction

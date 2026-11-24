@@ -7,7 +7,7 @@ import pandas as pd
 from scipy.stats import gmean
 
 from alphapepttools._decorator import deprecated_copy
-from alphapepttools._utils import get_matrix
+from alphapepttools._layers import get_matrix
 
 from ._utils import _raise_on_missing_value, _raise_on_nan_values
 

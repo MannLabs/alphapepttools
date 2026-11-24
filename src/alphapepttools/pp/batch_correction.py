@@ -5,7 +5,7 @@ import numpy as np
 import scanpy
 
 from alphapepttools._decorator import deprecated_copy
-from alphapepttools._utils import get_matrix
+from alphapepttools._layers import get_matrix
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

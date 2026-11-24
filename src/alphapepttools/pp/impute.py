@@ -10,7 +10,7 @@ from bpca import BPCA
 from sklearn.impute import KNNImputer
 
 from alphapepttools._decorator import deprecated_copy
-from alphapepttools._utils import get_matrix
+from alphapepttools._layers import get_matrix
 
 from ._utils import _is_data_complete, _raise_on_nan_values
 

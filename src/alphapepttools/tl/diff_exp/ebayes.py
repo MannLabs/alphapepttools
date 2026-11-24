@@ -15,7 +15,7 @@ try:
 except ModuleNotFoundError:
     _HAS_INMOOSE = False
 
-from alphapepttools._utils import get_matrix, validate_layer
+from alphapepttools._layers import get_matrix, validate_layer
 from alphapepttools.tl.defaults import tl_defaults
 from alphapepttools.tl.stats import nan_safe_bh_correction
 from alphapepttools.tl.utils import (
