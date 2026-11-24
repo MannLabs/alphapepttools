@@ -1,4 +1,3 @@
-import logging
 from collections.abc import Iterable
 from typing import Literal, cast
 
@@ -8,9 +7,9 @@ import scanpy as sc
 from bpca import BPCA
 
 from alphapepttools._decorator import deprecated_copy
+from alphapepttools._logging import get_logger
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 def _check_inputs_for_dim_reduction(

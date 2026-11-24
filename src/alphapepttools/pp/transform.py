@@ -1,17 +1,13 @@
 # Data transformations
-
-
-import logging
-
 import anndata as ad
 import numpy as np
 import pandas as pd
 
 from alphapepttools._decorator import deprecated_copy
+from alphapepttools._logging import get_logger
 from alphapepttools._utils import get_matrix
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 def detect_special_values(

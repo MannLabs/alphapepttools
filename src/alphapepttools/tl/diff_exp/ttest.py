@@ -1,4 +1,3 @@
-import logging
 from typing import cast
 
 import anndata as ad
@@ -6,14 +5,14 @@ import numpy as np
 import pandas as pd
 from scipy.stats import ttest_ind
 
+from alphapepttools._logging import get_logger
 from alphapepttools._utils import validate_layer
 from alphapepttools.pp.data import filter_by_metadata
 from alphapepttools.tl.defaults import tl_defaults
 from alphapepttools.tl.stats import nan_safe_bh_correction
 from alphapepttools.tl.utils import determine_max_replicates, negative_log10_pvalue, validate_ttest_inputs
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 def nan_safe_ttest_ind(
@@ -207,7 +206,7 @@ def diff_exp_ttest(
     # Validate inputs
     g1, g2 = validate_ttest_inputs(adata, between_column, comparison, min_valid_values)
     validate_layer(adata, layer)
-    print(f"Comparing groups: {g1} vs {g2}")
+    logger.info(f"Comparing groups: {g1} vs {g2}")
 
     # perform single comparison between the two specified groups
     g1_df = filter_by_metadata(adata, {between_column: g1}, axis=0).to_df(layer=layer)

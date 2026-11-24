@@ -1,4 +1,3 @@
-import logging
 import tempfile
 from pathlib import Path
 
@@ -12,11 +11,11 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - optional dep, env-dependent
     _HAS_ALPHAQUANT = False
 
+from alphapepttools._logging import get_logger
 from alphapepttools.tl import tl_defaults
 from alphapepttools.tl.utils import _suppress_plots, determine_max_replicates, negative_log10_pvalue
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 # Column holding each row's own identifier, per analysis level
 _FEATURE_COLUMN_PER_LEVEL = {"protein": "protein", "proteoform": "proteoform_id", "peptide": "sequence"}

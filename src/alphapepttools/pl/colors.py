@@ -9,7 +9,6 @@
 
 
 import colorsys
-import logging
 from typing import Any, ClassVar, cast
 
 import cmcrameri.cm as cmc
@@ -21,9 +20,10 @@ import pandas as pd
 from matplotlib import colors as mpl_colors
 from matplotlib.colors import Colormap
 
+from alphapepttools._logging import get_logger
 from alphapepttools.pl import defaults
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 config = defaults.plot_settings.to_dict()
 
@@ -592,7 +592,7 @@ class BaseColors:
             try:
                 color = mpl_colors.to_rgba(color_name)
             except ValueError:
-                logging.warning(f"Unknown color name: {color_name}, cannot parse to RGBA or change lightness/alpha")
+                logger.warning(f"Unknown color name: {color_name}, cannot parse to RGBA or change lightness/alpha")
                 return color_name
 
         if lighten is not None:

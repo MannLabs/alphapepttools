@@ -26,14 +26,15 @@ dependencies = [
   "alphabase",
   "anndata",
   "bpca>=0.1",
-  "cmcrameri",          # TODO: remove this to optional dependencies?
-  "matplotlib>=3.10.5", # 3.10.5 contains a critical fix (https://github.com/matplotlib/matplotlib/pull/30217) to make matplotlib compatible with python 3.14
+  "cmcrameri",           # TODO: remove this to optional dependencies?
+  "matplotlib>=3.10.5",  # 3.10.5 contains a critical fix (https://github.com/matplotlib/matplotlib/pull/30217) to make matplotlib compatible with python 3.14
   "mudata",
   "mulink",
   "openpyxl",
   "pyarrow",
   "scanpy",
   "scikit-learn",
+  "scverse-misc>=0.1.8", # bounded by logging functionality added in 0.1.8
   # for debug logging (referenced from the issue template)
   "session-info2",
   "tqdm",
@@ -77,8 +78,9 @@ optional-dependencies.stable = [
   "mulink==0.0.1",
   "openpyxl==3.1.5",
   "pyarrow==23.0.1",
-  "scanpy==1.11.5",     # scanpy version 1.12 dropped support for python<3.12
+  "scanpy==1.11.5",      # scanpy version 1.12 dropped support for python<3.12
   "scikit-learn==1.8",
+  "scverse-misc==0.1.9",
   "session-info2==0.4",
   "tqdm==4.70",
 ]

@@ -6,15 +6,15 @@ and organize them into DataFrames for use in scatter plotting.
 
 """
 
-import logging
 from typing import Literal
 
 import anndata as ad
 import numpy as np
 import pandas as pd
 
-# logging configuration
-logging.basicConfig(level=logging.INFO)
+from alphapepttools._logging import get_logger
+
+logger = get_logger()
 
 ## Helper function to validate plots inputs
 
@@ -111,7 +111,7 @@ def _validate_scree_plot_input(
 
     n_pcs_avail = len(adata.uns[pca_variance_layer_name]["variance_ratio"])
     if n_pcs > n_pcs_avail:
-        logging.warning(
+        logger.warning(
             f"Requested {n_pcs} PCs, but only {n_pcs_avail} PCs are available. Plotting only the available PCs"
         )
 
