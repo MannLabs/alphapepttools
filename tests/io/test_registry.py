@@ -1,3 +1,4 @@
+import sys
 from typing import Literal
 
 import pytest
@@ -22,3 +23,13 @@ def test_list_available_reader_invalid_kind() -> None:
     """Unknown `kind` should raise KeyError."""
     with pytest.raises(KeyError, match="Pass either"):
         list_available_reader("invalid_kind")
+
+
+def test_io_utils_import_is_deprecated(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Drop the cached module so the module-level warning fires again on import
+    monkeypatch.delitem(sys.modules, "alphapepttools.io.utils", raising=False)
+
+    with pytest.warns(DeprecationWarning, match="alphapepttools.io.utils"):
+        from alphapepttools.io.utils import list_available_reader as deprecated_reader
+
+    assert deprecated_reader is list_available_reader
