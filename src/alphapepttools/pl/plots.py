@@ -10,7 +10,7 @@
 
 import logging
 from collections import Counter
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from typing import Any, Literal, cast
 
@@ -40,7 +40,6 @@ from alphapepttools.tl.plot_data_handling import (
     prepare_pca_2d_loadings_data_to_plot,
     prepare_scree_data_to_plot,
 )
-from alphapepttools.tl.utils import find_iterable_kwargs
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -1396,6 +1395,34 @@ def histogram(
         ax.set_ylim(ylim)
 
 
+def _find_iterable_kwargs(
+    kwargs_dict: dict,
+    match_length: int | None = None,
+) -> dict:
+    """Find kwargs whose values are array-like (not strings/bytes/dicts).
+
+    Parameters
+    ----------
+    kwargs_dict
+        A dictionary of keyword arguments to check.
+
+    Returns
+    -------
+        A dictionary containing only those key-value pairs from kwargs_dict where the value is an iterable and, if match_length is specified, has the specified length.
+
+    """
+    if not isinstance(kwargs_dict, dict):
+        raise TypeError(f"Input must be a dictionary of keyword arguments, got {type(kwargs_dict).__name__}.")
+
+    return {
+        k: v
+        for k, v in kwargs_dict.items()
+        if isinstance(v, Iterable)
+        and not isinstance(v, (str, bytes, dict))
+        and (match_length is None or len(v) == match_length)
+    }
+
+
 def scatter(
     data: ad.AnnData | pd.DataFrame,
     x_column: str,
@@ -1664,7 +1691,7 @@ def scatter(
         color_values = color_values[order_indices]
 
         # In case users pass an array-like in kwargs, make sure the order is consistent. This concerns e.g. edgecolor, size, etc.
-        iterable_kwargs = find_iterable_kwargs(scatter_kwargs, match_length=len(color_values))
+        iterable_kwargs = _find_iterable_kwargs(scatter_kwargs, match_length=len(color_values))
         for k, v in iterable_kwargs.items():
             scatter_kwargs[k] = list(np.array(v)[order_indices])
 
