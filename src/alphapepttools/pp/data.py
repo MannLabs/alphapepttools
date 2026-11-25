@@ -12,7 +12,7 @@ from pandas.api.types import is_numeric_dtype
 from sklearn.preprocessing import RobustScaler, StandardScaler
 
 from alphapepttools._decorator import deprecated_copy
-from alphapepttools._utils import get_matrix
+from alphapepttools._layers import get_matrix
 
 # logging configuration
 logging.basicConfig(level=logging.INFO)

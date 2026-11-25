@@ -6,11 +6,11 @@ import numpy as np
 import pandas as pd
 from scipy.stats import ttest_ind
 
-from alphapepttools._utils import validate_layer
+from alphapepttools._layers import validate_layer
 from alphapepttools.pp.data import filter_by_metadata
 from alphapepttools.tl.defaults import tl_defaults
+from alphapepttools.tl.diff_exp._results import determine_max_replicates, negative_log10_pvalue
 from alphapepttools.tl.stats import nan_safe_bh_correction
-from alphapepttools.tl.utils import determine_max_replicates, negative_log10_pvalue, validate_ttest_inputs
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -135,6 +135,88 @@ def _standardize_diff_exp_ttest_results(
     return result_df[tl_defaults.DIFF_EXP_COLS].copy()
 
 
+def _validate_ttest_inputs(
+    adata: ad.AnnData,
+    between_column: str,
+    comparison: tuple,
+    min_valid_values: int,
+) -> tuple[str, str]:
+    """Validate inputs for group_ratios_ttest_ind.
+
+    This function checks:
+    - The between_column exists in adata.obs
+    - The comparison is a tuple of exactly two elements
+    - Both groups in the comparison exist in the data
+    - Each group has at least min_valid_values samples
+
+    Parameters
+    ----------
+    adata
+        AnnData object with features and observations.
+    between_column
+        Name of the column in adata.obs that contains the groups to compare.
+    comparison
+        Tuple of exactly two group names to compare (group1, group2).
+    min_valid_values
+        Minimum number of samples required per group.
+
+    Returns
+    -------
+    tuple[str, str]
+        Validated group names (g1, g2).
+
+    Raises
+    ------
+    ValueError
+        If any validation check fails.
+
+    Examples
+    --------
+    .. code-block:: python
+
+        import anndata as ad
+        import numpy as np
+        from alphapepttools.tl.diff_exp.ttest import _validate_ttest_inputs
+
+        # Create example data
+        adata = ad.AnnData(X=np.random.rand(6, 5), obs={"condition": ["A", "A", "A", "B", "B", "B"]})
+
+        # Validate comparison between two groups
+        g1, g2 = _validate_ttest_inputs(adata, "condition", ("A", "B"), min_valid_values=2)
+        # Returns ('A', 'B')
+
+    """
+    # check that between column exists in obs
+    if between_column not in adata.obs.columns:
+        raise ValueError(f"Error in group_ratios_ttest_ind: Column '{between_column}' not found in adata.obs.")
+
+    # validate comparison tuple
+    if not isinstance(comparison, tuple) or len(comparison) != 2:  # noqa: PLR2004 since this is a tuple check
+        raise ValueError("Error in group_ratios_ttest_ind: 'comparison' must be a tuple of exactly two group names.")
+
+    g1, g2 = comparison
+    available_groups = set(adata.obs[between_column].dropna().unique())
+
+    # check that both groups exist in the data
+    if g1 not in available_groups:
+        raise ValueError(f"Error in group_ratios_ttest_ind: Group '{g1}' not found in column '{between_column}'.")
+    if g2 not in available_groups:
+        raise ValueError(f"Error in group_ratios_ttest_ind: Group '{g2}' not found in column '{between_column}'.")
+
+    # check that each group has sufficient samples to even meet min_valid_values
+    group_counts = adata.obs[between_column].value_counts()
+    if group_counts[g1] < min_valid_values:
+        raise ValueError(
+            f"Error in group_ratios_ttest_ind: Group '{g1}' has only {group_counts[g1]} samples, need at least {min_valid_values}."
+        )
+    if group_counts[g2] < min_valid_values:
+        raise ValueError(
+            f"Error in group_ratios_ttest_ind: Group '{g2}' has only {group_counts[g2]} samples, need at least {min_valid_values}."
+        )
+
+    return g1, g2
+
+
 def diff_exp_ttest(
     adata: ad.AnnData,
     between_column: str,
@@ -173,7 +255,7 @@ def diff_exp_ttest(
     Raises
     ------
     ValueError
-        If `layer` is not found in adata.layers, or if any check in `validate_ttest_inputs` fails.
+        If `layer` is not found in adata.layers, or if any check in `_validate_ttest_inputs` fails.
 
     Examples
     --------
@@ -205,7 +287,7 @@ def diff_exp_ttest(
 
     """
     # Validate inputs
-    g1, g2 = validate_ttest_inputs(adata, between_column, comparison, min_valid_values)
+    g1, g2 = _validate_ttest_inputs(adata, between_column, comparison, min_valid_values)
     validate_layer(adata, layer)
     print(f"Comparing groups: {g1} vs {g2}")
 

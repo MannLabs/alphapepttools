@@ -28,7 +28,7 @@ from alphapepttools.tl.diff_exp.ebayes import (
     _run_contrasts,
     _standardize_contrast_frame,
 )
-from alphapepttools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results
+from alphapepttools.tl.diff_exp.ttest import _standardize_diff_exp_ttest_results, _validate_ttest_inputs
 
 
 @pytest.fixture
@@ -1612,3 +1612,42 @@ def test_diff_exp_ebayes_requires_inmoose():
         pytest.raises(ImportError, match="inmoose is required"),
     ):
         tl.diff_exp_ebayes(adata=_abc_adata(), between_column="group", comparison=("B", "A"))
+
+
+### Test _validate_ttest_inputs ###
+
+
+@pytest.fixture
+def simple_ttest_adata():
+    """AnnData with 5 samples of group A and 3 of group B (imbalanced for sample-count tests)."""
+    return ad.AnnData(
+        X=np.random.rand(8, 3),
+        obs=pd.DataFrame(
+            {"condition": ["A"] * 5 + ["B"] * 3},
+            index=[f"s{i}" for i in range(8)],
+        ),
+    )
+
+
+@pytest.mark.parametrize(
+    ("between_column", "comparison", "min_valid_values", "match"),
+    [
+        # missing between_column
+        ("nonexistent", ("A", "B"), 2, "not found in adata.obs"),
+        # comparison is a list, not a tuple
+        ("condition", ["A", "B"], 2, "tuple of exactly two"),
+        # comparison has wrong length
+        ("condition", ("A", "B", "C"), 2, "tuple of exactly two"),
+        # g1 not in available groups
+        ("condition", ("Z", "B"), 2, "Group 'Z' not found"),
+        # g2 not in available groups
+        ("condition", ("A", "Z"), 2, "Group 'Z' not found"),
+        # g1 has too few samples (A=5 < 6)
+        ("condition", ("A", "B"), 6, "Group 'A' has only"),
+        # g2 has too few samples (g1 passes first: A=5≥4, then B=3 < 4)
+        ("condition", ("A", "B"), 4, "Group 'B' has only"),
+    ],
+)
+def test_validate_ttest_inputs_raises(simple_ttest_adata, between_column, comparison, min_valid_values, match):
+    with pytest.raises(ValueError, match=match):
+        _validate_ttest_inputs(simple_ttest_adata, between_column, comparison, min_valid_values=min_valid_values)

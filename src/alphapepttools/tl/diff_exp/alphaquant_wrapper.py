@@ -1,8 +1,10 @@
+import contextlib
 import logging
 import tempfile
 from pathlib import Path
 
 import anndata as ad
+import matplotlib.pyplot as plt
 import pandas as pd
 
 try:
@@ -13,7 +15,7 @@ except ModuleNotFoundError:  # pragma: no cover - optional dep, env-dependent
     _HAS_ALPHAQUANT = False
 
 from alphapepttools.tl import tl_defaults
-from alphapepttools.tl.utils import _suppress_plots, determine_max_replicates, negative_log10_pvalue
+from alphapepttools.tl.diff_exp._results import determine_max_replicates, negative_log10_pvalue
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,6 +35,18 @@ _STACKED_COLS = [
     "num_peptides",  # proteoform only
     "sequence",  # peptide only
 ]
+
+
+@contextlib.contextmanager
+def _suppress_plots():  # noqa: ANN202 # avoid generator return type annotation
+    """Context manager to suppress matplotlib plot display."""
+    original_show = plt.show
+    plt.show = lambda *a, **k: None  # NOQA: ARG005
+    try:
+        yield
+        plt.close("all")
+    finally:
+        plt.show = original_show
 
 
 def _standardize_alphaquant_results(
