@@ -1,6 +1,0 @@
-name: alphapepttools
-channels:
-  - conda-forge
-dependencies:
-  - python==3.11.5
-  - pip
