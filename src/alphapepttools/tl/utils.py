@@ -1,4 +1,5 @@
 """Deprecated helpers, scheduled for removal in version 0.7.0."""
+# TODO: Drop with v0.7.0
 
 import warnings
 

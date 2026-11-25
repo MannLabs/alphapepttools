@@ -1,5 +1,6 @@
 """Deprecated alias for :mod:`alphapepttools.io._registry`, scheduled for removal in version 0.7.0."""
 
+# TODO: Drop with v0.7.0
 import warnings
 
 from ._registry import list_available_reader
