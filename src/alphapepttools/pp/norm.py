@@ -9,7 +9,7 @@ from scipy.stats import gmean
 from alphapepttools._decorator import deprecated_copy
 from alphapepttools._layers import get_matrix
 
-from ._utils import _raise_on_missing_value, _raise_on_nan_values
+from ._validation import _raise_on_missing_value, _raise_on_nan_values
 
 STRATEGIES = ["total_mean", "total_median"]
 

@@ -6,12 +6,12 @@ import pandas as pd
 import pytest
 
 from alphapepttools.pp import impute_bpca, impute_gaussian, impute_knn, impute_median
+from alphapepttools.pp._validation import _raise_on_nan_values
 from alphapepttools.pp.impute import (
     _impute_bpca,
     _impute_gaussian,
     _impute_knn,
     _impute_nanmedian,
-    _raise_on_nan_values,
 )
 
 
