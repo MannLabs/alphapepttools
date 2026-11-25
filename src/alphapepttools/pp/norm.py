@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import gmean
 
-from alphapepttools._decorator import deprecated_copy
+from alphapepttools._decorator import deprecated_copy, track_provenance
 from alphapepttools._utils import get_matrix
 
 from ._utils import _raise_on_missing_value, _raise_on_nan_values
@@ -123,6 +123,7 @@ def _total_median_normalization(data: np.ndarray) -> tuple[np.ndarray, np.ndarra
 
 
 @deprecated_copy(since="0.5.0", removed_in="0.6.0")
+@track_provenance
 def normalize(
     adata: ad.AnnData,
     layer: str | None = None,
@@ -245,6 +246,7 @@ def normalize(
 
 
 @deprecated_copy(since="0.5.0", removed_in="0.6.0")
+@track_provenance
 def irs(
     adata: ad.AnnData,
     group_column: str,

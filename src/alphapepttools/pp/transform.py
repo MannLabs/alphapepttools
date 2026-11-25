@@ -7,7 +7,7 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 
-from alphapepttools._decorator import deprecated_copy
+from alphapepttools._decorator import deprecated_copy, track_provenance
 from alphapepttools._utils import get_matrix
 
 logging.basicConfig(level=logging.INFO)
@@ -89,6 +89,7 @@ def detect_special_values(
 
 
 @deprecated_copy(since="0.5.0", removed_in="0.6.0")
+@track_provenance
 def nanlog(
     adata: ad.AnnData,
     base: int = 2,
