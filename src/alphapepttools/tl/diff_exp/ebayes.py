@@ -17,11 +17,11 @@ except ModuleNotFoundError:
 
 from alphapepttools._layers import get_matrix, validate_layer
 from alphapepttools.tl.defaults import tl_defaults
-from alphapepttools.tl.stats import nan_safe_bh_correction
-from alphapepttools.tl.utils import (
+from alphapepttools.tl.diff_exp._results import (
     determine_max_replicates,
     negative_log10_pvalue,
 )
+from alphapepttools.tl.stats import nan_safe_bh_correction
 
 _METHOD_NAME = "limma_ebayes_inmoose"
 
