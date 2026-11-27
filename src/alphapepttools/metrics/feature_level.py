@@ -424,8 +424,8 @@ def _pmad(x: np.ndarray) -> float:
 
     """
     # Compute feature-wise MAD (axis=0) and aggregate over all features
-    mad = median_abs_deviation(x, axis=0)
-    return np.mean(mad)
+    mad = median_abs_deviation(x, axis=0, nan_policy="omit")
+    return np.nanmean(mad)
 
 
 def pooled_median_absolute_deviation(
