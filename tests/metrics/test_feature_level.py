@@ -262,6 +262,14 @@ class TestPmad:
 
         assert _pmad(x=X) == pmad
 
+    def test__pmad_with_nans(self) -> None:
+        # Column 0: [1, 5, 6] -> median 5, MAD 1.0
+        # Column 1: [2, 1, 6] -> median 2, MAD 1.0
+        # Column 2: [3, 4, nan] -> median 3.5, MAD 0.5
+        # Column 3: all NaN -> ignored when averaging across features
+        X = np.array([[1.0, 2.0, 3.0, np.nan], [5.0, 1.0, 4.0, np.nan], [6.0, 6.0, np.nan, np.nan]])
+        assert np.isclose(_pmad(x=X), (1.0 + 1.0 + 0.5) / 3)
+
 
 class TestPooledMedianAbsoluteDeviation:
     @pytest.fixture
@@ -302,6 +310,23 @@ class TestPooledMedianAbsoluteDeviation:
 
         assert returned_result is None
         assert adata.uns.get("metrics").get("pmad") == reference
+
+    def test_pooled_median_absolute_deviation_with_nans(self) -> None:
+        X = np.array(
+            [
+                [1.0, 2.0, 3.0],
+                [5.0, 1.0, 4.0],
+                [6.0, 6.0, np.nan],
+                [9.0, 3.0, 10.0],
+                [4.0, 8.0, 11.0],
+                [7.0, 4.0, 12.0],
+            ]
+        )
+        adata = ad.AnnData(X=X, obs=pd.DataFrame({"condition": ["ctrl"] * 3 + ["treat"] * 3}))
+
+        result = pooled_median_absolute_deviation(adata, group_column="condition", inplace=False)
+        assert np.isclose(result.loc["ctrl", "pmad"], (1.0 + 1.0 + 0.5) / 3)
+        assert np.isclose(result.loc["treat", "pmad"], (2.0 + 1.0 + 1.0) / 3)
 
 
 @pytest.fixture
